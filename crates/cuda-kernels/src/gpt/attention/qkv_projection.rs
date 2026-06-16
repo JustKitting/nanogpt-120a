@@ -18,6 +18,7 @@ pub struct QkvProjectionParams {
     pub output_dim: u32,
     pub weight_global_scale: f32,
     pub bias_global_scale: f32,
+    pub residual_add: u32,
 }
 
 unsafe impl DeviceCopy for QkvProjectionParams {}
@@ -33,9 +34,19 @@ pub struct QkvProjectionArgs<'a, 'out> {
     pub output_dim: u32,
 }
 
+pub struct CProjArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub input: Nvfp4RowwiseDeviceTensor<'a>,
+    pub weight: Nvfp4FourSixMmaWeightTensor<'a>,
+    pub bias: Nvfp4DeviceTensor<'a>,
+    pub residual: &'out mut DeviceBuffer<f32>,
+    pub token_count: u32,
+    pub embedding_dim: u32,
+}
+
 impl AttentionModule {
     pub fn qkv_projection(&self, args: QkvProjectionArgs<'_, '_>) -> Result<(), DriverError> {
-        self.qkv_projection.qkv_projection_kernel(
+        self.qkv_projection.attention_projection_kernel(
             args.stream,
             LaunchConfig {
                 grid_dim: (
@@ -60,6 +71,38 @@ impl AttentionModule {
                 output_dim: args.output_dim,
                 weight_global_scale: args.weight.global_scale,
                 bias_global_scale: args.bias.global_scale,
+                residual_add: 0,
+            },
+        )
+    }
+
+    pub fn c_proj(&self, args: CProjArgs<'_, '_>) -> Result<(), DriverError> {
+        self.qkv_projection.attention_projection_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (
+                    args.embedding_dim.div_ceil(MMA_N),
+                    args.token_count.div_ceil(MMA_M),
+                    1,
+                ),
+                block_dim: (ATTENTION_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.input.bytes,
+            args.input.scales,
+            args.input.global_scales,
+            args.weight.bytes,
+            args.weight.scales,
+            args.bias.bytes,
+            args.bias.scales,
+            args.residual,
+            QkvProjectionParams {
+                token_count: args.token_count,
+                input_dim: args.embedding_dim,
+                output_dim: args.embedding_dim,
+                weight_global_scale: args.weight.global_scale,
+                bias_global_scale: args.bias.global_scale,
+                residual_add: 1,
             },
         )
     }
@@ -75,7 +118,7 @@ pub mod kernels {
 
     #[kernel]
     #[allow(clippy::too_many_arguments)]
-    pub fn qkv_projection_kernel(
+    pub fn attention_projection_kernel(
         input_bytes: &[u8],
         input_scales: &[u8],
         input_global_scales: &[f32],
@@ -298,11 +341,15 @@ pub mod kernels {
                     col as usize,
                 );
                 let value = fma_f32(acc[i as usize], global_scale, bias);
+                let index = row as usize * args.params.output_dim as usize + col as usize;
 
                 unsafe {
-                    *out.get_unchecked_mut(
-                        row as usize * args.params.output_dim as usize + col as usize,
-                    ) = value;
+                    let value = if args.params.residual_add == 0 {
+                        value
+                    } else {
+                        *out.get_unchecked_mut(index) + value
+                    };
+                    *out.get_unchecked_mut(index) = value;
                 }
             }
 

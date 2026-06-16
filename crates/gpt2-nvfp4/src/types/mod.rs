@@ -8,7 +8,9 @@ mod model;
 mod shapes;
 
 pub use l1_embeddings::{EmbeddingWeights, HiddenStateDevice, TokenEmbeddingArgs};
-pub use l2_attention::{AttentionForwardArgs, AttentionInputNvfp4, AttentionWeights};
+pub use l2_attention::{
+    AttentionForwardArgs, AttentionInputNvfp4, AttentionProjectionTensors, AttentionWeights,
+};
 pub use l3_mlp::{MlpForwardArgs, MlpWeights};
 pub use l4_block::{BlockForwardArgs, Gpt2BlockWeights};
 pub use l5_layer_norm::{LayerNormForwardArgs, LayerNormWeights};

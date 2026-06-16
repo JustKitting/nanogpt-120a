@@ -1,20 +1,18 @@
 use crate::random::InitRng;
 use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::AttentionModule;
-use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use super::{
-    AttentionInputNvfp4, AttentionWeights, HiddenStateDevice, LayerNormWeights, MlpWeights,
+    AttentionInputNvfp4, AttentionProjectionTensors, AttentionWeights, HiddenStateDevice,
+    LayerNormWeights, MlpWeights,
 };
 
 pub struct BlockForwardArgs<'a, 'scratch> {
     pub attention_module: &'a AttentionModule,
     pub attention_quant_module: &'a Nvfp4QuantModule,
     pub attention_input_nvfp4: AttentionInputNvfp4<'scratch>,
-    pub qkv_weight: Nvfp4FourSixMmaWeightTensor<'a>,
-    pub qkv_bias: Nvfp4DeviceTensor<'a>,
+    pub projections: AttentionProjectionTensors<'a>,
     pub qkv: &'scratch mut DeviceBuffer<f32>,
     pub hidden: HiddenStateDevice<'a>,
 }
@@ -45,8 +43,7 @@ impl Gpt2BlockWeights {
             args.attention_module,
             args.attention_quant_module,
             args.attention_input_nvfp4,
-            args.qkv_weight,
-            args.qkv_bias,
+            args.projections,
             args.qkv,
             args.hidden,
         ))?;

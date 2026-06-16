@@ -8,8 +8,8 @@ use crate::random::InitRng;
 use crate::{GPT2_N_LAYER, Gpt2Config};
 
 use super::{
-    AttentionInputNvfp4, BlockForwardArgs, EmbeddingWeights, Gpt2BlockWeights, HiddenStateDevice,
-    LayerNormWeights, TokenEmbeddingArgs,
+    AttentionInputNvfp4, AttentionProjectionTensors, BlockForwardArgs, EmbeddingWeights,
+    Gpt2BlockWeights, HiddenStateDevice, LayerNormWeights, TokenEmbeddingArgs,
 };
 
 pub struct Gpt2ForwardArgs<'a> {
@@ -19,6 +19,8 @@ pub struct Gpt2ForwardArgs<'a> {
     pub attention_input_nvfp4: AttentionInputNvfp4<'a>,
     pub attention_qkv_weights: [Nvfp4FourSixMmaWeightTensor<'a>; GPT2_N_LAYER],
     pub attention_qkv_biases: [Nvfp4DeviceTensor<'a>; GPT2_N_LAYER],
+    pub attention_c_proj_weights: [Nvfp4FourSixMmaWeightTensor<'a>; GPT2_N_LAYER],
+    pub attention_c_proj_biases: [Nvfp4DeviceTensor<'a>; GPT2_N_LAYER],
     pub attention_qkv: &'a mut DeviceBuffer<f32>,
 }
 
@@ -106,6 +108,8 @@ impl Gpt2Weights {
             mut attention_input_nvfp4,
             attention_qkv_weights,
             attention_qkv_biases,
+            attention_c_proj_weights,
+            attention_c_proj_biases,
             attention_qkv,
         } = args;
 
@@ -116,8 +120,12 @@ impl Gpt2Weights {
                 attention_module,
                 attention_quant_module,
                 attention_input_nvfp4: attention_input_nvfp4.reborrow(),
-                qkv_weight: attention_qkv_weights[block_index],
-                qkv_bias: attention_qkv_biases[block_index],
+                projections: AttentionProjectionTensors {
+                    qkv_weight: attention_qkv_weights[block_index],
+                    qkv_bias: attention_qkv_biases[block_index],
+                    c_proj_weight: attention_c_proj_weights[block_index],
+                    c_proj_bias: attention_c_proj_biases[block_index],
+                },
                 qkv: &mut *attention_qkv,
                 hidden,
             })?;
