@@ -1,24 +1,24 @@
-use std::marker::PhantomData;
-
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
-use crate::kernel_config::TransformerKernelConfig;
-
 const ATTENTION_THREADS_PER_BLOCK: u32 = 256;
 
-pub struct FakeAttentionArgs<'a, 'out, C: TransformerKernelConfig> {
+pub struct FakeAttentionArgs<'a, 'out> {
     pub stream: &'a CudaStream,
     pub hidden: &'out mut DeviceBuffer<f32>,
-    config: PhantomData<C>,
+    pub hidden_len: u32,
 }
 
-impl<'a, 'out, C: TransformerKernelConfig> FakeAttentionArgs<'a, 'out, C> {
-    pub fn new(stream: &'a CudaStream, hidden: &'out mut DeviceBuffer<f32>) -> Self {
+impl<'a, 'out> FakeAttentionArgs<'a, 'out> {
+    pub fn new(
+        stream: &'a CudaStream,
+        hidden: &'out mut DeviceBuffer<f32>,
+        hidden_len: u32,
+    ) -> Self {
         Self {
             stream,
             hidden,
-            config: PhantomData,
+            hidden_len,
         }
     }
 }
@@ -34,19 +34,16 @@ impl AttentionModule {
         })
     }
 
-    pub fn fake_attention<C: TransformerKernelConfig>(
-        &self,
-        args: FakeAttentionArgs<'_, '_, C>,
-    ) -> Result<(), DriverError> {
+    pub fn fake_attention(&self, args: FakeAttentionArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.fake_attention_kernel(
             args.stream,
             LaunchConfig {
-                grid_dim: (C::HIDDEN_LEN.div_ceil(ATTENTION_THREADS_PER_BLOCK), 1, 1),
+                grid_dim: (args.hidden_len.div_ceil(ATTENTION_THREADS_PER_BLOCK), 1, 1),
                 block_dim: (ATTENTION_THREADS_PER_BLOCK, 1, 1),
                 shared_mem_bytes: 0,
             },
             args.hidden,
-            C::HIDDEN_LEN,
+            args.hidden_len,
         )
     }
 }

@@ -36,8 +36,11 @@ impl AttentionWeights {
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
         let HiddenStateDevice { stream, hidden } = args.hidden;
 
-        args.module
-            .fake_attention::<crate::Gpt2KernelConfig>(FakeAttentionArgs::new(stream, hidden))?;
+        args.module.fake_attention(FakeAttentionArgs::new(
+            stream,
+            hidden,
+            crate::HiddenState::LEN as u32,
+        ))?;
 
         Ok(HiddenStateDevice { stream, hidden })
     }

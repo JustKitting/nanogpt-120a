@@ -1,9 +1,5 @@
-use std::marker::PhantomData;
-
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, ptx_asm, thread};
-
-use crate::kernel_config::TransformerKernelConfig;
 
 const EMBEDDING_THREADS_PER_BLOCK: u32 = 256;
 
@@ -24,22 +20,25 @@ pub struct Nvfp4DeviceTensor<'a> {
     pub global_scale: f32,
 }
 
-pub struct EmbeddingArgs<'a, 'out, C: TransformerKernelConfig> {
+pub struct EmbeddingArgs<'a, 'out> {
     pub stream: &'a CudaStream,
     pub tokens: &'a DeviceBuffer<u32>,
     pub token_embedding: Nvfp4DeviceTensor<'a>,
     pub position_embedding: Nvfp4DeviceTensor<'a>,
     pub hidden: &'out mut DeviceBuffer<f32>,
-    contract: PhantomData<C>,
+    pub hidden_len: u32,
+    pub embedding_dim: u32,
 }
 
-impl<'a, 'out, C: TransformerKernelConfig> EmbeddingArgs<'a, 'out, C> {
+impl<'a, 'out> EmbeddingArgs<'a, 'out> {
     pub fn new(
         stream: &'a CudaStream,
         tokens: &'a DeviceBuffer<u32>,
         token_embedding: Nvfp4DeviceTensor<'a>,
         position_embedding: Nvfp4DeviceTensor<'a>,
         hidden: &'out mut DeviceBuffer<f32>,
+        hidden_len: u32,
+        embedding_dim: u32,
     ) -> Self {
         Self {
             stream,
@@ -47,7 +46,8 @@ impl<'a, 'out, C: TransformerKernelConfig> EmbeddingArgs<'a, 'out, C> {
             token_embedding,
             position_embedding,
             hidden,
-            contract: PhantomData,
+            hidden_len,
+            embedding_dim,
         }
     }
 }
@@ -63,14 +63,11 @@ impl EmbeddingModule {
         })
     }
 
-    pub fn token_position_embedding<C: TransformerKernelConfig>(
-        &self,
-        args: EmbeddingArgs<'_, '_, C>,
-    ) -> Result<(), DriverError> {
+    pub fn token_position_embedding(&self, args: EmbeddingArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.token_position_embedding_kernel(
             args.stream,
             LaunchConfig {
-                grid_dim: (C::HIDDEN_LEN.div_ceil(EMBEDDING_THREADS_PER_BLOCK), 1, 1),
+                grid_dim: (args.hidden_len.div_ceil(EMBEDDING_THREADS_PER_BLOCK), 1, 1),
                 block_dim: (EMBEDDING_THREADS_PER_BLOCK, 1, 1),
                 shared_mem_bytes: 0,
             },
@@ -81,8 +78,8 @@ impl EmbeddingModule {
             args.position_embedding.scales,
             args.hidden,
             EmbeddingParams {
-                hidden_len: C::HIDDEN_LEN,
-                embedding_dim: C::EMBEDDING_DIM,
+                hidden_len: args.hidden_len,
+                embedding_dim: args.embedding_dim,
                 token_embedding_global_scale: args.token_embedding.global_scale,
                 position_embedding_global_scale: args.position_embedding.global_scale,
             },

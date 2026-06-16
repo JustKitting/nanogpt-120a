@@ -1,6 +1,5 @@
 mod activations;
 mod config;
-mod cuda_contract;
 mod random;
 mod tensor;
 mod types;
@@ -35,5 +34,4 @@ pub use types::{
     TokenEmbedding,
 };
 
-pub use cuda_contract::Gpt2KernelConfig;
 pub use types::{nvfp4_bytes, nvfp4_scales};

@@ -1,12 +1,10 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule, Nvfp4DeviceTensor};
 
-use crate::Gpt2KernelConfig;
 use crate::random::InitRng;
+use crate::{HiddenState, TokenEmbedding};
 
-use super::{
-    Nvfp4ShapeInit, PositionEmbedding, PositionEmbeddingShape, TokenEmbedding, TokenEmbeddingShape,
-};
+use super::{Nvfp4ShapeInit, PositionEmbedding, PositionEmbeddingShape, TokenEmbeddingShape};
 
 pub struct TokenPositionEmbeddingArgs<'a> {
     pub module: &'a EmbeddingModule,
@@ -49,12 +47,14 @@ impl EmbeddingWeights {
             hidden,
         } = args;
 
-        module.token_position_embedding::<Gpt2KernelConfig>(EmbeddingArgs::new(
+        module.token_position_embedding(EmbeddingArgs::new(
             stream,
             tokens,
             token_embedding,
             position_embedding,
             &mut *hidden,
+            HiddenState::LEN as u32,
+            TokenEmbedding::COLS as u32,
         ))?;
 
         Ok(HiddenStateDevice { stream, hidden })
