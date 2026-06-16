@@ -3,6 +3,8 @@ use std::error::Error;
 use cuda_core::{CudaContext, DeviceBuffer, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, ptx_asm, thread, warp};
 
+use crate::kernel_ops::warp_sum_f32;
+
 type AppResult<T> = Result<T, Box<dyn Error>>;
 
 const ROW_SIZE: usize = 32;
@@ -13,7 +15,6 @@ const THREADS_PER_BLOCK: u32 = WARPS_PER_BLOCK * ROW_SIZE as u32;
 mod kernels {
     use super::*;
 
-    const WARP_MASK: u32 = 0xffff_ffff;
     const ROW_SIZE_F32: f32 = ROW_SIZE as f32;
 
     #[kernel]
@@ -33,9 +34,9 @@ mod kernels {
         if row < row_count {
             let index = row as usize * ROW_SIZE + lane;
             let value = x[index];
-            let mean = warp_sum(value) / ROW_SIZE_F32;
+            let mean = warp_sum_f32(value) / ROW_SIZE_F32;
             let centered = value - mean;
-            let variance = warp_sum(centered * centered) / ROW_SIZE_F32;
+            let variance = warp_sum_f32(centered * centered) / ROW_SIZE_F32;
             let inv_std = 1.0 / sqrt_f32(variance + epsilon);
             let normalized = centered * inv_std;
 
@@ -43,15 +44,6 @@ mod kernels {
                 *out.get_unchecked_mut(index) = fma_f32(normalized, gamma[lane], beta[lane]);
             }
         }
-    }
-
-    #[inline(always)]
-    fn warp_sum(mut value: f32) -> f32 {
-        value += warp::shuffle_xor_f32_sync(WARP_MASK, value, 16);
-        value += warp::shuffle_xor_f32_sync(WARP_MASK, value, 8);
-        value += warp::shuffle_xor_f32_sync(WARP_MASK, value, 4);
-        value += warp::shuffle_xor_f32_sync(WARP_MASK, value, 2);
-        value + warp::shuffle_xor_f32_sync(WARP_MASK, value, 1)
     }
 
     #[inline(always)]

@@ -1,7 +1,5 @@
 use crate::random::InitRng;
-use crate::{
-    GPT2_CONTEXT_LEN, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE, Nvfp4Shape, Nvfp4Tensor,
-};
+use crate::{GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE, Nvfp4Shape, Nvfp4Tensor};
 
 use super::LinearWeights;
 pub const fn nvfp4_bytes(rows: usize, cols: usize) -> usize {
@@ -96,7 +94,6 @@ const fn pack_e2m1_pair(lo: u8, hi: u8) -> u8 {
 }
 
 nvfp4_shape!(TokenEmbeddingShape, GPT2_VOCAB_SIZE, GPT2_N_EMBD);
-nvfp4_shape!(PositionEmbeddingShape, GPT2_CONTEXT_LEN, GPT2_N_EMBD);
 nvfp4_shape!(HiddenVectorShape, 1, GPT2_N_EMBD);
 nvfp4_shape!(QkvWeightShape, GPT2_N_EMBD, GPT2_QKV);
 nvfp4_shape!(QkvVectorShape, 1, GPT2_QKV);
@@ -106,7 +103,6 @@ nvfp4_shape!(MlpVectorShape, 1, GPT2_MLP);
 nvfp4_shape!(MlpDownWeightShape, GPT2_MLP, GPT2_N_EMBD);
 
 pub type TokenEmbedding = Nvfp4Tensor<TokenEmbeddingShape>;
-pub type PositionEmbedding = Nvfp4Tensor<PositionEmbeddingShape>;
 pub type LayerNormTensor = Nvfp4Tensor<HiddenVectorShape>;
 pub type QkvLinear = LinearWeights<QkvWeightShape, QkvVectorShape>;
 pub type ResidualLinear = LinearWeights<ResidualWeightShape, HiddenVectorShape>;

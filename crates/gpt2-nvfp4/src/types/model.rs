@@ -6,11 +6,11 @@ use crate::{GPT2_N_LAYER, Gpt2Config};
 
 use super::{
     BlockForwardArgs, EmbeddingWeights, Gpt2BlockWeights, HiddenStateDevice, LayerNormWeights,
-    TokenPositionEmbeddingArgs,
+    TokenEmbeddingArgs,
 };
 
 pub struct Gpt2ForwardArgs<'a> {
-    pub embeddings: TokenPositionEmbeddingArgs<'a>,
+    pub embeddings: TokenEmbeddingArgs<'a>,
     pub attention_module: &'a AttentionModule,
 }
 
@@ -39,7 +39,7 @@ impl Gpt2 {
 
     pub fn forward_embeddings<'a>(
         &self,
-        args: TokenPositionEmbeddingArgs<'a>,
+        args: TokenEmbeddingArgs<'a>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
         self.weights()
             .expect("Gpt2::init must be called before forward_embeddings")
@@ -82,7 +82,7 @@ impl Gpt2Weights {
 
     pub fn forward_embeddings<'a>(
         &self,
-        args: TokenPositionEmbeddingArgs<'a>,
+        args: TokenEmbeddingArgs<'a>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
         self.embeddings.forward(args)
     }

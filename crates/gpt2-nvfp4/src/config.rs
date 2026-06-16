@@ -4,6 +4,7 @@ pub const GPT2_CONTEXT_LEN: usize = 1024;
 pub const GPT2_N_LAYER: usize = 12;
 pub const GPT2_N_HEAD: usize = 12;
 pub const GPT2_N_EMBD: usize = 768;
+pub const GPT2_RMS_NORM_EPSILON: f32 = 1.0e-5;
 
 pub const GPT2_MLP: usize = 4 * GPT2_N_EMBD;
 pub const GPT2_QKV: usize = 3 * GPT2_N_EMBD;

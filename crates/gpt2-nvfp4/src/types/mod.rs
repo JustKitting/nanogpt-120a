@@ -7,7 +7,7 @@ mod linear;
 mod model;
 mod shapes;
 
-pub use l1_embeddings::{EmbeddingWeights, HiddenStateDevice, TokenPositionEmbeddingArgs};
+pub use l1_embeddings::{EmbeddingWeights, HiddenStateDevice, TokenEmbeddingArgs};
 pub use l2_attention::{AttentionForwardArgs, AttentionWeights};
 pub use l3_mlp::{MlpForwardArgs, MlpWeights};
 pub use l4_block::{BlockForwardArgs, Gpt2BlockWeights};
@@ -17,7 +17,6 @@ pub use model::{Gpt2, Gpt2ForwardArgs, Gpt2Weights};
 pub(crate) use shapes::Nvfp4ShapeInit;
 pub use shapes::{
     HiddenVectorShape, LayerNormTensor, MlpDownLinear, MlpDownWeightShape, MlpUpLinear,
-    MlpUpWeightShape, MlpVectorShape, PositionEmbedding, PositionEmbeddingShape, QkvLinear,
-    QkvVectorShape, QkvWeightShape, ResidualLinear, ResidualWeightShape, TokenEmbedding,
-    TokenEmbeddingShape, nvfp4_bytes, nvfp4_scales,
+    MlpUpWeightShape, MlpVectorShape, QkvLinear, QkvVectorShape, QkvWeightShape, ResidualLinear,
+    ResidualWeightShape, TokenEmbedding, TokenEmbeddingShape, nvfp4_bytes, nvfp4_scales,
 };

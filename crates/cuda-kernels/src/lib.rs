@@ -1,5 +1,6 @@
 pub mod attention;
 pub mod embedding;
+pub mod kernel_ops;
 pub mod layer_norm;
 pub mod nvfp4_quant;
 
