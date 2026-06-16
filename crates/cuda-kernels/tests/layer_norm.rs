@@ -17,7 +17,7 @@ const SAMPLE_ROW_1: [f32; ROW_SIZE] = [
     2.5625, 2.9375, 3.3125, 3.6875, 4.0625, 4.4375, 4.8125, 5.1875, 5.5625, 5.9375, 6.3125,
 ];
 
-#[ignore = "requires generated sm_120 PTX and GPU 1"]
+#[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let row_count = 2usize;
@@ -34,7 +34,7 @@ fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
         beta[col] = -0.125 + col as f32 * 0.005;
     }
 
-    let ctx = CudaContext::new(common::GPU_DEVICE_INDEX)?;
+    let ctx = CudaContext::new(common::gpu_device_index())?;
     let stream = ctx.new_stream()?;
     let module =
         LayerNormModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;

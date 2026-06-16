@@ -5,7 +5,7 @@ use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantArgs, Nvfp4QuantModule};
 
 mod common;
 
-#[ignore = "requires generated sm_120 PTX and GPU 1"]
+#[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn fp32_to_nvfp4_four_six_writes_quantized_outputs() -> Result<(), Box<dyn Error>> {
     let x = [
@@ -14,7 +14,7 @@ fn fp32_to_nvfp4_four_six_writes_quantized_outputs() -> Result<(), Box<dyn Error
     ];
     let amax = [x.iter().fold(0.0f32, |max, value| max.max(value.abs()))];
 
-    let ctx = CudaContext::new(common::GPU_DEVICE_INDEX)?;
+    let ctx = CudaContext::new(common::gpu_device_index())?;
     let stream = ctx.new_stream()?;
     let module =
         Nvfp4QuantModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
