@@ -7,7 +7,8 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use super::{
     AttentionProjectionTensors, AttentionWeights, HiddenStateDevice, HiddenStateNvfp4,
-    LayerNormTensors, LayerNormWeights, MlpUpTensors, MlpWeights,
+    LayerNormTensors, LayerNormWeights, MlpActivationNvfp4, MlpDownTensors, MlpProjectionTensors,
+    MlpScratch, MlpUpTensors, MlpWeights,
 };
 
 pub struct BlockForwardArgs<'a, 'scratch> {
@@ -16,9 +17,11 @@ pub struct BlockForwardArgs<'a, 'scratch> {
     pub layer_norm_module: &'a LayerNormModule,
     pub mlp_module: &'a MlpModule,
     pub hidden_nvfp4: HiddenStateNvfp4<'scratch>,
+    pub mlp_activation_nvfp4: MlpActivationNvfp4<'scratch>,
     pub projections: AttentionProjectionTensors<'a>,
     pub ln_2: LayerNormTensors<'a>,
     pub mlp_up: MlpUpTensors<'a>,
+    pub mlp_down: MlpDownTensors<'a>,
     pub qkv: &'scratch mut DeviceBuffer<f32>,
     pub mlp_activation: &'scratch mut DeviceBuffer<f32>,
     pub hidden: HiddenStateDevice<'a>,
@@ -65,9 +68,15 @@ impl Gpt2BlockWeights {
         MlpWeights::forward(MlpWeights::input_from_attention(
             args.mlp_module,
             args.quant_module,
-            hidden_nvfp4.reborrow(),
-            args.mlp_up,
-            args.mlp_activation,
+            MlpScratch {
+                input_nvfp4: hidden_nvfp4.reborrow(),
+                activation_nvfp4: args.mlp_activation_nvfp4,
+                activation: args.mlp_activation,
+            },
+            MlpProjectionTensors {
+                up: args.mlp_up,
+                down: args.mlp_down,
+            },
             hidden,
         ))
     }
