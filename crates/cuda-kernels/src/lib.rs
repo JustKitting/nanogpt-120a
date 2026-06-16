@@ -8,11 +8,11 @@ pub mod float_ptx;
 pub mod layer_norm;
 #[path = "utils/mma/mod.rs"]
 pub mod mma;
-#[path = "utils/nvfp4.rs"]
+#[path = "utils/nvfp4/mod.rs"]
 pub mod nvfp4;
-#[path = "utils/nvfp4_cast.rs"]
+#[path = "utils/nvfp4/cast.rs"]
 pub mod nvfp4_cast;
-#[path = "utils/nvfp4_quant.rs"]
+#[path = "utils/nvfp4/quant/mod.rs"]
 pub mod nvfp4_quant;
 #[path = "utils/shuffle.rs"]
 pub mod shuffle;

@@ -1,0 +1,56 @@
+use cuda_device::ptx_asm;
+
+use crate::nvfp4_cast::{e2m1_value, e4m3_value};
+
+#[inline(always)]
+pub(super) fn candidate_error(value: f32, scale: f32, global_scale: f32) -> f32 {
+    let scale_for_payload = if scale == 0.0 { 1.0 } else { scale };
+    let inv_scale = 1.0 / (scale_for_payload * global_scale);
+    let dequant_scale = scale * global_scale;
+    let packed = cvt_rn_satfinite_e2m1x2_f32(0.0, value * inv_scale);
+    let dequant = e2m1_value(packed & 0x0f) * dequant_scale;
+    let diff = value - dequant;
+    diff * diff
+}
+
+#[inline(always)]
+pub(super) fn local_scale_bits(
+    group_amax: f32,
+    global_scale: f32,
+    scale_override: f32,
+    grid_max: f32,
+) -> u16 {
+    let value = group_amax * scale_override / (grid_max * global_scale);
+    let packed: u16;
+
+    unsafe {
+        ptx_asm!(
+            "cvt.rn.satfinite.e4m3x2.f32 %0, %1, %2;",
+            out("=h") packed,
+            in("f") 0.0f32,
+            in("f") value,
+            options(register_only),
+        );
+    }
+    packed
+}
+
+#[inline(always)]
+pub(super) fn scale_value(bits: u16) -> f32 {
+    e4m3_value(bits)
+}
+
+#[inline(always)]
+pub(super) fn cvt_rn_satfinite_e2m1x2_f32(hi: f32, lo: f32) -> u8 {
+    let packed: u16;
+    unsafe {
+        ptx_asm!(
+            "{ .reg .b8 tmp; cvt.rn.satfinite.e2m1x2.f32 tmp, %1, %2; cvt.u16.u8 %0, tmp; }",
+            out("=h") packed,
+            in("f") hi,
+            in("f") lo,
+            options(register_only),
+        );
+    }
+    packed as u8
+}
