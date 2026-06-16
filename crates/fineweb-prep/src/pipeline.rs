@@ -14,10 +14,9 @@ pub fn parse_data() -> AppResult<()> {
 
     let tokenizer = Gpt2Bpe::from_default_assets()?;
     let mut writer = shards::ShardWriter::new();
-    let mut docs_seen = 0usize;
 
     for path in &files {
-        parquet_text::tokenize_parquet_file(path, &tokenizer, &mut writer, &mut docs_seen)?;
+        parquet_text::tokenize_parquet_file(path, &tokenizer, &mut writer)?;
     }
 
     writer.finish()

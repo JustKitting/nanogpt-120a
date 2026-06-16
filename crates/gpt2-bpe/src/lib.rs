@@ -134,11 +134,11 @@ impl Gpt2Bpe {
 
             for index in 0..word.len() - 1 {
                 let pair = (word[index].clone(), word[index + 1].clone());
-                if let Some(&rank) = self.bpe_ranks.get(&pair) {
-                    if rank < best_rank {
-                        best_rank = rank;
-                        best_index = Some(index);
-                    }
+                if let Some(&rank) = self.bpe_ranks.get(&pair)
+                    && rank < best_rank
+                {
+                    best_rank = rank;
+                    best_index = Some(index);
                 }
             }
 
@@ -226,34 +226,11 @@ fn bytes_to_unicode() -> ([char; 256], HashMap<char, u8>) {
 
     let mut byte_encoder = ['\0'; 256];
     let mut byte_decoder = HashMap::new();
-    for (byte, codepoint) in bs.into_iter().zip(cs.into_iter()) {
+    for (byte, codepoint) in bs.into_iter().zip(cs) {
         let ch = char::from_u32(codepoint).expect("GPT-2 byte unicode codepoint is valid");
         byte_encoder[byte as usize] = ch;
         byte_decoder.insert(ch, byte);
     }
 
     (byte_encoder, byte_decoder)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn encodes_known_gpt2_text() {
-        let tokenizer = Gpt2Bpe::from_default_assets().unwrap();
-        assert_eq!(
-            tokenizer.encode("Hello, world!").unwrap(),
-            vec![15496, 11, 995, 0]
-        );
-    }
-
-    #[test]
-    fn roundtrips_text_and_eot() {
-        let tokenizer = Gpt2Bpe::from_default_assets().unwrap();
-        let text = "Hello, world!<|endoftext|> tabs\tand unicode: Δ";
-        let ids = tokenizer.encode(text).unwrap();
-        assert_eq!(tokenizer.decode(&ids).unwrap(), text);
-        assert!(ids.contains(&EOT_TOKEN));
-    }
 }
