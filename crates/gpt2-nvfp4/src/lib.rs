@@ -11,8 +11,8 @@ pub use activations::{
 };
 
 pub use config::{
-    GPT2_CONTEXT_LEN, GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_N_LAYER, GPT2_QKV,
-    GPT2_RMS_NORM_EPSILON, GPT2_VOCAB_SIZE, Gpt2Config,
+    GPT2_CONTEXT_LEN, GPT2_LAYER_NORM_EPSILON, GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_N_LAYER,
+    GPT2_QKV, GPT2_VOCAB_SIZE, Gpt2Config,
 };
 
 pub use tensor::{Nvfp4Shape, Nvfp4Tensor};
