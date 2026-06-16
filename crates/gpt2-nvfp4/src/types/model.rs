@@ -1,5 +1,6 @@
+use crate::kernels::launch_embedding_kernel;
 use crate::random::InitRng;
-use crate::{GPT2_N_LAYER, Gpt2Config};
+use crate::{GPT2_N_LAYER, Gpt2Config, HiddenState, TokenIds};
 
 use super::{
     Gpt2BlockWeights, LayerNormWeights, Nvfp4ShapeInit, PositionEmbedding, PositionEmbeddingShape,
@@ -28,6 +29,12 @@ impl Gpt2 {
     pub fn weights_mut(&mut self) -> Option<&mut Gpt2Weights> {
         self.weights.as_mut()
     }
+
+    pub fn forward_embeddings(&self, tokens: &TokenIds, hidden: &mut HiddenState) {
+        self.weights()
+            .expect("Gpt2::init must be called before forward_embeddings")
+            .forward_embeddings(tokens, hidden);
+    }
 }
 
 impl Default for Gpt2 {
@@ -54,5 +61,9 @@ impl Gpt2Weights {
             h: std::array::from_fn(|_| Gpt2BlockWeights::init(rng)),
             ln_f: LayerNormWeights::init(),
         }
+    }
+
+    pub fn forward_embeddings(&self, tokens: &TokenIds, hidden: &mut HiddenState) {
+        launch_embedding_kernel(tokens, &self.wte, &self.wpe, hidden);
     }
 }

@@ -1,5 +1,6 @@
 mod activations;
 mod config;
+mod kernels;
 mod random;
 mod tensor;
 mod types;
