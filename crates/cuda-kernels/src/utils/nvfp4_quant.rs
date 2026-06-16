@@ -1,9 +1,12 @@
-use std::error::Error;
+use std::sync::Arc;
 
-use cuda_core::{CudaContext, DeviceBuffer, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, ptx_asm, thread, warp};
 
-type AppResult<T> = Result<T, Box<dyn Error>>;
+use crate::kernel_ops::{abs_f32, max_f32};
+
+const THREADS_PER_BLOCK: u32 = 256;
+const GROUP_SIZE_U32: u32 = 16;
 
 #[cuda_module]
 mod kernels {
@@ -105,11 +108,14 @@ mod kernels {
     }
 
     #[inline(always)]
-    fn half_warp_max(mut value: f32, mask: u32) -> f32 {
-        value = max_f32(value, warp::shuffle_xor_f32_sync(mask, value, 8));
-        value = max_f32(value, warp::shuffle_xor_f32_sync(mask, value, 4));
-        value = max_f32(value, warp::shuffle_xor_f32_sync(mask, value, 2));
-        max_f32(value, warp::shuffle_xor_f32_sync(mask, value, 1))
+    fn candidate_error(value: f32, scale: f32, global_scale: f32) -> f32 {
+        let scale_for_payload = if scale == 0.0 { 1.0 } else { scale };
+        let inv_scale = 1.0 / (scale_for_payload * global_scale);
+        let dequant_scale = scale * global_scale;
+        let packed = cvt_rn_satfinite_e2m1x2_f32(0.0, value * inv_scale);
+        let dequant = e2m1_value(packed & 0x0f) * dequant_scale;
+        let diff = value - dequant;
+        diff * diff
     }
 
     #[inline(always)]
@@ -121,14 +127,11 @@ mod kernels {
     }
 
     #[inline(always)]
-    fn candidate_error(value: f32, scale: f32, global_scale: f32) -> f32 {
-        let scale_for_payload = if scale == 0.0 { 1.0 } else { scale };
-        let inv_scale = 1.0 / (scale_for_payload * global_scale);
-        let dequant_scale = scale * global_scale;
-        let packed = cvt_rn_satfinite_e2m1x2_f32(0.0, value * inv_scale);
-        let dequant = e2m1_value(packed & 0x0f) * dequant_scale;
-        let diff = value - dequant;
-        diff * diff
+    fn half_warp_max(mut value: f32, mask: u32) -> f32 {
+        value = max_f32(value, warp::shuffle_xor_f32_sync(mask, value, 8));
+        value = max_f32(value, warp::shuffle_xor_f32_sync(mask, value, 4));
+        value = max_f32(value, warp::shuffle_xor_f32_sync(mask, value, 2));
+        max_f32(value, warp::shuffle_xor_f32_sync(mask, value, 1))
     }
 
     #[inline(always)]
@@ -197,89 +200,46 @@ mod kernels {
         }
         value
     }
-
-    #[inline(always)]
-    fn abs_f32(x: f32) -> f32 {
-        let y: f32;
-        unsafe {
-            ptx_asm!(
-                "abs.f32 %0, %1;",
-                out("=f") y,
-                in("f") x,
-                options(register_only),
-            );
-        }
-        y
-    }
-
-    #[inline(always)]
-    fn max_f32(a: f32, b: f32) -> f32 {
-        let y: f32;
-        unsafe {
-            ptx_asm!(
-                "max.f32 %0, %1, %2;",
-                out("=f") y,
-                in("f") a,
-                in("f") b,
-                options(register_only),
-            );
-        }
-        y
-    }
 }
 
-pub fn run_default() -> AppResult<()> {
-    let x = [
-        -3.25f32, -2.0, -1.25, -0.5, -0.125, 0.0, 0.25, 0.75, 1.0, 1.5, 2.25, 3.0, 4.0, 5.0, 6.5,
-        8.0,
-    ];
-    let amax = [x.iter().fold(0.0f32, |max, v| max.max(v.abs()))];
-
-    let ctx = CudaContext::new(1)?;
-    let stream = ctx.new_stream()?;
-    let module = kernels::from_module(ctx.load_module_from_file(crate::CUDA_OXIDE_PTX_PATH)?)?;
-
-    let x_dev = DeviceBuffer::from_host(&stream, &x)?;
-    let amax_dev = DeviceBuffer::from_host(&stream, &amax)?;
-    let mut fp4_dev = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 2)?;
-    let mut scales_dev = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 16)?;
-    let mut global_scale_dev = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
-
-    let group_count = (x.len() / 16) as u32;
-    let threads_per_block = 256u32;
-    let groups_per_block = threads_per_block / 16;
-
-    module.fp32_to_nvfp4_four_six_kernel(
-        &stream,
-        LaunchConfig {
-            grid_dim: (group_count.div_ceil(groups_per_block), 1, 1),
-            block_dim: (threads_per_block, 1, 1),
-            shared_mem_bytes: 0,
-        },
-        &x_dev,
-        &amax_dev,
-        &mut fp4_dev,
-        &mut scales_dev,
-        &mut global_scale_dev,
-        1.0f32,
-    )?;
-
-    let fp4 = fp4_dev.to_host_vec(&stream)?;
-    let scales = scales_dev.to_host_vec(&stream)?;
-    let global_scale = global_scale_dev.to_host_vec(&stream)?;
-    println!(
-        "nvfp4 fp4=[{}] scales=[{}] global_scale={:.8e}",
-        hex_bytes(&fp4),
-        hex_bytes(&scales),
-        global_scale[0]
-    );
-    Ok(())
+pub struct Nvfp4QuantArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub x: &'a DeviceBuffer<f32>,
+    pub amax: &'a DeviceBuffer<f32>,
+    pub out_fp4: &'out mut DeviceBuffer<u8>,
+    pub out_scales: &'out mut DeviceBuffer<u8>,
+    pub out_global_scale: &'out mut DeviceBuffer<f32>,
+    pub group_count: u32,
+    pub scale_override: f32,
 }
 
-fn hex_bytes(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<Vec<_>>()
-        .join(" ")
+pub struct Nvfp4QuantModule {
+    module: kernels::LoadedModule,
+}
+
+impl Nvfp4QuantModule {
+    pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
+        Ok(Self {
+            module: kernels::from_module(module)?,
+        })
+    }
+
+    pub fn fp32_to_nvfp4_four_six(&self, args: Nvfp4QuantArgs<'_, '_>) -> Result<(), DriverError> {
+        let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
+
+        self.module.fp32_to_nvfp4_four_six_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (args.group_count.div_ceil(groups_per_block), 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.x,
+            args.amax,
+            args.out_fp4,
+            args.out_scales,
+            args.out_global_scale,
+            args.scale_override,
+        )
+    }
 }

@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, ptx_asm, thread, warp};
 
-use crate::kernel_ops::warp_sum_f32;
+use crate::kernel_ops::{sqrt_f32, warp_sum_f32};
 
 const EMBEDDING_THREADS_PER_BLOCK: u32 = 256;
 const WARP_SIZE: u32 = 32;
@@ -41,9 +43,9 @@ pub struct EmbeddingModule {
 }
 
 impl EmbeddingModule {
-    pub fn from_module(module: CudaModule) -> Result<Self, DriverError> {
+    pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
         Ok(Self {
-            module: kernels::from_module(module.into())?,
+            module: kernels::from_module(module)?,
         })
     }
 
@@ -271,19 +273,5 @@ pub mod kernels {
             );
         }
         value
-    }
-
-    #[inline(always)]
-    fn sqrt_f32(x: f32) -> f32 {
-        let y: f32;
-        unsafe {
-            ptx_asm!(
-                "sqrt.rn.f32 %0, %1;",
-                out("=f") y,
-                in("f") x,
-                options(register_only),
-            );
-        }
-        y
     }
 }

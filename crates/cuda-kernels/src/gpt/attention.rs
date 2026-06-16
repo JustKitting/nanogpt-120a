@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
@@ -28,9 +30,9 @@ pub struct AttentionModule {
 }
 
 impl AttentionModule {
-    pub fn from_module(module: CudaModule) -> Result<Self, DriverError> {
+    pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
         Ok(Self {
-            module: kernels::from_module(module.into())?,
+            module: kernels::from_module(module)?,
         })
     }
 
