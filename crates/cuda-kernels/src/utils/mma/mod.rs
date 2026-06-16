@@ -7,6 +7,6 @@ pub use projection::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_ACTIVATION_RELU2, NVFP4_PROJECTION_M,
     NVFP4_PROJECTION_N, NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams,
     Nvfp4ProjectionTile, nvfp4_projection_accumulate_tile, nvfp4_projection_kernel_body,
-    projection_grid_dim,
+    nvfp4_projection_nobias_kernel_body, projection_grid_dim,
 };
 pub use tensors::Nvfp4FourSixMmaWeightTensor;

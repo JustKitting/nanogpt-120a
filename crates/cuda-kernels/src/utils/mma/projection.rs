@@ -107,6 +107,54 @@ pub fn nvfp4_projection_kernel_body(
 }
 
 #[inline(always)]
+pub fn nvfp4_projection_nobias_kernel_body(
+    input_bytes: &[u8],
+    input_scales: &[u8],
+    input_global_scales: &[f32],
+    weight_bytes: &[u8],
+    weight_scales: &[u8],
+    out: &mut DisjointSlice<'_, f32>,
+    params: Nvfp4ProjectionParams,
+) {
+    let lane = thread::threadIdx_x();
+    if lane >= NVFP4_PROJECTION_THREADS_PER_BLOCK {
+        return;
+    }
+
+    let tile_col = thread::blockIdx_x() * NVFP4_PROJECTION_N;
+    let tile_row = thread::blockIdx_y() * NVFP4_PROJECTION_M;
+    let group = lane >> 2;
+    let thread_in_group = lane & 0x3;
+    let tile = Nvfp4ProjectionTile {
+        tile_row,
+        tile_col,
+        group,
+        thread_in_group,
+    };
+    let acc = nvfp4_projection_accumulate_tile(
+        input_bytes,
+        input_scales,
+        weight_bytes,
+        weight_scales,
+        tile,
+        &params,
+    );
+
+    store_accumulator_nobias(
+        acc,
+        group,
+        thread_in_group,
+        StoreAccumulatorNoBiasArgs {
+            input_global_scales,
+            tile_row,
+            tile_col,
+            params: &params,
+        },
+        out,
+    );
+}
+
+#[inline(always)]
 pub fn nvfp4_projection_accumulate_tile(
     input_bytes: &[u8],
     input_scales: &[u8],
@@ -276,6 +324,13 @@ struct StoreAccumulatorArgs<'a> {
     params: &'a Nvfp4ProjectionParams,
 }
 
+struct StoreAccumulatorNoBiasArgs<'a> {
+    input_global_scales: &'a [f32],
+    tile_row: u32,
+    tile_col: u32,
+    params: &'a Nvfp4ProjectionParams,
+}
+
 #[inline(always)]
 fn store_accumulator(
     acc: [f32; 4],
@@ -316,6 +371,38 @@ fn store_accumulator(
 
         i += 1;
     }
+}
+
+#[inline(always)]
+fn store_accumulator_nobias(
+    acc: [f32; 4],
+    group: u32,
+    thread_in_group: u32,
+    args: StoreAccumulatorNoBiasArgs<'_>,
+    out: &mut DisjointSlice<'_, f32>,
+) {
+    macro_rules! store {
+        ($acc_index:expr, $row_offset:expr, $col_offset:expr) => {{
+            let row = args.tile_row + group + $row_offset;
+            let col = args.tile_col + thread_in_group * 2 + $col_offset;
+
+            if row < args.params.token_count && col < args.params.output_dim {
+                let global_scale =
+                    args.input_global_scales[row as usize] * args.params.weight_global_scale;
+                let value = acc[$acc_index] * global_scale;
+                let index = row as usize * args.params.output_dim as usize + col as usize;
+
+                unsafe {
+                    *out.get_unchecked_mut(index) = value;
+                }
+            }
+        }};
+    }
+
+    store!(0, 0, 0);
+    store!(1, 0, 1);
+    store!(2, 8, 0);
+    store!(3, 8, 1);
 }
 
 #[inline(always)]
