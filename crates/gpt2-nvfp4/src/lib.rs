@@ -1,5 +1,6 @@
 mod activations;
 mod config;
+mod random;
 mod tensor;
 mod types;
 
@@ -17,7 +18,8 @@ pub use config::{
 pub use tensor::{Nvfp4Shape, Nvfp4Tensor};
 
 pub use types::{
-    AttentionWeights, Gpt2BlockWeights, Gpt2Weights, LayerNormWeights, LinearWeights, MlpWeights,
+    AttentionWeights, Gpt2, Gpt2BlockWeights, Gpt2Weights, LayerNormWeights, LinearWeights,
+    MlpWeights,
 };
 
 pub use types::{

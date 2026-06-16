@@ -11,8 +11,8 @@ pub use block::Gpt2BlockWeights;
 pub use layer_norm::LayerNormWeights;
 pub use linear::LinearWeights;
 pub use mlp::MlpWeights;
-pub use model::Gpt2Weights;
-
+pub use model::{Gpt2, Gpt2Weights};
+pub(crate) use shapes::Nvfp4ShapeInit;
 pub use shapes::{
     HiddenVectorShape, LayerNormTensor, MlpDownLinear, MlpDownWeightShape, MlpUpLinear,
     MlpUpWeightShape, MlpVectorShape, PositionEmbedding, PositionEmbeddingShape, QkvLinear,

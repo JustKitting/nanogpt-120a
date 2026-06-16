@@ -9,6 +9,9 @@ pub trait Nvfp4Shape {
 
     type Bytes: AsRef<[u8]> + AsMut<[u8]> + Clone + fmt::Debug;
     type Scales: AsRef<[u8]> + AsMut<[u8]> + Clone + fmt::Debug;
+
+    fn zero_bytes() -> Self::Bytes;
+    fn zero_scales() -> Self::Scales;
 }
 
 pub struct Nvfp4Tensor<S: Nvfp4Shape> {
