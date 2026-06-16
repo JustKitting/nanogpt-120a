@@ -1,4 +1,4 @@
-#[path = "gpt/attention.rs"]
+#[path = "gpt/attention/mod.rs"]
 pub mod attention;
 #[path = "gpt/embedding.rs"]
 pub mod embedding;

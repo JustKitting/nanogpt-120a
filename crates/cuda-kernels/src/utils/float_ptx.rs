@@ -31,6 +31,20 @@ pub fn fma_f32(a: f32, b: f32, c: f32) -> f32 {
 }
 
 #[inline(always)]
+pub fn exp_f32(x: f32) -> f32 {
+    let y: f32;
+    unsafe {
+        ptx_asm!(
+            "ex2.approx.ftz.f32 %0, %1;",
+            out("=f") y,
+            in("f") x * core::f32::consts::LOG2_E,
+            options(register_only),
+        );
+    }
+    y
+}
+
+#[inline(always)]
 pub fn abs_f32(x: f32) -> f32 {
     let y: f32;
     unsafe {

@@ -1,6 +1,6 @@
 use crate::random::InitRng;
 use cuda_core::{DeviceBuffer, DriverError};
-use rust_kernels_cuda::attention::{AttentionModule, QkvProjectionArgs};
+use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionArgs, QkvProjectionArgs};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantModule, Nvfp4QuantRowwiseArgs};
@@ -104,6 +104,17 @@ impl AttentionWeights {
             token_count: crate::GPT2_CONTEXT_LEN as u32,
             input_dim: crate::GPT2_N_EMBD as u32,
             output_dim: crate::GPT2_QKV as u32,
+        })?;
+
+        args.module.causal_attention(CausalAttentionArgs {
+            stream,
+            qkv: &*args.qkv,
+            out: normalized,
+            token_count: crate::GPT2_CONTEXT_LEN as u32,
+            embedding_dim: crate::GPT2_N_EMBD as u32,
+            qkv_dim: crate::GPT2_QKV as u32,
+            head_count: crate::GPT2_N_HEAD as u32,
+            head_dim: (crate::GPT2_N_EMBD / crate::GPT2_N_HEAD) as u32,
         })?;
 
         Ok(HiddenStateDevice {

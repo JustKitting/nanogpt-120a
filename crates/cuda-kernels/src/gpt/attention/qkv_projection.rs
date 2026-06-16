@@ -1,13 +1,12 @@
-use std::sync::Arc;
-
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
+use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
+use super::AttentionModule;
 use crate::float_ptx::fma_f32;
 use crate::mma::{Nvfp4FourSixMmaWeightTensor, mma_m16n8k64_scale4x_ue4m3};
 use crate::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor, nvfp4_value};
 
-const ATTENTION_THREADS_PER_BLOCK: u32 = 32;
+pub(crate) const ATTENTION_THREADS_PER_BLOCK: u32 = 32;
 const MMA_M: u32 = 16;
 const MMA_N: u32 = 8;
 
@@ -34,19 +33,9 @@ pub struct QkvProjectionArgs<'a, 'out> {
     pub output_dim: u32,
 }
 
-pub struct AttentionModule {
-    module: kernels::LoadedModule,
-}
-
 impl AttentionModule {
-    pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
-        Ok(Self {
-            module: kernels::from_module(module)?,
-        })
-    }
-
     pub fn qkv_projection(&self, args: QkvProjectionArgs<'_, '_>) -> Result<(), DriverError> {
-        self.module.qkv_projection_kernel(
+        self.qkv_projection.qkv_projection_kernel(
             args.stream,
             LaunchConfig {
                 grid_dim: (
@@ -114,8 +103,7 @@ pub mod kernels {
                 let mut fragments = [0_u32; $len];
                 let mut register = 0;
                 while register < $len {
-                    fragments[register as usize] =
-                        $loader($($arg,)* register, &params);
+                    fragments[register as usize] = $loader($($arg,)* register, &params);
                     register += 1;
                 }
                 fragments
