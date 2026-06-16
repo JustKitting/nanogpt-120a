@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, ptx_asm, thread, warp};
 
-use crate::kernel_ops::{abs_f32, max_f32};
+use crate::kernel_ops::{abs_f32, e2m1_value, e4m3_value, max_f32};
 
 const THREADS_PER_BLOCK: u32 = 256;
 const GROUP_SIZE_U32: u32 = 16;
@@ -63,8 +63,8 @@ mod kernels {
                         local_scale_bits(group_amax, global_scale, scale_override, 6.0);
                     scale_bits_four =
                         local_scale_bits(group_amax, global_scale, scale_override, 4.0);
-                    scale_six = local_scale_value(scale_bits_six);
-                    scale_four = local_scale_value(scale_bits_four);
+                    scale_six = e4m3_value(scale_bits_six);
+                    scale_four = e4m3_value(scale_bits_four);
                 }
 
                 scale_bits_six =
@@ -135,20 +135,6 @@ mod kernels {
     }
 
     #[inline(always)]
-    fn local_scale_value(bits: u16) -> f32 {
-        let value: f32;
-        unsafe {
-            ptx_asm!(
-                "{ .reg .b32 h2; .reg .b16 lo; cvt.rn.f16x2.e4m3x2 h2, %1; cvt.u16.u32 lo, h2; cvt.f32.f16 %0, lo; }",
-                out("=f") value,
-                in("h") bits,
-                options(register_only),
-            );
-        }
-        value
-    }
-
-    #[inline(always)]
     fn local_scale_bits(
         group_amax: f32,
         global_scale: f32,
@@ -183,22 +169,6 @@ mod kernels {
             );
         }
         packed as u8
-    }
-
-    #[inline(always)]
-    fn e2m1_value(bits: u8) -> f32 {
-        let value: f32;
-        let packed = bits as u16;
-
-        unsafe {
-            ptx_asm!(
-                "{ .reg .b8 e2; .reg .b32 h2; .reg .b16 lo; cvt.u8.u16 e2, %1; cvt.rn.f16x2.e2m1x2 h2, e2; cvt.u16.u32 lo, h2; cvt.f32.f16 %0, lo; }",
-                out("=f") value,
-                in("h") packed,
-                options(register_only),
-            );
-        }
-        value
     }
 }
 

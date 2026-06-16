@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, ptx_asm, thread, warp};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use crate::kernel_ops::{sqrt_f32, warp_sum_f32};
+use crate::nvfp4::nvfp4_value;
 
 const EMBEDDING_THREADS_PER_BLOCK: u32 = 256;
 const WARP_SIZE: u32 = 32;
@@ -105,30 +106,22 @@ pub mod kernels {
             let col1 = thread + EMBEDDING_THREADS_PER_BLOCK;
             let col2 = thread + EMBEDDING_THREADS_PER_BLOCK * 2;
 
-            let value0 = token_value(
-                token_embedding_bytes,
-                token_embedding_scales,
-                params.token_embedding_global_scale,
-                token_base,
-                col0,
-                params.embedding_dim,
-            );
-            let value1 = token_value(
-                token_embedding_bytes,
-                token_embedding_scales,
-                params.token_embedding_global_scale,
-                token_base,
-                col1,
-                params.embedding_dim,
-            );
-            let value2 = token_value(
-                token_embedding_bytes,
-                token_embedding_scales,
-                params.token_embedding_global_scale,
-                token_base,
-                col2,
-                params.embedding_dim,
-            );
+            macro_rules! load_token_column {
+                ($col:expr) => {
+                    token_value(
+                        token_embedding_bytes,
+                        token_embedding_scales,
+                        params.token_embedding_global_scale,
+                        token_base,
+                        $col,
+                        params.embedding_dim,
+                    )
+                };
+            }
+
+            let value0 = load_token_column!(col0);
+            let value1 = load_token_column!(col1);
+            let value2 = load_token_column!(col2);
 
             let local_sum = value0 * value0 + value1 * value1 + value2 * value2;
             let warp_total = warp_sum_f32(local_sum);
@@ -160,44 +153,28 @@ pub mod kernels {
             thread::sync_threads();
 
             let inv_rms = unsafe { WARP_SUMS[0] };
-            if col0 < params.embedding_dim {
-                let weight = rms_weight_value(
-                    rms_weight_bytes,
-                    rms_weight_scales,
-                    params.rms_weight_global_scale,
-                    col0,
-                );
 
-                unsafe {
-                    *hidden.get_unchecked_mut(row_base + col0 as usize) = value0 * inv_rms * weight;
-                }
+            macro_rules! store_hidden_column {
+                ($col:expr, $value:expr) => {
+                    if $col < params.embedding_dim {
+                        let weight = rms_weight_value(
+                            rms_weight_bytes,
+                            rms_weight_scales,
+                            params.rms_weight_global_scale,
+                            $col,
+                        );
+
+                        unsafe {
+                            *hidden.get_unchecked_mut(row_base + $col as usize) =
+                                $value * inv_rms * weight;
+                        }
+                    }
+                };
             }
 
-            if col1 < params.embedding_dim {
-                let weight = rms_weight_value(
-                    rms_weight_bytes,
-                    rms_weight_scales,
-                    params.rms_weight_global_scale,
-                    col1,
-                );
-
-                unsafe {
-                    *hidden.get_unchecked_mut(row_base + col1 as usize) = value1 * inv_rms * weight;
-                }
-            }
-
-            if col2 < params.embedding_dim {
-                let weight = rms_weight_value(
-                    rms_weight_bytes,
-                    rms_weight_scales,
-                    params.rms_weight_global_scale,
-                    col2,
-                );
-
-                unsafe {
-                    *hidden.get_unchecked_mut(row_base + col2 as usize) = value2 * inv_rms * weight;
-                }
-            }
+            store_hidden_column!(col0, value0);
+            store_hidden_column!(col1, value1);
+            store_hidden_column!(col2, value2);
         }
     }
 
@@ -230,48 +207,5 @@ pub mod kernels {
             rms_weight_global_scale,
             col as usize,
         )
-    }
-
-    #[inline(always)]
-    fn nvfp4_value(bytes: &[u8], scales: &[u8], global_scale: f32, index: usize) -> f32 {
-        let byte = bytes[index / 2];
-        let payload = if index & 1 == 0 {
-            byte & 0x0f
-        } else {
-            byte >> 4
-        };
-
-        e2m1_value(payload) * e4m3_value(scales[index / 16] as u16) * global_scale
-    }
-
-    #[inline(always)]
-    fn e2m1_value(bits: u8) -> f32 {
-        let value: f32;
-        let packed = bits as u16;
-
-        unsafe {
-            ptx_asm!(
-                "{ .reg .b8 e2; .reg .b32 h2; .reg .b16 lo; cvt.u8.u16 e2, %1; cvt.rn.f16x2.e2m1x2 h2, e2; cvt.u16.u32 lo, h2; cvt.f32.f16 %0, lo; }",
-                out("=f") value,
-                in("h") packed,
-                options(register_only),
-            );
-        }
-        value
-    }
-
-    #[inline(always)]
-    fn e4m3_value(bits: u16) -> f32 {
-        let value: f32;
-
-        unsafe {
-            ptx_asm!(
-                "{ .reg .b32 h2; .reg .b16 lo; cvt.rn.f16x2.e4m3x2 h2, %1; cvt.u16.u32 lo, h2; cvt.f32.f16 %0, lo; }",
-                out("=f") value,
-                in("h") bits,
-                options(register_only),
-            );
-        }
-        value
     }
 }

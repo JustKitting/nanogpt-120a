@@ -3,7 +3,7 @@ pub mod inline_ptx;
 #[path = "shuffle.rs"]
 pub mod shuffle;
 
-pub use inline_ptx::{abs_f32, fma_f32, max_f32, sqrt_f32};
+pub use inline_ptx::{abs_f32, e2m1_value, e4m3_value, fma_f32, max_f32, sqrt_f32};
 
 pub const FULL_WARP_MASK: u32 = 0xffff_ffff;
 
