@@ -5,7 +5,9 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 
 use crate::float_ptx::sqrt_f32;
 use crate::layer_norm_utils::{
-    centered_column, max_abs3, nvfp4_affine_normalized_column, nvfp4_column, store_column,
+    centered_column, layer_norm_columns3, layer_norm_map3, layer_norm_map3_indexed,
+    layer_norm_square_sum3, layer_norm_store3, layer_norm_sum3, max_abs3,
+    nvfp4_affine_normalized_column, nvfp4_column,
 };
 use crate::nvfp4::Nvfp4DeviceTensor;
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
@@ -117,36 +119,17 @@ pub mod kernels {
             let row_base = row as usize * params.embedding_dim as usize;
             let token_base = token as usize * params.embedding_dim as usize;
 
-            let col0 = thread;
-            let col1 = thread + EMBEDDING_THREADS_PER_BLOCK;
-            let col2 = thread + EMBEDDING_THREADS_PER_BLOCK * 2;
+            let cols = layer_norm_columns3!(thread, EMBEDDING_THREADS_PER_BLOCK);
+            let values = layer_norm_map3!(cols, |col| nvfp4_column(
+                token_embedding_bytes,
+                token_embedding_scales,
+                params.token_embedding_global_scale,
+                token_base,
+                col,
+                params.embedding_dim,
+            ));
 
-            let value0 = nvfp4_column(
-                token_embedding_bytes,
-                token_embedding_scales,
-                params.token_embedding_global_scale,
-                token_base,
-                col0,
-                params.embedding_dim,
-            );
-            let value1 = nvfp4_column(
-                token_embedding_bytes,
-                token_embedding_scales,
-                params.token_embedding_global_scale,
-                token_base,
-                col1,
-                params.embedding_dim,
-            );
-            let value2 = nvfp4_column(
-                token_embedding_bytes,
-                token_embedding_scales,
-                params.token_embedding_global_scale,
-                token_base,
-                col2,
-                params.embedding_dim,
-            );
-
-            let local_sum = value0 + value1 + value2;
+            let local_sum = layer_norm_sum3!(values);
             let warp_total = warp_sum_f32(local_sum);
 
             if lane == 0 {
@@ -176,12 +159,13 @@ pub mod kernels {
 
             let mean = unsafe { WARP_SUMS[0] };
 
-            let centered0 = centered_column(col0, params.embedding_dim, value0, mean);
-            let centered1 = centered_column(col1, params.embedding_dim, value1, mean);
-            let centered2 = centered_column(col2, params.embedding_dim, value2, mean);
-
-            let local_variance_sum =
-                centered0 * centered0 + centered1 * centered1 + centered2 * centered2;
+            let centered = layer_norm_map3_indexed!(cols, |index, col| centered_column(
+                col,
+                params.embedding_dim,
+                values[index],
+                mean
+            ));
+            let local_variance_sum = layer_norm_square_sum3!(centered);
             let warp_total = warp_sum_f32(local_variance_sum);
 
             if lane == 0 {
@@ -212,69 +196,34 @@ pub mod kernels {
 
             let inv_std = unsafe { WARP_SUMS[0] };
 
-            let normalized0 = nvfp4_affine_normalized_column(
-                layer_norm_weight_bytes,
-                layer_norm_weight_scales,
-                layer_norm_bias_bytes,
-                layer_norm_bias_scales,
-                col0,
+            let normalized_values =
+                layer_norm_map3_indexed!(cols, |index, col| nvfp4_affine_normalized_column(
+                    layer_norm_weight_bytes,
+                    layer_norm_weight_scales,
+                    layer_norm_bias_bytes,
+                    layer_norm_bias_scales,
+                    col,
+                    params.embedding_dim,
+                    centered[index],
+                    inv_std,
+                    params.layer_norm_weight_global_scale,
+                    params.layer_norm_bias_global_scale,
+                ));
+
+            layer_norm_store3!(&mut residual, row_base, cols, params.embedding_dim, values);
+            layer_norm_store3!(
+                &mut normalized,
+                row_base,
+                cols,
                 params.embedding_dim,
-                centered0,
-                inv_std,
-                params.layer_norm_weight_global_scale,
-                params.layer_norm_bias_global_scale,
-            );
-            let normalized1 = nvfp4_affine_normalized_column(
-                layer_norm_weight_bytes,
-                layer_norm_weight_scales,
-                layer_norm_bias_bytes,
-                layer_norm_bias_scales,
-                col1,
-                params.embedding_dim,
-                centered1,
-                inv_std,
-                params.layer_norm_weight_global_scale,
-                params.layer_norm_bias_global_scale,
-            );
-            let normalized2 = nvfp4_affine_normalized_column(
-                layer_norm_weight_bytes,
-                layer_norm_weight_scales,
-                layer_norm_bias_bytes,
-                layer_norm_bias_scales,
-                col2,
-                params.embedding_dim,
-                centered2,
-                inv_std,
-                params.layer_norm_weight_global_scale,
-                params.layer_norm_bias_global_scale,
+                normalized_values
             );
 
-            store_column(&mut residual, row_base, col0, params.embedding_dim, value0);
-            store_column(&mut residual, row_base, col1, params.embedding_dim, value1);
-            store_column(&mut residual, row_base, col2, params.embedding_dim, value2);
-            store_column(
-                &mut normalized,
-                row_base,
-                col0,
-                params.embedding_dim,
-                normalized0,
+            let local_amax = max_abs3(
+                normalized_values[0],
+                normalized_values[1],
+                normalized_values[2],
             );
-            store_column(
-                &mut normalized,
-                row_base,
-                col1,
-                params.embedding_dim,
-                normalized1,
-            );
-            store_column(
-                &mut normalized,
-                row_base,
-                col2,
-                params.embedding_dim,
-                normalized2,
-            );
-
-            let local_amax = max_abs3(normalized0, normalized1, normalized2);
             let warp_amax = warp_max_f32(local_amax);
 
             if lane == 0 {

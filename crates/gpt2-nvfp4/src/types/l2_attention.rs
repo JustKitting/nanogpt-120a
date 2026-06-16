@@ -7,23 +7,7 @@ use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantModule, Nvfp4QuantRowwiseArgs, RowAmaxArgs};
 
-use super::{HiddenStateDevice, QkvLinear, ResidualLinear};
-
-pub struct AttentionInputNvfp4<'a> {
-    pub bytes: &'a mut DeviceBuffer<u8>,
-    pub scales: &'a mut DeviceBuffer<u8>,
-    pub global_scales: &'a mut DeviceBuffer<f32>,
-}
-
-impl<'a> AttentionInputNvfp4<'a> {
-    pub fn reborrow(&mut self) -> AttentionInputNvfp4<'_> {
-        AttentionInputNvfp4 {
-            bytes: &mut *self.bytes,
-            scales: &mut *self.scales,
-            global_scales: &mut *self.global_scales,
-        }
-    }
-}
+use super::{HiddenStateDevice, HiddenStateNvfp4, QkvLinear, ResidualLinear};
 
 #[derive(Clone, Copy)]
 pub struct AttentionProjectionTensors<'a> {
@@ -36,7 +20,7 @@ pub struct AttentionProjectionTensors<'a> {
 pub struct AttentionForwardArgs<'a, 'scratch> {
     pub module: &'a AttentionModule,
     pub quant_module: &'a Nvfp4QuantModule,
-    pub input_nvfp4: AttentionInputNvfp4<'scratch>,
+    pub input_nvfp4: HiddenStateNvfp4<'scratch>,
     pub projections: AttentionProjectionTensors<'a>,
     pub qkv: &'scratch mut DeviceBuffer<f32>,
     pub hidden: HiddenStateDevice<'a>,
@@ -59,7 +43,7 @@ impl AttentionWeights {
     pub fn input_from_embeddings<'a, 'scratch>(
         module: &'a AttentionModule,
         quant_module: &'a Nvfp4QuantModule,
-        input_nvfp4: AttentionInputNvfp4<'scratch>,
+        input_nvfp4: HiddenStateNvfp4<'scratch>,
         projections: AttentionProjectionTensors<'a>,
         qkv: &'scratch mut DeviceBuffer<f32>,
         hidden: HiddenStateDevice<'a>,

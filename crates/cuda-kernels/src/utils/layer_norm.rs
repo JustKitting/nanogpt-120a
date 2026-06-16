@@ -3,6 +3,80 @@ use cuda_device::DisjointSlice;
 use crate::float_ptx::{abs_f32, fma_f32, max_f32};
 use crate::nvfp4::nvfp4_value;
 
+macro_rules! layer_norm_columns3 {
+    ($base:expr, $stride:expr) => {
+        [$base, $base + $stride, $base + $stride * 2]
+    };
+}
+
+macro_rules! layer_norm_map3 {
+    ($cols:expr, |$col:ident| $body:expr) => {{
+        [
+            {
+                let $col = $cols[0];
+                $body
+            },
+            {
+                let $col = $cols[1];
+                $body
+            },
+            {
+                let $col = $cols[2];
+                $body
+            },
+        ]
+    }};
+}
+
+macro_rules! layer_norm_map3_indexed {
+    ($cols:expr, |$index:ident, $col:ident| $body:expr) => {{
+        [
+            {
+                let $index = 0usize;
+                let $col = $cols[$index];
+                $body
+            },
+            {
+                let $index = 1usize;
+                let $col = $cols[$index];
+                $body
+            },
+            {
+                let $index = 2usize;
+                let $col = $cols[$index];
+                $body
+            },
+        ]
+    }};
+}
+
+macro_rules! layer_norm_sum3 {
+    ($values:expr) => {
+        $values[0] + $values[1] + $values[2]
+    };
+}
+
+macro_rules! layer_norm_square_sum3 {
+    ($values:expr) => {
+        $values[0] * $values[0] + $values[1] * $values[1] + $values[2] * $values[2]
+    };
+}
+
+macro_rules! layer_norm_store3 {
+    ($values:expr, $row_base:expr, $cols:expr, $row_len:expr, $source:expr) => {{
+        $crate::layer_norm_utils::store_column($values, $row_base, $cols[0], $row_len, $source[0]);
+        $crate::layer_norm_utils::store_column($values, $row_base, $cols[1], $row_len, $source[1]);
+        $crate::layer_norm_utils::store_column($values, $row_base, $cols[2], $row_len, $source[2]);
+    }};
+}
+
+pub(crate) use layer_norm_columns3;
+pub(crate) use layer_norm_map3;
+pub(crate) use layer_norm_map3_indexed;
+pub(crate) use layer_norm_square_sum3;
+pub(crate) use layer_norm_store3;
+pub(crate) use layer_norm_sum3;
+
 #[inline(always)]
 pub fn f32_column(values: &[f32], row_base: usize, col: u32, row_len: u32) -> f32 {
     if col < row_len {

@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use gpt2_nvfp4::{
-    AttentionInputNvfp4, AttentionProjectionTensors, AttentionWeights, GPT2_CONTEXT_LEN,
-    GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, HiddenState, HiddenStateDevice, HiddenVectorShape,
-    Nvfp4Shape, QkvActivation, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
+    AttentionProjectionTensors, AttentionWeights, GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD,
+    GPT2_QKV, HiddenState, HiddenStateDevice, HiddenStateNvfp4, HiddenVectorShape, Nvfp4Shape,
+    QkvActivation, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
@@ -58,7 +58,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     AttentionWeights::forward(AttentionWeights::input_from_embeddings(
         &attention_module,
         &quant_module,
-        AttentionInputNvfp4 {
+        HiddenStateNvfp4 {
             bytes: &mut input_bytes_dev,
             scales: &mut input_scales_dev,
             global_scales: &mut input_global_scales_dev,

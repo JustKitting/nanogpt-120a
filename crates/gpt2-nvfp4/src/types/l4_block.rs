@@ -2,21 +2,25 @@ use crate::random::InitRng;
 use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::layer_norm::LayerNormModule;
+use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use super::{
-    AttentionInputNvfp4, AttentionProjectionTensors, AttentionWeights, HiddenStateDevice,
-    LayerNormTensors, LayerNormWeights, MlpWeights,
+    AttentionProjectionTensors, AttentionWeights, HiddenStateDevice, HiddenStateNvfp4,
+    LayerNormTensors, LayerNormWeights, MlpUpTensors, MlpWeights,
 };
 
 pub struct BlockForwardArgs<'a, 'scratch> {
     pub attention_module: &'a AttentionModule,
-    pub attention_quant_module: &'a Nvfp4QuantModule,
+    pub quant_module: &'a Nvfp4QuantModule,
     pub layer_norm_module: &'a LayerNormModule,
-    pub attention_input_nvfp4: AttentionInputNvfp4<'scratch>,
+    pub mlp_module: &'a MlpModule,
+    pub hidden_nvfp4: HiddenStateNvfp4<'scratch>,
     pub projections: AttentionProjectionTensors<'a>,
     pub ln_2: LayerNormTensors<'a>,
+    pub mlp_up: MlpUpTensors<'a>,
     pub qkv: &'scratch mut DeviceBuffer<f32>,
+    pub mlp_activation: &'scratch mut DeviceBuffer<f32>,
     pub hidden: HiddenStateDevice<'a>,
 }
 
@@ -42,10 +46,11 @@ impl Gpt2BlockWeights {
         &self,
         args: BlockForwardArgs<'a, 'scratch>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
+        let mut hidden_nvfp4 = args.hidden_nvfp4;
         let hidden = AttentionWeights::forward(AttentionWeights::input_from_embeddings(
             args.attention_module,
-            args.attention_quant_module,
-            args.attention_input_nvfp4,
+            args.quant_module,
+            hidden_nvfp4.reborrow(),
             args.projections,
             args.qkv,
             args.hidden,
@@ -57,6 +62,13 @@ impl Gpt2BlockWeights {
             hidden,
         ))?;
 
-        self.mlp.forward(MlpWeights::input_from_attention(hidden))
+        MlpWeights::forward(MlpWeights::input_from_attention(
+            args.mlp_module,
+            args.quant_module,
+            hidden_nvfp4.reborrow(),
+            args.mlp_up,
+            args.mlp_activation,
+            hidden,
+        ))
     }
 }
