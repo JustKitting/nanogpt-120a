@@ -1,11 +1,9 @@
-use crate::kernels::launch_embedding_kernel;
-use crate::random::InitRng;
-use crate::{GPT2_N_LAYER, Gpt2Config, HiddenState, TokenIds};
+use cuda_core::DriverError;
 
-use super::{
-    Gpt2BlockWeights, LayerNormWeights, Nvfp4ShapeInit, PositionEmbedding, PositionEmbeddingShape,
-    TokenEmbedding, TokenEmbeddingShape,
-};
+use crate::random::InitRng;
+use crate::{GPT2_N_LAYER, Gpt2Config};
+
+use super::{EmbeddingWeights, Gpt2BlockWeights, LayerNormWeights, TokenPositionEmbeddingArgs};
 
 #[derive(Clone, Debug)]
 pub struct Gpt2 {
@@ -30,10 +28,13 @@ impl Gpt2 {
         self.weights.as_mut()
     }
 
-    pub fn forward_embeddings(&self, tokens: &TokenIds, hidden: &mut HiddenState) {
+    pub fn forward_embeddings(
+        &self,
+        args: TokenPositionEmbeddingArgs<'_>,
+    ) -> Result<(), DriverError> {
         self.weights()
             .expect("Gpt2::init must be called before forward_embeddings")
-            .forward_embeddings(tokens, hidden);
+            .forward_embeddings(args)
     }
 }
 
@@ -46,8 +47,7 @@ impl Default for Gpt2 {
 #[derive(Clone, Debug)]
 pub struct Gpt2Weights {
     pub config: Gpt2Config,
-    pub wte: TokenEmbedding,
-    pub wpe: PositionEmbedding,
+    pub embeddings: EmbeddingWeights,
     pub h: [Gpt2BlockWeights; GPT2_N_LAYER],
     pub ln_f: LayerNormWeights,
 }
@@ -56,14 +56,16 @@ impl Gpt2Weights {
     pub(crate) fn init(rng: &mut InitRng) -> Self {
         Self {
             config: Gpt2Config::gpt2_124m(),
-            wte: TokenEmbeddingShape::smooth_tensor(rng),
-            wpe: PositionEmbeddingShape::smooth_tensor(rng),
+            embeddings: EmbeddingWeights::init(rng),
             h: std::array::from_fn(|_| Gpt2BlockWeights::init(rng)),
             ln_f: LayerNormWeights::init(),
         }
     }
 
-    pub fn forward_embeddings(&self, tokens: &TokenIds, hidden: &mut HiddenState) {
-        launch_embedding_kernel(tokens, &self.wte, &self.wpe, hidden);
+    pub fn forward_embeddings(
+        &self,
+        args: TokenPositionEmbeddingArgs<'_>,
+    ) -> Result<(), DriverError> {
+        self.embeddings.forward(args)
     }
 }

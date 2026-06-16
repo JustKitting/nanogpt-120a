@@ -1,16 +1,18 @@
-mod attention;
-mod block;
-mod layer_norm;
+mod l1_embeddings;
+mod l2_attention;
+mod l3_mlp;
+mod l4_block;
+mod l5_layer_norm;
 mod linear;
-mod mlp;
 mod model;
 mod shapes;
 
-pub use attention::AttentionWeights;
-pub use block::Gpt2BlockWeights;
-pub use layer_norm::LayerNormWeights;
+pub use l1_embeddings::{EmbeddingWeights, TokenPositionEmbeddingArgs};
+pub use l2_attention::AttentionWeights;
+pub use l3_mlp::MlpWeights;
+pub use l4_block::Gpt2BlockWeights;
+pub use l5_layer_norm::LayerNormWeights;
 pub use linear::LinearWeights;
-pub use mlp::MlpWeights;
 pub use model::{Gpt2, Gpt2Weights};
 pub(crate) use shapes::Nvfp4ShapeInit;
 pub use shapes::{

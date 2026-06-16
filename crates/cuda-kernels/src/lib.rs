@@ -1,3 +1,5 @@
+pub mod embedding;
+pub mod kernel_config;
 pub mod layer_norm;
 pub mod nvfp4_quant;
 

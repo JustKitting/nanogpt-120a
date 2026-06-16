@@ -1219,6 +1219,10 @@ dependencies = [
 [[package]]
 name = "gpt2-nvfp4"
 version = "0.1.0"
+dependencies = [
+ "cuda-core",
+ "rust-kernels-cuda",
+]
 
 [[package]]
 name = "h2"

@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }
+rust-kernels-cuda = { path = "../cuda-kernels" }

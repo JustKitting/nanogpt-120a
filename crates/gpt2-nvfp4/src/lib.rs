@@ -1,6 +1,6 @@
 mod activations;
 mod config;
-mod kernels;
+mod cuda_contract;
 mod random;
 mod tensor;
 mod types;
@@ -20,7 +20,7 @@ pub use tensor::{Nvfp4Shape, Nvfp4Tensor};
 
 pub use types::{
     AttentionWeights, Gpt2, Gpt2BlockWeights, Gpt2Weights, LayerNormWeights, LinearWeights,
-    MlpWeights,
+    MlpWeights, TokenPositionEmbeddingArgs,
 };
 
 pub use types::{
@@ -34,4 +34,5 @@ pub use types::{
     TokenEmbedding,
 };
 
+pub use cuda_contract::Gpt2KernelConfig;
 pub use types::{nvfp4_bytes, nvfp4_scales};
