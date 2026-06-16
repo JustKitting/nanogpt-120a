@@ -1,17 +1,20 @@
 use cuda_core::DriverError;
 use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use crate::random::InitRng;
 use crate::{GPT2_N_LAYER, Gpt2Config};
 
 use super::{
-    BlockForwardArgs, EmbeddingWeights, Gpt2BlockWeights, HiddenStateDevice, LayerNormWeights,
-    TokenEmbeddingArgs,
+    AttentionInputNvfp4, BlockForwardArgs, EmbeddingWeights, Gpt2BlockWeights, HiddenStateDevice,
+    LayerNormWeights, TokenEmbeddingArgs,
 };
 
 pub struct Gpt2ForwardArgs<'a> {
     pub embeddings: TokenEmbeddingArgs<'a>,
     pub attention_module: &'a AttentionModule,
+    pub attention_quant_module: &'a Nvfp4QuantModule,
+    pub attention_input_nvfp4: AttentionInputNvfp4<'a>,
 }
 
 #[derive(Clone, Debug)]
@@ -91,11 +94,20 @@ impl Gpt2Weights {
         &self,
         args: Gpt2ForwardArgs<'a>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
-        let mut hidden = self.embeddings.forward(args.embeddings)?;
+        let Gpt2ForwardArgs {
+            embeddings,
+            attention_module,
+            attention_quant_module,
+            mut attention_input_nvfp4,
+        } = args;
+
+        let mut hidden = self.embeddings.forward(embeddings)?;
 
         for block in &self.h {
             hidden = block.forward(BlockForwardArgs {
-                attention_module: args.attention_module,
+                attention_module,
+                attention_quant_module,
+                attention_input_nvfp4: attention_input_nvfp4.reborrow(),
                 hidden,
             })?;
         }

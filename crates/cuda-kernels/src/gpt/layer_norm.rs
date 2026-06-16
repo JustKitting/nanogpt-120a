@@ -3,7 +3,8 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread, warp};
 
-use crate::kernel_ops::{fma_f32, sqrt_f32, warp_sum_f32};
+use crate::float_ptx::{fma_f32, sqrt_f32};
+use crate::warp_reduce::warp_sum_f32;
 
 pub const ROW_SIZE: usize = 32;
 const WARPS_PER_BLOCK: u32 = 8;

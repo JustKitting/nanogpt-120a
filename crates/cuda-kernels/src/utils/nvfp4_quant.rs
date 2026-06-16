@@ -3,7 +3,8 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, cuda_module, kernel, ptx_asm, thread, warp};
 
-use crate::kernel_ops::{abs_f32, e2m1_value, e4m3_value, max_f32};
+use crate::float_ptx::{abs_f32, max_f32};
+use crate::nvfp4_cast::{e2m1_value, e4m3_value};
 
 const THREADS_PER_BLOCK: u32 = 256;
 const GROUP_SIZE_U32: u32 = 16;
@@ -23,6 +24,7 @@ mod kernels {
         mut out_fp4: DisjointSlice<u8>,
         mut out_scales: DisjointSlice<u8>,
         mut out_global_scale: DisjointSlice<f32>,
+        row_len: u32,
         scale_override: f32,
     ) {
         let lane = warp::lane_id() as usize;
@@ -39,16 +41,25 @@ mod kernels {
 
         if group < out_scales.len() {
             let base = group * GROUP_SIZE;
-            let tensor_amax = amax[0];
+            let row_len = row_len as usize;
+            let scalar_scale = row_len == 0;
+            let scale_row_len = if scalar_scale { usize::MAX } else { row_len };
+            let row = base / scale_row_len;
+            let tensor_amax = amax[row];
             let global_scale = if tensor_amax == 0.0 {
                 1.0
             } else {
                 tensor_amax * scale_override / (FP8_MAX_FOUR_SIX * FP4_MAX)
             };
+            let writes_global_scale = if scalar_scale {
+                group == 0
+            } else {
+                base == row * scale_row_len
+            };
 
             unsafe {
-                if group == 0 && lane_in_group == 0 {
-                    *out_global_scale.get_unchecked_mut(0) = global_scale;
+                if writes_global_scale && lane_in_group == 0 {
+                    *out_global_scale.get_unchecked_mut(row) = global_scale;
                 }
 
                 let value = x[base + lane_in_group];
@@ -183,6 +194,18 @@ pub struct Nvfp4QuantArgs<'a, 'out> {
     pub scale_override: f32,
 }
 
+pub struct Nvfp4QuantRowwiseArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub x: &'a DeviceBuffer<f32>,
+    pub amax: &'a DeviceBuffer<f32>,
+    pub out_fp4: &'out mut DeviceBuffer<u8>,
+    pub out_scales: &'out mut DeviceBuffer<u8>,
+    pub out_global_scale: &'out mut DeviceBuffer<f32>,
+    pub group_count: u32,
+    pub row_len: u32,
+    pub scale_override: f32,
+}
+
 pub struct Nvfp4QuantModule {
     module: kernels::LoadedModule,
 }
@@ -195,21 +218,65 @@ impl Nvfp4QuantModule {
     }
 
     pub fn fp32_to_nvfp4_four_six(&self, args: Nvfp4QuantArgs<'_, '_>) -> Result<(), DriverError> {
-        let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
-
-        self.module.fp32_to_nvfp4_four_six_kernel(
+        self.launch_fp32_to_nvfp4_four_six(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.group_count.div_ceil(groups_per_block), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
             args.x,
             args.amax,
             args.out_fp4,
             args.out_scales,
             args.out_global_scale,
+            args.group_count,
+            0,
             args.scale_override,
+        )
+    }
+
+    pub fn fp32_to_nvfp4_four_six_rowwise(
+        &self,
+        args: Nvfp4QuantRowwiseArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        self.launch_fp32_to_nvfp4_four_six(
+            args.stream,
+            args.x,
+            args.amax,
+            args.out_fp4,
+            args.out_scales,
+            args.out_global_scale,
+            args.group_count,
+            args.row_len,
+            args.scale_override,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn launch_fp32_to_nvfp4_four_six(
+        &self,
+        stream: &CudaStream,
+        x: &DeviceBuffer<f32>,
+        amax: &DeviceBuffer<f32>,
+        out_fp4: &mut DeviceBuffer<u8>,
+        out_scales: &mut DeviceBuffer<u8>,
+        out_global_scale: &mut DeviceBuffer<f32>,
+        group_count: u32,
+        row_len: u32,
+        scale_override: f32,
+    ) -> Result<(), DriverError> {
+        let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
+
+        self.module.fp32_to_nvfp4_four_six_kernel(
+            stream,
+            LaunchConfig {
+                grid_dim: (group_count.div_ceil(groups_per_block), 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            x,
+            amax,
+            out_fp4,
+            out_scales,
+            out_global_scale,
+            row_len,
+            scale_override,
         )
     }
 }

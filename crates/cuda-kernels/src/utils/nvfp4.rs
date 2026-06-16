@@ -1,4 +1,4 @@
-use crate::kernel_ops::{e2m1_value, e4m3_value};
+use crate::nvfp4_cast::{e2m1_value, e4m3_value};
 
 #[inline(always)]
 pub fn nvfp4_value(bytes: &[u8], scales: &[u8], global_scale: f32, index: usize) -> f32 {

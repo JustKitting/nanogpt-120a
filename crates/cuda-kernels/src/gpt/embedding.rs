@@ -3,8 +3,9 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
-use crate::kernel_ops::{abs_f32, max_f32, sqrt_f32, warp_max_f32, warp_sum_f32};
+use crate::float_ptx::{abs_f32, max_f32, sqrt_f32};
 use crate::nvfp4::nvfp4_value;
+use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
 const EMBEDDING_THREADS_PER_BLOCK: u32 = 256;
 const WARP_SIZE: u32 = 32;

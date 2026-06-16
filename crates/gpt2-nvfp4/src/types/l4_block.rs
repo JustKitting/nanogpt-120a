@@ -1,11 +1,16 @@
 use crate::random::InitRng;
 use cuda_core::DriverError;
 use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
-use super::{AttentionWeights, HiddenStateDevice, LayerNormWeights, MlpWeights};
+use super::{
+    AttentionInputNvfp4, AttentionWeights, HiddenStateDevice, LayerNormWeights, MlpWeights,
+};
 
-pub struct BlockForwardArgs<'a> {
+pub struct BlockForwardArgs<'a, 'scratch> {
     pub attention_module: &'a AttentionModule,
+    pub attention_quant_module: &'a Nvfp4QuantModule,
+    pub attention_input_nvfp4: AttentionInputNvfp4<'scratch>,
     pub hidden: HiddenStateDevice<'a>,
 }
 
@@ -27,12 +32,14 @@ impl Gpt2BlockWeights {
         }
     }
 
-    pub fn forward<'a>(
+    pub fn forward<'a, 'scratch>(
         &self,
-        args: BlockForwardArgs<'a>,
+        args: BlockForwardArgs<'a, 'scratch>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
         let hidden = self.attn.forward(AttentionWeights::input_from_embeddings(
             args.attention_module,
+            args.attention_quant_module,
+            args.attention_input_nvfp4,
             args.hidden,
         ))?;
         self.mlp.forward(MlpWeights::input_from_attention(hidden))
