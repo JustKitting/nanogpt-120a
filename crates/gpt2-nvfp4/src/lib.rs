@@ -1,6 +1,13 @@
+mod activations;
 mod config;
 mod tensor;
 mod types;
+
+pub use activations::{
+    AttentionScores, AttentionScoresShape, BufferShape, F32Buffer, HiddenState, HiddenStateShape,
+    Logits, LogitsShape, MlpActivation, MlpActivationShape, QkvActivation, QkvActivationShape,
+    TokenIds, TokenIdsShape, U32Buffer,
+};
 
 pub use config::{
     GPT2_CONTEXT_LEN, GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_N_LAYER, GPT2_QKV, GPT2_VOCAB_SIZE,
