@@ -3,7 +3,7 @@ use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 use crate::random::InitRng;
-use crate::{GPT2_LAYER_NORM_EPSILON, HiddenState, TokenEmbedding};
+use crate::{HiddenState, TokenEmbedding};
 
 use super::{Nvfp4ShapeInit, TokenEmbeddingShape};
 
@@ -12,8 +12,6 @@ pub struct TokenEmbeddingArgs<'a> {
     pub stream: &'a CudaStream,
     pub tokens: &'a DeviceBuffer<u32>,
     pub token_embedding: Nvfp4DeviceTensor<'a>,
-    pub layer_norm_weight: Nvfp4DeviceTensor<'a>,
-    pub layer_norm_bias: Nvfp4DeviceTensor<'a>,
     pub residual: &'a mut DeviceBuffer<f32>,
     pub normalized: &'a mut DeviceBuffer<f32>,
     pub normalized_amax: &'a mut DeviceBuffer<f32>,
@@ -47,25 +45,18 @@ impl EmbeddingWeights {
             stream,
             tokens,
             token_embedding,
-            layer_norm_weight,
-            layer_norm_bias,
             residual,
             normalized,
             normalized_amax,
         } = args;
 
-        module.token_embedding_layer_norm(EmbeddingArgs {
+        module.token_embedding(EmbeddingArgs {
             stream,
             tokens,
             token_embedding,
-            layer_norm_weight,
-            layer_norm_bias,
             residual: &mut *residual,
-            normalized: &mut *normalized,
-            normalized_amax: &mut *normalized_amax,
             hidden_len: HiddenState::LEN as u32,
             embedding_dim: TokenEmbedding::COLS as u32,
-            epsilon: GPT2_LAYER_NORM_EPSILON,
         })?;
 
         Ok(HiddenStateDevice {
