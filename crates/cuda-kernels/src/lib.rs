@@ -10,6 +10,8 @@ pub mod layer_norm;
 pub mod layer_norm_utils;
 #[path = "gpt/lm_head.rs"]
 pub mod lm_head;
+#[path = "gpt/loss.rs"]
+pub mod loss;
 #[path = "gpt/mlp.rs"]
 pub mod mlp;
 #[path = "utils/mma/mod.rs"]
@@ -26,7 +28,7 @@ pub mod shuffle;
 pub mod warp_reduce;
 
 pub mod gpt {
-    pub use crate::{attention, embedding, layer_norm, lm_head, mlp};
+    pub use crate::{attention, embedding, layer_norm, lm_head, loss, mlp};
 }
 
 pub mod utils {

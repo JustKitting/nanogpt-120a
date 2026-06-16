@@ -45,6 +45,21 @@ pub fn exp_f32(x: f32) -> f32 {
 }
 
 #[inline(always)]
+pub fn ln_f32(x: f32) -> f32 {
+    const LN_2: f32 = core::f32::consts::LN_2;
+    let y: f32;
+    unsafe {
+        ptx_asm!(
+            "lg2.approx.ftz.f32 %0, %1;",
+            out("=f") y,
+            in("f") x,
+            options(register_only),
+        );
+    }
+    y * LN_2
+}
+
+#[inline(always)]
 pub fn sincos_f32(x: f32) -> (f32, f32) {
     let x = reduce_angle_f32(x);
     (sin_reduced_f32(x), cos_reduced_f32(x))
