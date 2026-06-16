@@ -1,0 +1,18 @@
+# Rust build outputs
+/target/
+
+# cuda-oxide build artifacts
+/.oxide-artifacts/
+/rust_kernels*.ll
+/rust_kernels*.opt.ll
+/rust_kernels*.ptx
+*.cubin
+
+# Local data and generated training shards
+/data/
+
+# Local VCS/editor/runtime state
+/.jj/
+.env
+*.log
+*.tmp

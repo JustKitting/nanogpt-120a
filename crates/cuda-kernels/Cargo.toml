@@ -1,0 +1,9 @@
+[package]
+name = "rust-kernels-cuda"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }
+cuda-device = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }
+cuda-host = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }

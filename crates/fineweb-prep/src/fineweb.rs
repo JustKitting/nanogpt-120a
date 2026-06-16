@@ -1,0 +1,10 @@
+pub const DATASET_OWNER: &str = "HuggingFaceFW";
+pub const DATASET_NAME: &str = "fineweb-edu";
+pub const DATASET_REPO: &str = "HuggingFaceFW/fineweb-edu";
+pub const DATASET_CONFIG: &str = "sample-10BT";
+pub const DATASET_SPLIT: &str = "train";
+pub const DATA_DIR: &str = "data/edu_fineweb10B";
+pub const PARQUET_DIR: &str = "parquet";
+pub const SHARDS_DIR: &str = "shards";
+pub const SHARD_SIZE: usize = 100_000_000;
+pub const SHARD_FILE_PREFIX: &str = "edufineweb";

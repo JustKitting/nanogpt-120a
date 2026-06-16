@@ -1,0 +1,11 @@
+[package]
+name = "fineweb-prep"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+arrow-array = "59"
+bytemuck = "1"
+gpt2-bpe = { path = "../gpt2-bpe" }
+hf-hub = { version = "1.0.0-rc.1", features = ["blocking", "rustls-tls"] }
+parquet = "59"

@@ -1,0 +1,17 @@
+[package]
+name = "rust-kernels"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = [
+    "crates/gpt2-bpe",
+    "crates/cuda-kernels",
+    "crates/fineweb-prep",
+]
+resolver = "3"
+
+[dependencies]
+fineweb-prep = { path = "crates/fineweb-prep" }
+gpt2-bpe = { path = "crates/gpt2-bpe" }
+rust-kernels-cuda = { path = "crates/cuda-kernels" }
