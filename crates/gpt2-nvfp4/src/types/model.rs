@@ -1,9 +1,18 @@
 use cuda_core::DriverError;
+use rust_kernels_cuda::attention::AttentionModule;
 
 use crate::random::InitRng;
 use crate::{GPT2_N_LAYER, Gpt2Config};
 
-use super::{EmbeddingWeights, Gpt2BlockWeights, LayerNormWeights, TokenPositionEmbeddingArgs};
+use super::{
+    BlockForwardArgs, EmbeddingWeights, Gpt2BlockWeights, HiddenStateDevice, LayerNormWeights,
+    TokenPositionEmbeddingArgs,
+};
+
+pub struct Gpt2ForwardArgs<'a> {
+    pub embeddings: TokenPositionEmbeddingArgs<'a>,
+    pub attention_module: &'a AttentionModule,
+}
 
 #[derive(Clone, Debug)]
 pub struct Gpt2 {
@@ -28,13 +37,22 @@ impl Gpt2 {
         self.weights.as_mut()
     }
 
-    pub fn forward_embeddings(
+    pub fn forward_embeddings<'a>(
         &self,
-        args: TokenPositionEmbeddingArgs<'_>,
-    ) -> Result<(), DriverError> {
+        args: TokenPositionEmbeddingArgs<'a>,
+    ) -> Result<HiddenStateDevice<'a>, DriverError> {
         self.weights()
             .expect("Gpt2::init must be called before forward_embeddings")
             .forward_embeddings(args)
+    }
+
+    pub fn forward<'a>(
+        &self,
+        args: Gpt2ForwardArgs<'a>,
+    ) -> Result<HiddenStateDevice<'a>, DriverError> {
+        self.weights()
+            .expect("Gpt2::init must be called before forward")
+            .forward(args)
     }
 }
 
@@ -62,10 +80,27 @@ impl Gpt2Weights {
         }
     }
 
-    pub fn forward_embeddings(
+    pub fn forward_embeddings<'a>(
         &self,
-        args: TokenPositionEmbeddingArgs<'_>,
-    ) -> Result<(), DriverError> {
+        args: TokenPositionEmbeddingArgs<'a>,
+    ) -> Result<HiddenStateDevice<'a>, DriverError> {
         self.embeddings.forward(args)
+    }
+
+    pub fn forward<'a>(
+        &self,
+        args: Gpt2ForwardArgs<'a>,
+    ) -> Result<HiddenStateDevice<'a>, DriverError> {
+        let mut hidden = self.embeddings.forward(args.embeddings)?;
+
+        for block in &self.h {
+            hidden = block.forward(BlockForwardArgs {
+                attention_module: args.attention_module,
+                hidden,
+            })?;
+        }
+
+        self.ln_f
+            .forward(LayerNormWeights::input_from_block(hidden))
     }
 }

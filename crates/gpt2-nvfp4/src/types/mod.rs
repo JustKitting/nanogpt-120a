@@ -7,13 +7,13 @@ mod linear;
 mod model;
 mod shapes;
 
-pub use l1_embeddings::{EmbeddingWeights, TokenPositionEmbeddingArgs};
-pub use l2_attention::AttentionWeights;
-pub use l3_mlp::MlpWeights;
-pub use l4_block::Gpt2BlockWeights;
-pub use l5_layer_norm::LayerNormWeights;
+pub use l1_embeddings::{EmbeddingWeights, HiddenStateDevice, TokenPositionEmbeddingArgs};
+pub use l2_attention::{AttentionForwardArgs, AttentionWeights};
+pub use l3_mlp::{MlpForwardArgs, MlpWeights};
+pub use l4_block::{BlockForwardArgs, Gpt2BlockWeights};
+pub use l5_layer_norm::{LayerNormForwardArgs, LayerNormWeights};
 pub use linear::LinearWeights;
-pub use model::{Gpt2, Gpt2Weights};
+pub use model::{Gpt2, Gpt2ForwardArgs, Gpt2Weights};
 pub(crate) use shapes::Nvfp4ShapeInit;
 pub use shapes::{
     HiddenVectorShape, LayerNormTensor, MlpDownLinear, MlpDownWeightShape, MlpUpLinear,

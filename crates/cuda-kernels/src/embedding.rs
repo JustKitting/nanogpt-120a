@@ -24,22 +24,22 @@ pub struct Nvfp4DeviceTensor<'a> {
     pub global_scale: f32,
 }
 
-pub struct EmbeddingArgs<'a, C: TransformerKernelConfig> {
+pub struct EmbeddingArgs<'a, 'out, C: TransformerKernelConfig> {
     pub stream: &'a CudaStream,
     pub tokens: &'a DeviceBuffer<u32>,
     pub token_embedding: Nvfp4DeviceTensor<'a>,
     pub position_embedding: Nvfp4DeviceTensor<'a>,
-    pub hidden: &'a mut DeviceBuffer<f32>,
+    pub hidden: &'out mut DeviceBuffer<f32>,
     contract: PhantomData<C>,
 }
 
-impl<'a, C: TransformerKernelConfig> EmbeddingArgs<'a, C> {
+impl<'a, 'out, C: TransformerKernelConfig> EmbeddingArgs<'a, 'out, C> {
     pub fn new(
         stream: &'a CudaStream,
         tokens: &'a DeviceBuffer<u32>,
         token_embedding: Nvfp4DeviceTensor<'a>,
         position_embedding: Nvfp4DeviceTensor<'a>,
-        hidden: &'a mut DeviceBuffer<f32>,
+        hidden: &'out mut DeviceBuffer<f32>,
     ) -> Self {
         Self {
             stream,
@@ -65,7 +65,7 @@ impl EmbeddingModule {
 
     pub fn token_position_embedding<C: TransformerKernelConfig>(
         &self,
-        args: EmbeddingArgs<'_, C>,
+        args: EmbeddingArgs<'_, '_, C>,
     ) -> Result<(), DriverError> {
         self.module.token_position_embedding_kernel(
             args.stream,

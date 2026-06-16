@@ -19,8 +19,9 @@ pub use config::{
 pub use tensor::{Nvfp4Shape, Nvfp4Tensor};
 
 pub use types::{
-    AttentionWeights, Gpt2, Gpt2BlockWeights, Gpt2Weights, LayerNormWeights, LinearWeights,
-    MlpWeights, TokenPositionEmbeddingArgs,
+    AttentionForwardArgs, AttentionWeights, BlockForwardArgs, Gpt2, Gpt2BlockWeights,
+    Gpt2ForwardArgs, Gpt2Weights, HiddenStateDevice, LayerNormForwardArgs, LayerNormWeights,
+    LinearWeights, MlpForwardArgs, MlpWeights, TokenPositionEmbeddingArgs,
 };
 
 pub use types::{

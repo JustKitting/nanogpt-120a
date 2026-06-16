@@ -17,6 +17,11 @@ pub struct TokenPositionEmbeddingArgs<'a> {
     pub hidden: &'a mut DeviceBuffer<f32>,
 }
 
+pub struct HiddenStateDevice<'a> {
+    pub stream: &'a CudaStream,
+    pub hidden: &'a mut DeviceBuffer<f32>,
+}
+
 #[derive(Clone, Debug)]
 pub struct EmbeddingWeights {
     pub wte: TokenEmbedding,
@@ -31,14 +36,27 @@ impl EmbeddingWeights {
         }
     }
 
-    pub fn forward(&self, args: TokenPositionEmbeddingArgs<'_>) -> Result<(), DriverError> {
-        args.module
-            .token_position_embedding::<Gpt2KernelConfig>(EmbeddingArgs::new(
-                args.stream,
-                args.tokens,
-                args.token_embedding,
-                args.position_embedding,
-                args.hidden,
-            ))
+    pub fn forward<'a>(
+        &self,
+        args: TokenPositionEmbeddingArgs<'a>,
+    ) -> Result<HiddenStateDevice<'a>, DriverError> {
+        let TokenPositionEmbeddingArgs {
+            module,
+            stream,
+            tokens,
+            token_embedding,
+            position_embedding,
+            hidden,
+        } = args;
+
+        module.token_position_embedding::<Gpt2KernelConfig>(EmbeddingArgs::new(
+            stream,
+            tokens,
+            token_embedding,
+            position_embedding,
+            &mut *hidden,
+        ))?;
+
+        Ok(HiddenStateDevice { stream, hidden })
     }
 }
