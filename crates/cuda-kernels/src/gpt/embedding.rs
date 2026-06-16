@@ -4,7 +4,7 @@ use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, L
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use crate::float_ptx::{abs_f32, fma_f32, max_f32, sqrt_f32};
-use crate::nvfp4::nvfp4_value;
+use crate::nvfp4::{Nvfp4DeviceTensor, nvfp4_value};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
 const EMBEDDING_THREADS_PER_BLOCK: u32 = 256;
@@ -23,12 +23,6 @@ pub struct EmbeddingParams {
 }
 
 unsafe impl DeviceCopy for EmbeddingParams {}
-
-pub struct Nvfp4DeviceTensor<'a> {
-    pub bytes: &'a DeviceBuffer<u8>,
-    pub scales: &'a DeviceBuffer<u8>,
-    pub global_scale: f32,
-}
 
 pub struct EmbeddingArgs<'a, 'out> {
     pub stream: &'a CudaStream,

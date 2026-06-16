@@ -1,5 +1,7 @@
-use cuda_core::DriverError;
+use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
+use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use crate::random::InitRng;
@@ -15,6 +17,9 @@ pub struct Gpt2ForwardArgs<'a> {
     pub attention_module: &'a AttentionModule,
     pub attention_quant_module: &'a Nvfp4QuantModule,
     pub attention_input_nvfp4: AttentionInputNvfp4<'a>,
+    pub attention_qkv_weights: [Nvfp4FourSixMmaWeightTensor<'a>; GPT2_N_LAYER],
+    pub attention_qkv_biases: [Nvfp4DeviceTensor<'a>; GPT2_N_LAYER],
+    pub attention_qkv: &'a mut DeviceBuffer<f32>,
 }
 
 #[derive(Clone, Debug)]
@@ -99,15 +104,21 @@ impl Gpt2Weights {
             attention_module,
             attention_quant_module,
             mut attention_input_nvfp4,
+            attention_qkv_weights,
+            attention_qkv_biases,
+            attention_qkv,
         } = args;
 
         let mut hidden = self.embeddings.forward(embeddings)?;
 
-        for block in &self.h {
+        for (block_index, block) in self.h.iter().enumerate() {
             hidden = block.forward(BlockForwardArgs {
                 attention_module,
                 attention_quant_module,
                 attention_input_nvfp4: attention_input_nvfp4.reborrow(),
+                qkv_weight: attention_qkv_weights[block_index],
+                qkv_bias: attention_qkv_biases[block_index],
+                qkv: &mut *attention_qkv,
                 hidden,
             })?;
         }

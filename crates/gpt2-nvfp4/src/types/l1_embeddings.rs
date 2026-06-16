@@ -1,5 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule, Nvfp4DeviceTensor};
+use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
+use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 use crate::random::InitRng;
 use crate::{GPT2_LAYER_NORM_EPSILON, HiddenState, TokenEmbedding};
