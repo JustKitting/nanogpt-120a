@@ -15,3 +15,12 @@ pub fn warp_sum_f32(mut value: f32) -> f32 {
     value += shuffle::xor_f32_sync(FULL_WARP_MASK, value, 2);
     value + shuffle::xor_f32_sync(FULL_WARP_MASK, value, 1)
 }
+
+#[inline(always)]
+pub fn warp_max_f32(mut value: f32) -> f32 {
+    value = max_f32(value, shuffle::xor_f32_sync(FULL_WARP_MASK, value, 16));
+    value = max_f32(value, shuffle::xor_f32_sync(FULL_WARP_MASK, value, 8));
+    value = max_f32(value, shuffle::xor_f32_sync(FULL_WARP_MASK, value, 4));
+    value = max_f32(value, shuffle::xor_f32_sync(FULL_WARP_MASK, value, 2));
+    max_f32(value, shuffle::xor_f32_sync(FULL_WARP_MASK, value, 1))
+}

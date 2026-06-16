@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
-use crate::kernel_ops::{sqrt_f32, warp_sum_f32};
+use crate::kernel_ops::{abs_f32, max_f32, sqrt_f32, warp_max_f32, warp_sum_f32};
 use crate::nvfp4::nvfp4_value;
 
 const EMBEDDING_THREADS_PER_BLOCK: u32 = 256;
@@ -35,6 +35,7 @@ pub struct EmbeddingArgs<'a, 'out> {
     pub rms_weight: Nvfp4DeviceTensor<'a>,
     pub residual: &'out mut DeviceBuffer<f32>,
     pub normalized: &'out mut DeviceBuffer<f32>,
+    pub normalized_amax: &'out mut DeviceBuffer<f32>,
     pub hidden_len: u32,
     pub embedding_dim: u32,
     pub epsilon: f32,
@@ -66,6 +67,7 @@ impl EmbeddingModule {
             args.rms_weight.scales,
             args.residual,
             args.normalized,
+            args.normalized_amax,
             EmbeddingParams {
                 hidden_len: args.hidden_len,
                 embedding_dim: args.embedding_dim,
@@ -92,6 +94,7 @@ pub mod kernels {
         rms_weight_scales: &[u8],
         mut residual: DisjointSlice<f32>,
         mut normalized: DisjointSlice<f32>,
+        mut normalized_amax: DisjointSlice<f32>,
         params: EmbeddingParams,
     ) {
         static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
@@ -158,7 +161,7 @@ pub mod kernels {
 
             let inv_rms = unsafe { WARP_SUMS[0] };
 
-            macro_rules! store_hidden_column {
+            macro_rules! normalized_column {
                 ($col:expr, $value:expr) => {
                     if $col < params.embedding_dim {
                         let weight = rms_weight_value(
@@ -168,18 +171,61 @@ pub mod kernels {
                             $col,
                         );
 
+                        $value * inv_rms * weight
+                    } else {
+                        0.0
+                    }
+                };
+            }
+
+            let normalized0 = normalized_column!(col0, value0);
+            let normalized1 = normalized_column!(col1, value1);
+            let normalized2 = normalized_column!(col2, value2);
+
+            macro_rules! store_hidden_column {
+                ($col:expr, $value:expr, $normalized_value:expr) => {
+                    if $col < params.embedding_dim {
                         unsafe {
                             *residual.get_unchecked_mut(row_base + $col as usize) = $value;
                             *normalized.get_unchecked_mut(row_base + $col as usize) =
-                                $value * inv_rms * weight;
+                                $normalized_value;
                         }
                     }
                 };
             }
 
-            store_hidden_column!(col0, value0);
-            store_hidden_column!(col1, value1);
-            store_hidden_column!(col2, value2);
+            store_hidden_column!(col0, value0, normalized0);
+            store_hidden_column!(col1, value1, normalized1);
+            store_hidden_column!(col2, value2, normalized2);
+
+            let local_amax = max_f32(
+                abs_f32(normalized0),
+                max_f32(abs_f32(normalized1), abs_f32(normalized2)),
+            );
+            let warp_amax = warp_max_f32(local_amax);
+
+            if lane == 0 {
+                unsafe {
+                    WARP_SUMS[warp_in_block as usize] = warp_amax;
+                }
+            }
+
+            thread::sync_threads();
+
+            if warp_in_block == 0 {
+                let partial = if lane < WARPS_PER_BLOCK {
+                    unsafe { WARP_SUMS[lane as usize] }
+                } else {
+                    0.0
+                };
+                let block_amax = warp_max_f32(partial);
+
+                if lane == 0 {
+                    unsafe {
+                        *normalized_amax.get_unchecked_mut(row as usize) = block_amax;
+                    }
+                }
+            }
         }
     }
 

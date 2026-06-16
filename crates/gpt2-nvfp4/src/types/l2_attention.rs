@@ -38,6 +38,7 @@ impl AttentionWeights {
             stream,
             residual,
             normalized,
+            normalized_amax,
         } = args.hidden;
 
         args.module.fake_attention(FakeAttentionArgs::new(
@@ -50,6 +51,7 @@ impl AttentionWeights {
             stream,
             residual,
             normalized,
+            normalized_amax,
         })
     }
 }

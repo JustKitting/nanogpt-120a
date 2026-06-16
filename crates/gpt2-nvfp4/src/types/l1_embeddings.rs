@@ -14,12 +14,14 @@ pub struct TokenEmbeddingArgs<'a> {
     pub rms_weight: Nvfp4DeviceTensor<'a>,
     pub residual: &'a mut DeviceBuffer<f32>,
     pub normalized: &'a mut DeviceBuffer<f32>,
+    pub normalized_amax: &'a mut DeviceBuffer<f32>,
 }
 
 pub struct HiddenStateDevice<'a> {
     pub stream: &'a CudaStream,
     pub residual: &'a mut DeviceBuffer<f32>,
     pub normalized: &'a mut DeviceBuffer<f32>,
+    pub normalized_amax: &'a mut DeviceBuffer<f32>,
 }
 
 #[derive(Clone, Debug)]
@@ -46,6 +48,7 @@ impl EmbeddingWeights {
             rms_weight,
             residual,
             normalized,
+            normalized_amax,
         } = args;
 
         module.token_embedding_rmsnorm(EmbeddingArgs {
@@ -55,6 +58,7 @@ impl EmbeddingWeights {
             rms_weight,
             residual: &mut *residual,
             normalized: &mut *normalized,
+            normalized_amax: &mut *normalized_amax,
             hidden_len: HiddenState::LEN as u32,
             embedding_dim: TokenEmbedding::COLS as u32,
             epsilon: GPT2_RMS_NORM_EPSILON,
@@ -64,6 +68,7 @@ impl EmbeddingWeights {
             stream,
             residual,
             normalized,
+            normalized_amax,
         })
     }
 }
