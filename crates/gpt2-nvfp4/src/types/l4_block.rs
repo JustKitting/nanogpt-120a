@@ -19,6 +19,7 @@ pub struct BlockForwardArgs<'a, 'scratch> {
     pub hidden_nvfp4: HiddenStateNvfp4<'scratch>,
     pub mlp_activation_nvfp4: MlpActivationNvfp4<'scratch>,
     pub projections: AttentionProjectionTensors<'a>,
+    pub ln_1: LayerNormTensors<'a>,
     pub ln_2: LayerNormTensors<'a>,
     pub mlp_up: MlpUpTensors<'a>,
     pub mlp_down: MlpDownTensors<'a>,
@@ -50,13 +51,19 @@ impl Gpt2BlockWeights {
         args: BlockForwardArgs<'a, 'scratch>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
         let mut hidden_nvfp4 = args.hidden_nvfp4;
+        let hidden = self.ln_1.forward(LayerNormWeights::input_from_block(
+            args.layer_norm_module,
+            args.ln_1,
+            args.hidden,
+        ))?;
+
         let hidden = AttentionWeights::forward(AttentionWeights::input_from_embeddings(
             args.attention_module,
             args.quant_module,
             hidden_nvfp4.reborrow(),
             args.projections,
             args.qkv,
-            args.hidden,
+            hidden,
         ))?;
 
         let hidden = self.ln_2.forward(LayerNormWeights::input_from_block(
