@@ -34,7 +34,6 @@ pub struct Gpt2ForwardArgs<'a> {
     pub mlp_up: [MlpUpTensors<'a>; GPT2_N_LAYER],
     pub mlp_down: [MlpDownTensors<'a>; GPT2_N_LAYER],
     pub ln_f: LayerNormTensors<'a>,
-    pub lm_head_weight: Nvfp4FourSixMmaWeightTensor<'a>,
     pub attention_qkv: &'a mut DeviceBuffer<f32>,
     pub mlp_activation: &'a mut DeviceBuffer<f32>,
     pub logits: &'a mut DeviceBuffer<f32>,
@@ -135,11 +134,16 @@ impl Gpt2Weights {
             mlp_up,
             mlp_down,
             ln_f,
-            lm_head_weight,
             attention_qkv,
             mlp_activation,
             logits,
         } = args;
+
+        let lm_head_weight = Nvfp4FourSixMmaWeightTensor {
+            bytes: embeddings.token_embedding.bytes,
+            scales: embeddings.token_embedding.scales,
+            global_scale: embeddings.token_embedding.global_scale,
+        };
 
         let mut hidden = self.embeddings.forward(embeddings)?;
 
