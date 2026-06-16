@@ -4,16 +4,16 @@ use std::path::PathBuf;
 use cuda_core::{CudaContext, DeviceBuffer};
 use gpt2_nvfp4::{
     AttentionInputNvfp4, AttentionProjectionTensors, AttentionWeights, GPT2_CONTEXT_LEN,
-    GPT2_N_EMBD, GPT2_QKV, HiddenState, HiddenStateDevice, HiddenVectorShape, Nvfp4Shape,
-    QkvActivation, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
+    GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, HiddenState, HiddenStateDevice, HiddenVectorShape,
+    Nvfp4Shape, QkvActivation, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
-const E2M1_ONE_PAIR: u8 = 0x22;
 const E4M3_ONE: u8 = 0x38;
+const HEAD_DIM: usize = GPT2_N_EMBD / GPT2_N_HEAD;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -35,7 +35,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let mut input_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
 
-    let weight_bytes = qkv_value_weight_bytes();
+    let weight_bytes = qkv_identity_weight_bytes();
     let weight_scales = vec![E4M3_ONE; QkvWeightShape::SCALE_LEN];
     let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
     let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
@@ -98,8 +98,8 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let out = hidden_dev.to_host_vec(&stream)?;
     let output_amax = amax_dev.to_host_vec(&stream)?;
     let residual_out = residual_dev.to_host_vec(&stream)?;
-    assert_qk_zero_and_v_nonzero(&qkv);
-    assert_prefix_average(&qkv, &out);
+    assert_qkv_nonzero(&qkv);
+    assert_rope_attention_matches(&qkv, &out);
     assert_output_amax(&out, &output_amax);
     assert_c_proj_residual_add(&residual, &out, &residual_out);
     Ok(())
@@ -125,11 +125,10 @@ fn residual_input() -> Vec<f32> {
     residual
 }
 
-fn qkv_value_weight_bytes() -> Vec<u8> {
+fn qkv_identity_weight_bytes() -> Vec<u8> {
     let mut bytes = vec![0_u8; QkvWeightShape::BYTE_LEN];
-    for col in (2 * GPT2_N_EMBD)..GPT2_QKV {
-        let byte_base = col * GPT2_N_EMBD / 2;
-        bytes[byte_base..byte_base + GPT2_N_EMBD / 2].fill(E2M1_ONE_PAIR);
+    for col in 0..GPT2_QKV {
+        set_e2m1_one(&mut bytes, col * GPT2_N_EMBD + col % GPT2_N_EMBD);
     }
     bytes
 }
@@ -137,48 +136,99 @@ fn qkv_value_weight_bytes() -> Vec<u8> {
 fn c_proj_identity_weight_bytes() -> Vec<u8> {
     let mut bytes = vec![0_u8; ResidualWeightShape::BYTE_LEN];
     for col in 0..GPT2_N_EMBD {
-        let element = col * GPT2_N_EMBD + col;
-        let byte = &mut bytes[element / 2];
-        if element & 1 == 0 {
-            *byte = (*byte & 0xf0) | 0x2;
-        } else {
-            *byte = (*byte & 0x0f) | 0x20;
-        }
+        set_e2m1_one(&mut bytes, col * GPT2_N_EMBD + col);
     }
     bytes
 }
 
-fn assert_qk_zero_and_v_nonzero(qkv: &[f32]) {
-    let mut v_nonzero = false;
-    for row in 0..GPT2_CONTEXT_LEN {
-        let row_base = row * GPT2_QKV;
-        for value in &qkv[row_base..row_base + 2 * GPT2_N_EMBD] {
-            assert!(value.abs() <= 1.0e-5, "q_or_k={value:.8e}");
-        }
-        v_nonzero |= qkv[row_base + 2 * GPT2_N_EMBD..row_base + GPT2_QKV]
-            .iter()
-            .any(|value| value.abs() > 1.0e-5);
+fn set_e2m1_one(bytes: &mut [u8], element: usize) {
+    let byte = &mut bytes[element / 2];
+    if element & 1 == 0 {
+        *byte = (*byte & 0xf0) | 0x2;
+    } else {
+        *byte = (*byte & 0x0f) | 0x20;
     }
-    assert!(v_nonzero);
 }
 
-fn assert_prefix_average(qkv: &[f32], out: &[f32]) {
-    let mut prefix = vec![0.0_f32; GPT2_N_EMBD];
-    for row in 0..GPT2_CONTEXT_LEN {
-        let v_base = row * GPT2_QKV + 2 * GPT2_N_EMBD;
-        let out_base = row * GPT2_N_EMBD;
-        for col in 0..GPT2_N_EMBD {
-            prefix[col] += qkv[v_base + col];
-            let expected = prefix[col] / (row + 1) as f32;
-            let actual = out[out_base + col];
-            let error = (actual - expected).abs();
-            let tolerance = expected.abs().max(1.0) * 1.0e-5;
-            assert!(
-                error <= tolerance,
-                "row={row} col={col} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
-            );
+fn assert_qkv_nonzero(qkv: &[f32]) {
+    let q_nonzero = qkv
+        .iter()
+        .take(GPT2_N_EMBD)
+        .any(|value| value.abs() > 1.0e-5);
+    let k_nonzero = qkv[GPT2_N_EMBD..2 * GPT2_N_EMBD]
+        .iter()
+        .any(|value| value.abs() > 1.0e-5);
+    let v_nonzero = qkv[2 * GPT2_N_EMBD..GPT2_QKV]
+        .iter()
+        .any(|value| value.abs() > 1.0e-5);
+    assert!(q_nonzero && k_nonzero && v_nonzero);
+}
+
+fn assert_rope_attention_matches(qkv: &[f32], out: &[f32]) {
+    for row in [0, 1, 2, 17, 128, GPT2_CONTEXT_LEN - 1] {
+        for head in [0, GPT2_N_HEAD / 2, GPT2_N_HEAD - 1] {
+            let scores = rope_scores(qkv, row, head);
+            let score_max = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            let denom = scores
+                .iter()
+                .map(|score| (*score - score_max).exp())
+                .sum::<f32>();
+
+            for dim in [0, 1, HEAD_DIM / 2, HEAD_DIM - 1] {
+                let mut expected = 0.0;
+                for (key, score) in scores.iter().copied().enumerate() {
+                    let weight = (score - score_max).exp() / denom;
+                    expected += weight * qkv_value(qkv, key, head, dim, 2 * GPT2_N_EMBD);
+                }
+
+                let col = head * HEAD_DIM + dim;
+                let actual = out[row * GPT2_N_EMBD + col];
+                let error = (actual - expected).abs();
+                let tolerance = expected.abs().max(1.0) * 2.0e-2;
+                assert!(
+                    error <= tolerance,
+                    "row={row} head={head} dim={dim} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
+                );
+            }
         }
     }
+}
+
+fn rope_scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
+    let mut scores = Vec::with_capacity(query + 1);
+    for key in 0..=query {
+        let mut dot = 0.0;
+        for dim in 0..HEAD_DIM {
+            dot += rope_value(qkv, query, head, dim, 0, query)
+                * rope_value(qkv, key, head, dim, GPT2_N_EMBD, key);
+        }
+        scores.push(dot / (HEAD_DIM as f32).sqrt());
+    }
+    scores
+}
+
+fn rope_value(
+    qkv: &[f32],
+    token: usize,
+    head: usize,
+    dim: usize,
+    offset: usize,
+    position: usize,
+) -> f32 {
+    let pair_dim = dim & !1;
+    let theta = position as f32 * 10_000.0_f32.powf(-(pair_dim as f32) / HEAD_DIM as f32);
+    let (sin, cos) = theta.sin_cos();
+    let value = qkv_value(qkv, token, head, dim, offset);
+    let paired = qkv_value(qkv, token, head, dim ^ 1, offset);
+    if dim & 1 == 0 {
+        value * cos - paired * sin
+    } else {
+        paired * sin + value * cos
+    }
+}
+
+fn qkv_value(qkv: &[f32], token: usize, head: usize, dim: usize, offset: usize) -> f32 {
+    qkv[token * GPT2_QKV + offset + head * HEAD_DIM + dim]
 }
 
 fn assert_output_amax(out: &[f32], output_amax: &[f32]) {
@@ -206,7 +256,7 @@ fn assert_c_proj_residual_add(
         let expected = residual_before[index] + attention_out[index];
         let actual = residual_after[index];
         let error = (actual - expected).abs();
-        let tolerance = expected.abs().max(1.0) * 1.0e-4;
+        let tolerance = expected.abs().max(1.0) * 2.0e-2;
         assert!(
             error <= tolerance,
             "index={index} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"

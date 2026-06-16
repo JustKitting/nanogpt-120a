@@ -45,6 +45,68 @@ pub fn exp_f32(x: f32) -> f32 {
 }
 
 #[inline(always)]
+pub fn sincos_f32(x: f32) -> (f32, f32) {
+    let x = reduce_angle_f32(x);
+    (sin_reduced_f32(x), cos_reduced_f32(x))
+}
+
+#[inline(always)]
+pub fn sin_f32(x: f32) -> f32 {
+    sin_reduced_f32(reduce_angle_f32(x))
+}
+
+#[inline(always)]
+pub fn cos_f32(x: f32) -> f32 {
+    cos_reduced_f32(reduce_angle_f32(x))
+}
+
+#[inline(always)]
+fn sin_reduced_f32(x: f32) -> f32 {
+    let y: f32;
+    unsafe {
+        ptx_asm!(
+            "sin.approx.ftz.f32 %0, %1;",
+            out("=f") y,
+            in("f") x,
+            options(register_only),
+        );
+    }
+    y
+}
+
+#[inline(always)]
+fn cos_reduced_f32(x: f32) -> f32 {
+    let y: f32;
+    unsafe {
+        ptx_asm!(
+            "cos.approx.ftz.f32 %0, %1;",
+            out("=f") y,
+            in("f") x,
+            options(register_only),
+        );
+    }
+    y
+}
+
+#[inline(always)]
+fn reduce_angle_f32(x: f32) -> f32 {
+    const INV_TAU: f32 = 0.159_154_94;
+    const NEG_TAU: f32 = -6.283_185_5;
+    let y: f32;
+    unsafe {
+        ptx_asm!(
+            "{ .reg .u32 n; .reg .f32 scaled, nearest; mul.rn.f32 scaled, %1, %2; cvt.rni.u32.f32 n, scaled; cvt.rn.f32.u32 nearest, n; fma.rn.f32 %0, nearest, %3, %1; }",
+            out("=f") y,
+            in("f") x,
+            in("f") INV_TAU,
+            in("f") NEG_TAU,
+            options(register_only),
+        );
+    }
+    y
+}
+
+#[inline(always)]
 pub fn abs_f32(x: f32) -> f32 {
     let y: f32;
     unsafe {
