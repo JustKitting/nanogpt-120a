@@ -34,14 +34,22 @@ impl AttentionWeights {
         &self,
         args: AttentionForwardArgs<'a>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
-        let HiddenStateDevice { stream, hidden } = args.hidden;
+        let HiddenStateDevice {
+            stream,
+            residual,
+            normalized,
+        } = args.hidden;
 
         args.module.fake_attention(FakeAttentionArgs::new(
             stream,
-            hidden,
+            normalized,
             crate::HiddenState::LEN as u32,
         ))?;
 
-        Ok(HiddenStateDevice { stream, hidden })
+        Ok(HiddenStateDevice {
+            stream,
+            residual,
+            normalized,
+        })
     }
 }

@@ -33,7 +33,8 @@ pub struct EmbeddingArgs<'a, 'out> {
     pub tokens: &'a DeviceBuffer<u32>,
     pub token_embedding: Nvfp4DeviceTensor<'a>,
     pub rms_weight: Nvfp4DeviceTensor<'a>,
-    pub hidden: &'out mut DeviceBuffer<f32>,
+    pub residual: &'out mut DeviceBuffer<f32>,
+    pub normalized: &'out mut DeviceBuffer<f32>,
     pub hidden_len: u32,
     pub embedding_dim: u32,
     pub epsilon: f32,
@@ -63,7 +64,8 @@ impl EmbeddingModule {
             args.token_embedding.scales,
             args.rms_weight.bytes,
             args.rms_weight.scales,
-            args.hidden,
+            args.residual,
+            args.normalized,
             EmbeddingParams {
                 hidden_len: args.hidden_len,
                 embedding_dim: args.embedding_dim,
@@ -81,13 +83,15 @@ pub mod kernels {
     use super::*;
 
     #[kernel]
+    #[allow(clippy::too_many_arguments)]
     pub fn token_embedding_rmsnorm_kernel(
         tokens: &[u32],
         token_embedding_bytes: &[u8],
         token_embedding_scales: &[u8],
         rms_weight_bytes: &[u8],
         rms_weight_scales: &[u8],
-        mut hidden: DisjointSlice<f32>,
+        mut residual: DisjointSlice<f32>,
+        mut normalized: DisjointSlice<f32>,
         params: EmbeddingParams,
     ) {
         static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
@@ -165,7 +169,8 @@ pub mod kernels {
                         );
 
                         unsafe {
-                            *hidden.get_unchecked_mut(row_base + $col as usize) =
+                            *residual.get_unchecked_mut(row_base + $col as usize) = $value;
+                            *normalized.get_unchecked_mut(row_base + $col as usize) =
                                 $value * inv_rms * weight;
                         }
                     }
