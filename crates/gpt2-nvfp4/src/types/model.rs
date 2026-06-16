@@ -1,10 +1,11 @@
 use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::layer_norm::LayerNormModule;
+use rust_kernels_cuda::lm_head::{LmHeadArgs, LmHeadModule};
 use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
-use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
+use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
+use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantModule, Nvfp4QuantRowwiseArgs};
 
 use crate::random::InitRng;
 use crate::{GPT2_N_LAYER, Gpt2Config};
@@ -21,6 +22,7 @@ pub struct Gpt2ForwardArgs<'a> {
     pub quant_module: &'a Nvfp4QuantModule,
     pub layer_norm_module: &'a LayerNormModule,
     pub mlp_module: &'a MlpModule,
+    pub lm_head_module: &'a LmHeadModule,
     pub hidden_nvfp4: HiddenStateNvfp4<'a>,
     pub mlp_activation_nvfp4: MlpActivationNvfp4<'a>,
     pub attention_qkv_weights: [Nvfp4FourSixMmaWeightTensor<'a>; GPT2_N_LAYER],
@@ -32,8 +34,10 @@ pub struct Gpt2ForwardArgs<'a> {
     pub mlp_up: [MlpUpTensors<'a>; GPT2_N_LAYER],
     pub mlp_down: [MlpDownTensors<'a>; GPT2_N_LAYER],
     pub ln_f: LayerNormTensors<'a>,
+    pub lm_head_weight: Nvfp4FourSixMmaWeightTensor<'a>,
     pub attention_qkv: &'a mut DeviceBuffer<f32>,
     pub mlp_activation: &'a mut DeviceBuffer<f32>,
+    pub logits: &'a mut DeviceBuffer<f32>,
 }
 
 #[derive(Clone, Debug)]
@@ -119,6 +123,7 @@ impl Gpt2Weights {
             quant_module,
             layer_norm_module,
             mlp_module,
+            lm_head_module,
             mut hidden_nvfp4,
             mut mlp_activation_nvfp4,
             attention_qkv_weights,
@@ -130,8 +135,10 @@ impl Gpt2Weights {
             mlp_up,
             mlp_down,
             ln_f,
+            lm_head_weight,
             attention_qkv,
             mlp_activation,
+            logits,
         } = args;
 
         let mut hidden = self.embeddings.forward(embeddings)?;
@@ -160,10 +167,49 @@ impl Gpt2Weights {
             })?;
         }
 
-        self.ln_f.forward(LayerNormWeights::input_from_block(
+        let hidden = self.ln_f.forward(LayerNormWeights::input_from_block(
             layer_norm_module,
             ln_f,
             hidden,
-        ))
+        ))?;
+
+        let HiddenStateDevice {
+            stream,
+            residual,
+            normalized,
+            normalized_amax,
+        } = hidden;
+
+        quant_module.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
+            stream,
+            x: normalized,
+            amax: normalized_amax,
+            out_fp4: &mut *hidden_nvfp4.bytes,
+            out_scales: &mut *hidden_nvfp4.scales,
+            out_global_scale: &mut *hidden_nvfp4.global_scales,
+            group_count: (crate::HiddenState::LEN / 16) as u32,
+            row_len: crate::GPT2_N_EMBD as u32,
+        })?;
+
+        lm_head_module.logits(LmHeadArgs {
+            stream,
+            input: Nvfp4RowwiseDeviceTensor {
+                bytes: &*hidden_nvfp4.bytes,
+                scales: &*hidden_nvfp4.scales,
+                global_scales: &*hidden_nvfp4.global_scales,
+            },
+            weight: lm_head_weight,
+            logits,
+            token_count: crate::GPT2_CONTEXT_LEN as u32,
+            input_dim: crate::GPT2_N_EMBD as u32,
+            vocab_size: crate::GPT2_VOCAB_SIZE as u32,
+        })?;
+
+        Ok(HiddenStateDevice {
+            stream,
+            residual,
+            normalized,
+            normalized_amax,
+        })
     }
 }
