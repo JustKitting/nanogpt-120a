@@ -15,7 +15,7 @@ pub use config::{
     GPT2_QKV, GPT2_VOCAB_SIZE, Gpt2Config,
 };
 
-pub use tensor::{Nvfp4Shape, Nvfp4Tensor};
+pub use tensor::{FixedBytes, Nvfp4Shape, Nvfp4Tensor};
 
 pub use types::{
     AttentionForwardArgs, AttentionProjectionTensors, AttentionWeights, BlockForwardArgs, Gpt2,

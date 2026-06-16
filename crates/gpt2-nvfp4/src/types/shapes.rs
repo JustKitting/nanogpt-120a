@@ -1,5 +1,7 @@
 use crate::random::InitRng;
-use crate::{GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE, Nvfp4Shape, Nvfp4Tensor};
+use crate::{
+    FixedBytes, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE, Nvfp4Shape, Nvfp4Tensor,
+};
 
 use super::LinearWeights;
 pub const fn nvfp4_bytes(rows: usize, cols: usize) -> usize {
@@ -21,15 +23,15 @@ macro_rules! nvfp4_shape {
             const BYTE_LEN: usize = nvfp4_bytes($rows, $cols);
             const SCALE_LEN: usize = nvfp4_scales($rows, $cols);
 
-            type Bytes = [u8; { nvfp4_bytes($rows, $cols) }];
-            type Scales = [u8; { nvfp4_scales($rows, $cols) }];
+            type Bytes = FixedBytes<{ nvfp4_bytes($rows, $cols) }>;
+            type Scales = FixedBytes<{ nvfp4_scales($rows, $cols) }>;
 
             fn zero_bytes() -> Self::Bytes {
-                [0; nvfp4_bytes($rows, $cols)]
+                FixedBytes::zeroed()
             }
 
             fn zero_scales() -> Self::Scales {
-                [0; nvfp4_scales($rows, $cols)]
+                FixedBytes::zeroed()
             }
         }
     };
