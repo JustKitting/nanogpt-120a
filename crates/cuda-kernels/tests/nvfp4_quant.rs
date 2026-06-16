@@ -33,7 +33,6 @@ fn fp32_to_nvfp4_four_six_writes_quantized_outputs() -> Result<(), Box<dyn Error
         out_scales: &mut scales_dev,
         out_global_scale: &mut global_scale_dev,
         group_count: 1,
-        scale_override: 1.0,
     })?;
 
     let fp4 = fp4_dev.to_host_vec(&stream)?;

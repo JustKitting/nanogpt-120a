@@ -41,7 +41,7 @@ impl Gpt2BlockWeights {
         &self,
         args: BlockForwardArgs<'a, 'scratch>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
-        let hidden = self.attn.forward(AttentionWeights::input_from_embeddings(
+        let hidden = AttentionWeights::forward(AttentionWeights::input_from_embeddings(
             args.attention_module,
             args.attention_quant_module,
             args.attention_input_nvfp4,

@@ -6,6 +6,8 @@ use super::args::{Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs, RowAmaxArgs};
 use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK};
 use super::kernels;
 
+const SCALE_OVERRIDE: f32 = 1.0;
+
 pub struct Nvfp4QuantModule {
     row_amax: kernels::row_amax::module::LoadedModule,
     four_six: kernels::four_six::module::LoadedModule,
@@ -29,7 +31,6 @@ impl Nvfp4QuantModule {
             args.out_global_scale,
             args.group_count,
             0,
-            args.scale_override,
         )
     }
 
@@ -46,7 +47,6 @@ impl Nvfp4QuantModule {
             args.out_global_scale,
             args.group_count,
             args.row_len,
-            args.scale_override,
         )
     }
 
@@ -76,7 +76,6 @@ impl Nvfp4QuantModule {
         out_global_scale: &mut DeviceBuffer<f32>,
         group_count: u32,
         row_len: u32,
-        scale_override: f32,
     ) -> Result<(), DriverError> {
         let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
 
@@ -93,7 +92,7 @@ impl Nvfp4QuantModule {
             out_scales,
             out_global_scale,
             row_len,
-            scale_override,
+            SCALE_OVERRIDE,
         )
     }
 }

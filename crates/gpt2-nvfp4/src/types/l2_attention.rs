@@ -3,7 +3,7 @@ use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionArgs, QkvProjectionArgs};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
-use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantModule, Nvfp4QuantRowwiseArgs};
+use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantModule, Nvfp4QuantRowwiseArgs, RowAmaxArgs};
 
 use super::{HiddenStateDevice, QkvLinear, ResidualLinear};
 
@@ -68,9 +68,9 @@ impl AttentionWeights {
     }
 
     pub fn forward<'a, 'scratch>(
-        &self,
         args: AttentionForwardArgs<'a, 'scratch>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
+        let input_nvfp4 = args.input_nvfp4;
         let HiddenStateDevice {
             stream,
             residual,
@@ -83,20 +83,19 @@ impl AttentionWeights {
                 stream,
                 x: normalized,
                 amax: normalized_amax,
-                out_fp4: args.input_nvfp4.bytes,
-                out_scales: args.input_nvfp4.scales,
-                out_global_scale: args.input_nvfp4.global_scales,
+                out_fp4: &mut *input_nvfp4.bytes,
+                out_scales: &mut *input_nvfp4.scales,
+                out_global_scale: &mut *input_nvfp4.global_scales,
                 group_count: (crate::HiddenState::LEN / 16) as u32,
                 row_len: crate::GPT2_N_EMBD as u32,
-                scale_override: 1.0,
             })?;
 
         args.module.qkv_projection(QkvProjectionArgs {
             stream,
             input: Nvfp4RowwiseDeviceTensor {
-                bytes: &*args.input_nvfp4.bytes,
-                scales: &*args.input_nvfp4.scales,
-                global_scales: &*args.input_nvfp4.global_scales,
+                bytes: &*input_nvfp4.bytes,
+                scales: &*input_nvfp4.scales,
+                global_scales: &*input_nvfp4.global_scales,
             },
             weight: args.qkv_weight,
             bias: args.qkv_bias,
@@ -116,6 +115,26 @@ impl AttentionWeights {
             head_count: crate::GPT2_N_HEAD as u32,
             head_dim: (crate::GPT2_N_EMBD / crate::GPT2_N_HEAD) as u32,
         })?;
+
+        args.quant_module.row_amax_f32(RowAmaxArgs {
+            stream,
+            x: normalized,
+            out: normalized_amax,
+            row_count: crate::GPT2_CONTEXT_LEN as u32,
+            row_len: crate::GPT2_N_EMBD as u32,
+        })?;
+
+        args.quant_module
+            .fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
+                stream,
+                x: normalized,
+                amax: normalized_amax,
+                out_fp4: &mut *input_nvfp4.bytes,
+                out_scales: &mut *input_nvfp4.scales,
+                out_global_scale: &mut *input_nvfp4.global_scales,
+                group_count: (crate::HiddenState::LEN / 16) as u32,
+                row_len: crate::GPT2_N_EMBD as u32,
+            })?;
 
         Ok(HiddenStateDevice {
             stream,

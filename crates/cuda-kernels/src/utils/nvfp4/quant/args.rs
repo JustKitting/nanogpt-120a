@@ -8,7 +8,6 @@ pub struct Nvfp4QuantArgs<'a, 'out> {
     pub out_scales: &'out mut DeviceBuffer<u8>,
     pub out_global_scale: &'out mut DeviceBuffer<f32>,
     pub group_count: u32,
-    pub scale_override: f32,
 }
 
 pub struct Nvfp4QuantRowwiseArgs<'a, 'out> {
@@ -20,7 +19,6 @@ pub struct Nvfp4QuantRowwiseArgs<'a, 'out> {
     pub out_global_scale: &'out mut DeviceBuffer<f32>,
     pub group_count: u32,
     pub row_len: u32,
-    pub scale_override: f32,
 }
 
 pub struct RowAmaxArgs<'a, 'out> {
