@@ -1,3 +1,7 @@
+mod tensor;
+
+pub use tensor::Nvfp4Tensor;
+
 pub const GPT2_VOCAB_SIZE: usize = 50_257;
 pub const GPT2_CONTEXT_LEN: usize = 1024;
 
@@ -32,14 +36,6 @@ impl Gpt2Config {
     pub const fn mlp_hidden(self) -> usize {
         4 * self.n_embd
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct Nvfp4Tensor {
-    pub bytes: Vec<u8>,
-    pub scales: Vec<u8>,
-    pub global_scale: f32,
-    pub shape: Vec<usize>,
 }
 
 #[derive(Clone, Debug)]
