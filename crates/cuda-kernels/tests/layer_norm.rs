@@ -1,9 +1,14 @@
 use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
-use rust_kernels_cuda::layer_norm::{LayerNormArgs, LayerNormModule, ROW_SIZE};
+use rust_kernels_cuda::layer_norm::{GptLayerNormArgs, LayerNormArgs, LayerNormModule, ROW_SIZE};
+use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 mod common;
+
+const GPT_EMBEDDING_DIM: usize = 768;
+const E2M1_ONE_PAIR: u8 = 0x22;
+const E4M3_ONE: u8 = 0x38;
 
 const SAMPLE_ROW_0: [f32; ROW_SIZE] = [
     -3.875, -3.625, -3.375, -3.125, -2.875, -2.625, -2.375, -2.125, -1.875, -1.625, -1.375, -1.125,
@@ -62,6 +67,67 @@ fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
+    let row_count = 2usize;
+    let epsilon = 1.0e-5f32;
+    let mut x = vec![0.0f32; row_count * GPT_EMBEDDING_DIM];
+
+    for row in 0..row_count {
+        for col in 0..GPT_EMBEDDING_DIM {
+            x[row * GPT_EMBEDDING_DIM + col] = (col as f32 - 383.5) * 0.001 + row as f32 * 0.25;
+        }
+    }
+
+    let weight_bytes = vec![E2M1_ONE_PAIR; GPT_EMBEDDING_DIM / 2];
+    let weight_scales = vec![E4M3_ONE; GPT_EMBEDDING_DIM / 16];
+    let bias_bytes = vec![0_u8; GPT_EMBEDDING_DIM / 2];
+    let bias_scales = vec![E4M3_ONE; GPT_EMBEDDING_DIM / 16];
+
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let module =
+        LayerNormModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+
+    let x_dev = DeviceBuffer::from_host(&stream, &x)?;
+    let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
+    let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
+    let bias_bytes_dev = DeviceBuffer::from_host(&stream, &bias_bytes)?;
+    let bias_scales_dev = DeviceBuffer::from_host(&stream, &bias_scales)?;
+    let mut out_dev = DeviceBuffer::<f32>::zeroed(&stream, x.len())?;
+    let mut amax_dev = DeviceBuffer::<f32>::zeroed(&stream, row_count)?;
+
+    module.gpt_layer_norm(GptLayerNormArgs {
+        stream: &stream,
+        residual: &x_dev,
+        weight: Nvfp4DeviceTensor {
+            bytes: &weight_bytes_dev,
+            scales: &weight_scales_dev,
+            global_scale: 1.0,
+        },
+        bias: Nvfp4DeviceTensor {
+            bytes: &bias_bytes_dev,
+            scales: &bias_scales_dev,
+            global_scale: 1.0,
+        },
+        normalized: &mut out_dev,
+        normalized_amax: &mut amax_dev,
+        row_count: row_count as u32,
+        embedding_dim: GPT_EMBEDDING_DIM as u32,
+        epsilon,
+    })?;
+
+    let out = out_dev.to_host_vec(&stream)?;
+    let amax = amax_dev.to_host_vec(&stream)?;
+    let expected = reference_layer_norm_rows(&x, row_count, GPT_EMBEDDING_DIM, epsilon);
+    let max_abs_error = max_abs_error(&out, &expected);
+
+    assert!(max_abs_error <= 1.0e-4, "max_abs_error={max_abs_error:.8e}");
+    assert_row_amax(&out, &amax, row_count, GPT_EMBEDDING_DIM);
+    Ok(())
+}
+
 fn reference_layer_norm(
     x: &[f32; ROW_SIZE * 2],
     gamma: &[f32; ROW_SIZE],
@@ -91,6 +157,33 @@ fn reference_layer_norm(
     out
 }
 
+fn reference_layer_norm_rows(
+    x: &[f32],
+    row_count: usize,
+    row_len: usize,
+    epsilon: f32,
+) -> Vec<f32> {
+    let mut out = vec![0.0f32; row_count * row_len];
+    for row in 0..row_count {
+        let base = row * row_len;
+        let mean = x[base..base + row_len].iter().sum::<f32>() / row_len as f32;
+        let variance = x[base..base + row_len]
+            .iter()
+            .map(|value| {
+                let centered = value - mean;
+                centered * centered
+            })
+            .sum::<f32>()
+            / row_len as f32;
+        let inv_std = 1.0 / (variance + epsilon).sqrt();
+
+        for col in 0..row_len {
+            out[base + col] = (x[base + col] - mean) * inv_std;
+        }
+    }
+    out
+}
+
 fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
     actual
         .iter()
@@ -98,4 +191,16 @@ fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
         .fold(0.0f32, |max, (actual, expected)| {
             max.max((actual - expected).abs())
         })
+}
+
+fn assert_row_amax(out: &[f32], amax: &[f32], row_count: usize, row_len: usize) {
+    for (row, actual) in amax.iter().copied().enumerate().take(row_count) {
+        let base = row * row_len;
+        let expected = out[base..base + row_len]
+            .iter()
+            .map(|value| value.abs())
+            .fold(0.0f32, f32::max);
+        let error = (actual - expected).abs();
+        assert!(error <= 1.0e-5, "row={row} error={error:.8e}");
+    }
 }

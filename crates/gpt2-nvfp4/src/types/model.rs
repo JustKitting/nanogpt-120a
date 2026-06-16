@@ -1,5 +1,6 @@
 use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
@@ -9,18 +10,21 @@ use crate::{GPT2_N_LAYER, Gpt2Config};
 
 use super::{
     AttentionInputNvfp4, AttentionProjectionTensors, BlockForwardArgs, EmbeddingWeights,
-    Gpt2BlockWeights, HiddenStateDevice, LayerNormWeights, TokenEmbeddingArgs,
+    Gpt2BlockWeights, HiddenStateDevice, LayerNormTensors, LayerNormWeights, TokenEmbeddingArgs,
 };
 
 pub struct Gpt2ForwardArgs<'a> {
     pub embeddings: TokenEmbeddingArgs<'a>,
     pub attention_module: &'a AttentionModule,
     pub attention_quant_module: &'a Nvfp4QuantModule,
+    pub layer_norm_module: &'a LayerNormModule,
     pub attention_input_nvfp4: AttentionInputNvfp4<'a>,
     pub attention_qkv_weights: [Nvfp4FourSixMmaWeightTensor<'a>; GPT2_N_LAYER],
     pub attention_qkv_biases: [Nvfp4DeviceTensor<'a>; GPT2_N_LAYER],
     pub attention_c_proj_weights: [Nvfp4FourSixMmaWeightTensor<'a>; GPT2_N_LAYER],
     pub attention_c_proj_biases: [Nvfp4DeviceTensor<'a>; GPT2_N_LAYER],
+    pub block_ln_2: [LayerNormTensors<'a>; GPT2_N_LAYER],
+    pub ln_f: LayerNormTensors<'a>,
     pub attention_qkv: &'a mut DeviceBuffer<f32>,
 }
 
@@ -105,11 +109,14 @@ impl Gpt2Weights {
             embeddings,
             attention_module,
             attention_quant_module,
+            layer_norm_module,
             mut attention_input_nvfp4,
             attention_qkv_weights,
             attention_qkv_biases,
             attention_c_proj_weights,
             attention_c_proj_biases,
+            block_ln_2,
+            ln_f,
             attention_qkv,
         } = args;
 
@@ -119,6 +126,7 @@ impl Gpt2Weights {
             hidden = block.forward(BlockForwardArgs {
                 attention_module,
                 attention_quant_module,
+                layer_norm_module,
                 attention_input_nvfp4: attention_input_nvfp4.reborrow(),
                 projections: AttentionProjectionTensors {
                     qkv_weight: attention_qkv_weights[block_index],
@@ -126,12 +134,16 @@ impl Gpt2Weights {
                     c_proj_weight: attention_c_proj_weights[block_index],
                     c_proj_bias: attention_c_proj_biases[block_index],
                 },
+                ln_2: block_ln_2[block_index],
                 qkv: &mut *attention_qkv,
                 hidden,
             })?;
         }
 
-        self.ln_f
-            .forward(LayerNormWeights::input_from_block(hidden))
+        self.ln_f.forward(LayerNormWeights::input_from_block(
+            layer_norm_module,
+            ln_f,
+            hidden,
+        ))
     }
 }

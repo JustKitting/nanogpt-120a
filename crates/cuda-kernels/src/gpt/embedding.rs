@@ -3,8 +3,11 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
-use crate::float_ptx::{abs_f32, fma_f32, max_f32, sqrt_f32};
-use crate::nvfp4::{Nvfp4DeviceTensor, nvfp4_value};
+use crate::float_ptx::sqrt_f32;
+use crate::layer_norm_utils::{
+    centered_column, max_abs3, nvfp4_affine_normalized_column, nvfp4_column, store_column,
+};
+use crate::nvfp4::Nvfp4DeviceTensor;
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
 const EMBEDDING_THREADS_PER_BLOCK: u32 = 256;
@@ -118,22 +121,30 @@ pub mod kernels {
             let col1 = thread + EMBEDDING_THREADS_PER_BLOCK;
             let col2 = thread + EMBEDDING_THREADS_PER_BLOCK * 2;
 
-            macro_rules! load_token_column {
-                ($col:expr) => {
-                    token_value(
-                        token_embedding_bytes,
-                        token_embedding_scales,
-                        params.token_embedding_global_scale,
-                        token_base,
-                        $col,
-                        params.embedding_dim,
-                    )
-                };
-            }
-
-            let value0 = load_token_column!(col0);
-            let value1 = load_token_column!(col1);
-            let value2 = load_token_column!(col2);
+            let value0 = nvfp4_column(
+                token_embedding_bytes,
+                token_embedding_scales,
+                params.token_embedding_global_scale,
+                token_base,
+                col0,
+                params.embedding_dim,
+            );
+            let value1 = nvfp4_column(
+                token_embedding_bytes,
+                token_embedding_scales,
+                params.token_embedding_global_scale,
+                token_base,
+                col1,
+                params.embedding_dim,
+            );
+            let value2 = nvfp4_column(
+                token_embedding_bytes,
+                token_embedding_scales,
+                params.token_embedding_global_scale,
+                token_base,
+                col2,
+                params.embedding_dim,
+            );
 
             let local_sum = value0 + value1 + value2;
             let warp_total = warp_sum_f32(local_sum);
@@ -165,19 +176,9 @@ pub mod kernels {
 
             let mean = unsafe { WARP_SUMS[0] };
 
-            macro_rules! centered_column {
-                ($col:expr, $value:expr) => {
-                    if $col < params.embedding_dim {
-                        $value - mean
-                    } else {
-                        0.0
-                    }
-                };
-            }
-
-            let centered0 = centered_column!(col0, value0);
-            let centered1 = centered_column!(col1, value1);
-            let centered2 = centered_column!(col2, value2);
+            let centered0 = centered_column(col0, params.embedding_dim, value0, mean);
+            let centered1 = centered_column(col1, params.embedding_dim, value1, mean);
+            let centered2 = centered_column(col2, params.embedding_dim, value2, mean);
 
             let local_variance_sum =
                 centered0 * centered0 + centered1 * centered1 + centered2 * centered2;
@@ -211,53 +212,69 @@ pub mod kernels {
 
             let inv_std = unsafe { WARP_SUMS[0] };
 
-            macro_rules! normalized_column {
-                ($col:expr, $centered:expr) => {
-                    if $col < params.embedding_dim {
-                        let weight = layer_norm_value(
-                            layer_norm_weight_bytes,
-                            layer_norm_weight_scales,
-                            params.layer_norm_weight_global_scale,
-                            $col,
-                        );
-                        let bias = layer_norm_value(
-                            layer_norm_bias_bytes,
-                            layer_norm_bias_scales,
-                            params.layer_norm_bias_global_scale,
-                            $col,
-                        );
-
-                        fma_f32($centered * inv_std, weight, bias)
-                    } else {
-                        0.0
-                    }
-                };
-            }
-
-            let normalized0 = normalized_column!(col0, centered0);
-            let normalized1 = normalized_column!(col1, centered1);
-            let normalized2 = normalized_column!(col2, centered2);
-
-            macro_rules! store_hidden_column {
-                ($col:expr, $value:expr, $normalized_value:expr) => {
-                    if $col < params.embedding_dim {
-                        unsafe {
-                            *residual.get_unchecked_mut(row_base + $col as usize) = $value;
-                            *normalized.get_unchecked_mut(row_base + $col as usize) =
-                                $normalized_value;
-                        }
-                    }
-                };
-            }
-
-            store_hidden_column!(col0, value0, normalized0);
-            store_hidden_column!(col1, value1, normalized1);
-            store_hidden_column!(col2, value2, normalized2);
-
-            let local_amax = max_f32(
-                abs_f32(normalized0),
-                max_f32(abs_f32(normalized1), abs_f32(normalized2)),
+            let normalized0 = nvfp4_affine_normalized_column(
+                layer_norm_weight_bytes,
+                layer_norm_weight_scales,
+                layer_norm_bias_bytes,
+                layer_norm_bias_scales,
+                col0,
+                params.embedding_dim,
+                centered0,
+                inv_std,
+                params.layer_norm_weight_global_scale,
+                params.layer_norm_bias_global_scale,
             );
+            let normalized1 = nvfp4_affine_normalized_column(
+                layer_norm_weight_bytes,
+                layer_norm_weight_scales,
+                layer_norm_bias_bytes,
+                layer_norm_bias_scales,
+                col1,
+                params.embedding_dim,
+                centered1,
+                inv_std,
+                params.layer_norm_weight_global_scale,
+                params.layer_norm_bias_global_scale,
+            );
+            let normalized2 = nvfp4_affine_normalized_column(
+                layer_norm_weight_bytes,
+                layer_norm_weight_scales,
+                layer_norm_bias_bytes,
+                layer_norm_bias_scales,
+                col2,
+                params.embedding_dim,
+                centered2,
+                inv_std,
+                params.layer_norm_weight_global_scale,
+                params.layer_norm_bias_global_scale,
+            );
+
+            store_column(&mut residual, row_base, col0, params.embedding_dim, value0);
+            store_column(&mut residual, row_base, col1, params.embedding_dim, value1);
+            store_column(&mut residual, row_base, col2, params.embedding_dim, value2);
+            store_column(
+                &mut normalized,
+                row_base,
+                col0,
+                params.embedding_dim,
+                normalized0,
+            );
+            store_column(
+                &mut normalized,
+                row_base,
+                col1,
+                params.embedding_dim,
+                normalized1,
+            );
+            store_column(
+                &mut normalized,
+                row_base,
+                col2,
+                params.embedding_dim,
+                normalized2,
+            );
+
+            let local_amax = max_abs3(normalized0, normalized1, normalized2);
             let warp_amax = warp_max_f32(local_amax);
 
             if lane == 0 {
@@ -283,36 +300,5 @@ pub mod kernels {
                 }
             }
         }
-    }
-
-    #[inline(always)]
-    fn token_value(
-        bytes: &[u8],
-        scales: &[u8],
-        global_scale: f32,
-        token_base: usize,
-        col: u32,
-        embedding_dim: u32,
-    ) -> f32 {
-        if col < embedding_dim {
-            nvfp4_value(bytes, scales, global_scale, token_base + col as usize)
-        } else {
-            0.0
-        }
-    }
-
-    #[inline(always)]
-    fn layer_norm_value(
-        layer_norm_bytes: &[u8],
-        layer_norm_scales: &[u8],
-        layer_norm_global_scale: f32,
-        col: u32,
-    ) -> f32 {
-        nvfp4_value(
-            layer_norm_bytes,
-            layer_norm_scales,
-            layer_norm_global_scale,
-            col as usize,
-        )
     }
 }

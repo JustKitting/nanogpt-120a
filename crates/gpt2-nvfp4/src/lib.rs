@@ -20,8 +20,8 @@ pub use tensor::{Nvfp4Shape, Nvfp4Tensor};
 pub use types::{
     AttentionForwardArgs, AttentionInputNvfp4, AttentionProjectionTensors, AttentionWeights,
     BlockForwardArgs, Gpt2, Gpt2BlockWeights, Gpt2ForwardArgs, Gpt2Weights, HiddenStateDevice,
-    LayerNormForwardArgs, LayerNormWeights, LinearWeights, MlpForwardArgs, MlpWeights,
-    TokenEmbeddingArgs,
+    LayerNormForwardArgs, LayerNormTensors, LayerNormWeights, LinearWeights, MlpForwardArgs,
+    MlpWeights, TokenEmbeddingArgs,
 };
 
 pub use types::{

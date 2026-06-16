@@ -13,7 +13,7 @@ pub use l2_attention::{
 };
 pub use l3_mlp::{MlpForwardArgs, MlpWeights};
 pub use l4_block::{BlockForwardArgs, Gpt2BlockWeights};
-pub use l5_layer_norm::{LayerNormForwardArgs, LayerNormWeights};
+pub use l5_layer_norm::{LayerNormForwardArgs, LayerNormTensors, LayerNormWeights};
 pub use linear::LinearWeights;
 pub use model::{Gpt2, Gpt2ForwardArgs, Gpt2Weights};
 pub(crate) use shapes::Nvfp4ShapeInit;
