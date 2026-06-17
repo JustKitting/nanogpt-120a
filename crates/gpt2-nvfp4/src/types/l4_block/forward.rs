@@ -13,6 +13,7 @@ impl Gpt2BlockWeights {
         args: BlockForwardArgs<'a, 'scratch>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
         let qkv = args.qkv;
+        let attention_lse = args.attention_lse;
         let mlp_pre_activation = args.mlp_pre_activation;
         let mlp_activation = args.mlp_activation;
         let mut hidden_nvfp4 = args.hidden_nvfp4;
@@ -47,6 +48,7 @@ impl Gpt2BlockWeights {
             hidden_nvfp4.reborrow(),
             args.projections,
             &mut *qkv,
+            &mut *attention_lse,
             hidden,
             attention_tape,
         ))?;
@@ -54,6 +56,7 @@ impl Gpt2BlockWeights {
         if let Some(tape) = tape.as_mut() {
             tape.save_qkv(hidden.stream, qkv)?;
             tape.save_attention_out(hidden.stream, hidden.normalized)?;
+            tape.save_attention_lse(hidden.stream, attention_lse)?;
             tape.save_residual_after_attention(hidden.stream, hidden.residual)?;
         }
 

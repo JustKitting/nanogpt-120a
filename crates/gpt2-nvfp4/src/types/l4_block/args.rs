@@ -22,6 +22,7 @@ pub struct BlockForwardArgs<'a, 'scratch> {
     pub mlp_up: MlpUpTensors<'a>,
     pub mlp_down: MlpDownTensors<'a>,
     pub qkv: &'scratch mut DeviceBuffer<f32>,
+    pub attention_lse: &'scratch mut DeviceBuffer<f32>,
     pub mlp_pre_activation: &'scratch mut DeviceBuffer<f32>,
     pub mlp_activation: &'scratch mut DeviceBuffer<f32>,
     pub hidden: HiddenStateDevice<'a>,

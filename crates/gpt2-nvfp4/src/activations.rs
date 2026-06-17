@@ -77,6 +77,7 @@ buffer_shape!(
     f32,
     GPT2_N_HEAD * GPT2_CONTEXT_LEN * GPT2_CONTEXT_LEN
 );
+buffer_shape!(AttentionLseShape, f32, GPT2_N_HEAD * GPT2_CONTEXT_LEN);
 buffer_shape!(MlpActivationShape, f32, GPT2_CONTEXT_LEN * GPT2_MLP);
 buffer_shape!(LogitsShape, f32, GPT2_CONTEXT_LEN * GPT2_VOCAB_SIZE);
 
@@ -84,5 +85,6 @@ pub type TokenIds = U32Buffer<TokenIdsShape>;
 pub type HiddenState = F32Buffer<HiddenStateShape>;
 pub type QkvActivation = F32Buffer<QkvActivationShape>;
 pub type AttentionScores = F32Buffer<AttentionScoresShape>;
+pub type AttentionLse = F32Buffer<AttentionLseShape>;
 pub type MlpActivation = F32Buffer<MlpActivationShape>;
 pub type Logits = F32Buffer<LogitsShape>;

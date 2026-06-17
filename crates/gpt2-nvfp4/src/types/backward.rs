@@ -25,6 +25,7 @@ pub struct BlockForwardSaved<'a> {
     pub qkv_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub qkv: &'a DeviceBuffer<f32>,
     pub attention_out: &'a DeviceBuffer<f32>,
+    pub attention_lse: &'a DeviceBuffer<f32>,
     pub c_proj_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub residual_after_attention: &'a DeviceBuffer<f32>,
     pub ln_2: LayerNormSaved<'a>,

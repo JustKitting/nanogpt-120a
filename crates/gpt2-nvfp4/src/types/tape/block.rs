@@ -12,6 +12,7 @@ impl<'a> BlockForwardTape<'a> {
             qkv_input_nvfp4: self.qkv_input_nvfp4.saved(),
             qkv: &*self.qkv,
             attention_out: &*self.attention_out,
+            attention_lse: &*self.attention_lse,
             c_proj_input_nvfp4: self.c_proj_input_nvfp4.saved(),
             residual_after_attention: &*self.residual_after_attention,
             ln_2: self.ln_2.saved(),
@@ -30,6 +31,7 @@ impl<'a> BlockForwardTape<'a> {
             qkv_input_nvfp4: self.qkv_input_nvfp4.reborrow(),
             qkv: &mut *self.qkv,
             attention_out: &mut *self.attention_out,
+            attention_lse: &mut *self.attention_lse,
             c_proj_input_nvfp4: self.c_proj_input_nvfp4.reborrow(),
             residual_after_attention: &mut *self.residual_after_attention,
             ln_2: self.ln_2.reborrow(),
@@ -63,6 +65,14 @@ impl<'a> BlockForwardTape<'a> {
         out: &DeviceBuffer<f32>,
     ) -> Result<(), DriverError> {
         copy_device(stream, out, self.attention_out)
+    }
+
+    pub(crate) fn save_attention_lse(
+        &mut self,
+        stream: &CudaStream,
+        lse: &DeviceBuffer<f32>,
+    ) -> Result<(), DriverError> {
+        copy_device(stream, lse, self.attention_lse)
     }
 
     pub(crate) fn save_residual_after_attention(

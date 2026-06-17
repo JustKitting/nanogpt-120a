@@ -3,9 +3,10 @@ use std::path::PathBuf;
 
 use cuda_core::{CudaContext, CudaStream, DeviceBuffer};
 use gpt2_nvfp4::{
-    GPT2_CONTEXT_LEN, Gpt2, Gpt2BlockWeights, Gpt2ForwardArgs, HiddenState, HiddenStateNvfp4,
-    LayerNormTensors, LayerNormWeights, Logits, MlpActivation, MlpActivationNvfp4, MlpDownTensors,
-    MlpUpTensors, Nvfp4Shape, Nvfp4Tensor, QkvActivation, TokenEmbeddingArgs,
+    AttentionLse, GPT2_CONTEXT_LEN, Gpt2, Gpt2BlockWeights, Gpt2ForwardArgs, HiddenState,
+    HiddenStateNvfp4, LayerNormTensors, LayerNormWeights, Logits, MlpActivation,
+    MlpActivationNvfp4, MlpDownTensors, MlpUpTensors, Nvfp4Shape, Nvfp4Tensor, QkvActivation,
+    TokenEmbeddingArgs,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::embedding::EmbeddingModule;
@@ -67,6 +68,7 @@ fn run_forward() -> TestResult {
     let mut mlp_activation_global_scales_dev =
         DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
+    let mut attention_lse_dev = DeviceBuffer::<f32>::zeroed(&stream, AttentionLse::LEN)?;
     let mut logits_dev = DeviceBuffer::<f32>::zeroed(&stream, Logits::LEN)?;
 
     model.forward(Gpt2ForwardArgs {
@@ -112,6 +114,7 @@ fn run_forward() -> TestResult {
         }),
         ln_f: ln_f.tensors(),
         attention_qkv: &mut qkv_dev,
+        attention_lse: &mut attention_lse_dev,
         mlp_pre_activation: &mut mlp_pre_activation_dev,
         mlp_activation: &mut mlp_activation_dev,
         logits: &mut logits_dev,

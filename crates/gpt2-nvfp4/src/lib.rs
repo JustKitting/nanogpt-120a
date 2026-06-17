@@ -6,9 +6,9 @@ mod tensor;
 mod types;
 
 pub use activations::{
-    AttentionScores, AttentionScoresShape, BufferShape, F32Buffer, HiddenState, HiddenStateShape,
-    Logits, LogitsShape, MlpActivation, MlpActivationShape, QkvActivation, QkvActivationShape,
-    TokenIds, TokenIdsShape, U32Buffer,
+    AttentionLse, AttentionLseShape, AttentionScores, AttentionScoresShape, BufferShape, F32Buffer,
+    HiddenState, HiddenStateShape, Logits, LogitsShape, MlpActivation, MlpActivationShape,
+    QkvActivation, QkvActivationShape, TokenIds, TokenIdsShape, U32Buffer,
 };
 
 pub use backward::{

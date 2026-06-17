@@ -2,7 +2,7 @@ use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig}
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use super::AttentionModule;
-use crate::float_ptx::{exp_f32, fma_f32, max_f32, sincos_f32};
+use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32, sincos_f32};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
 pub(crate) const CAUSAL_ATTENTION_THREADS_PER_BLOCK: u32 = 64;
@@ -25,6 +25,7 @@ pub struct CausalAttentionArgs<'a, 'out> {
     pub stream: &'a CudaStream,
     pub qkv: &'a DeviceBuffer<f32>,
     pub out: &'out mut DeviceBuffer<f32>,
+    pub lse: &'out mut DeviceBuffer<f32>,
     pub token_count: u32,
     pub embedding_dim: u32,
     pub qkv_dim: u32,
@@ -43,6 +44,7 @@ impl AttentionModule {
             },
             args.qkv,
             args.out,
+            args.lse,
             CausalAttentionParams {
                 token_count: args.token_count,
                 embedding_dim: args.embedding_dim,
@@ -70,6 +72,7 @@ pub mod kernels {
     pub fn causal_attention_kernel(
         qkv: &[f32],
         mut out: DisjointSlice<f32>,
+        mut lse: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         let query = thread::blockIdx_x();
@@ -125,6 +128,12 @@ pub mod kernels {
 
         let score_max = score_max(query, thread);
         let denom = score_denom(query, thread, score_max);
+        if thread == 0 {
+            let lse_index = head as usize * params.token_count as usize + query as usize;
+            unsafe {
+                *lse.get_unchecked_mut(lse_index) = score_max + ln_f32(denom);
+            }
+        }
 
         if thread < params.head_dim {
             let mut value = 0.0;

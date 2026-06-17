@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use gpt2_nvfp4::{
-    AttentionProjectionTensors, AttentionWeights, GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD,
-    GPT2_QKV, HiddenState, HiddenStateDevice, HiddenStateNvfp4, HiddenVectorShape, Nvfp4Shape,
-    QkvActivation, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
+    AttentionLse, AttentionProjectionTensors, AttentionWeights, GPT2_CONTEXT_LEN, GPT2_N_EMBD,
+    GPT2_N_HEAD, GPT2_QKV, HiddenState, HiddenStateDevice, HiddenStateNvfp4, HiddenVectorShape,
+    Nvfp4Shape, QkvActivation, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
@@ -38,6 +38,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let mut input_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 16)?;
     let mut input_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
+    let mut attention_lse_dev = DeviceBuffer::<f32>::zeroed(&stream, AttentionLse::LEN)?;
 
     let weight_bytes = qkv_identity_weight_bytes();
     let weight_scales = vec![E4M3_ONE; QkvWeightShape::SCALE_LEN];
@@ -90,6 +91,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
             },
         },
         &mut qkv_dev,
+        &mut attention_lse_dev,
         HiddenStateDevice {
             stream: &stream,
             residual: &mut residual_dev,
@@ -102,9 +104,11 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
 
     let qkv = qkv_dev.to_host_vec(&stream)?;
     let out = hidden_dev.to_host_vec(&stream)?;
+    let attention_lse = attention_lse_dev.to_host_vec(&stream)?;
     let output_amax = amax_dev.to_host_vec(&stream)?;
     let residual_out = residual_dev.to_host_vec(&stream)?;
     assert_qkv_nonzero(&qkv);
+    assert_attention_lse(&attention_lse);
     assert_rope_attention_matches(&qkv, &out);
     assert_output_amax(&out, &output_amax);
     assert_c_proj_residual_add(&residual, &out, &residual_out);
@@ -168,6 +172,11 @@ fn assert_qkv_nonzero(qkv: &[f32]) {
         .iter()
         .any(|value| value.abs() > 1.0e-7);
     assert!(q_nonzero && k_nonzero && v_nonzero);
+}
+
+fn assert_attention_lse(lse: &[f32]) {
+    assert!(lse.iter().all(|value| value.is_finite()));
+    assert!(lse.iter().any(|value| value.abs() > 1.0e-7));
 }
 
 fn assert_rope_attention_matches(qkv: &[f32], out: &[f32]) {

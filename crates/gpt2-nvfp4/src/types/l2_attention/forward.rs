@@ -57,6 +57,7 @@ pub(super) fn forward<'a, 'scratch>(
         stream,
         qkv: &*args.qkv,
         out: normalized,
+        lse: args.attention_lse,
         token_count: crate::GPT2_CONTEXT_LEN as u32,
         embedding_dim: crate::GPT2_N_EMBD as u32,
         qkv_dim: crate::GPT2_QKV as u32,
