@@ -1,8 +1,8 @@
 use cuda_device::SharedArray;
 
 use super::dkv_thread::KeyThread;
-use super::layout::{d_out_value, softmax_d_value, softmax_prob, v_value};
-use super::rope::{k_value, q_value};
+use super::layout::{d_out_value, softmax_d_value, softmax_prob};
+use super::rope::q_value;
 use super::types::{CAUSAL_BACKWARD_KEY_BLOCK, CausalAttentionBackwardParams};
 
 #[inline(always)]
@@ -12,6 +12,7 @@ pub(super) fn score_local(
     thread_state: KeyThread,
     query: u32,
     active: bool,
+    key_value: f32,
 ) -> f32 {
     if active {
         q_value(
@@ -21,14 +22,7 @@ pub(super) fn score_local(
             thread_state.head,
             thread_state.dim,
             params,
-        ) * k_value(
-            qkv,
-            thread_state.batch,
-            thread_state.key(),
-            thread_state.head,
-            thread_state.dim,
-            params,
-        )
+        ) * key_value
     } else {
         0.0
     }
@@ -36,12 +30,12 @@ pub(super) fn score_local(
 
 #[inline(always)]
 pub(super) fn dp_local(
-    qkv: &[f32],
     d_out: &[f32],
     params: &CausalAttentionBackwardParams,
     thread_state: KeyThread,
     query: u32,
     active: bool,
+    value_value: f32,
 ) -> f32 {
     if active {
         d_out_value(
@@ -51,14 +45,7 @@ pub(super) fn dp_local(
             thread_state.head,
             thread_state.dim,
             params,
-        ) * v_value(
-            qkv,
-            thread_state.batch,
-            thread_state.key(),
-            thread_state.head,
-            thread_state.dim,
-            params,
-        )
+        ) * value_value
     } else {
         0.0
     }

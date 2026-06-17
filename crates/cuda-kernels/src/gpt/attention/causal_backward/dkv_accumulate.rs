@@ -2,9 +2,9 @@ use cuda_device::{SharedArray, thread};
 
 use super::dkv_scalars::{dp_local, score_local, write_query_scalars};
 use super::dkv_thread::KeyThread;
-use super::layout::d_out_value;
+use super::layout::{d_out_value, v_value};
 use super::reductions::reduce_key;
-use super::rope::q_value;
+use super::rope::{k_value, q_value};
 use super::types::{CAUSAL_BACKWARD_KEY_BLOCK, CausalAttentionBackwardParams};
 
 #[allow(clippy::too_many_arguments)]
@@ -22,18 +22,43 @@ pub(super) fn accumulate_key(
 ) -> (f32, f32) {
     let mut dk_rot = 0.0;
     let mut dv = 0.0;
+    let key_valid = thread_state.valid(params);
+    let key_value = if key_valid {
+        k_value(
+            qkv,
+            thread_state.batch,
+            thread_state.key(),
+            thread_state.head,
+            thread_state.dim,
+            params,
+        )
+    } else {
+        0.0
+    };
+    let value_value = if key_valid {
+        v_value(
+            qkv,
+            thread_state.batch,
+            thread_state.key(),
+            thread_state.head,
+            thread_state.dim,
+            params,
+        )
+    } else {
+        0.0
+    };
     let mut query = thread_state.key();
     while query < params.seq_len {
         let active = thread_state.active(query, params);
         let score = reduce_key(
-            score_local(qkv, params, thread_state, query, active),
+            score_local(qkv, params, thread_state, query, active, key_value),
             thread_state.key_offset,
             thread_state.lane,
             thread_state.warp_in_key,
             reduce,
         );
         let dp = reduce_key(
-            dp_local(qkv, d_out, params, thread_state, query, active),
+            dp_local(d_out, params, thread_state, query, active, value_value),
             thread_state.key_offset,
             thread_state.lane,
             thread_state.warp_in_key,
