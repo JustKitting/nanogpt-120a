@@ -13,6 +13,7 @@ impl Gpt2BlockWeights {
         args: BlockForwardArgs<'a, 'scratch>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
         let qkv = args.qkv;
+        let mlp_pre_activation = args.mlp_pre_activation;
         let mlp_activation = args.mlp_activation;
         let mut hidden_nvfp4 = args.hidden_nvfp4;
         let mut tape = args.tape;
@@ -69,17 +70,10 @@ impl Gpt2BlockWeights {
             )?;
         }
 
-        let (pre_activation, mlp_tape) = if let Some(tape) = tape.as_mut() {
-            (
-                Some(&mut *tape.mlp_up),
-                Some(crate::types::MlpForwardTape {
-                    up_input_nvfp4: tape.mlp_up_input_nvfp4.reborrow(),
-                    down_input_nvfp4: tape.mlp_down_input_nvfp4.reborrow(),
-                }),
-            )
-        } else {
-            (None, None)
-        };
+        let mlp_tape = tape.as_mut().map(|tape| crate::types::MlpForwardTape {
+            up_input_nvfp4: tape.mlp_up_input_nvfp4.reborrow(),
+            down_input_nvfp4: tape.mlp_down_input_nvfp4.reborrow(),
+        });
 
         let hidden = MlpWeights::forward(MlpWeights::input_from_attention_with_tape(
             args.mlp_module,
@@ -87,7 +81,7 @@ impl Gpt2BlockWeights {
             MlpScratch {
                 input_nvfp4: hidden_nvfp4.reborrow(),
                 activation_nvfp4: args.mlp_activation_nvfp4,
-                pre_activation,
+                pre_activation: &mut *mlp_pre_activation,
                 activation: &mut *mlp_activation,
             },
             MlpProjectionTensors {
@@ -98,16 +92,18 @@ impl Gpt2BlockWeights {
             mlp_tape,
         ))?;
 
-        save_mlp_tape(tape.as_mut(), mlp_activation, hidden)
+        save_mlp_tape(tape.as_mut(), mlp_pre_activation, mlp_activation, hidden)
     }
 }
 
 fn save_mlp_tape<'a>(
     tape: Option<&mut crate::types::BlockForwardTape<'_>>,
+    mlp_pre_activation: &DeviceBuffer<f32>,
     mlp_activation: &DeviceBuffer<f32>,
     hidden: HiddenStateDevice<'a>,
 ) -> Result<HiddenStateDevice<'a>, DriverError> {
     if let Some(tape) = tape {
+        tape.save_mlp_up(hidden.stream, mlp_pre_activation)?;
         tape.save_mlp_relu2(hidden.stream, mlp_activation)?;
         tape.save_residual_out(hidden.stream, hidden.residual)?;
     }

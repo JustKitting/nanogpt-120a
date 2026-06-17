@@ -81,6 +81,14 @@ impl<'a> BlockForwardTape<'a> {
         copy_device(stream, activation, self.mlp_relu2)
     }
 
+    pub(crate) fn save_mlp_up(
+        &mut self,
+        stream: &CudaStream,
+        activation: &DeviceBuffer<f32>,
+    ) -> Result<(), DriverError> {
+        copy_device(stream, activation, self.mlp_up)
+    }
+
     pub(crate) fn save_residual_out(
         &mut self,
         stream: &CudaStream,

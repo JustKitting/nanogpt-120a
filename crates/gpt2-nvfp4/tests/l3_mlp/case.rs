@@ -41,7 +41,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 scales: &mut scratch.activation_scales,
                 global_scales: &mut scratch.activation_global_scales,
             },
-            pre_activation: None,
+            pre_activation: &mut scratch.pre_activation,
             activation: &mut scratch.activation,
         },
         MlpProjectionTensors {

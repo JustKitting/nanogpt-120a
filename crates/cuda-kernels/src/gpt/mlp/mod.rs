@@ -2,5 +2,5 @@ mod args;
 mod kernels;
 mod launcher;
 
-pub use args::{MlpDownResidualArgs, MlpUpRelu2Args, MlpUpRelu2TapeArgs};
+pub use args::{MlpDownResidualArgs, MlpUpRelu2Args};
 pub use launcher::MlpModule;

@@ -59,6 +59,7 @@ fn run_forward() -> TestResult {
     let mut hidden_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 2)?;
     let mut hidden_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 16)?;
     let mut hidden_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
+    let mut mlp_pre_activation_dev = DeviceBuffer::<f32>::zeroed(&stream, MlpActivation::LEN)?;
     let mut mlp_activation_dev = DeviceBuffer::<f32>::zeroed(&stream, MlpActivation::LEN)?;
     let mut mlp_activation_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, MlpActivation::LEN / 2)?;
     let mut mlp_activation_scales_dev =
@@ -111,6 +112,7 @@ fn run_forward() -> TestResult {
         }),
         ln_f: ln_f.tensors(),
         attention_qkv: &mut qkv_dev,
+        mlp_pre_activation: &mut mlp_pre_activation_dev,
         mlp_activation: &mut mlp_activation_dev,
         logits: &mut logits_dev,
         tape: None,

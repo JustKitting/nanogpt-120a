@@ -1,5 +1,5 @@
 use cuda_core::DriverError;
-use rust_kernels_cuda::mlp::{MlpDownResidualArgs, MlpUpRelu2Args, MlpUpRelu2TapeArgs};
+use rust_kernels_cuda::mlp::{MlpDownResidualArgs, MlpUpRelu2Args};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantRowwiseArgs;
 
@@ -43,30 +43,17 @@ pub(super) fn forward<'a, 'scratch>(
         tape.save_up_input(stream, input)?;
     }
 
-    if let Some(pre_activation) = args.scratch.pre_activation {
-        args.module.up_relu2_tape(MlpUpRelu2TapeArgs {
-            stream,
-            input,
-            weight: args.projections.up.weight,
-            bias: args.projections.up.bias,
-            pre_activation,
-            out: args.scratch.activation,
-            token_count: crate::GPT2_CONTEXT_LEN as u32,
-            input_dim: crate::GPT2_N_EMBD as u32,
-            output_dim: crate::GPT2_MLP as u32,
-        })?;
-    } else {
-        args.module.up_relu2(MlpUpRelu2Args {
-            stream,
-            input,
-            weight: args.projections.up.weight,
-            bias: args.projections.up.bias,
-            out: args.scratch.activation,
-            token_count: crate::GPT2_CONTEXT_LEN as u32,
-            input_dim: crate::GPT2_N_EMBD as u32,
-            output_dim: crate::GPT2_MLP as u32,
-        })?;
-    }
+    args.module.up_relu2(MlpUpRelu2Args {
+        stream,
+        input,
+        weight: args.projections.up.weight,
+        bias: args.projections.up.bias,
+        pre_activation: args.scratch.pre_activation,
+        out: args.scratch.activation,
+        token_count: crate::GPT2_CONTEXT_LEN as u32,
+        input_dim: crate::GPT2_N_EMBD as u32,
+        output_dim: crate::GPT2_MLP as u32,
+    })?;
 
     quantize_activation(
         args.quant_module,

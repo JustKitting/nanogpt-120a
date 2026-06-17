@@ -36,7 +36,7 @@ mod module {
 
     #[kernel]
     #[allow(clippy::too_many_arguments)]
-    pub fn mlp_projection_relu2_tape_kernel(
+    pub fn mlp_projection_relu2_kernel(
         input_bytes: &[u8],
         input_scales: &[u8],
         input_global_scales: &[f32],

@@ -1,7 +1,7 @@
 mod accumulate;
 mod args;
 mod body;
-mod body_tape;
+mod body_fused;
 mod load;
 mod load_bytes;
 mod store;
@@ -13,4 +13,4 @@ pub use args::{
     Nvfp4ProjectionTile, projection_grid_dim,
 };
 pub use body::{nvfp4_projection_kernel_body, nvfp4_projection_nobias_kernel_body};
-pub use body_tape::{nvfp4_projection_relu2_kernel_body, nvfp4_projection_residual_kernel_body};
+pub use body_fused::{nvfp4_projection_relu2_kernel_body, nvfp4_projection_residual_kernel_body};
