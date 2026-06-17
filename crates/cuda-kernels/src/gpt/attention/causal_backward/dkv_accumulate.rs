@@ -3,7 +3,7 @@ use cuda_device::{SharedArray, thread};
 use super::dkv_scalars::{dp_local, score_local, write_query_scalars};
 use super::dkv_thread::KeyThread;
 use super::layout::{d_out_value, v_value};
-use super::reductions::reduce_key;
+use super::reductions::{KEY_REDUCE_PAIR_LEN, reduce_key_pair};
 use super::rope::{k_value, q_value};
 use super::types::{CAUSAL_BACKWARD_KEY_BLOCK, CausalAttentionBackwardParams};
 
@@ -16,7 +16,7 @@ pub(super) fn accumulate_key(
     softmax_d: &[f32],
     params: &CausalAttentionBackwardParams,
     thread_state: KeyThread,
-    reduce: &mut SharedArray<f32, { (CAUSAL_BACKWARD_KEY_BLOCK * 2) as usize }>,
+    reduce: &mut SharedArray<f32, KEY_REDUCE_PAIR_LEN>,
     prob: &mut SharedArray<f32, { CAUSAL_BACKWARD_KEY_BLOCK as usize }>,
     ds: &mut SharedArray<f32, { CAUSAL_BACKWARD_KEY_BLOCK as usize }>,
 ) -> (f32, f32) {
@@ -75,14 +75,8 @@ pub(super) fn accumulate_key(
         } else {
             0.0
         };
-        let score = reduce_key(
+        let (score, dp) = reduce_key_pair(
             score_local(query_value, active, key_value),
-            thread_state.key_offset,
-            thread_state.lane,
-            thread_state.warp_in_key,
-            reduce,
-        );
-        let dp = reduce_key(
             dp_local(d_out_query, active, value_value),
             thread_state.key_offset,
             thread_state.lane,

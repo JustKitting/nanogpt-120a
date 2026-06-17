@@ -3,6 +3,7 @@ use cuda_device::{DisjointSlice, SharedArray, thread, warp};
 use super::dkv_accumulate::accumulate_key;
 use super::dkv_thread::KeyThread;
 use super::layout::qkv_index;
+use super::reductions::KEY_REDUCE_PAIR_LEN;
 use super::rope::rope_raw_grad;
 use super::types::{
     CAUSAL_BACKWARD_HEAD_DIM_THREADS, CAUSAL_BACKWARD_KEY_BLOCK, CausalAttentionBackwardParams,
@@ -15,7 +16,7 @@ pub(super) fn dkv_body(
     softmax_d: &[f32],
     mut d_qkv: DisjointSlice<f32>,
     params: CausalAttentionBackwardParams,
-    reduce: &mut SharedArray<f32, { (CAUSAL_BACKWARD_KEY_BLOCK * 2) as usize }>,
+    reduce: &mut SharedArray<f32, KEY_REDUCE_PAIR_LEN>,
     prob: &mut SharedArray<f32, { CAUSAL_BACKWARD_KEY_BLOCK as usize }>,
     ds: &mut SharedArray<f32, { CAUSAL_BACKWARD_KEY_BLOCK as usize }>,
     dk_rot_shared: &mut SharedArray<
