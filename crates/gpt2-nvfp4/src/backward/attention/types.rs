@@ -15,12 +15,15 @@ pub struct AttentionBackwardModules<'a> {
     pub quant: &'a Nvfp4QuantModule,
 }
 
-pub struct AttentionCProjScratch<'scratch> {
+pub struct AttentionLinearScratch<'scratch> {
     pub error_t: &'scratch mut DeviceBuffer<f32>,
     pub weight_t: &'scratch mut DeviceBuffer<f32>,
     pub input_t: &'scratch mut DeviceBuffer<f32>,
     pub linear: LinearBackwardMsEdenScratch<'scratch>,
 }
+
+pub type AttentionCProjScratch<'scratch> = AttentionLinearScratch<'scratch>;
+pub type AttentionQkvScratch<'scratch> = AttentionLinearScratch<'scratch>;
 
 pub struct AttentionCoreScratch<'scratch> {
     pub softmax_d: &'scratch mut DeviceBuffer<f32>,
@@ -59,4 +62,16 @@ pub struct AttentionCoreBackwardArgs<'a, 'scratch, 'out> {
     pub d_attention_out: &'a DeviceBuffer<f32>,
     pub d_qkv: &'out mut DeviceBuffer<f32>,
     pub scratch: AttentionCoreScratch<'scratch>,
+}
+
+pub struct AttentionQkvBackwardArgs<'a, 'scratch, 'out> {
+    pub stream: &'a CudaStream,
+    pub modules: AttentionBackwardModules<'a>,
+    pub saved: BlockForwardSaved<'a>,
+    pub projections: AttentionProjectionTensors<'a>,
+    pub d_qkv: &'a DeviceBuffer<f32>,
+    pub d_ln_1_normalized: &'out mut DeviceBuffer<f32>,
+    pub d_attn_qkv_weight: &'out mut DeviceBuffer<f32>,
+    pub scratch: AttentionQkvScratch<'scratch>,
+    pub seeds: AttentionBackwardSeeds,
 }
