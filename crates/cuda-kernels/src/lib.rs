@@ -28,6 +28,8 @@ pub mod nvfp4;
 pub mod nvfp4_cast;
 #[path = "utils/nvfp4/quant/mod.rs"]
 pub mod nvfp4_quant;
+#[path = "gpt/residual.rs"]
+pub mod residual;
 #[path = "utils/shuffle.rs"]
 pub mod shuffle;
 #[path = "utils/transpose.rs"]
@@ -38,6 +40,7 @@ pub mod warp_reduce;
 pub mod gpt {
     pub use crate::{
         attention, embedding, layer_norm, layer_norm_backward, linear_backward, lm_head, loss, mlp,
+        residual,
     };
 }
 

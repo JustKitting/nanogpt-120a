@@ -1,7 +1,9 @@
+mod block;
 pub mod final_head;
 mod layer_norm;
 mod mlp;
 
+pub use block::{BlockMlpBackwardArgs, BlockMlpBackwardModules, mlp_side_backward};
 pub use final_head::{
     FinalHeadBackwardArgs, FinalHeadBackwardModules, FinalHeadBackwardScratch,
     FinalHeadBackwardSeeds, backward as final_head_backward,
