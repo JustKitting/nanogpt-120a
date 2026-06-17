@@ -13,9 +13,10 @@ pub use activations::{
 
 pub use backward::{
     FinalHeadBackwardArgs, FinalHeadBackwardModules, FinalHeadBackwardScratch,
-    FinalHeadBackwardSeeds, Gpt2LayerNormBackwardInputArgs, MlpBackwardArgs, MlpBackwardGrads,
-    MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds, final_head_backward,
-    layer_norm_backward_input, mlp_backward,
+    FinalHeadBackwardSeeds, Gpt2LayerNormBackwardArgs, Gpt2LayerNormBackwardInputArgs,
+    Gpt2LayerNormBackwardParamArgs, MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules,
+    MlpBackwardScratch, MlpBackwardSeeds, final_head_backward, layer_norm_backward,
+    layer_norm_backward_input, layer_norm_backward_params, mlp_backward,
 };
 
 pub use config::{

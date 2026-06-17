@@ -8,6 +8,7 @@ pub struct Gpt2BackwardContext<'a> {
     pub grads: Gpt2BackwardGrads<'a>,
 }
 
+#[derive(Clone, Copy)]
 pub struct Gpt2ForwardSaved<'a> {
     pub tokens: &'a DeviceBuffer<u32>,
     pub embedding_residual: &'a DeviceBuffer<f32>,
@@ -17,6 +18,7 @@ pub struct Gpt2ForwardSaved<'a> {
     pub logits: &'a DeviceBuffer<f32>,
 }
 
+#[derive(Clone, Copy)]
 pub struct BlockForwardSaved<'a> {
     pub residual_in: &'a DeviceBuffer<f32>,
     pub ln_1: LayerNormSaved<'a>,
@@ -33,6 +35,7 @@ pub struct BlockForwardSaved<'a> {
     pub residual_out: &'a DeviceBuffer<f32>,
 }
 
+#[derive(Clone, Copy)]
 pub struct LayerNormSaved<'a> {
     pub residual: &'a DeviceBuffer<f32>,
     pub normalized: &'a DeviceBuffer<f32>,
@@ -62,4 +65,6 @@ pub struct BlockBackwardGrads<'a> {
 pub struct LayerNormGrads<'a> {
     pub d_residual: &'a mut DeviceBuffer<f32>,
     pub d_normalized: &'a mut DeviceBuffer<f32>,
+    pub d_weight: &'a mut DeviceBuffer<f32>,
+    pub d_bias: &'a mut DeviceBuffer<f32>,
 }
