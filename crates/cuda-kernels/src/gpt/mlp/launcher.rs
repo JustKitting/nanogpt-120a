@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
-use super::args::{MlpDownResidualArgs, MlpUpRelu2Args};
+use super::args::{MlpDownResidualArgs, MlpUpRelu2Args, Relu2BackwardArgs};
 use super::kernels;
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams,
@@ -50,6 +50,21 @@ impl MlpModule {
             args.bias.scales,
             args.residual,
             down_params(&args),
+        )
+    }
+
+    pub fn relu2_backward(&self, args: Relu2BackwardArgs<'_, '_>) -> Result<(), DriverError> {
+        self.module.relu2_backward_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (args.len.div_ceil(kernels::RELU2_THREADS_PER_BLOCK), 1, 1),
+                block_dim: (kernels::RELU2_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.pre_activation,
+            args.d_out,
+            args.d_pre_activation,
+            args.len,
         )
     }
 }

@@ -6,6 +6,8 @@ use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
+use crate::Gpt2Rng;
+
 pub struct FinalHeadBackwardModules<'a> {
     pub loss: &'a LossModule,
     pub transpose: &'a TransposeModule,
@@ -21,6 +23,20 @@ pub struct FinalHeadBackwardScratch<'scratch> {
     pub linear: LinearBackwardMsEdenScratch<'scratch>,
 }
 
+pub struct FinalHeadBackwardSeeds {
+    pub(crate) sign: u32,
+    pub(crate) scale: u32,
+}
+
+impl FinalHeadBackwardSeeds {
+    pub fn from_rng(rng: &mut Gpt2Rng) -> Self {
+        Self {
+            sign: rng.next_u32(),
+            scale: rng.next_u32(),
+        }
+    }
+}
+
 pub struct FinalHeadBackwardArgs<'a, 'scratch, 'out> {
     pub stream: &'a CudaStream,
     pub modules: FinalHeadBackwardModules<'a>,
@@ -33,6 +49,5 @@ pub struct FinalHeadBackwardArgs<'a, 'scratch, 'out> {
     pub d_final_normalized: &'out mut DeviceBuffer<f32>,
     pub d_lm_head_weight: &'out mut DeviceBuffer<f32>,
     pub scratch: FinalHeadBackwardScratch<'scratch>,
-    pub sign_seed: u32,
-    pub scale_seed: u32,
+    pub seeds: FinalHeadBackwardSeeds,
 }

@@ -13,7 +13,9 @@ pub use activations::{
 
 pub use backward::{
     FinalHeadBackwardArgs, FinalHeadBackwardModules, FinalHeadBackwardScratch,
-    Gpt2LayerNormBackwardInputArgs, final_head_backward, layer_norm_backward_input,
+    FinalHeadBackwardSeeds, Gpt2LayerNormBackwardInputArgs, MlpBackwardArgs, MlpBackwardGrads,
+    MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds, final_head_backward,
+    layer_norm_backward_input, mlp_backward,
 };
 
 pub use config::{
@@ -22,6 +24,8 @@ pub use config::{
 };
 
 pub use tensor::{FixedBytes, Nvfp4Shape, Nvfp4Tensor};
+
+pub use random::Gpt2Rng;
 
 pub use types::{
     AttentionForwardArgs, AttentionForwardTape, AttentionProjectionTensors, AttentionWeights,

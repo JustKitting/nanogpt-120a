@@ -19,8 +19,7 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         d_final_normalized,
         d_lm_head_weight,
         scratch,
-        sign_seed,
-        scale_seed,
+        seeds,
     } = args;
 
     run_loss(modules.loss, stream, logits, targets, losses, dlogits)?;
@@ -51,8 +50,8 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
             d_final_normalized,
             d_lm_head_weight,
             scratch,
-            sign_seed,
-            scale_seed,
+            sign_seed: seeds.sign,
+            scale_seed: seeds.scale,
         },
     )
 }

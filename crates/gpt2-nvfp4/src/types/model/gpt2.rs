@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 
 use super::args::Gpt2ForwardArgs;
 use super::weights::Gpt2Weights;
-use crate::random::InitRng;
+use crate::Gpt2Rng;
 use crate::types::{HiddenStateDevice, TokenEmbeddingArgs};
 
 #[derive(Clone, Debug)]
@@ -16,8 +16,12 @@ impl Gpt2 {
     }
 
     pub fn init(&mut self, seed: u64) {
-        let mut rng = InitRng::new(seed);
-        self.weights = Some(Gpt2Weights::init(&mut rng));
+        let mut rng = Gpt2Rng::new(seed);
+        self.init_from_rng(&mut rng);
+    }
+
+    pub fn init_from_rng(&mut self, rng: &mut Gpt2Rng) {
+        self.weights = Some(Gpt2Weights::init(rng));
     }
 
     pub fn weights(&self) -> Option<&Gpt2Weights> {

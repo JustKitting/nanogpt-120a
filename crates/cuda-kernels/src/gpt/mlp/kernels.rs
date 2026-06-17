@@ -1,8 +1,11 @@
-use cuda_device::{DisjointSlice, cuda_module, kernel};
+use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
+use crate::float_ptx::max_f32;
 use crate::mma::{
     Nvfp4ProjectionParams, nvfp4_projection_kernel_body, nvfp4_projection_relu2_kernel_body,
 };
+
+pub(super) const RELU2_THREADS_PER_BLOCK: u32 = 256;
 
 #[cuda_module]
 mod module {
@@ -60,6 +63,23 @@ mod module {
             &mut out,
             params,
         );
+    }
+
+    #[kernel]
+    pub fn relu2_backward_kernel(
+        pre_activation: &[f32],
+        d_out: &[f32],
+        mut d_pre_activation: DisjointSlice<f32>,
+        len: u32,
+    ) {
+        let index = thread::blockIdx_x() * super::RELU2_THREADS_PER_BLOCK + thread::threadIdx_x();
+        if index < len {
+            let relu = max_f32(pre_activation[index as usize], 0.0);
+            unsafe {
+                *d_pre_activation.get_unchecked_mut(index as usize) =
+                    d_out[index as usize] * 2.0 * relu;
+            }
+        }
     }
 }
 
