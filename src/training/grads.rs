@@ -1,0 +1,63 @@
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
+use gpt2_nvfp4::{
+    GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_LAYER, GPT2_VOCAB_SIZE, Gpt2BackwardGrads, HiddenState,
+    Logits,
+};
+
+use super::grad_block::{BlockGradBuffers, LayerNormGradBuffers};
+use super::tape_leaf::zero;
+
+pub struct BackwardBuffers {
+    pub losses: DeviceBuffer<f32>,
+    pub(super) d_lm_head_weight: DeviceBuffer<f32>,
+    pub(super) dlogits: DeviceBuffer<f32>,
+    pub(super) d_embedding_residual: DeviceBuffer<f32>,
+    pub(super) blocks: [BlockGradBuffers; GPT2_N_LAYER],
+    pub(super) final_norm: LayerNormGradBuffers,
+}
+
+pub struct BackwardParts<'a> {
+    pub losses: &'a mut DeviceBuffer<f32>,
+    pub d_lm_head_weight: &'a mut DeviceBuffer<f32>,
+    pub grads: Gpt2BackwardGrads<'a>,
+}
+
+impl BackwardBuffers {
+    pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
+        Ok(Self {
+            losses: zero(stream, GPT2_CONTEXT_LEN)?,
+            d_lm_head_weight: zero(stream, GPT2_VOCAB_SIZE * GPT2_N_EMBD)?,
+            dlogits: zero(stream, Logits::LEN)?,
+            d_embedding_residual: zero(stream, HiddenState::LEN)?,
+            blocks: block_array(|| BlockGradBuffers::new(stream))?,
+            final_norm: LayerNormGradBuffers::new(stream)?,
+        })
+    }
+
+    pub fn parts(&mut self) -> BackwardParts<'_> {
+        let blocks = self.blocks.as_mut_ptr();
+        BackwardParts {
+            losses: &mut self.losses,
+            d_lm_head_weight: &mut self.d_lm_head_weight,
+            grads: Gpt2BackwardGrads {
+                dlogits: &mut self.dlogits,
+                d_embedding_residual: &mut self.d_embedding_residual,
+                blocks: std::array::from_fn(|i| unsafe { (&mut *blocks.add(i)).grads() }),
+                final_norm: self.final_norm.grads(),
+            },
+        }
+    }
+}
+
+fn block_array<F, T>(mut f: F) -> Result<[T; GPT2_N_LAYER], DriverError>
+where
+    F: FnMut() -> Result<T, DriverError>,
+{
+    let values = (0..GPT2_N_LAYER)
+        .map(|_| f())
+        .collect::<Result<Vec<_>, _>>()?;
+    match values.try_into() {
+        Ok(array) => Ok(array),
+        Err(_) => unreachable!("block array length must match GPT2_N_LAYER"),
+    }
+}

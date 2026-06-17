@@ -13,6 +13,7 @@ members = [
 resolver = "3"
 
 [dependencies]
+cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }
 fineweb-prep = { path = "crates/fineweb-prep" }
 gpt2-bpe = { path = "crates/gpt2-bpe" }
 gpt2-nvfp4 = { path = "crates/gpt2-nvfp4" }

@@ -2415,6 +2415,7 @@ dependencies = [
 name = "rust-kernels"
 version = "0.1.0"
 dependencies = [
+ "cuda-core",
  "fineweb-prep",
  "gpt2-bpe",
  "gpt2-nvfp4",
