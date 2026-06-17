@@ -122,6 +122,47 @@ pub(crate) mod module {
         }
     }
 
+    #[kernel]
+    pub fn tensor_amax_from_chunks_f32_kernel(
+        chunk_amax: &[f32],
+        mut out: DisjointSlice<f32>,
+        chunk_count: u32,
+    ) {
+        let thread = thread::threadIdx_x();
+        let lane = warp::lane_id();
+        let warp_in_block = thread / 32;
+        let mut chunk = thread;
+        let mut local_amax = 0.0;
+
+        while chunk < chunk_count {
+            local_amax = max_f32(local_amax, chunk_amax[chunk as usize]);
+            chunk += thread::blockDim_x();
+        }
+
+        let warp_amax = warp_max_f32(local_amax);
+        if lane == 0 {
+            unsafe {
+                TENSOR_AMAX[warp_in_block as usize] = warp_amax;
+            }
+        }
+
+        thread::sync_threads();
+
+        if warp_in_block == 0 {
+            let partial = if lane < WARPS_PER_BLOCK {
+                unsafe { TENSOR_AMAX[lane as usize] }
+            } else {
+                0.0
+            };
+            let block_amax = warp_max_f32(partial);
+            if lane == 0 {
+                unsafe {
+                    *out.get_unchecked_mut(0) = block_amax;
+                }
+            }
+        }
+    }
+
     #[inline(always)]
     fn checked_abs_f32(x: &[f32], index: u32, element_count: u32) -> f32 {
         if index < element_count {

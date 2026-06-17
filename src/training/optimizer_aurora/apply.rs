@@ -15,6 +15,7 @@ pub(super) fn apply_update(args: AuroraMatrixArgs<'_, '_>, len: u32) -> Result<(
             aurora_update: &args.scratch.oriented,
             fp32_workspace: &mut args.optimizer_scratch.fp32_workspace,
             amax: &mut args.optimizer_scratch.amax,
+            chunk_amax: &mut args.optimizer_scratch.chunk_amax,
             next_global_scale: &mut args.optimizer_scratch.next_global_scale,
             len,
             learning_rate: AURORA_LR * super::super::learning_rate::aurora_scale(),

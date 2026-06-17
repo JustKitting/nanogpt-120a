@@ -43,10 +43,10 @@ pub(crate) mod module {
             let scale_row_len = if scalar_scale { usize::MAX } else { row_len };
             let row = base / scale_row_len;
             let tensor_amax = amax[row];
-            let global_scale = if tensor_amax == 0.0 {
-                1.0
-            } else if fixed_global_scale > 0.0 {
+            let global_scale = if fixed_global_scale > 0.0 {
                 fixed_global_scale
+            } else if tensor_amax == 0.0 {
+                1.0
             } else {
                 tensor_amax * scale_override / (FP8_MAX_FOUR_SIX * FP4_MAX)
             };

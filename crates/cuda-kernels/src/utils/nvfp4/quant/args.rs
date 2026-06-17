@@ -29,6 +29,14 @@ pub struct RowAmaxArgs<'a, 'out> {
     pub row_len: u32,
 }
 
+pub struct TensorAmaxArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub x: &'a DeviceBuffer<f32>,
+    pub chunk_amax: &'out mut DeviceBuffer<f32>,
+    pub out: &'out mut DeviceBuffer<f32>,
+    pub element_count: u32,
+}
+
 pub struct MsEdenQuantArgs<'a, 'out> {
     pub stream: &'a CudaStream,
     pub x: &'a DeviceBuffer<f32>,

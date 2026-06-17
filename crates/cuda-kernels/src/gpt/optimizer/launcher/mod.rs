@@ -9,7 +9,7 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
 use super::kernels::{self, MATRIX_THREADS_PER_BLOCK};
-use crate::nvfp4_quant::{Nvfp4QuantArgs, Nvfp4QuantModule, RowAmaxArgs};
+use crate::nvfp4_quant::{Nvfp4QuantArgs, Nvfp4QuantModule, TensorAmaxArgs};
 
 pub struct OptimizerModule {
     pub(super) apply: kernels::LoadedModule,
@@ -25,13 +25,15 @@ impl OptimizerModule {
     }
 
     fn requantize(&self, args: super::args::Nvfp4WeightUpdateArgs<'_>) -> Result<(), DriverError> {
-        self.quant.row_amax_f32(RowAmaxArgs {
-            stream: args.stream,
-            x: &*args.fp32_workspace,
-            out: args.amax,
-            row_count: 1,
-            row_len: args.len,
-        })?;
+        if args.requantize_global_scale == 0.0 {
+            self.quant.tensor_amax_f32(TensorAmaxArgs {
+                stream: args.stream,
+                x: &*args.fp32_workspace,
+                chunk_amax: args.chunk_amax,
+                out: args.amax,
+                element_count: args.len,
+            })?;
+        }
 
         self.quant.fp32_to_nvfp4_four_six_fixed_global(
             Nvfp4QuantArgs {

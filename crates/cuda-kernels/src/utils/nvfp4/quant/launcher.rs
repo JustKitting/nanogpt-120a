@@ -5,6 +5,7 @@ use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig,
 use super::args::{
     MsEdenDeviceScaleQuantArgs, MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs,
     QuartetBackwardMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenQuantArgs, RowAmaxArgs,
+    TensorAmaxArgs,
 };
 use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK};
 use super::kernels;
@@ -88,6 +89,22 @@ impl Nvfp4QuantModule {
             args.out,
             args.row_count,
             args.row_len,
+        )
+    }
+
+    pub fn tensor_amax_f32(&self, args: TensorAmaxArgs<'_, '_>) -> Result<(), DriverError> {
+        let chunk_count =
+            self.tensor_chunk_amax_f32(args.stream, args.x, args.chunk_amax, args.element_count)?;
+        self.row_amax.tensor_amax_from_chunks_f32_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (1, 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            &*args.chunk_amax,
+            args.out,
+            chunk_count,
         )
     }
 

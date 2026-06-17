@@ -47,13 +47,18 @@ impl OptimizerModule {
             aurora_update: args.grad,
             fp32_workspace: args.fp32_workspace,
             amax: args.amax,
+            chunk_amax: args.chunk_amax,
             next_global_scale: args.next_global_scale,
             len: args.len,
             learning_rate: args.learning_rate,
             weight_decay: args.weight_decay,
         })?;
 
-        let next_global_scale = args.next_global_scale.to_host_vec(args.stream)?[0];
+        let next_global_scale = if args.requantize_global_scale > 0.0 {
+            args.requantize_global_scale
+        } else {
+            args.next_global_scale.to_host_vec(args.stream)?[0]
+        };
         self.apply.adam.nvfp4_adamw_residual_update_kernel(
             args.stream,
             LaunchConfig {
