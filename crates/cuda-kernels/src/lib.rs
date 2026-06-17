@@ -1,3 +1,5 @@
+#[path = "utils/atomic.rs"]
+pub mod atomic;
 #[path = "gpt/attention/mod.rs"]
 pub mod attention;
 #[path = "gpt/embedding.rs"]
@@ -50,8 +52,8 @@ pub mod gpt {
 
 pub mod utils {
     pub use crate::{
-        float_ptx, layer_norm_utils, mma, nvfp4, nvfp4_cast, nvfp4_quant, nvfp4_tc_matmul, shuffle,
-        transpose, warp_reduce,
+        atomic, float_ptx, layer_norm_utils, mma, nvfp4, nvfp4_cast, nvfp4_quant, nvfp4_tc_matmul,
+        shuffle, transpose, warp_reduce,
     };
 }
 

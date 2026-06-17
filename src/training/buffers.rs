@@ -5,6 +5,8 @@ use gpt2_nvfp4::{
 
 use super::grads::BackwardBuffers;
 use super::optimizer::OptimizerScratch;
+use super::optimizer_state::OptimizerStateBuffers;
+use super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::scratch::BackwardScratchBuffers;
 use super::tape::ForwardTapeBuffers;
 
@@ -29,6 +31,8 @@ pub struct TrainBuffers {
     pub backward: BackwardBuffers,
     pub scratch: BackwardScratchBuffers,
     pub optimizer: OptimizerScratch,
+    pub optimizer_state: OptimizerStateBuffers,
+    pub aurora: AuroraScratchBuffers,
 }
 
 impl TrainBuffers {
@@ -54,6 +58,8 @@ impl TrainBuffers {
             backward: BackwardBuffers::new(stream)?,
             scratch: BackwardScratchBuffers::new(stream)?,
             optimizer: OptimizerScratch::new(stream)?,
+            optimizer_state: OptimizerStateBuffers::new(stream)?,
+            aurora: AuroraScratchBuffers::new(stream)?,
         })
     }
 }

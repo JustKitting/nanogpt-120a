@@ -2,10 +2,10 @@ use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
 use crate::nvfp4::nvfp4_value;
 
-pub const APPLY_THREADS_PER_BLOCK: u32 = 256;
+use super::APPLY_THREADS_PER_BLOCK;
 
 #[cuda_module]
-mod module {
+pub(super) mod module {
     use super::*;
 
     #[kernel]
@@ -31,5 +31,3 @@ mod module {
         }
     }
 }
-
-pub(super) use module::{LoadedModule, from_module};

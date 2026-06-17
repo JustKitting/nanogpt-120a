@@ -37,10 +37,13 @@ impl Trainer {
 
         super::optimizer_apply::apply_weight_updates(
             stream,
-            &self.runtime.optimizer,
+            &self.runtime,
+            batch,
             &mut self.uploaded,
-            &self.buffers.backward,
+            &mut self.buffers.backward,
             &mut self.buffers.optimizer,
+            &mut self.buffers.optimizer_state,
+            &mut self.buffers.aurora,
         )?;
 
         Ok(stats)

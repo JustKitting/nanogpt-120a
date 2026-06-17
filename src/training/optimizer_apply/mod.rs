@@ -1,0 +1,87 @@
+mod adam;
+mod block;
+mod layer_norm;
+mod matrix;
+mod mlp;
+mod qkv;
+
+use cuda_core::{CudaStream, DriverError};
+use gpt2_nvfp4::GPT2_N_EMBD;
+use rust_kernels_cuda::optimizer::{EmbeddingLookupGradArgs, OptimizerModule};
+
+use crate::runtime::Runtime;
+use crate::upload::UploadedModel;
+
+use super::TokenBatch;
+use super::grads::BackwardBuffers;
+use super::optimizer::OptimizerScratch;
+use super::optimizer_state::OptimizerStateBuffers;
+use super::optimizer_tc_scratch::AuroraScratchBuffers;
+
+use adam::update_adam_tensor;
+use block::update_block;
+use layer_norm::update_layer_norm;
+
+pub fn apply_weight_updates(
+    stream: &CudaStream,
+    runtime: &Runtime,
+    batch: &TokenBatch,
+    uploaded: &mut UploadedModel,
+    grads: &mut BackwardBuffers,
+    scratch: &mut OptimizerScratch,
+    state: &mut OptimizerStateBuffers,
+    aurora: &mut AuroraScratchBuffers,
+) -> Result<(), DriverError> {
+    let optimizer = &runtime.optimizer;
+    let step = state.advance();
+    add_embedding_lookup_grad(stream, optimizer, batch, grads)?;
+    update_adam_tensor(
+        stream,
+        optimizer,
+        &mut uploaded.token_embedding,
+        &grads.d_lm_head_weight,
+        scratch,
+        &mut state.token_embedding,
+        step,
+    )?;
+    update_layer_norm(
+        stream,
+        optimizer,
+        &mut uploaded.ln_f,
+        &grads.final_norm,
+        scratch,
+        &mut state.ln_f,
+        step,
+    )?;
+
+    for ((block, grad), state) in uploaded
+        .blocks
+        .iter_mut()
+        .zip(grads.blocks.iter())
+        .zip(state.blocks.iter_mut())
+    {
+        update_block(stream, runtime, block, grad, scratch, state, aurora, step)?;
+    }
+
+    Ok(())
+}
+
+fn add_embedding_lookup_grad(
+    stream: &CudaStream,
+    optimizer: &OptimizerModule,
+    batch: &TokenBatch,
+    grads: &mut BackwardBuffers,
+) -> Result<(), DriverError> {
+    optimizer.add_embedding_lookup_grad(EmbeddingLookupGradArgs {
+        stream,
+        tokens: &batch.tokens,
+        d_embedding_residual: &grads.d_embedding_residual,
+        d_token_embedding: &mut grads.d_lm_head_weight,
+        token_count: batch.token_count as u32,
+        embedding_dim: GPT2_N_EMBD as u32,
+    })
+}
+
+fn seed(step: u32, salt: u32) -> u32 {
+    step.wrapping_mul(0x9e37_79b9) ^ salt
+}

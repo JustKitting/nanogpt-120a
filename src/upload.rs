@@ -78,6 +78,7 @@ pub struct UploadedNvfp4 {
     pub(crate) bytes: DeviceBuffer<u8>,
     pub(crate) scales: DeviceBuffer<u8>,
     pub(crate) global_scale: f32,
+    pub(crate) len: usize,
 }
 
 impl UploadedNvfp4 {
@@ -116,5 +117,6 @@ fn upload_nvfp4<S: Nvfp4Shape>(
         bytes: DeviceBuffer::from_host(stream, tensor.bytes.as_ref())?,
         scales: DeviceBuffer::from_host(stream, tensor.scales.as_ref())?,
         global_scale: tensor.global_scale,
+        len: tensor.len(),
     })
 }
