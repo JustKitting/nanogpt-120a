@@ -1,3 +1,4 @@
+mod backward;
 mod l1_embeddings;
 mod l2_attention;
 mod l3_mlp;
@@ -8,6 +9,10 @@ mod model;
 mod nvfp4_scratch;
 mod shapes;
 
+pub use backward::{
+    BlockBackwardGrads, BlockForwardSaved, Gpt2BackwardContext, Gpt2BackwardGrads,
+    Gpt2ForwardSaved, LayerNormGrads, LayerNormSaved,
+};
 pub use l1_embeddings::{EmbeddingWeights, HiddenStateDevice, TokenEmbeddingArgs};
 pub use l2_attention::{AttentionForwardArgs, AttentionProjectionTensors, AttentionWeights};
 pub use l3_mlp::{

@@ -18,11 +18,13 @@ pub use config::{
 pub use tensor::{FixedBytes, Nvfp4Shape, Nvfp4Tensor};
 
 pub use types::{
-    AttentionForwardArgs, AttentionProjectionTensors, AttentionWeights, BlockForwardArgs, Gpt2,
-    Gpt2BlockWeights, Gpt2ForwardArgs, Gpt2Weights, HiddenStateDevice, HiddenStateNvfp4,
-    LayerNormForwardArgs, LayerNormTensors, LayerNormWeights, LinearWeights, MlpActivationNvfp4,
-    MlpDownTensors, MlpForwardArgs, MlpProjectionTensors, MlpScratch, MlpUpTensors, MlpWeights,
-    RowwiseNvfp4Scratch, TokenEmbeddingArgs,
+    AttentionForwardArgs, AttentionProjectionTensors, AttentionWeights, BlockBackwardGrads,
+    BlockForwardArgs, BlockForwardSaved, Gpt2, Gpt2BackwardContext, Gpt2BackwardGrads,
+    Gpt2BlockWeights, Gpt2ForwardArgs, Gpt2ForwardSaved, Gpt2Weights, HiddenStateDevice,
+    HiddenStateNvfp4, LayerNormForwardArgs, LayerNormGrads, LayerNormSaved, LayerNormTensors,
+    LayerNormWeights, LinearWeights, MlpActivationNvfp4, MlpDownTensors, MlpForwardArgs,
+    MlpProjectionTensors, MlpScratch, MlpUpTensors, MlpWeights, RowwiseNvfp4Scratch,
+    TokenEmbeddingArgs,
 };
 
 pub use types::{
