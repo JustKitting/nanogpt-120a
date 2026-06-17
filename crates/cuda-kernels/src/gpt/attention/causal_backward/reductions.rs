@@ -5,6 +5,7 @@ use crate::warp_reduce::warp_sum_f32;
 use super::types::{CAUSAL_BACKWARD_HEAD_DIM_THREADS, CAUSAL_BACKWARD_KEY_BLOCK};
 
 const WARPS_PER_HEAD: u32 = CAUSAL_BACKWARD_HEAD_DIM_THREADS / 32;
+pub(super) const HEAD_REDUCE_PAIR_LEN: usize = (WARPS_PER_HEAD * 2) as usize;
 const KEY_REDUCE_LEN: usize = (CAUSAL_BACKWARD_KEY_BLOCK * WARPS_PER_HEAD) as usize;
 pub(super) const KEY_REDUCE_PAIR_LEN: usize = KEY_REDUCE_LEN * 2;
 
@@ -32,6 +33,39 @@ pub(super) fn reduce_head(
     }
     thread::sync_threads();
     shared[0]
+}
+
+#[inline(always)]
+pub(super) fn reduce_head_pair(
+    local_a: f32,
+    local_b: f32,
+    lane: u32,
+    warp_in_head: u32,
+    shared: &mut SharedArray<f32, HEAD_REDUCE_PAIR_LEN>,
+) -> (f32, f32) {
+    let base_b = WARPS_PER_HEAD;
+    let warp_a = warp_sum_f32(local_a);
+    let warp_b = warp_sum_f32(local_b);
+    if lane == 0 {
+        shared[warp_in_head as usize] = warp_a;
+        shared[(base_b + warp_in_head) as usize] = warp_b;
+    }
+    thread::sync_threads();
+
+    if warp_in_head == 0 && lane == 0 {
+        let mut total_a = 0.0;
+        let mut total_b = 0.0;
+        let mut warp = 0;
+        while warp < WARPS_PER_HEAD {
+            total_a += shared[warp as usize];
+            total_b += shared[(base_b + warp) as usize];
+            warp += 1;
+        }
+        shared[0] = total_a;
+        shared[base_b as usize] = total_b;
+    }
+    thread::sync_threads();
+    (shared[0], shared[base_b as usize])
 }
 
 #[inline(always)]

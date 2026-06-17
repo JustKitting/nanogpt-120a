@@ -2,7 +2,7 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel};
 
 use super::dkv::dkv_body;
 use super::dq::dq_body;
-use super::reductions::KEY_REDUCE_PAIR_LEN;
+use super::reductions::{HEAD_REDUCE_PAIR_LEN, KEY_REDUCE_PAIR_LEN};
 use super::softmax_d::softmax_d_body;
 use super::types::{
     CAUSAL_BACKWARD_HEAD_DIM_THREADS, CAUSAL_BACKWARD_KEY_BLOCK, CausalAttentionBackwardParams,
@@ -35,7 +35,7 @@ pub(super) mod module {
         d_qkv: DisjointSlice<f32>,
         params: CausalAttentionBackwardParams,
     ) {
-        static mut REDUCE: SharedArray<f32, 2> = SharedArray::UNINIT;
+        static mut REDUCE: SharedArray<f32, HEAD_REDUCE_PAIR_LEN> = SharedArray::UNINIT;
         static mut DS: SharedArray<f32, 1> = SharedArray::UNINIT;
         static mut DQ_ROT: SharedArray<f32, { CAUSAL_BACKWARD_HEAD_DIM_THREADS as usize }> =
             SharedArray::UNINIT;
