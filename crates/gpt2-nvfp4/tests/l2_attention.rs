@@ -30,6 +30,8 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let mut residual_dev = DeviceBuffer::from_host(&stream, &residual)?;
     let mut hidden_dev = DeviceBuffer::from_host(&stream, &hidden)?;
     let mut amax_dev = DeviceBuffer::from_host(&stream, &amax)?;
+    let mut mean_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
+    let mut inv_std_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
     let mut input_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 2)?;
     let mut input_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 16)?;
     let mut input_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
@@ -91,6 +93,8 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
             residual: &mut residual_dev,
             normalized: &mut hidden_dev,
             normalized_amax: &mut amax_dev,
+            mean: &mut mean_dev,
+            inv_std: &mut inv_std_dev,
         },
     ))?;
 

@@ -40,6 +40,8 @@ impl LayerNormWeights {
             residual,
             normalized,
             normalized_amax,
+            mean,
+            inv_std,
         } = args.hidden;
 
         args.module.gpt_layer_norm(GptLayerNormArgs {
@@ -49,6 +51,8 @@ impl LayerNormWeights {
             bias: args.tensors.bias,
             normalized,
             normalized_amax,
+            mean,
+            inv_std,
             row_count: GPT2_CONTEXT_LEN as u32,
             embedding_dim: GPT2_N_EMBD as u32,
             epsilon: GPT2_LAYER_NORM_EPSILON,
@@ -59,6 +63,8 @@ impl LayerNormWeights {
             residual,
             normalized,
             normalized_amax,
+            mean,
+            inv_std,
         })
     }
 }

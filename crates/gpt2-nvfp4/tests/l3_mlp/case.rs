@@ -53,6 +53,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             residual: &mut scratch.residual,
             normalized: &mut scratch.normalized,
             normalized_amax: &mut scratch.amax,
+            mean: &mut scratch.mean,
+            inv_std: &mut scratch.inv_std,
         },
     ))?;
 

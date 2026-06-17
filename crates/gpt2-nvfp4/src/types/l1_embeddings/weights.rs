@@ -30,6 +30,8 @@ impl EmbeddingWeights {
             residual,
             normalized,
             normalized_amax,
+            mean,
+            inv_std,
         } = args;
 
         module.token_embedding(EmbeddingArgs {
@@ -46,6 +48,8 @@ impl EmbeddingWeights {
             residual,
             normalized,
             normalized_amax,
+            mean,
+            inv_std,
         })
     }
 }

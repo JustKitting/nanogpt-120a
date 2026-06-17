@@ -27,23 +27,21 @@ pub(super) fn finish_forward<'a>(
 ) -> Result<HiddenStateDevice<'a>, DriverError> {
     let hidden_nvfp4 = args.hidden_nvfp4;
     let mut tape = args.tape;
-    let hidden = args
-        .ln_f_weights
-        .forward(LayerNormWeights::input_from_block(
-            args.layer_norm_module,
-            args.ln_f,
-            args.hidden,
-        ))?;
+    let ln_f = LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_f, args.hidden);
+    let hidden = args.ln_f_weights.forward(ln_f)?;
 
     let HiddenStateDevice {
         stream,
         residual,
         normalized,
         normalized_amax,
+        mean,
+        inv_std,
     } = hidden;
 
     if let Some(tape) = tape.as_mut() {
-        tape.final_norm.save(stream, residual, normalized)?;
+        tape.final_norm
+            .save(stream, residual, normalized, mean, inv_std)?;
     }
 
     args.quant_module
@@ -86,5 +84,7 @@ pub(super) fn finish_forward<'a>(
         residual,
         normalized,
         normalized_amax,
+        mean,
+        inv_std,
     })
 }

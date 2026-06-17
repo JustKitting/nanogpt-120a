@@ -4,6 +4,7 @@ use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig}
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use crate::float_ptx::{fma_f32, sqrt_f32};
+use crate::layer_norm_reduce::{layer_norm_block_reduce, layer_norm_store_row};
 use crate::layer_norm_utils::{
     centered_column, f32_column, layer_norm_columns3, layer_norm_map3, layer_norm_map3_indexed,
     layer_norm_square_sum3, layer_norm_store3, layer_norm_sum3, max_abs3,
@@ -65,6 +66,8 @@ mod kernels {
         bias_scales: &[u8],
         mut normalized: DisjointSlice<f32>,
         mut normalized_amax: DisjointSlice<f32>,
+        mut mean_out: DisjointSlice<f32>,
+        mut inv_std_out: DisjointSlice<f32>,
         row_count: u32,
         embedding_dim: u32,
         weight_global_scale: f32,
@@ -89,70 +92,31 @@ mod kernels {
                 embedding_dim
             ));
 
-            let local_sum = layer_norm_sum3!(values);
-            let warp_total = warp_sum_f32(local_sum);
-
-            if lane == 0 {
-                unsafe {
-                    WARP_SUMS[warp_in_block as usize] = warp_total;
-                }
-            }
-
-            thread::sync_threads();
-
-            if warp_in_block == 0 {
-                let partial = if lane < GPT_LAYER_NORM_WARPS_PER_BLOCK {
-                    unsafe { WARP_SUMS[lane as usize] }
-                } else {
-                    0.0
-                };
-                let block_total = warp_sum_f32(partial);
-
-                if lane == 0 {
-                    unsafe {
-                        WARP_SUMS[0] = block_total / embedding_dim as f32;
-                    }
-                }
-            }
-
-            thread::sync_threads();
-
-            let mean = unsafe { WARP_SUMS[0] };
+            let mean = layer_norm_block_reduce!(
+                WARP_SUMS,
+                GPT_LAYER_NORM_WARPS_PER_BLOCK,
+                layer_norm_sum3!(values),
+                lane,
+                warp_in_block,
+                warp_sum_f32
+            ) / embedding_dim as f32;
+            layer_norm_store_row!(&mut mean_out, row, lane, warp_in_block, mean);
             let centered = layer_norm_map3_indexed!(cols, |index, col| centered_column(
                 col,
                 embedding_dim,
                 values[index],
                 mean
             ));
-            let local_variance_sum = layer_norm_square_sum3!(centered);
-            let warp_total = warp_sum_f32(local_variance_sum);
-
-            if lane == 0 {
-                unsafe {
-                    WARP_SUMS[warp_in_block as usize] = warp_total;
-                }
-            }
-
-            thread::sync_threads();
-
-            if warp_in_block == 0 {
-                let partial = if lane < GPT_LAYER_NORM_WARPS_PER_BLOCK {
-                    unsafe { WARP_SUMS[lane as usize] }
-                } else {
-                    0.0
-                };
-                let block_total = warp_sum_f32(partial);
-
-                if lane == 0 {
-                    unsafe {
-                        WARP_SUMS[0] = 1.0 / sqrt_f32(block_total / embedding_dim as f32 + epsilon);
-                    }
-                }
-            }
-
-            thread::sync_threads();
-
-            let inv_std = unsafe { WARP_SUMS[0] };
+            let variance_sum = layer_norm_block_reduce!(
+                WARP_SUMS,
+                GPT_LAYER_NORM_WARPS_PER_BLOCK,
+                layer_norm_square_sum3!(centered),
+                lane,
+                warp_in_block,
+                warp_sum_f32
+            );
+            let inv_std = 1.0 / sqrt_f32(variance_sum / embedding_dim as f32 + epsilon);
+            layer_norm_store_row!(&mut inv_std_out, row, lane, warp_in_block, inv_std);
             let normalized_values =
                 layer_norm_map3_indexed!(cols, |index, col| nvfp4_affine_normalized_column(
                     weight_bytes,
@@ -180,30 +144,16 @@ mod kernels {
                 normalized_values[1],
                 normalized_values[2],
             );
-            let warp_amax = warp_max_f32(local_amax);
+            let block_amax = layer_norm_block_reduce!(
+                WARP_SUMS,
+                GPT_LAYER_NORM_WARPS_PER_BLOCK,
+                local_amax,
+                lane,
+                warp_in_block,
+                warp_max_f32
+            );
 
-            if lane == 0 {
-                unsafe {
-                    WARP_SUMS[warp_in_block as usize] = warp_amax;
-                }
-            }
-
-            thread::sync_threads();
-
-            if warp_in_block == 0 {
-                let partial = if lane < GPT_LAYER_NORM_WARPS_PER_BLOCK {
-                    unsafe { WARP_SUMS[lane as usize] }
-                } else {
-                    0.0
-                };
-                let block_amax = warp_max_f32(partial);
-
-                if lane == 0 {
-                    unsafe {
-                        *normalized_amax.get_unchecked_mut(row as usize) = block_amax;
-                    }
-                }
-            }
+            layer_norm_store_row!(&mut normalized_amax, row, lane, warp_in_block, block_amax);
         }
     }
 }
@@ -225,6 +175,8 @@ pub struct GptLayerNormArgs<'a, 'out> {
     pub bias: Nvfp4DeviceTensor<'a>,
     pub normalized: &'out mut DeviceBuffer<f32>,
     pub normalized_amax: &'out mut DeviceBuffer<f32>,
+    pub mean: &'out mut DeviceBuffer<f32>,
+    pub inv_std: &'out mut DeviceBuffer<f32>,
     pub row_count: u32,
     pub embedding_dim: u32,
     pub epsilon: f32,
@@ -273,6 +225,8 @@ impl LayerNormModule {
             args.bias.scales,
             args.normalized,
             args.normalized_amax,
+            args.mean,
+            args.inv_std,
             args.row_count,
             args.embedding_dim,
             args.weight.global_scale,

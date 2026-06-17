@@ -17,6 +17,8 @@ pub(super) fn forward<'a, 'scratch>(
         residual,
         normalized,
         normalized_amax,
+        mean,
+        inv_std,
     } = args.hidden;
 
     args.quant_module
@@ -94,5 +96,7 @@ pub(super) fn forward<'a, 'scratch>(
         residual,
         normalized,
         normalized_amax,
+        mean,
+        inv_std,
     })
 }

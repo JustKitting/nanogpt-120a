@@ -6,6 +6,10 @@ pub mod embedding;
 pub mod float_ptx;
 #[path = "gpt/layer_norm.rs"]
 pub mod layer_norm;
+#[path = "gpt/layer_norm_backward/mod.rs"]
+pub mod layer_norm_backward;
+#[path = "utils/layer_norm_reduce.rs"]
+pub(crate) mod layer_norm_reduce;
 #[path = "utils/layer_norm.rs"]
 pub mod layer_norm_utils;
 #[path = "gpt/linear_backward.rs"]
@@ -32,7 +36,9 @@ pub mod transpose;
 pub mod warp_reduce;
 
 pub mod gpt {
-    pub use crate::{attention, embedding, layer_norm, linear_backward, lm_head, loss, mlp};
+    pub use crate::{
+        attention, embedding, layer_norm, layer_norm_backward, linear_backward, lm_head, loss, mlp,
+    };
 }
 
 pub mod utils {

@@ -54,6 +54,8 @@ fn run_forward() -> TestResult {
     let mut residual_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut normalized_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut normalized_amax_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
+    let mut mean_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
+    let mut inv_std_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
     let mut hidden_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 2)?;
     let mut hidden_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 16)?;
     let mut hidden_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
@@ -75,6 +77,8 @@ fn run_forward() -> TestResult {
             residual: &mut residual_dev,
             normalized: &mut normalized_dev,
             normalized_amax: &mut normalized_amax_dev,
+            mean: &mut mean_dev,
+            inv_std: &mut inv_std_dev,
         },
         attention_module: &attention_module,
         quant_module: &quant_module,

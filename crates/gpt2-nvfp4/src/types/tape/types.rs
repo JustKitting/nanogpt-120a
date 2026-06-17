@@ -29,6 +29,8 @@ pub struct BlockForwardTape<'a> {
 pub struct LayerNormTape<'a> {
     pub residual: &'a mut DeviceBuffer<f32>,
     pub normalized: &'a mut DeviceBuffer<f32>,
+    pub mean: &'a mut DeviceBuffer<f32>,
+    pub inv_std: &'a mut DeviceBuffer<f32>,
 }
 
 pub struct RowwiseNvfp4Tape<'a> {

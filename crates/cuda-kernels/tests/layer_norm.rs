@@ -97,6 +97,8 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let bias_scales_dev = DeviceBuffer::from_host(&stream, &bias_scales)?;
     let mut out_dev = DeviceBuffer::<f32>::zeroed(&stream, x.len())?;
     let mut amax_dev = DeviceBuffer::<f32>::zeroed(&stream, row_count)?;
+    let mut mean_dev = DeviceBuffer::<f32>::zeroed(&stream, row_count)?;
+    let mut inv_std_dev = DeviceBuffer::<f32>::zeroed(&stream, row_count)?;
 
     module.gpt_layer_norm(GptLayerNormArgs {
         stream: &stream,
@@ -113,6 +115,8 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
         },
         normalized: &mut out_dev,
         normalized_amax: &mut amax_dev,
+        mean: &mut mean_dev,
+        inv_std: &mut inv_std_dev,
         row_count: row_count as u32,
         embedding_dim: GPT_EMBEDDING_DIM as u32,
         epsilon,

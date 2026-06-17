@@ -10,6 +10,8 @@ pub struct TokenEmbeddingArgs<'a> {
     pub residual: &'a mut DeviceBuffer<f32>,
     pub normalized: &'a mut DeviceBuffer<f32>,
     pub normalized_amax: &'a mut DeviceBuffer<f32>,
+    pub mean: &'a mut DeviceBuffer<f32>,
+    pub inv_std: &'a mut DeviceBuffer<f32>,
 }
 
 pub struct HiddenStateDevice<'a> {
@@ -17,4 +19,6 @@ pub struct HiddenStateDevice<'a> {
     pub residual: &'a mut DeviceBuffer<f32>,
     pub normalized: &'a mut DeviceBuffer<f32>,
     pub normalized_amax: &'a mut DeviceBuffer<f32>,
+    pub mean: &'a mut DeviceBuffer<f32>,
+    pub inv_std: &'a mut DeviceBuffer<f32>,
 }

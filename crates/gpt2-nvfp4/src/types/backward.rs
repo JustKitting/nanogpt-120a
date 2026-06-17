@@ -36,6 +36,8 @@ pub struct BlockForwardSaved<'a> {
 pub struct LayerNormSaved<'a> {
     pub residual: &'a DeviceBuffer<f32>,
     pub normalized: &'a DeviceBuffer<f32>,
+    pub mean: &'a DeviceBuffer<f32>,
+    pub inv_std: &'a DeviceBuffer<f32>,
 }
 
 pub struct Gpt2BackwardGrads<'a> {
