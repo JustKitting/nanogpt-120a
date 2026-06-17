@@ -1,5 +1,5 @@
 use cuda_core::DriverError;
-use rust_kernels_cuda::attention::CausalAttentionBackwardArgs;
+use rust_kernels_cuda::attention::CausalAttentionBackwardTcArgs;
 
 use super::types::AttentionCoreBackwardArgs;
 use crate::{GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV};
@@ -8,14 +8,16 @@ pub fn causal_attention_backward(
     args: AttentionCoreBackwardArgs<'_, '_, '_>,
 ) -> Result<(), DriverError> {
     args.module
-        .causal_attention_backward(CausalAttentionBackwardArgs {
+        .causal_attention_backward_tc(CausalAttentionBackwardTcArgs {
             stream: args.stream,
+            tc_module: args.tc_module,
             qkv: args.saved.qkv,
             attention_out: args.saved.attention_out,
             d_out: args.d_attention_out,
             log_sum_exp: args.saved.attention_log_sum_exp,
             softmax_d: args.scratch.softmax_d,
             d_qkv: args.d_qkv,
+            scratch: args.scratch.tc,
             row_count: args.saved.row_count,
             seq_len: args.saved.seq_len,
             batch_size: args.saved.batch_size,

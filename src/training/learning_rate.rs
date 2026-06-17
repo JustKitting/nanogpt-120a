@@ -1,6 +1,5 @@
 const TRAIN_LR_SCALE_ENV: &str = "TRAIN_LR_SCALE";
 const TRAIN_ADAM_LR_SCALE_ENV: &str = "TRAIN_ADAM_LR_SCALE";
-const TRAIN_AURORA_LR_SCALE_ENV: &str = "TRAIN_AURORA_LR_SCALE";
 const TRAIN_LR_WARMUP_STEPS_ENV: &str = "TRAIN_LR_WARMUP_STEPS";
 const TRAIN_LR_STABLE_STEPS_ENV: &str = "TRAIN_LR_STABLE_STEPS";
 const TRAIN_LR_DECAY_STEPS_ENV: &str = "TRAIN_LR_DECAY_STEPS";
@@ -19,8 +18,8 @@ pub(super) fn adam_multiplier(step: u32) -> f32 {
     adam_scale() * warmup_stable_cosine(step)
 }
 
-pub(super) fn aurora_scale() -> f32 {
-    scale_from(TRAIN_AURORA_LR_SCALE_ENV).unwrap_or_else(scale)
+pub(super) fn aurora_multiplier(step: u32) -> f32 {
+    scale() * warmup_stable_cosine(step)
 }
 
 fn warmup_stable_cosine(step: u32) -> f32 {

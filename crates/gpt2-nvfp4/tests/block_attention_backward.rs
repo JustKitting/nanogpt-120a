@@ -7,6 +7,7 @@ use gpt2_nvfp4::{
     BlockAttentionBackwardSeeds, Gpt2Rng, attention_side_backward,
 };
 use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::layer_norm_backward::LayerNormBackwardModule;
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
@@ -14,6 +15,8 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::residual::ResidualBackwardModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
+#[path = "support/attention_core_scratch.rs"]
+mod attention_core_scratch;
 #[path = "block_attention_backward/buffers/mod.rs"]
 mod buffers;
 #[path = "block_attention_backward/data.rs"]
@@ -39,6 +42,7 @@ fn block_attention_side_backward_runs_full_chain() -> Result<(), Box<dyn Error>>
             residual: &ResidualBackwardModule::from_module(ptx.clone())?,
             layer_norm: &LayerNormBackwardModule::from_module(ptx.clone())?,
             attention: &AttentionModule::from_module(ptx.clone())?,
+            f16_tc: &F16TcMatmulModule::from_module(ptx.clone())?,
             linear: AttentionBackwardModules {
                 transpose: &TransposeModule::from_module(ptx.clone())?,
                 decode: &Nvfp4DecodeModule::from_module(ptx.clone())?,

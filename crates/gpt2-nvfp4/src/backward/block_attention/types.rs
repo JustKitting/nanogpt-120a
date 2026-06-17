@@ -1,5 +1,6 @@
 use cuda_core::CudaStream;
 use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::layer_norm_backward::LayerNormBackwardModule;
 use rust_kernels_cuda::residual::ResidualBackwardModule;
 
@@ -16,6 +17,7 @@ pub struct BlockAttentionBackwardModules<'a> {
     pub residual: &'a ResidualBackwardModule,
     pub layer_norm: &'a LayerNormBackwardModule,
     pub attention: &'a AttentionModule,
+    pub f16_tc: &'a F16TcMatmulModule,
     pub linear: AttentionBackwardModules<'a>,
 }
 

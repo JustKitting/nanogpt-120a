@@ -11,7 +11,7 @@ use super::super::optimizer_state::BlockState;
 use super::super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::adam::update_adam_tensor;
 use super::elapsed_ms;
-use super::matrix::{MatrixOptimizer, update_matrix_tensor};
+use super::matrix::update_matrix_tensor;
 use super::seed;
 use std::time::Instant;
 
@@ -28,7 +28,7 @@ pub(super) fn update_mlp(
 ) -> Result<(), DriverError> {
     let optimizer = &runtime.optimizer;
     let start = Instant::now();
-    let kind = update_matrix_tensor(
+    update_matrix_tensor(
         stream,
         runtime,
         &mut block.mlp_up.weight,
@@ -38,10 +38,10 @@ pub(super) fn update_mlp(
         aurora,
         GPT2_N_EMBD as u32,
         GPT2_MLP as u32,
-        step,
         seed(step, 0x37),
+        step,
     )?;
-    add_matrix_elapsed(trace, kind, elapsed_ms(start));
+    trace.aurora_ms += elapsed_ms(start);
 
     let start = Instant::now();
     update_adam_tensor(
@@ -56,7 +56,7 @@ pub(super) fn update_mlp(
     trace.adam_ms += elapsed_ms(start);
 
     let start = Instant::now();
-    let kind = update_matrix_tensor(
+    update_matrix_tensor(
         stream,
         runtime,
         &mut block.mlp_down.weight,
@@ -66,10 +66,10 @@ pub(super) fn update_mlp(
         aurora,
         GPT2_MLP as u32,
         GPT2_N_EMBD as u32,
-        step,
         seed(step, 0x41),
+        step,
     )?;
-    add_matrix_elapsed(trace, kind, elapsed_ms(start));
+    trace.aurora_ms += elapsed_ms(start);
 
     let start = Instant::now();
     update_adam_tensor(
@@ -83,11 +83,4 @@ pub(super) fn update_mlp(
     )?;
     trace.adam_ms += elapsed_ms(start);
     Ok(())
-}
-
-fn add_matrix_elapsed(trace: &mut OptimizerTrace, kind: MatrixOptimizer, elapsed_ms: f64) {
-    match kind {
-        MatrixOptimizer::Adam => trace.adam_ms += elapsed_ms,
-        MatrixOptimizer::Aurora => trace.aurora_ms += elapsed_ms,
-    }
 }

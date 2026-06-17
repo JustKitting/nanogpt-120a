@@ -1,3 +1,4 @@
+mod attention_core_scratch;
 mod backward;
 mod batch;
 mod buffers;
@@ -61,6 +62,7 @@ pub struct OptimizerTrace {
     pub aurora_ms: f64,
     pub adam_ms: f64,
     pub adam_lr: f32,
+    pub aurora_lr: f32,
 }
 
 impl Trainer {

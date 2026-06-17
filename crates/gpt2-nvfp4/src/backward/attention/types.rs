@@ -1,5 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer};
-use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionBackwardTcScratch};
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::linear_backward::{LinearBackwardModule, LinearBackwardMsEdenScratch};
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
@@ -29,6 +30,7 @@ pub type AttentionQkvScratch<'scratch> = AttentionLinearScratch<'scratch>;
 
 pub struct AttentionCoreScratch<'scratch> {
     pub softmax_d: &'scratch mut DeviceBuffer<f32>,
+    pub tc: CausalAttentionBackwardTcScratch<'scratch>,
 }
 
 impl<'scratch> AttentionLinearScratch<'scratch> {
@@ -46,6 +48,7 @@ impl<'scratch> AttentionCoreScratch<'scratch> {
     pub fn reborrow(&mut self) -> AttentionCoreScratch<'_> {
         AttentionCoreScratch {
             softmax_d: &mut *self.softmax_d,
+            tc: self.tc.reborrow(),
         }
     }
 }
@@ -81,6 +84,7 @@ pub struct AttentionCProjBackwardArgs<'a, 'scratch, 'out> {
 pub struct AttentionCoreBackwardArgs<'a, 'scratch, 'out> {
     pub stream: &'a CudaStream,
     pub module: &'a AttentionModule,
+    pub tc_module: &'a F16TcMatmulModule,
     pub saved: BlockForwardSaved<'a>,
     pub d_attention_out: &'a DeviceBuffer<f32>,
     pub d_qkv: &'out mut DeviceBuffer<f32>,

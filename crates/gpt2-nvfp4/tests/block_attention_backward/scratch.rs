@@ -1,14 +1,15 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    AttentionCProjScratch, AttentionCoreScratch, BlockAttentionBackwardScratch, GPT2_N_EMBD,
-    GPT2_QKV, GPT2_TOKEN_ROWS,
+    AttentionCProjScratch, BlockAttentionBackwardScratch, GPT2_N_EMBD, GPT2_QKV, GPT2_TOKEN_ROWS,
 };
 use rust_kernels_cuda::linear_backward::{LinearBackwardMsEdenScratch, MsEdenOperandScratch};
+
+use super::attention_core_scratch::AttentionCoreScratchBuffers;
 
 pub struct BlockAttentionScratch {
     c_proj: LinearScratch,
     qkv: LinearScratch,
-    softmax_d: DeviceBuffer<f32>,
+    core: AttentionCoreScratchBuffers,
 }
 
 impl BlockAttentionScratch {
@@ -16,16 +17,14 @@ impl BlockAttentionScratch {
         Ok(Self {
             c_proj: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_N_EMBD)?,
             qkv: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_QKV)?,
-            softmax_d: DeviceBuffer::zeroed(stream, gpt2_nvfp4::AttentionLogSumExp::LEN)?,
+            core: AttentionCoreScratchBuffers::new(stream)?,
         })
     }
 
     pub fn block(&mut self) -> BlockAttentionBackwardScratch<'_> {
         BlockAttentionBackwardScratch {
             c_proj: self.c_proj.as_attention_scratch(),
-            core: AttentionCoreScratch {
-                softmax_d: &mut self.softmax_d,
-            },
+            core: self.core.args(),
             qkv: self.qkv.as_attention_scratch(),
         }
     }

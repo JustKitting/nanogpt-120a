@@ -20,6 +20,7 @@ use super::optimizer_state::OptimizerStateBuffers;
 use super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::{OptimizerTrace, TokenBatch};
 
+use super::optimizer_aurora::aurora_learning_rate;
 pub(crate) use adam::adam_debug_config;
 use adam::{adam_learning_rate, update_adam_tensor};
 use block::update_block;
@@ -44,6 +45,7 @@ pub fn apply_weight_updates(
     let mut trace = OptimizerTrace::default();
     let step = state.advance();
     trace.adam_lr = adam_learning_rate(step);
+    trace.aurora_lr = aurora_learning_rate(step);
 
     let start = Instant::now();
     add_embedding_lookup_grad(stream, optimizer, batch, grads)?;

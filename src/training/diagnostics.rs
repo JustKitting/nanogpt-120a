@@ -174,7 +174,7 @@ struct PendingTensorUpdateDiagnostics {
     before_scales: Vec<u8>,
     before_global: f32,
     grad: Vec<f32>,
-    adam: AdamSnapshot,
+    adam: Option<AdamSnapshot>,
 }
 
 struct AdamSnapshot {
@@ -233,14 +233,12 @@ fn collect_update_snapshots(
             &state.ln_1,
             step,
         )?;
-        push_update(
+        push_observed_update(
             &mut updates,
             stream,
             &format!("block{index}.attn_qkv.weight"),
             &block.attn_qkv.weight,
             &grad.d_attn_qkv_weight,
-            &state.attn_qkv.weight_adam,
-            step,
         )?;
         push_update(
             &mut updates,
@@ -251,14 +249,12 @@ fn collect_update_snapshots(
             &state.attn_qkv.bias,
             step,
         )?;
-        push_update(
+        push_observed_update(
             &mut updates,
             stream,
             &format!("block{index}.attn_c_proj.weight"),
             &block.attn_c_proj.weight,
             &grad.d_attn_c_proj_weight,
-            &state.attn_c_proj.weight_adam,
-            step,
         )?;
         push_update(
             &mut updates,
@@ -278,14 +274,12 @@ fn collect_update_snapshots(
             &state.ln_2,
             step,
         )?;
-        push_update(
+        push_observed_update(
             &mut updates,
             stream,
             &format!("block{index}.mlp_up.weight"),
             &block.mlp_up.weight,
             &grad.d_mlp_c_fc_weight,
-            &state.mlp_up.weight_adam,
-            step,
         )?;
         push_update(
             &mut updates,
@@ -296,14 +290,12 @@ fn collect_update_snapshots(
             &state.mlp_up.bias,
             step,
         )?;
-        push_update(
+        push_observed_update(
             &mut updates,
             stream,
             &format!("block{index}.mlp_down.weight"),
             &block.mlp_down.weight,
             &grad.d_mlp_c_proj_weight,
-            &state.mlp_down.weight_adam,
-            step,
         )?;
         push_update(
             &mut updates,
@@ -358,6 +350,39 @@ fn push_update(
     step: u32,
 ) -> AppResult {
     let config = adam_debug_config(step);
+    let adam = AdamSnapshot {
+        first: state.first.to_host_vec(stream)?,
+        second: state.second.to_host_vec(stream)?,
+        residual: state.residual.to_host_vec(stream)?,
+        learning_rate: config.learning_rate,
+        weight_decay: config.weight_decay,
+        beta1: config.beta1,
+        beta2: config.beta2,
+        beta1_correction: config.beta1_correction,
+        beta2_correction: config.beta2_correction,
+        eps: config.eps,
+    };
+    push_snapshot(updates, stream, name, tensor, grad, Some(adam))
+}
+
+fn push_observed_update(
+    updates: &mut Vec<PendingTensorUpdateDiagnostics>,
+    stream: &CudaStream,
+    name: &str,
+    tensor: &UploadedNvfp4,
+    grad: &DeviceBuffer<f32>,
+) -> AppResult {
+    push_snapshot(updates, stream, name, tensor, grad, None)
+}
+
+fn push_snapshot(
+    updates: &mut Vec<PendingTensorUpdateDiagnostics>,
+    stream: &CudaStream,
+    name: &str,
+    tensor: &UploadedNvfp4,
+    grad: &DeviceBuffer<f32>,
+    adam: Option<AdamSnapshot>,
+) -> AppResult {
     updates.push(PendingTensorUpdateDiagnostics {
         name: name.to_string(),
         len: tensor.len,
@@ -365,18 +390,7 @@ fn push_update(
         before_scales: tensor.scales.to_host_vec(stream)?,
         before_global: tensor.global_scale,
         grad: grad.to_host_vec(stream)?,
-        adam: AdamSnapshot {
-            first: state.first.to_host_vec(stream)?,
-            second: state.second.to_host_vec(stream)?,
-            residual: state.residual.to_host_vec(stream)?,
-            learning_rate: config.learning_rate,
-            weight_decay: config.weight_decay,
-            beta1: config.beta1,
-            beta2: config.beta2,
-            beta1_correction: config.beta1_correction,
-            beta2_correction: config.beta2_correction,
-            eps: config.eps,
-        },
+        adam,
     });
     Ok(())
 }
@@ -507,18 +521,22 @@ fn tensor_update_stats(
             pending.before_global,
             i,
         );
-        let before = decoded_before + pending.adam.residual[i];
+        let residual = pending
+            .adam
+            .as_ref()
+            .map(|adam| adam.residual[i])
+            .unwrap_or(0.0);
+        let before = decoded_before + residual;
         let after = nvfp4_host_value(&after_bytes, &after_scales, after_global, i);
         let delta = after - before;
-        let predicted_next = adam_predicted_next(
-            before,
-            grad,
-            pending.adam.first[i],
-            pending.adam.second[i],
-            &pending.adam,
-        );
-        let predicted_delta = predicted_next - before;
-        let quant_error = after - predicted_next;
+        let (predicted_delta, quant_error) = match pending.adam.as_ref() {
+            Some(adam) => {
+                let predicted_next =
+                    adam_predicted_next(before, grad, adam.first[i], adam.second[i], adam);
+                (predicted_next - before, after - predicted_next)
+            }
+            None => (0.0, 0.0),
+        };
 
         grad_finite &= grad.is_finite();
         if grad != 0.0 {

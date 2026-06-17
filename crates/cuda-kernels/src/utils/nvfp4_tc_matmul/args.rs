@@ -56,6 +56,16 @@ pub fn nvfp4_tc_matmul_chunks(rows: u32, k: u32) -> usize {
 }
 
 impl<'a> Nvfp4TcMatmulOperand<'a> {
+    pub fn reborrow(&mut self) -> Nvfp4TcMatmulOperand<'_> {
+        Nvfp4TcMatmulOperand {
+            bytes: &mut *self.bytes,
+            scales: &mut *self.scales,
+            global_scales: &mut *self.global_scales,
+            chunk_amax: &mut *self.chunk_amax,
+            global_scale: self.global_scale,
+        }
+    }
+
     pub(super) fn rowwise(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
         Nvfp4RowwiseDeviceTensor {
             bytes: &*self.bytes,
@@ -69,6 +79,17 @@ impl<'a> Nvfp4TcMatmulOperand<'a> {
             bytes: &*self.bytes,
             scales: &*self.scales,
             global_scale: self.global_scale,
+        }
+    }
+}
+
+impl<'a> Nvfp4TcMatmulScratch<'a> {
+    pub fn reborrow(&mut self) -> Nvfp4TcMatmulScratch<'_> {
+        Nvfp4TcMatmulScratch {
+            a_padded: &mut *self.a_padded,
+            b_t_padded: &mut *self.b_t_padded,
+            a: self.a.reborrow(),
+            b_t: self.b_t.reborrow(),
         }
     }
 }

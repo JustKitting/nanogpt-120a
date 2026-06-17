@@ -4,6 +4,8 @@ pub mod atomic;
 pub mod attention;
 #[path = "gpt/embedding.rs"]
 pub mod embedding;
+#[path = "utils/f16_tc_matmul/mod.rs"]
+pub mod f16_tc_matmul;
 #[path = "utils/float_ptx.rs"]
 pub mod float_ptx;
 #[path = "gpt/layer_norm.rs"]
@@ -54,8 +56,8 @@ pub mod gpt {
 
 pub mod utils {
     pub use crate::{
-        atomic, float_ptx, layer_norm_utils, mma, nvfp4, nvfp4_cast, nvfp4_quant, nvfp4_tc_matmul,
-        quartet, shuffle, transpose, warp_reduce,
+        atomic, f16_tc_matmul, float_ptx, layer_norm_utils, mma, nvfp4, nvfp4_cast, nvfp4_quant,
+        nvfp4_tc_matmul, quartet, shuffle, transpose, warp_reduce,
     };
 }
 

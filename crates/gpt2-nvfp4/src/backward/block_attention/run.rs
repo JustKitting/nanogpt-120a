@@ -57,6 +57,7 @@ pub fn attention_side_backward(
     causal_attention_backward(AttentionCoreBackwardArgs {
         stream,
         module: modules.attention,
+        tc_module: modules.f16_tc,
         saved,
         d_attention_out: &*d_attention_out,
         d_qkv,

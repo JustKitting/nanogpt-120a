@@ -1,7 +1,7 @@
 use cuda_core::DriverError;
 use rust_kernels_cuda::optimizer::Nvfp4WeightUpdateArgs;
 
-use super::{AURORA_LR, AURORA_WEIGHT_DECAY, AuroraMatrixArgs};
+use super::{AURORA_WEIGHT_DECAY, AuroraMatrixArgs, aurora_learning_rate};
 
 pub(super) fn apply_update(args: AuroraMatrixArgs<'_, '_>, len: u32) -> Result<(), DriverError> {
     args.modules
@@ -18,7 +18,7 @@ pub(super) fn apply_update(args: AuroraMatrixArgs<'_, '_>, len: u32) -> Result<(
             chunk_amax: &mut args.optimizer_scratch.chunk_amax,
             next_global_scale: &mut args.optimizer_scratch.next_global_scale,
             len,
-            learning_rate: AURORA_LR * super::super::learning_rate::aurora_scale(),
+            learning_rate: aurora_learning_rate(args.step),
             weight_decay: AURORA_WEIGHT_DECAY,
         })?;
     args.tensor.global_scale = args

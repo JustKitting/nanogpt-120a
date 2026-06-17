@@ -1,0 +1,58 @@
+use cuda_device::{DisjointSlice, thread};
+
+use super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
+use super::types::CausalAttentionBackwardTcParams;
+use crate::float_ptx::exp_f32;
+
+pub(super) fn prob_ds_body(
+    scores: &[f32],
+    dot: &[f32],
+    log_sum_exp: &[f32],
+    softmax_d: &[f32],
+    mut p: DisjointSlice<f32>,
+    mut ds: DisjointSlice<f32>,
+    params: CausalAttentionBackwardTcParams,
+) {
+    let index = thread::blockIdx_x() * TC_BACKWARD_THREADS_PER_BLOCK + thread::threadIdx_x();
+    let total = params.batch_size * params.head_count * params.seq_len * params.seq_len;
+    if index >= total {
+        return;
+    }
+
+    let key = index % params.seq_len;
+    let query = (index / params.seq_len) % params.seq_len;
+    let batch_head = index / (params.seq_len * params.seq_len);
+    let batch = batch_head / params.head_count;
+    let head = batch_head - batch * params.head_count;
+    let row = batch * params.seq_len + query;
+    let active = key <= query && row < params.row_count;
+    let prob = if active {
+        exp_f32(
+            scores[index as usize] * params.scale
+                - log_sum_exp[log_sum_exp_index(batch, query, head, &params)],
+        )
+    } else {
+        0.0
+    };
+    let grad = if active {
+        prob * (dot[index as usize] - softmax_d[log_sum_exp_index(batch, query, head, &params)])
+    } else {
+        0.0
+    };
+
+    unsafe {
+        *p.get_unchecked_mut(index as usize) = prob;
+        *ds.get_unchecked_mut(index as usize) = grad;
+    }
+}
+
+#[inline(always)]
+fn log_sum_exp_index(
+    batch: u32,
+    token: u32,
+    head: u32,
+    params: &CausalAttentionBackwardTcParams,
+) -> usize {
+    (batch as usize * params.head_count as usize + head as usize) * params.seq_len as usize
+        + token as usize
+}

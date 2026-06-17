@@ -39,7 +39,7 @@ fn main() -> AppResult {
 
         if should_log_step(step, steps, log_interval) {
             println!(
-                "step={step} source={source} offset={offset} batch_size={window_batch_size} seq_len={window_seq_len} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_sync_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
+                "step={step} source={source} offset={offset} batch_size={window_batch_size} seq_len={window_seq_len} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} aurora_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_sync_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
                 stats.tokens,
                 stats.logits,
                 stats.loss,
@@ -48,6 +48,7 @@ fn main() -> AppResult {
                 stats.finite,
                 stats.nonzero,
                 stats.optimizer.adam_lr,
+                stats.optimizer.aurora_lr,
                 stats.forward_ms,
                 stats.backward_enqueue_ms,
                 stats.loss_sync_ms,

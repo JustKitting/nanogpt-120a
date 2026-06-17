@@ -1,28 +1,5 @@
 use super::shape::*;
 
-pub fn scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
-    let mut values = Vec::with_capacity(query + 1);
-    let scale = 1.0 / (HEAD_DIM as f32).sqrt();
-    for key in 0..=query {
-        let mut dot = 0.0;
-        for dim in 0..HEAD_DIM {
-            dot +=
-                rope_value(qkv, query, head, dim, 0) * rope_value(qkv, key, head, dim, EMBEDDING);
-        }
-        values.push(dot * scale);
-    }
-    values
-}
-
-pub fn logsumexp(values: &[f32]) -> f32 {
-    let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    max + values
-        .iter()
-        .map(|value| (*value - max).exp())
-        .sum::<f32>()
-        .ln()
-}
-
 pub fn backward(qkv: &[f32], out: &[f32], d_out: &[f32], log_sum_exp: &[f32]) -> Vec<f32> {
     let mut dq_rot = vec![0.0_f32; TOKEN_COUNT * EMBEDDING];
     let mut dk_rot = vec![0.0_f32; TOKEN_COUNT * EMBEDDING];
@@ -37,18 +14,32 @@ pub fn backward(qkv: &[f32], out: &[f32], d_out: &[f32], log_sum_exp: &[f32]) ->
                 let p = (row_scores[key] - log_sum_exp[log_sum_exp_index(query, head)]).exp();
                 let ds = p * (d_out_dot_v(qkv, d_out, query, key, head) - row_d);
                 for dim in 0..HEAD_DIM {
-                    let h = hidden_index(query, head, dim);
-                    let k = hidden_index(key, head, dim);
+                    let q_index = hidden_index(query, head, dim);
+                    let k_index = hidden_index(key, head, dim);
                     grad[qkv_index(key, head, dim, 2 * EMBEDDING)] +=
                         p * d_out[hidden_index(query, head, dim)];
-                    dq_rot[h] += ds * rope_value(qkv, key, head, dim, EMBEDDING) * scale;
-                    dk_rot[k] += ds * rope_value(qkv, query, head, dim, 0) * scale;
+                    dq_rot[q_index] += ds * rope_value(qkv, key, head, dim, EMBEDDING) * scale;
+                    dk_rot[k_index] += ds * rope_value(qkv, query, head, dim, 0) * scale;
                 }
             }
         }
     }
     apply_rope_backward(&mut grad, &dq_rot, &dk_rot);
     grad
+}
+
+fn scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
+    let scale = 1.0 / (HEAD_DIM as f32).sqrt();
+    (0..=query)
+        .map(|key| {
+            let mut dot = 0.0;
+            for dim in 0..HEAD_DIM {
+                dot += rope_value(qkv, query, head, dim, 0)
+                    * rope_value(qkv, key, head, dim, EMBEDDING);
+            }
+            dot * scale
+        })
+        .collect()
 }
 
 fn softmax_d(out: &[f32], d_out: &[f32], query: usize, head: usize) -> f32 {

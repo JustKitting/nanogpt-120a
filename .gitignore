@@ -10,6 +10,7 @@
 
 # Local data and generated training shards
 /data/
+/crates/cuda-kernels/src/utils/nvfp4/quant/kernels/data/
 
 # Local VCS/editor/runtime state
 /.jj/

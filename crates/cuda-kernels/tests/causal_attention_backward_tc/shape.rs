@@ -1,4 +1,4 @@
-pub const TOKEN_COUNT: usize = 5;
+pub const TOKEN_COUNT: usize = 2;
 pub const HEADS: usize = 2;
 pub const HEAD_DIM: usize = 8;
 pub const EMBEDDING: usize = HEADS * HEAD_DIM;

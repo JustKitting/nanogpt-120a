@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::nvfp4_tc_matmul::Nvfp4TcMatmulArgs;
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulArgs;
 
 use super::super::optimizer_tc_scratch::TcMatmulScratch;
 use super::AuroraModules;
@@ -15,20 +15,18 @@ pub(super) fn tc_matmul(
     m: u32,
     n: u32,
     k: u32,
-    base_seed: u32,
-    seed: u32,
+    _base_seed: u32,
+    _seed: u32,
 ) -> Result<(), DriverError> {
-    modules.tc.matmul_ms_eden(Nvfp4TcMatmulArgs {
+    modules.tc.batched_matmul(F16TcMatmulArgs {
         stream,
-        quant_module: modules.quant,
         a,
         b_t,
         out,
         scratch: scratch.scratch(),
+        batch_count: 1,
         m,
         n,
         k,
-        sign_seed: base_seed ^ seed,
-        scale_seed: base_seed.rotate_left(13) ^ seed,
     })
 }

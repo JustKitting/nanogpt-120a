@@ -1,9 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD};
-use rust_kernels_cuda::nvfp4_tc_matmul::{
-    Nvfp4TcMatmulOperand, Nvfp4TcMatmulScratch, nvfp4_tc_matmul_bytes, nvfp4_tc_matmul_chunks,
-    nvfp4_tc_matmul_elements, nvfp4_tc_matmul_scales,
-};
+use rust_kernels_cuda::f16_tc_matmul::{F16TcMatmulScratch, f16_tc_matmul_elements};
 
 pub struct AuroraScratchBuffers {
     pub(super) update: DeviceBuffer<f32>,
@@ -26,15 +23,8 @@ pub struct AuroraScratchBuffers {
 pub(super) struct TcMatmulScratch {
     a_padded: DeviceBuffer<f32>,
     b_t_padded: DeviceBuffer<f32>,
-    a: TcOperand,
-    b_t: TcOperand,
-}
-
-struct TcOperand {
-    bytes: DeviceBuffer<u8>,
-    scales: DeviceBuffer<u8>,
-    global_scales: DeviceBuffer<f32>,
-    chunk_amax: DeviceBuffer<f32>,
+    a_halves: DeviceBuffer<u16>,
+    b_t_halves: DeviceBuffer<u16>,
 }
 
 impl AuroraScratchBuffers {
@@ -61,44 +51,21 @@ impl AuroraScratchBuffers {
 
 impl TcMatmulScratch {
     fn new(stream: &CudaStream) -> Result<Self, DriverError> {
+        let matmul = f16_tc_matmul_elements(max_dim(), max_dim());
         Ok(Self {
-            a_padded: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_elements(max_dim(), max_dim()))?,
-            b_t_padded: DeviceBuffer::zeroed(
-                stream,
-                nvfp4_tc_matmul_elements(max_dim(), max_dim()),
-            )?,
-            a: TcOperand::new(stream)?,
-            b_t: TcOperand::new(stream)?,
+            a_padded: DeviceBuffer::zeroed(stream, matmul)?,
+            b_t_padded: DeviceBuffer::zeroed(stream, matmul)?,
+            a_halves: DeviceBuffer::zeroed(stream, matmul)?,
+            b_t_halves: DeviceBuffer::zeroed(stream, matmul)?,
         })
     }
 
-    pub(super) fn scratch(&mut self) -> Nvfp4TcMatmulScratch<'_> {
-        Nvfp4TcMatmulScratch {
+    pub(super) fn scratch(&mut self) -> F16TcMatmulScratch<'_> {
+        F16TcMatmulScratch {
             a_padded: &mut self.a_padded,
             b_t_padded: &mut self.b_t_padded,
-            a: self.a.operand(),
-            b_t: self.b_t.operand(),
-        }
-    }
-}
-
-impl TcOperand {
-    fn new(stream: &CudaStream) -> Result<Self, DriverError> {
-        Ok(Self {
-            bytes: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_bytes(max_dim(), max_dim()))?,
-            scales: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_scales(max_dim(), max_dim()))?,
-            global_scales: DeviceBuffer::zeroed(stream, max_dim() as usize)?,
-            chunk_amax: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_chunks(max_dim(), max_dim()))?,
-        })
-    }
-
-    fn operand(&mut self) -> Nvfp4TcMatmulOperand<'_> {
-        Nvfp4TcMatmulOperand {
-            bytes: &mut self.bytes,
-            scales: &mut self.scales,
-            global_scales: &mut self.global_scales,
-            chunk_amax: &mut self.chunk_amax,
-            global_scale: 1.0,
+            a_halves: &mut self.a_halves,
+            b_t_halves: &mut self.b_t_halves,
         }
     }
 }
@@ -112,5 +79,5 @@ const fn max_matrix() -> usize {
 }
 
 const fn small_square() -> usize {
-    GPT2_N_EMBD * GPT2_N_EMBD
+    max_dim() as usize * max_dim() as usize
 }

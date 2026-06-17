@@ -8,8 +8,7 @@ mod polar_source;
 mod tc;
 
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
-use rust_kernels_cuda::nvfp4_tc_matmul::Nvfp4TcMatmulModule;
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::optimizer::OptimizerModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
@@ -28,14 +27,13 @@ pub(super) const PP_ITERATIONS: usize = 2;
 pub(super) const EPS: f32 = 1.0e-7;
 
 const MU: f32 = 0.95;
-pub(super) const AURORA_LR: f32 = 3.75e-3;
+pub(super) const AURORA_LR: f32 = 1.0e-4;
 pub(super) const AURORA_WEIGHT_DECAY: f32 = 0.025;
 
 #[derive(Clone, Copy)]
 pub(super) struct AuroraModules<'a> {
     pub(super) optimizer: &'a OptimizerModule,
-    pub(super) quant: &'a Nvfp4QuantModule,
-    pub(super) tc: &'a Nvfp4TcMatmulModule,
+    pub(super) tc: &'a F16TcMatmulModule,
     pub(super) transpose: &'a TransposeModule,
 }
 
@@ -50,6 +48,11 @@ pub(super) struct AuroraMatrixArgs<'a, 'scratch> {
     pub(super) rows: u32,
     pub(super) cols: u32,
     pub(super) seed: u32,
+    pub(super) step: u32,
+}
+
+pub(super) fn aurora_learning_rate(step: u32) -> f32 {
+    AURORA_LR * super::learning_rate::aurora_multiplier(step)
 }
 
 pub(super) fn apply_aurora_matrix(args: AuroraMatrixArgs<'_, '_>) -> Result<(), DriverError> {

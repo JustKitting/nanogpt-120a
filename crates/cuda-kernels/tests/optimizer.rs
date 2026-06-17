@@ -24,6 +24,7 @@ fn nvfp4_weight_update_applies_decay_update_and_requantizes() -> Result<(), Box<
     let update = DeviceBuffer::from_host(&stream, &[0.5_f32; LEN])?;
     let mut workspace = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
     let mut amax = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let mut chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
     let mut next_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
 
     module.apply_nvfp4_weight_update(Nvfp4WeightUpdateArgs {
@@ -35,6 +36,7 @@ fn nvfp4_weight_update_applies_decay_update_and_requantizes() -> Result<(), Box<
         aurora_update: &update,
         fp32_workspace: &mut workspace,
         amax: &mut amax,
+        chunk_amax: &mut chunk_amax,
         next_global_scale: &mut next_global_scale,
         len: LEN as u32,
         learning_rate: 0.25,
@@ -73,6 +75,7 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
     let mut residual = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
     let mut workspace = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
     let mut amax = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let mut chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
     let mut next_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
 
     module.apply_adamw_update(AdamWUpdateArgs {
@@ -87,6 +90,7 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
         residual: &mut residual,
         fp32_workspace: &mut workspace,
         amax: &mut amax,
+        chunk_amax: &mut chunk_amax,
         next_global_scale: &mut next_global_scale,
         len: LEN as u32,
         learning_rate: 0.25,

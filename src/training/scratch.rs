@@ -1,16 +1,17 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError};
+use cuda_core::{CudaStream, DriverError};
 use gpt2_nvfp4::{
-    AttentionCoreScratch, BlockAttentionBackwardScratch, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV,
-    GPT2_VOCAB_SIZE, Gpt2BackwardScratch, MlpBackwardScratch,
+    BlockAttentionBackwardScratch, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE,
+    Gpt2BackwardScratch, MlpBackwardScratch,
 };
 
+use super::attention_core_scratch::AttentionCoreScratchBuffers;
 use super::linear_scratch::LinearScratch;
 
 pub struct BackwardScratchBuffers {
     final_head: LinearScratch,
     attention_c_proj: LinearScratch,
     attention_qkv: LinearScratch,
-    attention_softmax_d: DeviceBuffer<f32>,
+    attention_core: AttentionCoreScratchBuffers,
     mlp_down: LinearScratch,
     mlp_up: LinearScratch,
 }
@@ -21,7 +22,7 @@ impl BackwardScratchBuffers {
             final_head: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_VOCAB_SIZE)?,
             attention_c_proj: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_N_EMBD)?,
             attention_qkv: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_QKV)?,
-            attention_softmax_d: DeviceBuffer::zeroed(stream, gpt2_nvfp4::AttentionLogSumExp::LEN)?,
+            attention_core: AttentionCoreScratchBuffers::new(stream)?,
             mlp_down: LinearScratch::new(stream, GPT2_MLP, GPT2_N_EMBD)?,
             mlp_up: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_MLP)?,
         })
@@ -34,9 +35,7 @@ impl BackwardScratchBuffers {
             final_head: self.final_head.final_head(),
             attention: BlockAttentionBackwardScratch {
                 c_proj: self.attention_c_proj.attention(),
-                core: AttentionCoreScratch {
-                    softmax_d: &mut self.attention_softmax_d,
-                },
+                core: self.attention_core.args(),
                 qkv: self.attention_qkv.attention(),
             },
             mlp: MlpBackwardScratch {
