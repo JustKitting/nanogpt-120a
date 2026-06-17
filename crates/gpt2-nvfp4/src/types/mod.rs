@@ -8,6 +8,7 @@ mod linear;
 mod model;
 mod nvfp4_scratch;
 mod shapes;
+mod tape;
 
 pub use backward::{
     BlockBackwardGrads, BlockForwardSaved, Gpt2BackwardContext, Gpt2BackwardGrads,
@@ -29,3 +30,4 @@ pub use shapes::{
     MlpUpWeightShape, MlpVectorShape, QkvLinear, QkvVectorShape, QkvWeightShape, ResidualLinear,
     ResidualWeightShape, TokenEmbedding, TokenEmbeddingShape, nvfp4_bytes, nvfp4_scales,
 };
+pub use tape::{BlockForwardTape, Gpt2ForwardTape, LayerNormTape};
