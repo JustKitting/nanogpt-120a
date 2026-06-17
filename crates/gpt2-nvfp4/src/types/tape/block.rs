@@ -9,12 +9,16 @@ impl<'a> BlockForwardTape<'a> {
         BlockForwardSaved {
             residual_in: &*self.residual_in,
             ln_1: self.ln_1.saved(),
+            qkv_input_nvfp4: self.qkv_input_nvfp4.saved(),
             qkv: &*self.qkv,
             attention_out: &*self.attention_out,
+            c_proj_input_nvfp4: self.c_proj_input_nvfp4.saved(),
             residual_after_attention: &*self.residual_after_attention,
             ln_2: self.ln_2.saved(),
+            mlp_up_input_nvfp4: self.mlp_up_input_nvfp4.saved(),
             mlp_up: &*self.mlp_up,
             mlp_relu2: &*self.mlp_relu2,
+            mlp_down_input_nvfp4: self.mlp_down_input_nvfp4.saved(),
             residual_out: &*self.residual_out,
         }
     }
@@ -23,12 +27,16 @@ impl<'a> BlockForwardTape<'a> {
         BlockForwardTape {
             residual_in: &mut *self.residual_in,
             ln_1: self.ln_1.reborrow(),
+            qkv_input_nvfp4: self.qkv_input_nvfp4.reborrow(),
             qkv: &mut *self.qkv,
             attention_out: &mut *self.attention_out,
+            c_proj_input_nvfp4: self.c_proj_input_nvfp4.reborrow(),
             residual_after_attention: &mut *self.residual_after_attention,
             ln_2: self.ln_2.reborrow(),
+            mlp_up_input_nvfp4: self.mlp_up_input_nvfp4.reborrow(),
             mlp_up: &mut *self.mlp_up,
             mlp_relu2: &mut *self.mlp_relu2,
+            mlp_down_input_nvfp4: self.mlp_down_input_nvfp4.reborrow(),
             residual_out: &mut *self.residual_out,
         }
     }

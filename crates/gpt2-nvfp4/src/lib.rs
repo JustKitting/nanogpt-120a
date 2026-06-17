@@ -23,13 +23,14 @@ pub use config::{
 pub use tensor::{FixedBytes, Nvfp4Shape, Nvfp4Tensor};
 
 pub use types::{
-    AttentionForwardArgs, AttentionProjectionTensors, AttentionWeights, BlockBackwardGrads,
-    BlockForwardArgs, BlockForwardSaved, BlockForwardTape, Gpt2, Gpt2BackwardContext,
-    Gpt2BackwardGrads, Gpt2BlockWeights, Gpt2ForwardArgs, Gpt2ForwardSaved, Gpt2ForwardTape,
-    Gpt2Weights, HiddenStateDevice, HiddenStateNvfp4, LayerNormForwardArgs, LayerNormGrads,
-    LayerNormSaved, LayerNormTape, LayerNormTensors, LayerNormWeights, LinearWeights,
-    MlpActivationNvfp4, MlpDownTensors, MlpForwardArgs, MlpProjectionTensors, MlpScratch,
-    MlpUpTensors, MlpWeights, RowwiseNvfp4Scratch, TokenEmbeddingArgs,
+    AttentionForwardArgs, AttentionForwardTape, AttentionProjectionTensors, AttentionWeights,
+    BlockBackwardGrads, BlockForwardArgs, BlockForwardSaved, BlockForwardTape, Gpt2,
+    Gpt2BackwardContext, Gpt2BackwardGrads, Gpt2BlockWeights, Gpt2ForwardArgs, Gpt2ForwardSaved,
+    Gpt2ForwardTape, Gpt2Weights, HiddenStateDevice, HiddenStateNvfp4, LayerNormForwardArgs,
+    LayerNormGrads, LayerNormSaved, LayerNormTape, LayerNormTensors, LayerNormWeights,
+    LinearWeights, MlpActivationNvfp4, MlpDownTensors, MlpForwardArgs, MlpForwardTape,
+    MlpProjectionTensors, MlpScratch, MlpUpTensors, MlpWeights, RowwiseNvfp4Scratch,
+    RowwiseNvfp4Tape, TokenEmbeddingArgs,
 };
 
 pub use types::{

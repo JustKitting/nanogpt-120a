@@ -4,6 +4,7 @@ use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
+use super::tape::MlpForwardTape;
 use crate::types::{HiddenStateDevice, HiddenStateNvfp4, MlpActivationNvfp4};
 
 #[derive(Clone, Copy)]
@@ -37,4 +38,5 @@ pub struct MlpForwardArgs<'a, 'scratch> {
     pub scratch: MlpScratch<'scratch>,
     pub projections: MlpProjectionTensors<'a>,
     pub hidden: HiddenStateDevice<'a>,
+    pub tape: Option<MlpForwardTape<'scratch>>,
 }

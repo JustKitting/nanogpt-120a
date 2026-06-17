@@ -4,6 +4,7 @@ use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
+use super::tape::AttentionForwardTape;
 use crate::types::{HiddenStateDevice, HiddenStateNvfp4};
 
 #[derive(Clone, Copy)]
@@ -21,4 +22,5 @@ pub struct AttentionForwardArgs<'a, 'scratch> {
     pub projections: AttentionProjectionTensors<'a>,
     pub qkv: &'scratch mut DeviceBuffer<f32>,
     pub hidden: HiddenStateDevice<'a>,
+    pub tape: Option<AttentionForwardTape<'scratch>>,
 }

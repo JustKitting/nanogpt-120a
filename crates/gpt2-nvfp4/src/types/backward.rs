@@ -1,4 +1,5 @@
 use cuda_core::DeviceBuffer;
+use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use crate::GPT2_N_LAYER;
 
@@ -12,18 +13,23 @@ pub struct Gpt2ForwardSaved<'a> {
     pub embedding_residual: &'a DeviceBuffer<f32>,
     pub blocks: [BlockForwardSaved<'a>; GPT2_N_LAYER],
     pub final_norm: LayerNormSaved<'a>,
+    pub lm_head_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub logits: &'a DeviceBuffer<f32>,
 }
 
 pub struct BlockForwardSaved<'a> {
     pub residual_in: &'a DeviceBuffer<f32>,
     pub ln_1: LayerNormSaved<'a>,
+    pub qkv_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub qkv: &'a DeviceBuffer<f32>,
     pub attention_out: &'a DeviceBuffer<f32>,
+    pub c_proj_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub residual_after_attention: &'a DeviceBuffer<f32>,
     pub ln_2: LayerNormSaved<'a>,
+    pub mlp_up_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub mlp_up: &'a DeviceBuffer<f32>,
     pub mlp_relu2: &'a DeviceBuffer<f32>,
+    pub mlp_down_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub residual_out: &'a DeviceBuffer<f32>,
 }
 

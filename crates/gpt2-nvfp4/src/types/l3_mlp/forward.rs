@@ -1,8 +1,9 @@
 use cuda_core::DriverError;
 use rust_kernels_cuda::mlp::{MlpDownResidualArgs, MlpUpRelu2Args, MlpUpRelu2TapeArgs};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
-use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantRowwiseArgs, RowAmaxArgs};
+use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantRowwiseArgs;
 
+use super::quantize::quantize_activation;
 use super::tensors::MlpForwardArgs;
 use crate::types::HiddenStateDevice;
 
@@ -11,6 +12,7 @@ pub(super) fn forward<'a, 'scratch>(
 ) -> Result<HiddenStateDevice<'a>, DriverError> {
     let input_nvfp4 = args.scratch.input_nvfp4;
     let mut activation_nvfp4 = args.scratch.activation_nvfp4;
+    let mut tape = args.tape;
     let HiddenStateDevice {
         stream,
         residual,
@@ -35,6 +37,9 @@ pub(super) fn forward<'a, 'scratch>(
         scales: &*input_nvfp4.scales,
         global_scales: &*input_nvfp4.global_scales,
     };
+    if let Some(tape) = tape.as_mut() {
+        tape.save_up_input(stream, input)?;
+    }
 
     if let Some(pre_activation) = args.scratch.pre_activation {
         args.module.up_relu2_tape(MlpUpRelu2TapeArgs {
@@ -69,13 +74,18 @@ pub(super) fn forward<'a, 'scratch>(
         normalized_amax,
     )?;
 
+    let input = Nvfp4RowwiseDeviceTensor {
+        bytes: &*activation_nvfp4.bytes,
+        scales: &*activation_nvfp4.scales,
+        global_scales: &*activation_nvfp4.global_scales,
+    };
+    if let Some(tape) = tape.as_mut() {
+        tape.save_down_input(stream, input)?;
+    }
+
     args.module.down_residual(MlpDownResidualArgs {
         stream,
-        input: Nvfp4RowwiseDeviceTensor {
-            bytes: &*activation_nvfp4.bytes,
-            scales: &*activation_nvfp4.scales,
-            global_scales: &*activation_nvfp4.global_scales,
-        },
+        input,
         weight: args.projections.down.weight,
         bias: args.projections.down.bias,
         residual,
@@ -89,32 +99,5 @@ pub(super) fn forward<'a, 'scratch>(
         residual,
         normalized,
         normalized_amax,
-    })
-}
-
-fn quantize_activation(
-    quant_module: &rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule,
-    stream: &cuda_core::CudaStream,
-    activation: &cuda_core::DeviceBuffer<f32>,
-    activation_nvfp4: crate::types::MlpActivationNvfp4<'_>,
-    normalized_amax: &mut cuda_core::DeviceBuffer<f32>,
-) -> Result<(), DriverError> {
-    quant_module.row_amax_f32(RowAmaxArgs {
-        stream,
-        x: activation,
-        out: normalized_amax,
-        row_count: crate::GPT2_CONTEXT_LEN as u32,
-        row_len: crate::GPT2_MLP as u32,
-    })?;
-
-    quant_module.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
-        stream,
-        x: activation,
-        amax: normalized_amax,
-        out_fp4: &mut *activation_nvfp4.bytes,
-        out_scales: &mut *activation_nvfp4.scales,
-        out_global_scale: &mut *activation_nvfp4.global_scales,
-        group_count: (crate::MlpActivation::LEN / 16) as u32,
-        row_len: crate::GPT2_MLP as u32,
     })
 }

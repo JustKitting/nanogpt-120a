@@ -11,6 +11,7 @@ impl<'a> Gpt2ForwardTape<'a> {
             embedding_residual: &*self.embedding_residual,
             blocks: std::array::from_fn(|index| self.blocks[index].saved()),
             final_norm: self.final_norm.saved(),
+            lm_head_input_nvfp4: self.lm_head_input_nvfp4.saved(),
             logits: &*self.logits,
         }
     }

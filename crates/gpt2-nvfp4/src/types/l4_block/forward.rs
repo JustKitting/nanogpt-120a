@@ -3,8 +3,8 @@ use cuda_core::{DeviceBuffer, DriverError};
 use super::args::BlockForwardArgs;
 use super::weights::Gpt2BlockWeights;
 use crate::types::{
-    AttentionWeights, HiddenStateDevice, LayerNormWeights, MlpProjectionTensors, MlpScratch,
-    MlpWeights,
+    AttentionForwardTape, AttentionWeights, HiddenStateDevice, LayerNormWeights,
+    MlpProjectionTensors, MlpScratch, MlpWeights,
 };
 
 impl Gpt2BlockWeights {
@@ -32,13 +32,19 @@ impl Gpt2BlockWeights {
                 .save(hidden.stream, hidden.residual, hidden.normalized)?;
         }
 
-        let hidden = AttentionWeights::forward(AttentionWeights::input_from_embeddings(
+        let attention_tape = tape.as_mut().map(|tape| AttentionForwardTape {
+            qkv_input_nvfp4: tape.qkv_input_nvfp4.reborrow(),
+            c_proj_input_nvfp4: tape.c_proj_input_nvfp4.reborrow(),
+        });
+
+        let hidden = AttentionWeights::forward(AttentionWeights::input_from_embeddings_with_tape(
             args.attention_module,
             args.quant_module,
             hidden_nvfp4.reborrow(),
             args.projections,
             &mut *qkv,
             hidden,
+            attention_tape,
         ))?;
 
         if let Some(tape) = tape.as_mut() {
@@ -58,8 +64,19 @@ impl Gpt2BlockWeights {
                 .save(hidden.stream, hidden.residual, hidden.normalized)?;
         }
 
-        let pre_activation = tape.as_mut().map(|tape| &mut *tape.mlp_up);
-        MlpWeights::forward(MlpWeights::input_from_attention(
+        let (pre_activation, mlp_tape) = if let Some(tape) = tape.as_mut() {
+            (
+                Some(&mut *tape.mlp_up),
+                Some(crate::types::MlpForwardTape {
+                    up_input_nvfp4: tape.mlp_up_input_nvfp4.reborrow(),
+                    down_input_nvfp4: tape.mlp_down_input_nvfp4.reborrow(),
+                }),
+            )
+        } else {
+            (None, None)
+        };
+
+        let hidden = MlpWeights::forward(MlpWeights::input_from_attention_with_tape(
             args.mlp_module,
             args.quant_module,
             MlpScratch {
@@ -73,8 +90,10 @@ impl Gpt2BlockWeights {
                 down: args.mlp_down,
             },
             hidden,
-        ))
-        .and_then(|hidden| save_mlp_tape(tape.as_mut(), mlp_activation, hidden))
+            mlp_tape,
+        ))?;
+
+        save_mlp_tape(tape.as_mut(), mlp_activation, hidden)
     }
 }
 

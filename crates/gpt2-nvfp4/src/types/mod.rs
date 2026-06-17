@@ -15,9 +15,12 @@ pub use backward::{
     Gpt2ForwardSaved, LayerNormGrads, LayerNormSaved,
 };
 pub use l1_embeddings::{EmbeddingWeights, HiddenStateDevice, TokenEmbeddingArgs};
-pub use l2_attention::{AttentionForwardArgs, AttentionProjectionTensors, AttentionWeights};
+pub use l2_attention::{
+    AttentionForwardArgs, AttentionForwardTape, AttentionProjectionTensors, AttentionWeights,
+};
 pub use l3_mlp::{
-    MlpDownTensors, MlpForwardArgs, MlpProjectionTensors, MlpScratch, MlpUpTensors, MlpWeights,
+    MlpDownTensors, MlpForwardArgs, MlpForwardTape, MlpProjectionTensors, MlpScratch, MlpUpTensors,
+    MlpWeights,
 };
 pub use l4_block::{BlockForwardArgs, Gpt2BlockWeights};
 pub use l5_layer_norm::{LayerNormForwardArgs, LayerNormTensors, LayerNormWeights};
@@ -30,4 +33,4 @@ pub use shapes::{
     MlpUpWeightShape, MlpVectorShape, QkvLinear, QkvVectorShape, QkvWeightShape, ResidualLinear,
     ResidualWeightShape, TokenEmbedding, TokenEmbeddingShape, nvfp4_bytes, nvfp4_scales,
 };
-pub use tape::{BlockForwardTape, Gpt2ForwardTape, LayerNormTape};
+pub use tape::{BlockForwardTape, Gpt2ForwardTape, LayerNormTape, RowwiseNvfp4Tape};
