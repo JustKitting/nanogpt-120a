@@ -14,11 +14,13 @@ pub use activations::{
 pub use backward::{
     AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
     AttentionCProjScratch, AttentionCoreBackwardArgs, AttentionCoreScratch,
-    AttentionQkvBackwardArgs, AttentionQkvScratch, BlockMlpBackwardArgs, BlockMlpBackwardModules,
-    FinalHeadBackwardArgs, FinalHeadBackwardModules, FinalHeadBackwardScratch,
-    FinalHeadBackwardSeeds, Gpt2LayerNormBackwardArgs, Gpt2LayerNormBackwardInputArgs,
-    Gpt2LayerNormBackwardParamArgs, MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules,
-    MlpBackwardScratch, MlpBackwardSeeds, attention_c_proj_backward, causal_attention_backward,
+    AttentionQkvBackwardArgs, AttentionQkvScratch, BlockAttentionBackwardArgs,
+    BlockAttentionBackwardModules, BlockAttentionBackwardScratch, BlockAttentionBackwardSeeds,
+    BlockMlpBackwardArgs, BlockMlpBackwardModules, FinalHeadBackwardArgs, FinalHeadBackwardModules,
+    FinalHeadBackwardScratch, FinalHeadBackwardSeeds, Gpt2LayerNormBackwardArgs,
+    Gpt2LayerNormBackwardInputArgs, Gpt2LayerNormBackwardParamArgs, MlpBackwardArgs,
+    MlpBackwardGrads, MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds,
+    attention_c_proj_backward, attention_side_backward, causal_attention_backward,
     final_head_backward, layer_norm_backward, layer_norm_backward_input,
     layer_norm_backward_params, mlp_backward, mlp_side_backward, qkv_projection_backward,
 };

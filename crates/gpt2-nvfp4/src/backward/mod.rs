@@ -1,5 +1,6 @@
 mod attention;
 mod block;
+mod block_attention;
 pub mod final_head;
 mod layer_norm;
 mod mlp;
@@ -11,6 +12,10 @@ pub use attention::{
     causal_attention_backward, qkv_projection_backward,
 };
 pub use block::{BlockMlpBackwardArgs, BlockMlpBackwardModules, mlp_side_backward};
+pub use block_attention::{
+    BlockAttentionBackwardArgs, BlockAttentionBackwardModules, BlockAttentionBackwardScratch,
+    BlockAttentionBackwardSeeds, attention_side_backward,
+};
 pub use final_head::{
     FinalHeadBackwardArgs, FinalHeadBackwardModules, FinalHeadBackwardScratch,
     FinalHeadBackwardSeeds, backward as final_head_backward,

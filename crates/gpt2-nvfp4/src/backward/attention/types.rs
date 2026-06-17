@@ -8,6 +8,7 @@ use rust_kernels_cuda::transpose::TransposeModule;
 use crate::Gpt2Rng;
 use crate::types::{AttentionProjectionTensors, BlockForwardSaved};
 
+#[derive(Clone, Copy)]
 pub struct AttentionBackwardModules<'a> {
     pub transpose: &'a TransposeModule,
     pub decode: &'a Nvfp4DecodeModule,
@@ -29,6 +30,7 @@ pub struct AttentionCoreScratch<'scratch> {
     pub softmax_d: &'scratch mut DeviceBuffer<f32>,
 }
 
+#[derive(Clone, Copy)]
 pub struct AttentionBackwardSeeds {
     pub(crate) sign: u32,
     pub(crate) scale: u32,
