@@ -11,6 +11,7 @@ use crate::backward::{
 };
 use crate::types::{AttentionProjectionTensors, BlockBackwardGrads, BlockForwardSaved};
 
+#[derive(Clone, Copy)]
 pub struct BlockAttentionBackwardModules<'a> {
     pub residual: &'a ResidualBackwardModule,
     pub layer_norm: &'a LayerNormBackwardModule,
@@ -24,6 +25,17 @@ pub struct BlockAttentionBackwardScratch<'scratch> {
     pub qkv: AttentionQkvScratch<'scratch>,
 }
 
+impl<'scratch> BlockAttentionBackwardScratch<'scratch> {
+    pub fn reborrow(&mut self) -> BlockAttentionBackwardScratch<'_> {
+        BlockAttentionBackwardScratch {
+            c_proj: self.c_proj.reborrow(),
+            core: self.core.reborrow(),
+            qkv: self.qkv.reborrow(),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct BlockAttentionBackwardSeeds {
     pub c_proj: AttentionBackwardSeeds,
     pub qkv: AttentionBackwardSeeds,

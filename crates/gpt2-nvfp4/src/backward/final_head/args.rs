@@ -8,6 +8,7 @@ use rust_kernels_cuda::transpose::TransposeModule;
 
 use crate::Gpt2Rng;
 
+#[derive(Clone, Copy)]
 pub struct FinalHeadBackwardModules<'a> {
     pub loss: &'a LossModule,
     pub transpose: &'a TransposeModule,
@@ -23,6 +24,7 @@ pub struct FinalHeadBackwardScratch<'scratch> {
     pub linear: LinearBackwardMsEdenScratch<'scratch>,
 }
 
+#[derive(Clone, Copy)]
 pub struct FinalHeadBackwardSeeds {
     pub(crate) sign: u32,
     pub(crate) scale: u32,

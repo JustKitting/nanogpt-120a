@@ -1,9 +1,12 @@
 mod attention;
 mod block;
 mod block_attention;
+mod device_copy;
 pub mod final_head;
 mod layer_norm;
 mod mlp;
+mod model;
+mod scratch_reborrow;
 
 pub use attention::{
     AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
@@ -27,4 +30,8 @@ pub use layer_norm::{
 pub use mlp::{
     MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds,
     backward as mlp_backward,
+};
+pub use model::{
+    Gpt2BackwardArgs, Gpt2BackwardModules, Gpt2BackwardScratch, Gpt2BackwardSeeds,
+    Gpt2BackwardWeights, backward as gpt2_backward,
 };

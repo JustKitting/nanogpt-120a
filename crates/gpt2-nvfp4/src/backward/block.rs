@@ -10,6 +10,7 @@ use super::mlp::{
 use crate::types::{BlockBackwardGrads, BlockForwardSaved, LayerNormGrads};
 use crate::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, LayerNormTensors, MlpProjectionTensors};
 
+#[derive(Clone, Copy)]
 pub struct BlockMlpBackwardModules<'a> {
     pub residual: &'a ResidualBackwardModule,
     pub layer_norm: &'a LayerNormBackwardModule,

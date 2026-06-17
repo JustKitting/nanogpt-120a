@@ -73,3 +73,34 @@ pub struct LayerNormGrads<'a> {
     pub d_weight: &'a mut DeviceBuffer<f32>,
     pub d_bias: &'a mut DeviceBuffer<f32>,
 }
+
+impl<'a> BlockBackwardGrads<'a> {
+    pub fn reborrow(&mut self) -> BlockBackwardGrads<'_> {
+        BlockBackwardGrads {
+            d_residual_in: &mut *self.d_residual_in,
+            ln_1: self.ln_1.reborrow(),
+            d_qkv: &mut *self.d_qkv,
+            d_attention_out: &mut *self.d_attention_out,
+            d_residual_after_attention: &mut *self.d_residual_after_attention,
+            ln_2: self.ln_2.reborrow(),
+            d_mlp_up: &mut *self.d_mlp_up,
+            d_mlp_relu2: &mut *self.d_mlp_relu2,
+            d_attn_qkv_weight: &mut *self.d_attn_qkv_weight,
+            d_attn_c_proj_weight: &mut *self.d_attn_c_proj_weight,
+            d_mlp_c_fc_weight: &mut *self.d_mlp_c_fc_weight,
+            d_mlp_c_proj_weight: &mut *self.d_mlp_c_proj_weight,
+            d_residual_out: &mut *self.d_residual_out,
+        }
+    }
+}
+
+impl<'a> LayerNormGrads<'a> {
+    pub fn reborrow(&mut self) -> LayerNormGrads<'_> {
+        LayerNormGrads {
+            d_residual: &mut *self.d_residual,
+            d_normalized: &mut *self.d_normalized,
+            d_weight: &mut *self.d_weight,
+            d_bias: &mut *self.d_bias,
+        }
+    }
+}

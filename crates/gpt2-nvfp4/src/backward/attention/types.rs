@@ -6,6 +6,7 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
 use crate::Gpt2Rng;
+use crate::backward::scratch_reborrow::reborrow_ms_eden;
 use crate::types::{AttentionProjectionTensors, BlockForwardSaved};
 
 #[derive(Clone, Copy)]
@@ -28,6 +29,25 @@ pub type AttentionQkvScratch<'scratch> = AttentionLinearScratch<'scratch>;
 
 pub struct AttentionCoreScratch<'scratch> {
     pub softmax_d: &'scratch mut DeviceBuffer<f32>,
+}
+
+impl<'scratch> AttentionLinearScratch<'scratch> {
+    pub fn reborrow(&mut self) -> AttentionLinearScratch<'_> {
+        AttentionLinearScratch {
+            error_t: &mut *self.error_t,
+            weight_t: &mut *self.weight_t,
+            input_t: &mut *self.input_t,
+            linear: reborrow_ms_eden(&mut self.linear),
+        }
+    }
+}
+
+impl<'scratch> AttentionCoreScratch<'scratch> {
+    pub fn reborrow(&mut self) -> AttentionCoreScratch<'_> {
+        AttentionCoreScratch {
+            softmax_d: &mut *self.softmax_d,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

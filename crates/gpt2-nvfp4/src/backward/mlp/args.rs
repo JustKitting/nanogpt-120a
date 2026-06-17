@@ -6,8 +6,10 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
 use crate::Gpt2Rng;
+use crate::backward::scratch_reborrow::reborrow_ms_eden;
 use crate::types::{BlockForwardSaved, MlpProjectionTensors};
 
+#[derive(Clone, Copy)]
 pub struct MlpBackwardModules<'a> {
     pub transpose: &'a TransposeModule,
     pub decode: &'a Nvfp4DecodeModule,
@@ -27,6 +29,21 @@ pub struct MlpBackwardScratch<'scratch> {
     pub up_linear: LinearBackwardMsEdenScratch<'scratch>,
 }
 
+impl<'scratch> MlpBackwardScratch<'scratch> {
+    pub fn reborrow(&mut self) -> MlpBackwardScratch<'_> {
+        MlpBackwardScratch {
+            down_error_t: &mut *self.down_error_t,
+            down_weight_t: &mut *self.down_weight_t,
+            down_input_t: &mut *self.down_input_t,
+            up_error_t: &mut *self.up_error_t,
+            up_weight_t: &mut *self.up_weight_t,
+            up_input_t: &mut *self.up_input_t,
+            down_linear: reborrow_ms_eden(&mut self.down_linear),
+            up_linear: reborrow_ms_eden(&mut self.up_linear),
+        }
+    }
+}
+
 pub struct MlpBackwardGrads<'out> {
     pub d_mlp_relu2: &'out mut DeviceBuffer<f32>,
     pub d_mlp_up: &'out mut DeviceBuffer<f32>,
@@ -35,6 +52,7 @@ pub struct MlpBackwardGrads<'out> {
     pub d_c_fc_weight: &'out mut DeviceBuffer<f32>,
 }
 
+#[derive(Clone, Copy)]
 pub struct MlpBackwardSeeds {
     pub(crate) down_sign: u32,
     pub(crate) down_scale: u32,
