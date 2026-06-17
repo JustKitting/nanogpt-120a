@@ -82,6 +82,7 @@ impl Trainer {
             loss_sync_ms: 0.0,
             optimizer_ms: 0.0,
             optimizer: OptimizerTrace::default(),
+            diagnostics: None,
         })
     }
 }

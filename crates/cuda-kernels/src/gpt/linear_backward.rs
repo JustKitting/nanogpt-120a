@@ -10,10 +10,10 @@ use crate::mma::{
     projection_grid_dim,
 };
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
-use crate::nvfp4_quant::{MsEdenQuantArgs, Nvfp4QuantModule};
+use crate::nvfp4_quant::{Nvfp4QuantModule, QuartetBackwardMsEdenQuantArgs};
+use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 use crate::warp_reduce::warp_sum_f32;
 
-pub const QUARTET_BACKWARD_SCALE_OVERRIDE: f32 = (17.0 / 16.0) * 0.93;
 pub const LINEAR_BIAS_THREADS_PER_BLOCK: u32 = 256;
 const LINEAR_BIAS_WARP_SIZE: u32 = 32;
 const LINEAR_BIAS_WARPS_PER_BLOCK: u32 = LINEAR_BIAS_THREADS_PER_BLOCK / LINEAR_BIAS_WARP_SIZE;
@@ -98,6 +98,9 @@ impl LinearBackwardModule {
     }
 
     pub fn backward(&self, args: LinearBackwardArgs<'_, '_>) -> Result<(), DriverError> {
+        let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
+        let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
+
         self.module.linear_backward_projection_kernel(
             args.stream,
             LaunchConfig {
@@ -113,7 +116,7 @@ impl LinearBackwardModule {
             args.dinput,
             Nvfp4ProjectionParams {
                 token_count: args.token_count,
-                input_dim: args.output_dim,
+                input_dim: dinput_k,
                 output_dim: args.input_dim,
                 weight_global_scale: args.weight_t_h.global_scale,
                 bias_global_scale: 0.0,
@@ -137,7 +140,7 @@ impl LinearBackwardModule {
             args.dweight,
             Nvfp4ProjectionParams {
                 token_count: args.output_dim,
-                input_dim: args.token_count,
+                input_dim: dweight_k,
                 output_dim: args.input_dim,
                 weight_global_scale: args.input_t_h.global_scale,
                 bias_global_scale: 0.0,
@@ -166,8 +169,11 @@ impl LinearBackwardModule {
             )?;
         }
 
-        let scratch = args.scratch;
-        quantize_operand(
+        let mut scratch = args.scratch;
+        let output_k = nvfp4_tc_matmul_padded_k(args.output_dim);
+        let token_k = nvfp4_tc_matmul_padded_k(args.token_count);
+
+        scratch.e_h.global_scale = quantize_operand(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -177,13 +183,13 @@ impl LinearBackwardModule {
                 global_scales: &mut *scratch.e_h.global_scales,
                 chunk_amax: &mut *scratch.e_h.chunk_amax,
                 row_count: args.token_count,
-                row_len: args.output_dim,
-                global_scale: scratch.e_h.global_scale,
+                src_row_len: args.output_dim,
+                dst_row_len: output_k,
                 sign_seed: args.sign_seed,
                 scale_seed: args.scale_seed,
             },
         )?;
-        quantize_operand(
+        scratch.weight_t_h.global_scale = quantize_operand(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -193,13 +199,13 @@ impl LinearBackwardModule {
                 global_scales: &mut *scratch.weight_t_h.global_scales,
                 chunk_amax: &mut *scratch.weight_t_h.chunk_amax,
                 row_count: args.input_dim,
-                row_len: args.output_dim,
-                global_scale: scratch.weight_t_h.global_scale,
+                src_row_len: args.output_dim,
+                dst_row_len: output_k,
                 sign_seed: args.sign_seed,
                 scale_seed: args.scale_seed ^ 0x9e37_79b9,
             },
         )?;
-        quantize_operand(
+        scratch.e_t_h.global_scale = quantize_operand(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -209,13 +215,13 @@ impl LinearBackwardModule {
                 global_scales: &mut *scratch.e_t_h.global_scales,
                 chunk_amax: &mut *scratch.e_t_h.chunk_amax,
                 row_count: args.output_dim,
-                row_len: args.token_count,
-                global_scale: scratch.e_t_h.global_scale,
+                src_row_len: args.token_count,
+                dst_row_len: token_k,
                 sign_seed: args.sign_seed,
                 scale_seed: args.scale_seed ^ 0x85eb_ca6b,
             },
         )?;
-        quantize_operand(
+        scratch.input_t_h.global_scale = quantize_operand(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -225,8 +231,8 @@ impl LinearBackwardModule {
                 global_scales: &mut *scratch.input_t_h.global_scales,
                 chunk_amax: &mut *scratch.input_t_h.chunk_amax,
                 row_count: args.input_dim,
-                row_len: args.token_count,
-                global_scale: scratch.input_t_h.global_scale,
+                src_row_len: args.token_count,
+                dst_row_len: token_k,
                 sign_seed: args.sign_seed,
                 scale_seed: args.scale_seed ^ 0xc2b2_ae35,
             },
@@ -256,8 +262,8 @@ struct QuantizeOperandArgs<'a, 'out> {
     global_scales: &'out mut DeviceBuffer<f32>,
     chunk_amax: &'out mut DeviceBuffer<f32>,
     row_count: u32,
-    row_len: u32,
-    global_scale: f32,
+    src_row_len: u32,
+    dst_row_len: u32,
     sign_seed: u32,
     scale_seed: u32,
 }
@@ -265,8 +271,8 @@ struct QuantizeOperandArgs<'a, 'out> {
 fn quantize_operand(
     module: &Nvfp4QuantModule,
     args: QuantizeOperandArgs<'_, '_>,
-) -> Result<(), DriverError> {
-    module.fp32_to_nvfp4_ms_eden(MsEdenQuantArgs {
+) -> Result<f32, DriverError> {
+    module.fp32_to_nvfp4_quartet_backward_ms_eden(QuartetBackwardMsEdenQuantArgs {
         stream: args.stream,
         x: args.x,
         out_fp4: args.scratch,
@@ -274,9 +280,8 @@ fn quantize_operand(
         out_global_scales: args.global_scales,
         out_chunk_amax: args.chunk_amax,
         row_count: args.row_count,
-        row_len: args.row_len,
-        global_scale: args.global_scale,
-        scale_override: QUARTET_BACKWARD_SCALE_OVERRIDE,
+        src_row_len: args.src_row_len,
+        dst_row_len: args.dst_row_len,
         sign_seed: args.sign_seed,
         scale_seed: args.scale_seed,
     })

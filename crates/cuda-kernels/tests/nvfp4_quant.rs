@@ -2,6 +2,7 @@ use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use rust_kernels_cuda::nvfp4_quant::{MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantModule};
+use rust_kernels_cuda::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
 
 mod common;
 
@@ -71,9 +72,10 @@ fn fp32_to_nvfp4_ms_eden_writes_rotated_quantized_outputs() -> Result<(), Box<dy
         out_global_scales: &mut global_scales_dev,
         out_chunk_amax: &mut chunk_amax_dev,
         row_count: 2,
-        row_len: 32,
+        src_row_len: 32,
+        dst_row_len: 32,
         global_scale: 1.0,
-        scale_override: (17.0 / 16.0) * 0.93,
+        scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
         sign_seed: 0x1234_5678,
         scale_seed: 0x9abc_def0,
     })?;

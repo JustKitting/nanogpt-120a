@@ -10,6 +10,7 @@ use gpt2_nvfp4::GPT2_N_EMBD;
 use rust_kernels_cuda::optimizer::{EmbeddingLookupGradArgs, OptimizerModule};
 use std::time::Instant;
 
+use crate::AppResult;
 use crate::runtime::Runtime;
 use crate::upload::UploadedModel;
 
@@ -19,9 +20,15 @@ use super::optimizer_state::OptimizerStateBuffers;
 use super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::{OptimizerTrace, TokenBatch};
 
-use adam::update_adam_tensor;
+pub(crate) use adam::adam_debug_config;
+use adam::{adam_learning_rate, update_adam_tensor};
 use block::update_block;
 use layer_norm::update_layer_norm;
+
+pub struct WeightUpdateResult {
+    pub trace: OptimizerTrace,
+    pub diagnostics: Option<super::diagnostics::TrainingDiagnostics>,
+}
 
 pub fn apply_weight_updates(
     stream: &CudaStream,
@@ -32,14 +39,22 @@ pub fn apply_weight_updates(
     scratch: &mut OptimizerScratch,
     state: &mut OptimizerStateBuffers,
     aurora: &mut AuroraScratchBuffers,
-) -> Result<OptimizerTrace, DriverError> {
+) -> AppResult<WeightUpdateResult> {
     let optimizer = &runtime.optimizer;
     let mut trace = OptimizerTrace::default();
     let step = state.advance();
+    trace.adam_lr = adam_learning_rate(step);
 
     let start = Instant::now();
     add_embedding_lookup_grad(stream, optimizer, batch, grads)?;
     trace.embedding_lookup_ms = elapsed_ms(start);
+    let diagnostics = if super::diagnostics::enabled() {
+        Some(super::diagnostics::PendingTrainingDiagnostics::collect(
+            stream, uploaded, grads, state, step,
+        )?)
+    } else {
+        None
+    };
 
     let start = Instant::now();
     update_adam_tensor(
@@ -80,7 +95,11 @@ pub fn apply_weight_updates(
     }
     trace.blocks_ms = elapsed_ms(start);
 
-    Ok(trace)
+    let diagnostics = diagnostics
+        .map(|pending| pending.finish(stream, uploaded))
+        .transpose()?;
+
+    Ok(WeightUpdateResult { trace, diagnostics })
 }
 
 fn add_embedding_lookup_grad(

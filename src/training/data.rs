@@ -10,6 +10,7 @@ use gpt2_nvfp4::GPT2_CONTEXT_LEN;
 use crate::AppResult;
 
 const TRAIN_DATASET_ENV: &str = "TRAIN_DATASET";
+const TRAIN_REPEAT_BATCH_ENV: &str = "TRAIN_REPEAT_BATCH";
 const DATASET_FINEWEB: &str = "fineweb";
 const DATASET_SHAKESPEARE: &str = "shakespeare";
 const SHAKESPEARE_URL: &str =
@@ -17,11 +18,14 @@ const SHAKESPEARE_URL: &str =
 const SHAKESPEARE_DIR: &str = "data/shakespeare";
 const SHAKESPEARE_RAW: &str = "input.txt";
 const SHAKESPEARE_SHARD: &str = "shakespeare_train_000000.bin";
+const VALIDATION_WINDOWS: usize = 4;
 
 pub struct TokenDataLoader {
     path: PathBuf,
     tokens: Vec<u16>,
     offset: usize,
+    train_end: usize,
+    repeat_first_window: bool,
 }
 
 pub struct TokenWindow<'a> {
@@ -54,10 +58,17 @@ impl TokenDataLoader {
 
     pub fn next_window(&mut self) -> AppResult<TokenWindow<'_>> {
         let len = GPT2_CONTEXT_LEN + 1;
-        if self.tokens.len() < len {
+        if self.train_end < len {
             return Err(format!("{} has fewer than {len} tokens", self.path.display()).into());
         }
-        if self.offset + len > self.tokens.len() {
+        if self.repeat_first_window {
+            return Ok(TokenWindow {
+                tokens: &self.tokens[..len],
+                source: &self.path,
+                offset: 0,
+            });
+        }
+        if self.offset + len > self.train_end {
             self.offset = 0;
         }
 
@@ -75,17 +86,42 @@ impl TokenDataLoader {
         self.tokens.len()
     }
 
+    pub fn validation_tokens(&self) -> AppResult<Vec<u16>> {
+        let len = GPT2_CONTEXT_LEN + 1;
+        if self.tokens.len() < len {
+            return Err(format!("{} has fewer than {len} tokens", self.path.display()).into());
+        }
+        let start = self.tokens.len() - len;
+        Ok(self.tokens[start..].to_vec())
+    }
+
     fn from_path(path: PathBuf) -> AppResult<Self> {
+        let tokens = read_u16_tokens(&path)?;
+        let train_end = train_end(tokens.len());
         Ok(Self {
-            tokens: read_u16_tokens(&path)?,
             path,
+            tokens,
             offset: 0,
+            train_end,
+            repeat_first_window: repeat_first_window(),
         })
     }
 }
 
+fn train_end(token_count: usize) -> usize {
+    let validation_tokens = VALIDATION_WINDOWS * GPT2_CONTEXT_LEN;
+    token_count
+        .saturating_sub(validation_tokens)
+        .max(GPT2_CONTEXT_LEN + 1)
+}
+
 fn training_dataset() -> AppResult<String> {
     Ok(std::env::var(TRAIN_DATASET_ENV).unwrap_or_else(|_| DATASET_FINEWEB.to_string()))
+}
+
+fn repeat_first_window() -> bool {
+    std::env::var(TRAIN_REPEAT_BATCH_ENV)
+        .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
 }
 
 fn first_train_shard() -> AppResult<PathBuf> {

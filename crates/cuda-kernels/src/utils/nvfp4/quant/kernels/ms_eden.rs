@@ -26,7 +26,8 @@ pub(crate) mod module {
         mut out_scales: DisjointSlice<u8>,
         mut out_global_scales: DisjointSlice<f32>,
         mut out_chunk_amax: DisjointSlice<f32>,
-        row_len: u32,
+        src_row_len: u32,
+        dst_row_len: u32,
         global_scale: f32,
         scale_override: f32,
         sign_seed: u32,
@@ -36,10 +37,10 @@ pub(crate) mod module {
         let chunk = thread::blockIdx_x();
         let chunk_base = chunk * HADAMARD_DIM;
         let element = chunk_base + lane;
-        let row = element / row_len;
-        let row_offset = element - row * row_len;
+        let row = element / dst_row_len;
+        let row_offset = element - row * dst_row_len;
 
-        let value = hadamard_value(x, chunk_base, lane, sign_seed);
+        let value = hadamard_value(x, chunk_base, lane, src_row_len, dst_row_len, sign_seed);
         unsafe {
             ROTATED[lane as usize] = value;
         }
@@ -101,18 +102,33 @@ pub(crate) mod module {
             let hi = unsafe { ROTATED[pair as usize] } / (scale * safe_global_scale);
             let lo = unsafe { ROTATED[pair as usize + 1] } / (scale * safe_global_scale);
             unsafe {
-                *out_fp4.get_unchecked_mut(byte as usize) = cvt_rn_satfinite_e2m1x2_f32(hi, lo);
+                *out_fp4.get_unchecked_mut(byte as usize) = cvt_rn_satfinite_e2m1x2_f32(lo, hi);
             }
         }
     }
 
     #[inline(always)]
-    fn hadamard_value(x: &[f32], chunk_base: u32, lane: u32, seed: u32) -> f32 {
+    fn hadamard_value(
+        x: &[f32],
+        chunk_base: u32,
+        lane: u32,
+        src_row_len: u32,
+        dst_row_len: u32,
+        seed: u32,
+    ) -> f32 {
+        let row = chunk_base / dst_row_len;
+        let row_base = row * dst_row_len;
+        let chunk_in_row = chunk_base - row_base;
         let mut sum = 0.0_f32;
         let mut col = 0;
         while col < HADAMARD_DIM {
-            let input = x[(chunk_base + col) as usize];
-            let sign = hadamard_sign(col, lane) * random_sign(seed, chunk_base + lane);
+            let input_col = chunk_in_row + col;
+            let input = if input_col < src_row_len {
+                x[(row * src_row_len + input_col) as usize]
+            } else {
+                0.0
+            };
+            let sign = hadamard_sign(col, lane) * random_sign(seed, chunk_in_row + col);
             sum += input * sign;
             col += 1;
         }

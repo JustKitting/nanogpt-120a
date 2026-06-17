@@ -15,10 +15,10 @@ impl OperandScratch {
         rows: usize,
     ) -> Result<Self, DriverError> {
         Ok(Self {
-            bytes: DeviceBuffer::zeroed(stream, elements / 2)?,
-            scales: DeviceBuffer::zeroed(stream, elements / 16)?,
+            bytes: DeviceBuffer::zeroed(stream, elements.div_ceil(2))?,
+            scales: DeviceBuffer::zeroed(stream, elements.div_ceil(16))?,
             global_scales: DeviceBuffer::zeroed(stream, rows)?,
-            chunk_amax: DeviceBuffer::zeroed(stream, elements / 32)?,
+            chunk_amax: DeviceBuffer::zeroed(stream, elements.div_ceil(32))?,
         })
     }
 

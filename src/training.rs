@@ -2,9 +2,13 @@ mod backward;
 mod batch;
 mod buffers;
 mod data;
+mod diagnostics;
+mod eval;
 mod forward;
 mod grad_block;
+mod grad_clear;
 mod grads;
+mod learning_rate;
 mod linear_scratch;
 mod operand_scratch;
 mod optimizer;
@@ -45,6 +49,7 @@ pub struct TrainStats {
     pub loss_sync_ms: f64,
     pub optimizer_ms: f64,
     pub optimizer: OptimizerTrace,
+    pub diagnostics: Option<diagnostics::TrainingDiagnostics>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -55,6 +60,7 @@ pub struct OptimizerTrace {
     pub blocks_ms: f64,
     pub aurora_ms: f64,
     pub adam_ms: f64,
+    pub adam_lr: f32,
 }
 
 impl Trainer {

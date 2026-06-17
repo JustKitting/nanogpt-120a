@@ -32,7 +32,7 @@ pub struct Runtime {
     pub mlp: MlpModule,
     pub lm_head: LmHeadModule,
     pub tc_matmul: Nvfp4TcMatmulModule,
-    loss: LossModule,
+    pub loss: LossModule,
     pub transpose: TransposeModule,
     decode: Nvfp4DecodeModule,
     linear: LinearBackwardModule,

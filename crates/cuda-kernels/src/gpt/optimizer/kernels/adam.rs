@@ -16,6 +16,7 @@ pub(super) mod module {
         grad: &[f32],
         mut first_moment: DisjointSlice<f32>,
         mut second_moment: DisjointSlice<f32>,
+        residual: &[f32],
         mut fp32_workspace: DisjointSlice<f32>,
         global_scale: f32,
         learning_rate: f32,
@@ -38,13 +39,32 @@ pub(super) mod module {
                 let m = beta1 * *first + (1.0 - beta1) * g;
                 let v = beta2 * *second + (1.0 - beta2) * g * g;
                 let update = (m / beta1_correction) / (sqrt_f32(v / beta2_correction) + eps);
-                let current = nvfp4_value(bytes, scales, global_scale, i);
+                let current = nvfp4_value(bytes, scales, global_scale, i) + residual[i];
                 let decay = 1.0 - learning_rate * weight_decay;
                 let next = current * decay - learning_rate * update;
 
                 *first = m;
                 *second = v;
                 *fp32_workspace.get_unchecked_mut(i) = next;
+            }
+        }
+    }
+
+    #[kernel]
+    pub fn nvfp4_adamw_residual_update_kernel(
+        bytes: &[u8],
+        scales: &[u8],
+        mut residual: DisjointSlice<f32>,
+        fp32_workspace: &[f32],
+        global_scale: f32,
+        len: u32,
+    ) {
+        let index = thread::blockIdx_x() * APPLY_THREADS_PER_BLOCK + thread::threadIdx_x();
+        if index < len {
+            let i = index as usize;
+            let decoded = nvfp4_value(bytes, scales, global_scale, i);
+            unsafe {
+                *residual.get_unchecked_mut(i) = fp32_workspace[i] - decoded;
             }
         }
     }

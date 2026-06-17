@@ -33,15 +33,18 @@ impl OptimizerModule {
             row_len: args.len,
         })?;
 
-        self.quant.fp32_to_nvfp4_four_six(Nvfp4QuantArgs {
-            stream: args.stream,
-            x: &*args.fp32_workspace,
-            amax: &*args.amax,
-            out_fp4: args.bytes,
-            out_scales: args.scales,
-            out_global_scale: args.next_global_scale,
-            group_count: args.len / 16,
-        })
+        self.quant.fp32_to_nvfp4_four_six_fixed_global(
+            Nvfp4QuantArgs {
+                stream: args.stream,
+                x: &*args.fp32_workspace,
+                amax: &*args.amax,
+                out_fp4: args.bytes,
+                out_scales: args.scales,
+                out_global_scale: args.next_global_scale,
+                group_count: args.len / 16,
+            },
+            args.requantize_global_scale,
+        )
     }
 }
 

@@ -11,6 +11,7 @@ impl OptimizerModule {
         assert!(args.grad.len() >= args.len as usize);
         assert!(args.first_moment.len() >= args.len as usize);
         assert!(args.second_moment.len() >= args.len as usize);
+        assert!(args.residual.len() >= args.len as usize);
 
         self.apply.adam.nvfp4_adamw_update_to_f32_kernel(
             args.stream,
@@ -24,6 +25,7 @@ impl OptimizerModule {
             args.grad,
             args.first_moment,
             args.second_moment,
+            &*args.residual,
             args.fp32_workspace,
             args.global_scale,
             args.learning_rate,
@@ -41,6 +43,7 @@ impl OptimizerModule {
             bytes: args.bytes,
             scales: args.scales,
             global_scale: args.global_scale,
+            requantize_global_scale: args.requantize_global_scale,
             aurora_update: args.grad,
             fp32_workspace: args.fp32_workspace,
             amax: args.amax,
@@ -48,6 +51,22 @@ impl OptimizerModule {
             len: args.len,
             learning_rate: args.learning_rate,
             weight_decay: args.weight_decay,
-        })
+        })?;
+
+        let next_global_scale = args.next_global_scale.to_host_vec(args.stream)?[0];
+        self.apply.adam.nvfp4_adamw_residual_update_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (args.len.div_ceil(APPLY_THREADS_PER_BLOCK), 1, 1),
+                block_dim: (APPLY_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            &*args.bytes,
+            &*args.scales,
+            args.residual,
+            &*args.fp32_workspace,
+            next_global_scale,
+            args.len,
+        )
     }
 }

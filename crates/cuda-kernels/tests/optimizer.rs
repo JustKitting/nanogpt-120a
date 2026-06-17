@@ -31,6 +31,7 @@ fn nvfp4_weight_update_applies_decay_update_and_requantizes() -> Result<(), Box<
         bytes: &mut bytes,
         scales: &mut scales,
         global_scale: 1.0,
+        requantize_global_scale: 0.0,
         aurora_update: &update,
         fp32_workspace: &mut workspace,
         amax: &mut amax,
@@ -69,6 +70,7 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
     let grad = DeviceBuffer::from_host(&stream, &[0.5_f32; LEN])?;
     let mut first = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
     let mut second = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
+    let mut residual = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
     let mut workspace = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
     let mut amax = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
     let mut next_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
@@ -78,9 +80,11 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
         bytes: &mut bytes,
         scales: &mut scales,
         global_scale: 1.0,
+        requantize_global_scale: 0.0,
         grad: &grad,
         first_moment: &mut first,
         second_moment: &mut second,
+        residual: &mut residual,
         fp32_workspace: &mut workspace,
         amax: &mut amax,
         next_global_scale: &mut next_global_scale,

@@ -23,13 +23,15 @@ pub(super) struct LayerNormState {
 }
 
 pub(super) struct LinearState {
-    pub(super) weight: AuroraState,
+    pub(super) weight_aurora: AuroraState,
+    pub(super) weight_adam: AdamState,
     pub(super) bias: AdamState,
 }
 
 pub(super) struct AdamState {
     pub(super) first: DeviceBuffer<f32>,
     pub(super) second: DeviceBuffer<f32>,
+    pub(super) residual: DeviceBuffer<f32>,
 }
 
 pub(super) struct AuroraState {
@@ -77,7 +79,8 @@ impl LayerNormState {
 impl LinearState {
     fn new(stream: &CudaStream, weight_len: usize, bias_len: usize) -> Result<Self, DriverError> {
         Ok(Self {
-            weight: AuroraState::new(stream, weight_len)?,
+            weight_aurora: AuroraState::new(stream, weight_len)?,
+            weight_adam: AdamState::new(stream, weight_len)?,
             bias: AdamState::new(stream, bias_len)?,
         })
     }
@@ -88,6 +91,7 @@ impl AdamState {
         Ok(Self {
             first: DeviceBuffer::zeroed(stream, len)?,
             second: DeviceBuffer::zeroed(stream, len)?,
+            residual: DeviceBuffer::zeroed(stream, len)?,
         })
     }
 }

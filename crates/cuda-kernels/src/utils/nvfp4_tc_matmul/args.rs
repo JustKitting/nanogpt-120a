@@ -3,7 +3,7 @@ use cuda_core::{CudaStream, DeviceBuffer};
 use crate::mma::Nvfp4FourSixMmaWeightTensor;
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
 
-pub const QUARTET_MS_EDEN_SCALE_OVERRIDE: f32 = (17.0 / 16.0) * 0.93;
+pub use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
 pub const NVFP4_TC_MATMUL_K_ALIGNMENT: u32 = 64;
 
 pub struct Nvfp4TcMatmulOperand<'a> {

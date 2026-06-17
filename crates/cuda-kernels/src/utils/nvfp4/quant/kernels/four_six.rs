@@ -22,6 +22,7 @@ pub(crate) mod module {
         mut out_global_scale: DisjointSlice<f32>,
         row_len: u32,
         scale_override: f32,
+        fixed_global_scale: f32,
     ) {
         let lane = warp::lane_id() as usize;
         let lane_in_group = lane & 0x0f;
@@ -44,6 +45,8 @@ pub(crate) mod module {
             let tensor_amax = amax[row];
             let global_scale = if tensor_amax == 0.0 {
                 1.0
+            } else if fixed_global_scale > 0.0 {
+                fixed_global_scale
             } else {
                 tensor_amax * scale_override / (FP8_MAX_FOUR_SIX * FP4_MAX)
             };
@@ -108,7 +111,7 @@ pub(crate) mod module {
                     let hi = x[base + pair] * inv_scale;
                     let lo = x[base + pair + 1] * inv_scale;
                     *out_fp4.get_unchecked_mut(base / 2 + lane_in_group) =
-                        cvt_rn_satfinite_e2m1x2_f32(hi, lo);
+                        cvt_rn_satfinite_e2m1x2_f32(lo, hi);
                 }
             }
         }

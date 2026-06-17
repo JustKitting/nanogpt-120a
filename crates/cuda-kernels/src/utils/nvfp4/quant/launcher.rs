@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig, memory};
 
-use super::args::{MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs, RowAmaxArgs};
+use super::args::{
+    MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs, QuartetBackwardMsEdenQuantArgs,
+    RowAmaxArgs,
+};
 use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK};
 use super::kernels;
+use crate::quartet::{QUARTET_MS_EDEN_SCALE_OVERRIDE, quartet_backward_ms_eden_global_scale};
 
 const SCALE_OVERRIDE: f32 = 1.0;
 
@@ -33,6 +37,7 @@ impl Nvfp4QuantModule {
             args.out_global_scale,
             args.group_count,
             0,
+            0.0,
         )
     }
 
@@ -49,6 +54,25 @@ impl Nvfp4QuantModule {
             args.out_global_scale,
             args.group_count,
             args.row_len,
+            0.0,
+        )
+    }
+
+    pub fn fp32_to_nvfp4_four_six_fixed_global(
+        &self,
+        args: Nvfp4QuantArgs<'_, '_>,
+        global_scale: f32,
+    ) -> Result<(), DriverError> {
+        self.launch_fp32_to_nvfp4_four_six(
+            args.stream,
+            args.x,
+            args.amax,
+            args.out_fp4,
+            args.out_scales,
+            args.out_global_scale,
+            args.group_count,
+            0,
+            global_scale,
         )
     }
 
@@ -68,7 +92,7 @@ impl Nvfp4QuantModule {
     }
 
     pub fn fp32_to_nvfp4_ms_eden(&self, args: MsEdenQuantArgs<'_, '_>) -> Result<(), DriverError> {
-        let element_count = args.row_count * args.row_len;
+        let element_count = args.row_count * args.dst_row_len;
         self.ms_eden.fp32_to_nvfp4_ms_eden_kernel(
             args.stream,
             LaunchConfig {
@@ -81,12 +105,73 @@ impl Nvfp4QuantModule {
             args.out_scales,
             args.out_global_scales,
             args.out_chunk_amax,
-            args.row_len,
+            args.src_row_len,
+            args.dst_row_len,
             args.global_scale,
             args.scale_override,
             args.sign_seed,
             args.scale_seed,
         )
+    }
+
+    pub fn fp32_to_nvfp4_quartet_backward_ms_eden(
+        &self,
+        args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
+    ) -> Result<f32, DriverError> {
+        let args = args;
+        self.row_amax_f32(RowAmaxArgs {
+            stream: args.stream,
+            x: args.x,
+            out: &mut *args.out_chunk_amax,
+            row_count: 1,
+            row_len: args.row_count * args.src_row_len,
+        })?;
+
+        let global_scale = quartet_backward_ms_eden_global_scale(copy_first_f32(
+            args.stream,
+            args.out_chunk_amax,
+        )?);
+        self.fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(args, global_scale)
+    }
+
+    pub fn fp32_to_nvfp4_quartet_backward_ms_eden_with_amax(
+        &self,
+        args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
+        amax: f32,
+    ) -> Result<f32, DriverError> {
+        let global_scale = quartet_backward_ms_eden_global_scale(amax);
+        self.fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(args, global_scale)
+    }
+
+    pub fn fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(
+        &self,
+        args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
+        global_scale: f32,
+    ) -> Result<f32, DriverError> {
+        self.launch_quartet_backward_ms_eden(args, global_scale)?;
+        Ok(global_scale)
+    }
+
+    fn launch_quartet_backward_ms_eden(
+        &self,
+        args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
+        global_scale: f32,
+    ) -> Result<(), DriverError> {
+        self.fp32_to_nvfp4_ms_eden(MsEdenQuantArgs {
+            stream: args.stream,
+            x: args.x,
+            out_fp4: args.out_fp4,
+            out_scales: args.out_scales,
+            out_global_scales: args.out_global_scales,
+            out_chunk_amax: args.out_chunk_amax,
+            row_count: args.row_count,
+            src_row_len: args.src_row_len,
+            dst_row_len: args.dst_row_len,
+            global_scale,
+            scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
+            sign_seed: args.sign_seed,
+            scale_seed: args.scale_seed,
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -100,6 +185,7 @@ impl Nvfp4QuantModule {
         out_global_scale: &mut DeviceBuffer<f32>,
         group_count: u32,
         row_len: u32,
+        fixed_global_scale: f32,
     ) -> Result<(), DriverError> {
         let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
 
@@ -117,6 +203,21 @@ impl Nvfp4QuantModule {
             out_global_scale,
             row_len,
             SCALE_OVERRIDE,
+            fixed_global_scale,
         )
     }
+}
+
+fn copy_first_f32(stream: &CudaStream, buffer: &DeviceBuffer<f32>) -> Result<f32, DriverError> {
+    let mut value = 0.0f32;
+    unsafe {
+        memory::memcpy_dtoh_async(
+            &mut value as *mut f32,
+            buffer.cu_deviceptr(),
+            std::mem::size_of::<f32>(),
+            stream.cu_stream(),
+        )?;
+    }
+    stream.synchronize()?;
+    Ok(value)
 }

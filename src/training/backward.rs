@@ -18,7 +18,8 @@ impl Trainer {
         {
             let saved = self.buffers.tape.saved(&batch.tokens);
             let weights = backward_weights(&self.uploaded);
-            let backward = self.buffers.backward.parts();
+            let mut backward = self.buffers.backward.parts();
+            super::grad_clear::clear_backward_parts(stream, &mut backward)?;
 
             gpt2_backward(Gpt2BackwardArgs {
                 stream,
@@ -43,7 +44,7 @@ impl Trainer {
         stats.loss_sync_ms = loss_sync_start.elapsed().as_secs_f64() * 1000.0;
 
         let optimizer_start = Instant::now();
-        stats.optimizer = super::optimizer_apply::apply_weight_updates(
+        let updates = super::optimizer_apply::apply_weight_updates(
             stream,
             &self.runtime,
             batch,
@@ -53,7 +54,9 @@ impl Trainer {
             &mut self.buffers.optimizer_state,
             &mut self.buffers.aurora,
         )?;
+        stats.optimizer = updates.trace;
         stats.optimizer_ms = optimizer_start.elapsed().as_secs_f64() * 1000.0;
+        stats.diagnostics = updates.diagnostics;
 
         Ok(stats)
     }
