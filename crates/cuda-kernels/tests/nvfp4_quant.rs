@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
-use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantArgs, Nvfp4QuantModule};
+use rust_kernels_cuda::nvfp4_quant::{MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantModule};
 
 mod common;
 
@@ -42,5 +42,58 @@ fn fp32_to_nvfp4_four_six_writes_quantized_outputs() -> Result<(), Box<dyn Error
     assert!(fp4.iter().any(|byte| *byte != 0));
     assert!(scales.iter().any(|byte| *byte != 0));
     assert!((global_scale[0] - 8.0 / (256.0 * 6.0)).abs() <= 1.0e-8);
+    Ok(())
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn fp32_to_nvfp4_ms_eden_writes_rotated_quantized_outputs() -> Result<(), Box<dyn Error>> {
+    let x = (0..64)
+        .map(|index| (index as f32 - 31.5) * 0.03125)
+        .collect::<Vec<_>>();
+
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let module =
+        Nvfp4QuantModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+
+    let x_dev = DeviceBuffer::from_host(&stream, &x)?;
+    let mut fp4_dev = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 2)?;
+    let mut scales_dev = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 16)?;
+    let mut global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, 2)?;
+    let mut chunk_amax_dev = DeviceBuffer::<f32>::zeroed(&stream, x.len() / 32)?;
+
+    module.fp32_to_nvfp4_ms_eden(MsEdenQuantArgs {
+        stream: &stream,
+        x: &x_dev,
+        out_fp4: &mut fp4_dev,
+        out_scales: &mut scales_dev,
+        out_global_scales: &mut global_scales_dev,
+        out_chunk_amax: &mut chunk_amax_dev,
+        row_count: 2,
+        row_len: 32,
+        global_scale: 1.0,
+        scale_override: (17.0 / 16.0) * 0.93,
+        sign_seed: 0x1234_5678,
+        scale_seed: 0x9abc_def0,
+    })?;
+
+    let fp4 = fp4_dev.to_host_vec(&stream)?;
+    let scales = scales_dev.to_host_vec(&stream)?;
+    let global_scales = global_scales_dev.to_host_vec(&stream)?;
+    let chunk_amax = chunk_amax_dev.to_host_vec(&stream)?;
+
+    assert!(fp4.iter().any(|byte| *byte != 0));
+    assert!(scales.iter().any(|byte| *byte != 0));
+    assert!(
+        global_scales
+            .iter()
+            .all(|scale| (*scale - 1.0).abs() <= 1.0e-8)
+    );
+    assert!(
+        chunk_amax
+            .iter()
+            .all(|amax| *amax > 0.0 && amax.is_finite())
+    );
     Ok(())
 }
