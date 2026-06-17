@@ -15,6 +15,7 @@ pub fn qkv_projection_backward(
         d_qkv,
         d_ln_1_normalized,
         d_attn_qkv_weight,
+        d_attn_qkv_bias,
         scratch,
         seeds,
     } = args;
@@ -29,6 +30,7 @@ pub fn qkv_projection_backward(
             scratch,
             dinput: d_ln_1_normalized,
             dweight: d_attn_qkv_weight,
+            dbias: d_attn_qkv_bias,
             input_dim: GPT2_N_EMBD as u32,
             output_dim: GPT2_QKV as u32,
             sign_seed: seeds.sign,

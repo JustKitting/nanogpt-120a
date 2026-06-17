@@ -61,9 +61,13 @@ pub struct BlockBackwardGrads<'a> {
     pub d_mlp_up: &'a mut DeviceBuffer<f32>,
     pub d_mlp_relu2: &'a mut DeviceBuffer<f32>,
     pub d_attn_qkv_weight: &'a mut DeviceBuffer<f32>,
+    pub d_attn_qkv_bias: &'a mut DeviceBuffer<f32>,
     pub d_attn_c_proj_weight: &'a mut DeviceBuffer<f32>,
+    pub d_attn_c_proj_bias: &'a mut DeviceBuffer<f32>,
     pub d_mlp_c_fc_weight: &'a mut DeviceBuffer<f32>,
+    pub d_mlp_c_fc_bias: &'a mut DeviceBuffer<f32>,
     pub d_mlp_c_proj_weight: &'a mut DeviceBuffer<f32>,
+    pub d_mlp_c_proj_bias: &'a mut DeviceBuffer<f32>,
     pub d_residual_out: &'a mut DeviceBuffer<f32>,
 }
 
@@ -86,9 +90,13 @@ impl<'a> BlockBackwardGrads<'a> {
             d_mlp_up: &mut *self.d_mlp_up,
             d_mlp_relu2: &mut *self.d_mlp_relu2,
             d_attn_qkv_weight: &mut *self.d_attn_qkv_weight,
+            d_attn_qkv_bias: &mut *self.d_attn_qkv_bias,
             d_attn_c_proj_weight: &mut *self.d_attn_c_proj_weight,
+            d_attn_c_proj_bias: &mut *self.d_attn_c_proj_bias,
             d_mlp_c_fc_weight: &mut *self.d_mlp_c_fc_weight,
+            d_mlp_c_fc_bias: &mut *self.d_mlp_c_fc_bias,
             d_mlp_c_proj_weight: &mut *self.d_mlp_c_proj_weight,
+            d_mlp_c_proj_bias: &mut *self.d_mlp_c_proj_bias,
             d_residual_out: &mut *self.d_residual_out,
         }
     }

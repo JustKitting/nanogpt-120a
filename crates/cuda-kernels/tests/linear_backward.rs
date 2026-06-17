@@ -91,6 +91,7 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
         },
         dinput: &mut dinput_dev,
         dweight: &mut dweight_dev,
+        dbias: None,
         token_count: TOKEN_COUNT as u32,
         input_dim: INPUT_DIM as u32,
         output_dim: OUTPUT_DIM as u32,
@@ -154,6 +155,7 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
 
     let mut dinput_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * INPUT_DIM)?;
     let mut dweight_dev = DeviceBuffer::<f32>::zeroed(&stream, OUTPUT_DIM * INPUT_DIM)?;
+    let mut dbias_dev = DeviceBuffer::<f32>::zeroed(&stream, OUTPUT_DIM)?;
 
     module.backward_ms_eden(LinearBackwardMsEdenArgs {
         stream: &stream,
@@ -194,6 +196,7 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
         },
         dinput: &mut dinput_dev,
         dweight: &mut dweight_dev,
+        dbias: Some(&mut dbias_dev),
         token_count: TOKEN_COUNT as u32,
         input_dim: INPUT_DIM as u32,
         output_dim: OUTPUT_DIM as u32,
@@ -203,6 +206,7 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
 
     let dinput = dinput_dev.to_host_vec(&stream)?;
     let dweight = dweight_dev.to_host_vec(&stream)?;
+    let dbias = dbias_dev.to_host_vec(&stream)?;
     let e_quant = e_bytes.to_host_vec(&stream)?;
     let e_amax = e_chunk_amax.to_host_vec(&stream)?;
 
@@ -210,6 +214,12 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
     assert!(dweight.iter().all(|value| value.is_finite()));
     assert!(dinput.iter().any(|value| value.abs() > TOLERANCE));
     assert!(dweight.iter().any(|value| value.abs() > TOLERANCE));
+    for col in 0..OUTPUT_DIM {
+        let expected = (0..TOKEN_COUNT)
+            .map(|row| e[row * OUTPUT_DIM + col])
+            .sum::<f32>();
+        assert_close(dbias[col], expected);
+    }
     assert!(e_quant.iter().any(|byte| *byte != 0));
     assert!(e_amax.iter().all(|amax| *amax > 0.0 && amax.is_finite()));
 

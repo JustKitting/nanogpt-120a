@@ -41,8 +41,22 @@ pub fn apply_weight_updates(
         update_tensor(
             stream,
             optimizer,
+            &mut block.attn_qkv.bias,
+            &grad.d_attn_qkv_bias,
+            scratch,
+        )?;
+        update_tensor(
+            stream,
+            optimizer,
             &mut block.attn_c_proj.weight,
             &grad.d_attn_c_proj_weight,
+            scratch,
+        )?;
+        update_tensor(
+            stream,
+            optimizer,
+            &mut block.attn_c_proj.bias,
+            &grad.d_attn_c_proj_bias,
             scratch,
         )?;
         update_layer_norm(stream, optimizer, &mut block.ln_2, &grad.ln_2, scratch)?;
@@ -56,8 +70,22 @@ pub fn apply_weight_updates(
         update_tensor(
             stream,
             optimizer,
+            &mut block.mlp_up.bias,
+            &grad.d_mlp_c_fc_bias,
+            scratch,
+        )?;
+        update_tensor(
+            stream,
+            optimizer,
             &mut block.mlp_down.weight,
             &grad.d_mlp_c_proj_weight,
+            scratch,
+        )?;
+        update_tensor(
+            stream,
+            optimizer,
+            &mut block.mlp_down.bias,
+            &grad.d_mlp_c_proj_bias,
             scratch,
         )?;
     }

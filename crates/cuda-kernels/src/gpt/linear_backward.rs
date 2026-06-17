@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
-use cuda_device::{DisjointSlice, cuda_module, kernel};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
+use crate::layer_norm_reduce::{layer_norm_block_reduce, layer_norm_store_row};
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_THREADS_PER_BLOCK,
     Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionParams, nvfp4_projection_nobias_kernel_body,
@@ -10,8 +11,15 @@ use crate::mma::{
 };
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
 use crate::nvfp4_quant::{MsEdenQuantArgs, Nvfp4QuantModule};
+use crate::warp_reduce::warp_sum_f32;
 
 pub const QUARTET_BACKWARD_SCALE_OVERRIDE: f32 = (17.0 / 16.0) * 0.93;
+pub const LINEAR_BIAS_THREADS_PER_BLOCK: u32 = 256;
+const LINEAR_BIAS_WARP_SIZE: u32 = 32;
+const LINEAR_BIAS_WARPS_PER_BLOCK: u32 = LINEAR_BIAS_THREADS_PER_BLOCK / LINEAR_BIAS_WARP_SIZE;
+const LINEAR_BIAS_ROWS_PER_THREAD: u32 = 4;
+const LINEAR_BIAS_UNROLLED_ROW_STRIDE: u32 =
+    LINEAR_BIAS_THREADS_PER_BLOCK * LINEAR_BIAS_ROWS_PER_THREAD;
 
 pub struct LinearBackwardArgs<'a, 'out> {
     pub stream: &'a CudaStream,
@@ -21,6 +29,7 @@ pub struct LinearBackwardArgs<'a, 'out> {
     pub input_t_h: Nvfp4FourSixMmaWeightTensor<'a>,
     pub dinput: &'out mut DeviceBuffer<f32>,
     pub dweight: &'out mut DeviceBuffer<f32>,
+    pub dbias: Option<&'out mut DeviceBuffer<f32>>,
     pub token_count: u32,
     pub input_dim: u32,
     pub output_dim: u32,
@@ -69,6 +78,7 @@ pub struct LinearBackwardMsEdenArgs<'a, 'scratch, 'out> {
     pub scratch: LinearBackwardMsEdenScratch<'scratch>,
     pub dinput: &'out mut DeviceBuffer<f32>,
     pub dweight: &'out mut DeviceBuffer<f32>,
+    pub dbias: Option<&'out mut DeviceBuffer<f32>>,
     pub token_count: u32,
     pub input_dim: u32,
     pub output_dim: u32,
@@ -141,6 +151,21 @@ impl LinearBackwardModule {
         &self,
         args: LinearBackwardMsEdenArgs<'_, '_, '_>,
     ) -> Result<(), DriverError> {
+        if let Some(dbias) = args.dbias {
+            self.module.linear_bias_grad_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: (args.output_dim, 1, 1),
+                    block_dim: (LINEAR_BIAS_THREADS_PER_BLOCK, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                args.e,
+                dbias,
+                args.token_count,
+                args.output_dim,
+            )?;
+        }
+
         let scratch = args.scratch;
         quantize_operand(
             args.quant_module,
@@ -215,6 +240,7 @@ impl LinearBackwardModule {
             input_t_h: scratch.input_t_h.mma_weight(),
             dinput: args.dinput,
             dweight: args.dweight,
+            dbias: None,
             token_count: args.token_count,
             input_dim: args.input_dim,
             output_dim: args.output_dim,
@@ -256,6 +282,7 @@ fn quantize_operand(
     })
 }
 
+#[allow(static_mut_refs)]
 #[cuda_module]
 mod kernels {
     use super::*;
@@ -279,5 +306,56 @@ mod kernels {
             &mut out,
             params,
         );
+    }
+
+    #[kernel]
+    pub fn linear_bias_grad_kernel(
+        e: &[f32],
+        mut dbias: DisjointSlice<f32>,
+        token_count: u32,
+        output_dim: u32,
+    ) {
+        static mut WARP_SUMS: SharedArray<f32, { LINEAR_BIAS_WARPS_PER_BLOCK as usize }> =
+            SharedArray::UNINIT;
+
+        let col = thread::blockIdx_x();
+        let tid = thread::threadIdx_x();
+        let lane = warp::lane_id();
+        let warp_in_block = tid / LINEAR_BIAS_WARP_SIZE;
+
+        if col < output_dim {
+            let mut local = 0.0f32;
+            let mut row = tid;
+
+            macro_rules! accumulate_bias_grad {
+                ($row:expr) => {{
+                    let row = $row;
+                    local += e[row as usize * output_dim as usize + col as usize];
+                }};
+            }
+
+            while row + LINEAR_BIAS_THREADS_PER_BLOCK * 3 < token_count {
+                accumulate_bias_grad!(row);
+                accumulate_bias_grad!(row + LINEAR_BIAS_THREADS_PER_BLOCK);
+                accumulate_bias_grad!(row + LINEAR_BIAS_THREADS_PER_BLOCK * 2);
+                accumulate_bias_grad!(row + LINEAR_BIAS_THREADS_PER_BLOCK * 3);
+                row += LINEAR_BIAS_UNROLLED_ROW_STRIDE;
+            }
+
+            while row < token_count {
+                accumulate_bias_grad!(row);
+                row += LINEAR_BIAS_THREADS_PER_BLOCK;
+            }
+
+            let sum = layer_norm_block_reduce!(
+                WARP_SUMS,
+                LINEAR_BIAS_WARPS_PER_BLOCK,
+                local,
+                lane,
+                warp_in_block,
+                warp_sum_f32
+            );
+            layer_norm_store_row!(&mut dbias, col, lane, warp_in_block, sum);
+        }
     }
 }

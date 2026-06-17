@@ -13,6 +13,7 @@ pub fn c_proj_backward(args: AttentionCProjBackwardArgs<'_, '_, '_>) -> Result<(
         d_residual_after_attention,
         d_attention_out,
         d_attn_c_proj_weight,
+        d_attn_c_proj_bias,
         scratch,
         seeds,
     } = args;
@@ -26,6 +27,7 @@ pub fn c_proj_backward(args: AttentionCProjBackwardArgs<'_, '_, '_>) -> Result<(
             scratch,
             dinput: d_attention_out,
             dweight: d_attn_c_proj_weight,
+            dbias: d_attn_c_proj_bias,
             input_dim: GPT2_N_EMBD as u32,
             output_dim: GPT2_N_EMBD as u32,
             sign_seed: seeds.sign,

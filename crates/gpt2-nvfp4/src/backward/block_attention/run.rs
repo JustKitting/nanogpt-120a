@@ -30,7 +30,9 @@ pub fn attention_side_backward(
         d_attention_out,
         d_residual_after_attention,
         d_attn_qkv_weight,
+        d_attn_qkv_bias,
         d_attn_c_proj_weight,
+        d_attn_c_proj_bias,
         ..
     } = grads;
     let LayerNormGrads {
@@ -48,6 +50,7 @@ pub fn attention_side_backward(
         d_residual_after_attention: &*d_residual_after_attention,
         d_attention_out,
         d_attn_c_proj_weight,
+        d_attn_c_proj_bias,
         scratch: scratch.c_proj,
         seeds: seeds.c_proj,
     })?;
@@ -67,6 +70,7 @@ pub fn attention_side_backward(
         d_qkv: &*d_qkv,
         d_ln_1_normalized,
         d_attn_qkv_weight,
+        d_attn_qkv_bias,
         scratch: scratch.qkv,
         seeds: seeds.qkv,
     })?;

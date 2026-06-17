@@ -61,6 +61,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
     let mut scratch = scratch::QkvBackwardScratch::new(&stream)?;
     let mut d_ln_1_normalized = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut d_attn_qkv_weight = DeviceBuffer::<f32>::zeroed(&stream, GPT2_N_EMBD * GPT2_QKV)?;
+    let mut d_attn_qkv_bias = DeviceBuffer::<f32>::zeroed(&stream, GPT2_QKV)?;
 
     qkv_projection_backward(AttentionQkvBackwardArgs {
         stream: &stream,
@@ -75,12 +76,14 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
         d_qkv: &d_qkv,
         d_ln_1_normalized: &mut d_ln_1_normalized,
         d_attn_qkv_weight: &mut d_attn_qkv_weight,
+        d_attn_qkv_bias: &mut d_attn_qkv_bias,
         scratch: scratch.as_attention_scratch(),
         seeds: data::seeds(),
     })?;
 
     assert_nonzero_finite(&d_ln_1_normalized.to_host_vec(&stream)?);
     assert_nonzero_finite(&d_attn_qkv_weight.to_host_vec(&stream)?);
+    assert_nonzero_finite(&d_attn_qkv_bias.to_host_vec(&stream)?);
     Ok(())
 }
 

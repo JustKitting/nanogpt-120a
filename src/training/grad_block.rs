@@ -16,9 +16,13 @@ pub struct BlockGradBuffers {
     pub(super) d_mlp_up: DeviceBuffer<f32>,
     pub(super) d_mlp_relu2: DeviceBuffer<f32>,
     pub(super) d_attn_qkv_weight: DeviceBuffer<f32>,
+    pub(super) d_attn_qkv_bias: DeviceBuffer<f32>,
     pub(super) d_attn_c_proj_weight: DeviceBuffer<f32>,
+    pub(super) d_attn_c_proj_bias: DeviceBuffer<f32>,
     pub(super) d_mlp_c_fc_weight: DeviceBuffer<f32>,
+    pub(super) d_mlp_c_fc_bias: DeviceBuffer<f32>,
     pub(super) d_mlp_c_proj_weight: DeviceBuffer<f32>,
+    pub(super) d_mlp_c_proj_bias: DeviceBuffer<f32>,
     pub(super) d_residual_out: DeviceBuffer<f32>,
 }
 
@@ -34,9 +38,13 @@ impl BlockGradBuffers {
             d_mlp_up: zero(stream, MlpActivation::LEN)?,
             d_mlp_relu2: zero(stream, MlpActivation::LEN)?,
             d_attn_qkv_weight: zero(stream, GPT2_N_EMBD * GPT2_QKV)?,
+            d_attn_qkv_bias: zero(stream, GPT2_QKV)?,
             d_attn_c_proj_weight: zero(stream, GPT2_N_EMBD * GPT2_N_EMBD)?,
+            d_attn_c_proj_bias: zero(stream, GPT2_N_EMBD)?,
             d_mlp_c_fc_weight: zero(stream, GPT2_N_EMBD * GPT2_MLP)?,
+            d_mlp_c_fc_bias: zero(stream, GPT2_MLP)?,
             d_mlp_c_proj_weight: zero(stream, GPT2_MLP * GPT2_N_EMBD)?,
+            d_mlp_c_proj_bias: zero(stream, GPT2_N_EMBD)?,
             d_residual_out: zero(stream, HiddenState::LEN)?,
         })
     }
@@ -52,9 +60,13 @@ impl BlockGradBuffers {
             d_mlp_up: &mut self.d_mlp_up,
             d_mlp_relu2: &mut self.d_mlp_relu2,
             d_attn_qkv_weight: &mut self.d_attn_qkv_weight,
+            d_attn_qkv_bias: &mut self.d_attn_qkv_bias,
             d_attn_c_proj_weight: &mut self.d_attn_c_proj_weight,
+            d_attn_c_proj_bias: &mut self.d_attn_c_proj_bias,
             d_mlp_c_fc_weight: &mut self.d_mlp_c_fc_weight,
+            d_mlp_c_fc_bias: &mut self.d_mlp_c_fc_bias,
             d_mlp_c_proj_weight: &mut self.d_mlp_c_proj_weight,
+            d_mlp_c_proj_bias: &mut self.d_mlp_c_proj_bias,
             d_residual_out: &mut self.d_residual_out,
         }
     }

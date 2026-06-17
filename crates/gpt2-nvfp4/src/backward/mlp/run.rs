@@ -31,7 +31,9 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         d_mlp_up,
         d_ln_2_normalized,
         d_c_proj_weight,
+        d_c_proj_bias,
         d_c_fc_weight,
+        d_c_fc_bias,
     } = grads;
 
     run_linear_pass(
@@ -47,6 +49,7 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
             linear_scratch: down_linear,
             dinput: d_mlp_relu2,
             dweight: d_c_proj_weight,
+            dbias: d_c_proj_bias,
             input_dim: GPT2_MLP as u32,
             output_dim: GPT2_N_EMBD as u32,
             sign_seed: seeds.down_sign,
@@ -75,6 +78,7 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
             linear_scratch: up_linear,
             dinput: d_ln_2_normalized,
             dweight: d_c_fc_weight,
+            dbias: d_c_fc_bias,
             input_dim: GPT2_N_EMBD as u32,
             output_dim: GPT2_MLP as u32,
             sign_seed: seeds.up_sign,

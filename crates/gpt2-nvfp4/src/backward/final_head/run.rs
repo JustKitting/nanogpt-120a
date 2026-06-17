@@ -100,6 +100,7 @@ fn run_linear_backward(
         scratch: inputs.scratch.linear,
         dinput: inputs.d_final_normalized,
         dweight: inputs.d_lm_head_weight,
+        dbias: None,
         token_count: GPT2_CONTEXT_LEN as u32,
         input_dim: GPT2_N_EMBD as u32,
         output_dim: GPT2_VOCAB_SIZE as u32,

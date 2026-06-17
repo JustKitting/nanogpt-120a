@@ -73,6 +73,7 @@ pub struct AttentionCProjBackwardArgs<'a, 'scratch, 'out> {
     pub d_residual_after_attention: &'a DeviceBuffer<f32>,
     pub d_attention_out: &'out mut DeviceBuffer<f32>,
     pub d_attn_c_proj_weight: &'out mut DeviceBuffer<f32>,
+    pub d_attn_c_proj_bias: &'out mut DeviceBuffer<f32>,
     pub scratch: AttentionCProjScratch<'scratch>,
     pub seeds: AttentionBackwardSeeds,
 }
@@ -94,6 +95,7 @@ pub struct AttentionQkvBackwardArgs<'a, 'scratch, 'out> {
     pub d_qkv: &'a DeviceBuffer<f32>,
     pub d_ln_1_normalized: &'out mut DeviceBuffer<f32>,
     pub d_attn_qkv_weight: &'out mut DeviceBuffer<f32>,
+    pub d_attn_qkv_bias: &'out mut DeviceBuffer<f32>,
     pub scratch: AttentionQkvScratch<'scratch>,
     pub seeds: AttentionBackwardSeeds,
 }
