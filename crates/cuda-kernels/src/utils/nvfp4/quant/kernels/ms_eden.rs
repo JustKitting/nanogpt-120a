@@ -1,6 +1,6 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
-use crate::float_ptx::abs_f32;
+use crate::float_ptx::{abs_f32, max_f32};
 use crate::nvfp4_cast::{e2m1_value, e4m3_value};
 use crate::quartet::{
     QUARTET_MS_EDEN_FP4_MAX, QUARTET_MS_EDEN_FP8_MAX, QUARTET_MS_EDEN_SCALE_OVERRIDE,
@@ -18,8 +18,11 @@ pub(crate) mod module {
     const GROUP_SIZE: u32 = 16;
     const INV_SQRT_32: f32 = 0.176_776_69;
     const FP4_MAX: f32 = 6.0;
+    const AMAX_WARPS_PER_BLOCK: u32 = crate::nvfp4_quant::config::WARPS_PER_BLOCK;
 
     static mut ROTATED: SharedArray<f32, { HADAMARD_DIM as usize }> = SharedArray::UNINIT;
+    static mut AMAX_REDUCE: SharedArray<f32, { AMAX_WARPS_PER_BLOCK as usize }> =
+        SharedArray::UNINIT;
 
     #[kernel]
     #[allow(clippy::too_many_arguments)]
@@ -95,6 +98,53 @@ pub(crate) mod module {
         };
         unsafe {
             *out_global_scale.get_unchecked_mut(0) = global_scale;
+        }
+    }
+
+    #[kernel]
+    pub fn quartet_backward_ms_eden_global_scale_from_chunks_kernel(
+        chunk_amax: &[f32],
+        mut out_global_scale: DisjointSlice<f32>,
+        chunk_count: u32,
+    ) {
+        let thread = thread::threadIdx_x();
+        let lane = warp::lane_id();
+        let warp_in_block = thread / 32;
+        let mut chunk = thread;
+        let mut local_amax = 0.0;
+
+        while chunk < chunk_count {
+            local_amax = max_f32(local_amax, chunk_amax[chunk as usize]);
+            chunk += thread::blockDim_x();
+        }
+
+        let warp_amax = warp_max_f32(local_amax);
+        if lane == 0 {
+            unsafe {
+                AMAX_REDUCE[warp_in_block as usize] = warp_amax;
+            }
+        }
+
+        thread::sync_threads();
+
+        if warp_in_block == 0 {
+            let partial = if lane < AMAX_WARPS_PER_BLOCK {
+                unsafe { AMAX_REDUCE[lane as usize] }
+            } else {
+                0.0
+            };
+            let amax = warp_max_f32(partial);
+            if lane == 0 {
+                let global_scale = if amax == 0.0 {
+                    1.0
+                } else {
+                    amax * QUARTET_MS_EDEN_SCALE_OVERRIDE
+                        / (QUARTET_MS_EDEN_FP8_MAX * QUARTET_MS_EDEN_FP4_MAX)
+                };
+                unsafe {
+                    *out_global_scale.get_unchecked_mut(0) = global_scale;
+                }
+            }
         }
     }
 

@@ -91,6 +91,28 @@ impl Nvfp4QuantModule {
         )
     }
 
+    fn tensor_chunk_amax_f32(
+        &self,
+        stream: &CudaStream,
+        x: &DeviceBuffer<f32>,
+        out: &mut DeviceBuffer<f32>,
+        element_count: u32,
+    ) -> Result<u32, DriverError> {
+        let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
+        self.row_amax.tensor_chunk_amax_f32_kernel(
+            stream,
+            LaunchConfig {
+                grid_dim: (chunk_count, 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            x,
+            out,
+            element_count,
+        )?;
+        Ok(chunk_count)
+    }
+
     pub fn fp32_to_nvfp4_ms_eden(&self, args: MsEdenQuantArgs<'_, '_>) -> Result<(), DriverError> {
         let element_count = args.row_count * args.dst_row_len;
         self.ms_eden.fp32_to_nvfp4_ms_eden_kernel(
@@ -165,24 +187,26 @@ impl Nvfp4QuantModule {
         args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         let args = args;
-        self.row_amax_f32(RowAmaxArgs {
-            stream: args.stream,
-            x: args.x,
-            out: &mut *args.out_chunk_amax,
-            row_count: 1,
-            row_len: args.row_count * args.src_row_len,
-        })?;
-
-        self.ms_eden.quartet_backward_ms_eden_global_scale_kernel(
+        let element_count = args.row_count * args.src_row_len;
+        let chunk_count = self.tensor_chunk_amax_f32(
             args.stream,
-            LaunchConfig {
-                grid_dim: (1, 1, 1),
-                block_dim: (1, 1, 1),
-                shared_mem_bytes: 0,
-            },
-            &*args.out_chunk_amax,
-            &mut *args.out_global_scale,
+            args.x,
+            &mut *args.out_chunk_amax,
+            element_count,
         )?;
+
+        self.ms_eden
+            .quartet_backward_ms_eden_global_scale_from_chunks_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: (1, 1, 1),
+                    block_dim: (THREADS_PER_BLOCK, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                &*args.out_chunk_amax,
+                &mut *args.out_global_scale,
+                chunk_count,
+            )?;
 
         self.fp32_to_nvfp4_ms_eden_device_scale(MsEdenDeviceScaleQuantArgs {
             stream: args.stream,

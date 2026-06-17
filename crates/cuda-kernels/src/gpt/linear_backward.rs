@@ -10,8 +10,11 @@ use crate::mma::{
     nvfp4_projection_nobias_kernel_body, projection_grid_dim,
 };
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
-use crate::nvfp4_quant::{Nvfp4QuantModule, QuartetBackwardMsEdenDeviceScaleQuantArgs};
+use crate::nvfp4_quant::{
+    MsEdenDeviceScaleQuantArgs, Nvfp4QuantModule, QuartetBackwardMsEdenDeviceScaleQuantArgs,
+};
 use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
+use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
 use crate::warp_reduce::warp_sum_f32;
 
 pub const LINEAR_BIAS_THREADS_PER_BLOCK: u32 = 256;
@@ -278,7 +281,7 @@ impl LinearBackwardModule {
                 scale_seed: args.scale_seed ^ 0x9e37_79b9,
             },
         )?;
-        quantize_operand(
+        quantize_operand_with_device_scale(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -294,6 +297,7 @@ impl LinearBackwardModule {
                 sign_seed: args.sign_seed,
                 scale_seed: args.scale_seed ^ 0x85eb_ca6b,
             },
+            &*scratch.e_h.global_scale,
         )?;
         quantize_operand(
             args.quant_module,
@@ -363,6 +367,28 @@ fn quantize_operand(
             scale_seed: args.scale_seed,
         },
     )
+}
+
+fn quantize_operand_with_device_scale(
+    module: &Nvfp4QuantModule,
+    args: QuantizeOperandArgs<'_, '_>,
+    global_scale: &DeviceBuffer<f32>,
+) -> Result<(), DriverError> {
+    module.fp32_to_nvfp4_ms_eden_device_scale(MsEdenDeviceScaleQuantArgs {
+        stream: args.stream,
+        x: args.x,
+        out_fp4: args.scratch,
+        out_scales: args.scales,
+        out_global_scales: args.global_scales,
+        out_chunk_amax: args.chunk_amax,
+        global_scale,
+        row_count: args.row_count,
+        src_row_len: args.src_row_len,
+        dst_row_len: args.dst_row_len,
+        scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
+        sign_seed: args.sign_seed,
+        scale_seed: args.scale_seed,
+    })
 }
 
 #[allow(static_mut_refs)]

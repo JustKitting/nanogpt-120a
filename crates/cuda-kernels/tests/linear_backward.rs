@@ -216,7 +216,6 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
     let generated_scales = [
         e_global_scale.to_host_vec(&stream)?[0],
         weight_t_global_scale.to_host_vec(&stream)?[0],
-        e_t_global_scale.to_host_vec(&stream)?[0],
         input_t_global_scale.to_host_vec(&stream)?[0],
     ];
 
