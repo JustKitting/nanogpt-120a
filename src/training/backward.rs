@@ -2,15 +2,19 @@ use gpt2_nvfp4::{
     AttentionProjectionTensors, Gpt2BackwardArgs, Gpt2BackwardSeeds, Gpt2BackwardWeights,
     MlpDownTensors, MlpProjectionTensors, MlpUpTensors, gpt2_backward,
 };
+use std::time::Instant;
 
 use super::{TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
 
 impl Trainer {
     pub fn train_step(&mut self, batch: &TokenBatch) -> AppResult<TrainStats> {
+        let forward_start = Instant::now();
         let mut stats = self.forward_step(batch)?;
+        stats.forward_ms = forward_start.elapsed().as_secs_f64() * 1000.0;
         let stream = self.runtime.stream.as_ref();
 
+        let backward_start = Instant::now();
         {
             let saved = self.buffers.tape.saved(&batch.tokens);
             let weights = backward_weights(&self.uploaded);
@@ -29,13 +33,17 @@ impl Trainer {
                 seeds: Gpt2BackwardSeeds::from_rng(&mut self.rng),
             })?;
         }
+        stats.backward_ms = backward_start.elapsed().as_secs_f64() * 1000.0;
 
+        let loss_sync_start = Instant::now();
         let losses = self.buffers.backward.losses.to_host_vec(stream)?;
         stats.loss = losses.iter().sum::<f32>() / losses.len() as f32;
         stats.finite &= losses.iter().all(|value| value.is_finite());
         stats.nonzero |= losses.iter().any(|value| value.abs() > 0.0);
+        stats.loss_sync_ms = loss_sync_start.elapsed().as_secs_f64() * 1000.0;
 
-        super::optimizer_apply::apply_weight_updates(
+        let optimizer_start = Instant::now();
+        stats.optimizer = super::optimizer_apply::apply_weight_updates(
             stream,
             &self.runtime,
             batch,
@@ -45,6 +53,7 @@ impl Trainer {
             &mut self.buffers.optimizer_state,
             &mut self.buffers.aurora,
         )?;
+        stats.optimizer_ms = optimizer_start.elapsed().as_secs_f64() * 1000.0;
 
         Ok(stats)
     }

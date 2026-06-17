@@ -3,7 +3,7 @@ use gpt2_nvfp4::{
     TokenEmbeddingArgs,
 };
 
-use super::{TokenBatch, TrainStats, Trainer};
+use super::{OptimizerTrace, TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
 
 impl Trainer {
@@ -77,6 +77,11 @@ impl Trainer {
             finite: logits.iter().all(|value| value.is_finite()),
             nonzero: logits.iter().any(|value| value.abs() > 0.0),
             loss: 0.0,
+            forward_ms: 0.0,
+            backward_ms: 0.0,
+            loss_sync_ms: 0.0,
+            optimizer_ms: 0.0,
+            optimizer: OptimizerTrace::default(),
         })
     }
 }

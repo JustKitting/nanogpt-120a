@@ -4,13 +4,16 @@ use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD};
 use crate::runtime::Runtime;
 use crate::upload::UploadedBlock;
 
+use super::super::OptimizerTrace;
 use super::super::grad_block::BlockGradBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::BlockState;
 use super::super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::adam::update_adam_tensor;
+use super::elapsed_ms;
 use super::matrix::update_matrix_tensor;
 use super::seed;
+use std::time::Instant;
 
 pub(super) fn update_mlp(
     stream: &CudaStream,
@@ -21,8 +24,10 @@ pub(super) fn update_mlp(
     state: &mut BlockState,
     aurora: &mut AuroraScratchBuffers,
     step: u32,
+    trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
     let optimizer = &runtime.optimizer;
+    let start = Instant::now();
     update_matrix_tensor(
         stream,
         runtime,
@@ -35,6 +40,9 @@ pub(super) fn update_mlp(
         GPT2_MLP as u32,
         seed(step, 0x37),
     )?;
+    trace.aurora_ms += elapsed_ms(start);
+
+    let start = Instant::now();
     update_adam_tensor(
         stream,
         optimizer,
@@ -44,6 +52,9 @@ pub(super) fn update_mlp(
         &mut state.mlp_up.bias,
         step,
     )?;
+    trace.adam_ms += elapsed_ms(start);
+
+    let start = Instant::now();
     update_matrix_tensor(
         stream,
         runtime,
@@ -56,6 +67,9 @@ pub(super) fn update_mlp(
         GPT2_N_EMBD as u32,
         seed(step, 0x41),
     )?;
+    trace.aurora_ms += elapsed_ms(start);
+
+    let start = Instant::now();
     update_adam_tensor(
         stream,
         optimizer,
@@ -64,5 +78,7 @@ pub(super) fn update_mlp(
         scratch,
         &mut state.mlp_down.bias,
         step,
-    )
+    )?;
+    trace.adam_ms += elapsed_ms(start);
+    Ok(())
 }

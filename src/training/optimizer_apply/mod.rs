@@ -8,15 +8,16 @@ mod qkv;
 use cuda_core::{CudaStream, DriverError};
 use gpt2_nvfp4::GPT2_N_EMBD;
 use rust_kernels_cuda::optimizer::{EmbeddingLookupGradArgs, OptimizerModule};
+use std::time::Instant;
 
 use crate::runtime::Runtime;
 use crate::upload::UploadedModel;
 
-use super::TokenBatch;
 use super::grads::BackwardBuffers;
 use super::optimizer::OptimizerScratch;
 use super::optimizer_state::OptimizerStateBuffers;
 use super::optimizer_tc_scratch::AuroraScratchBuffers;
+use super::{OptimizerTrace, TokenBatch};
 
 use adam::update_adam_tensor;
 use block::update_block;
@@ -31,10 +32,16 @@ pub fn apply_weight_updates(
     scratch: &mut OptimizerScratch,
     state: &mut OptimizerStateBuffers,
     aurora: &mut AuroraScratchBuffers,
-) -> Result<(), DriverError> {
+) -> Result<OptimizerTrace, DriverError> {
     let optimizer = &runtime.optimizer;
+    let mut trace = OptimizerTrace::default();
     let step = state.advance();
+
+    let start = Instant::now();
     add_embedding_lookup_grad(stream, optimizer, batch, grads)?;
+    trace.embedding_lookup_ms = elapsed_ms(start);
+
+    let start = Instant::now();
     update_adam_tensor(
         stream,
         optimizer,
@@ -44,6 +51,10 @@ pub fn apply_weight_updates(
         &mut state.token_embedding,
         step,
     )?;
+    trace.token_embedding_ms = elapsed_ms(start);
+    trace.adam_ms += trace.token_embedding_ms;
+
+    let start = Instant::now();
     update_layer_norm(
         stream,
         optimizer,
@@ -53,17 +64,23 @@ pub fn apply_weight_updates(
         &mut state.ln_f,
         step,
     )?;
+    trace.final_norm_ms = elapsed_ms(start);
+    trace.adam_ms += trace.final_norm_ms;
 
+    let start = Instant::now();
     for ((block, grad), state) in uploaded
         .blocks
         .iter_mut()
         .zip(grads.blocks.iter())
         .zip(state.blocks.iter_mut())
     {
-        update_block(stream, runtime, block, grad, scratch, state, aurora, step)?;
+        update_block(
+            stream, runtime, block, grad, scratch, state, aurora, step, &mut trace,
+        )?;
     }
+    trace.blocks_ms = elapsed_ms(start);
 
-    Ok(())
+    Ok(trace)
 }
 
 fn add_embedding_lookup_grad(
@@ -84,4 +101,8 @@ fn add_embedding_lookup_grad(
 
 fn seed(step: u32, salt: u32) -> u32 {
     step.wrapping_mul(0x9e37_79b9) ^ salt
+}
+
+fn elapsed_ms(start: Instant) -> f64 {
+    start.elapsed().as_secs_f64() * 1000.0
 }

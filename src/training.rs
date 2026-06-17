@@ -40,6 +40,21 @@ pub struct TrainStats {
     pub finite: bool,
     pub nonzero: bool,
     pub loss: f32,
+    pub forward_ms: f64,
+    pub backward_ms: f64,
+    pub loss_sync_ms: f64,
+    pub optimizer_ms: f64,
+    pub optimizer: OptimizerTrace,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OptimizerTrace {
+    pub embedding_lookup_ms: f64,
+    pub token_embedding_ms: f64,
+    pub final_norm_ms: f64,
+    pub blocks_ms: f64,
+    pub aurora_ms: f64,
+    pub adam_ms: f64,
 }
 
 impl Trainer {
