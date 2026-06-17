@@ -22,7 +22,7 @@ pub(super) fn accumulate_key(
 ) -> (f32, f32) {
     let mut dk_rot = 0.0;
     let mut dv = 0.0;
-    let mut query = 0;
+    let mut query = thread_state.key();
     while query < params.seq_len {
         let active = thread_state.active(query, params);
         let score = reduce_key(
