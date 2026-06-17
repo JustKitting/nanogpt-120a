@@ -162,9 +162,10 @@ mod kernels {
             while col < params.vocab_size {
                 let probability = exp_f32(logits[row_base + col as usize] - row_max) / denom;
                 let target_delta = if col == target { 1.0 } else { 0.0 };
+                let grad_scale = 1.0 / params.token_count as f32;
                 unsafe {
                     *dlogits.get_unchecked_mut(row_base + col as usize) =
-                        probability - target_delta;
+                        (probability - target_delta) * grad_scale;
                 }
                 col += CROSS_ENTROPY_THREADS_PER_BLOCK;
             }

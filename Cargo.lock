@@ -2342,6 +2342,7 @@ dependencies = [
  "base64",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2",
@@ -2417,7 +2418,9 @@ version = "0.1.0"
 dependencies = [
  "cuda-core",
  "fineweb-prep",
+ "gpt2-bpe",
  "gpt2-nvfp4",
+ "reqwest",
  "rust-kernels-cuda",
 ]
 

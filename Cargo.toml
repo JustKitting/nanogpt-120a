@@ -15,7 +15,9 @@ resolver = "3"
 [dependencies]
 cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }
 fineweb-prep = { path = "crates/fineweb-prep" }
+gpt2-bpe = { path = "crates/gpt2-bpe" }
 gpt2-nvfp4 = { path = "crates/gpt2-nvfp4" }
+reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "rustls"] }
 rust-kernels-cuda = { path = "crates/cuda-kernels" }
 
 [package.metadata.cuda-oxide]

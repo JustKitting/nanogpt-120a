@@ -13,7 +13,7 @@ const DEFAULT_TRAIN_STEPS: usize = 10;
 
 fn main() -> AppResult {
     let mut trainer = Trainer::new(SEED)?;
-    let mut data = TokenDataLoader::from_env_or_default()?;
+    let mut data = TokenDataLoader::from_training_dataset()?;
     let mut previous_loss = None;
     let steps = train_steps();
 

@@ -74,7 +74,8 @@ fn expected_loss_and_grad(logits: &[f32], targets: &[u32]) -> (Vec<f32>, Vec<f32
 
         for col in 0..VOCAB_SIZE {
             let probability = (row_logits[col] - row_max).exp() / denom;
-            grad[row_base + col] = probability - if col == target { 1.0 } else { 0.0 };
+            grad[row_base + col] =
+                (probability - if col == target { 1.0 } else { 0.0 }) / TOKEN_COUNT as f32;
         }
     }
 
