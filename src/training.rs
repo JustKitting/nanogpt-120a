@@ -1,6 +1,7 @@
 mod backward;
 mod batch;
 mod buffers;
+mod data;
 mod forward;
 mod grad_block;
 mod grads;
@@ -17,6 +18,7 @@ mod tape_block;
 mod tape_leaf;
 
 pub use batch::TokenBatch;
+pub use data::TokenDataLoader;
 
 use gpt2_nvfp4::{Gpt2, Gpt2Rng};
 
@@ -57,7 +59,7 @@ impl Trainer {
         })
     }
 
-    pub fn batch_from_text(&self, text: &str) -> AppResult<TokenBatch> {
-        TokenBatch::from_text(self.runtime.stream.as_ref(), text)
+    pub fn batch_from_token_window(&self, tokens: &[u16]) -> AppResult<TokenBatch> {
+        TokenBatch::from_token_window(self.runtime.stream.as_ref(), tokens)
     }
 }

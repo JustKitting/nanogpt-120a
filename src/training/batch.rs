@@ -1,5 +1,4 @@
 use cuda_core::{CudaStream, DeviceBuffer};
-use gpt2_bpe::Gpt2Bpe;
 use gpt2_nvfp4::GPT2_CONTEXT_LEN;
 
 use crate::AppResult;
@@ -11,19 +10,29 @@ pub struct TokenBatch {
 }
 
 impl TokenBatch {
-    pub fn from_text(stream: &CudaStream, text: &str) -> AppResult<Self> {
-        let tokenizer = Gpt2Bpe::from_default_assets()?;
-        let mut tokens = tokenizer.encode(text)?;
-        tokens.truncate(GPT2_CONTEXT_LEN);
-        let token_count = tokens.len();
-        tokens.resize(GPT2_CONTEXT_LEN, tokenizer.eot_token());
-        let mut targets = tokens[1..].to_vec();
-        targets.push(tokenizer.eot_token());
+    pub fn from_token_window(stream: &CudaStream, window: &[u16]) -> AppResult<Self> {
+        if window.len() < GPT2_CONTEXT_LEN + 1 {
+            return Err(format!(
+                "token window has {} tokens, needs {}",
+                window.len(),
+                GPT2_CONTEXT_LEN + 1
+            )
+            .into());
+        }
+
+        let tokens: Vec<u32> = window[..GPT2_CONTEXT_LEN]
+            .iter()
+            .map(|&id| id as u32)
+            .collect();
+        let targets: Vec<u32> = window[1..=GPT2_CONTEXT_LEN]
+            .iter()
+            .map(|&id| id as u32)
+            .collect();
 
         Ok(Self {
             tokens: DeviceBuffer::from_host(stream, &tokens)?,
             targets: DeviceBuffer::from_host(stream, &targets)?,
-            token_count,
+            token_count: GPT2_CONTEXT_LEN,
         })
     }
 }
