@@ -12,8 +12,8 @@ use crate::{GPT2_N_LAYER, Gpt2Config};
 
 use super::{
     AttentionProjectionTensors, BlockForwardArgs, EmbeddingWeights, Gpt2BlockWeights,
-    HiddenStateDevice, HiddenStateNvfp4, LayerNormTensors, LayerNormWeights, MlpActivationNvfp4,
-    MlpDownTensors, MlpUpTensors, TokenEmbeddingArgs,
+    Gpt2ForwardTape, HiddenStateDevice, HiddenStateNvfp4, LayerNormTensors, LayerNormWeights,
+    MlpActivationNvfp4, MlpDownTensors, MlpUpTensors, TokenEmbeddingArgs,
 };
 
 pub struct Gpt2ForwardArgs<'a> {
@@ -37,6 +37,7 @@ pub struct Gpt2ForwardArgs<'a> {
     pub attention_qkv: &'a mut DeviceBuffer<f32>,
     pub mlp_activation: &'a mut DeviceBuffer<f32>,
     pub logits: &'a mut DeviceBuffer<f32>,
+    pub tape: Option<Gpt2ForwardTape<'a>>,
 }
 
 #[derive(Clone, Debug)]
@@ -137,6 +138,7 @@ impl Gpt2Weights {
             attention_qkv,
             mlp_activation,
             logits,
+            mut tape,
         } = args;
 
         let lm_head_weight = Nvfp4FourSixMmaWeightTensor {
@@ -146,6 +148,10 @@ impl Gpt2Weights {
         };
 
         let mut hidden = self.embeddings.forward(embeddings)?;
+
+        if let Some(tape) = tape.as_mut() {
+            tape.save_embedding(hidden.stream, hidden.residual)?;
+        }
 
         for (block_index, block) in self.h.iter().enumerate() {
             hidden = block.forward(BlockForwardArgs {
@@ -168,6 +174,7 @@ impl Gpt2Weights {
                 qkv: &mut *attention_qkv,
                 mlp_activation: &mut *mlp_activation,
                 hidden,
+                tape: tape.as_mut().map(|tape| tape.block(block_index)),
             })?;
         }
 
@@ -183,6 +190,11 @@ impl Gpt2Weights {
             normalized,
             normalized_amax,
         } = hidden;
+
+        if let Some(tape) = tape.as_mut() {
+            tape.final_norm
+                .save(stream, residual, normalized, normalized_amax)?;
+        }
 
         quant_module.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
             stream,
@@ -203,11 +215,15 @@ impl Gpt2Weights {
                 global_scales: &*hidden_nvfp4.global_scales,
             },
             weight: lm_head_weight,
-            logits,
+            logits: &mut *logits,
             token_count: crate::GPT2_CONTEXT_LEN as u32,
             input_dim: crate::GPT2_N_EMBD as u32,
             vocab_size: crate::GPT2_VOCAB_SIZE as u32,
         })?;
+
+        if let Some(tape) = tape.as_mut() {
+            tape.save_logits(stream, logits)?;
+        }
 
         Ok(HiddenStateDevice {
             stream,

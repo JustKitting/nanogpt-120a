@@ -109,6 +109,7 @@ fn run_forward() -> TestResult {
         attention_qkv: &mut qkv_dev,
         mlp_activation: &mut mlp_activation_dev,
         logits: &mut logits_dev,
+        tape: None,
     })?;
 
     let logits = logits_dev.to_host_vec(&stream)?;

@@ -6,9 +6,9 @@ use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use super::{
-    AttentionProjectionTensors, AttentionWeights, HiddenStateDevice, HiddenStateNvfp4,
-    LayerNormTensors, LayerNormWeights, MlpActivationNvfp4, MlpDownTensors, MlpProjectionTensors,
-    MlpScratch, MlpUpTensors, MlpWeights,
+    AttentionProjectionTensors, AttentionWeights, BlockForwardTape, HiddenStateDevice,
+    HiddenStateNvfp4, LayerNormTensors, LayerNormWeights, MlpActivationNvfp4, MlpDownTensors,
+    MlpProjectionTensors, MlpScratch, MlpUpTensors, MlpWeights,
 };
 
 pub struct BlockForwardArgs<'a, 'scratch> {
@@ -26,6 +26,7 @@ pub struct BlockForwardArgs<'a, 'scratch> {
     pub qkv: &'scratch mut DeviceBuffer<f32>,
     pub mlp_activation: &'scratch mut DeviceBuffer<f32>,
     pub hidden: HiddenStateDevice<'a>,
+    pub tape: Option<BlockForwardTape<'scratch>>,
 }
 
 #[derive(Clone, Debug)]
@@ -50,21 +51,44 @@ impl Gpt2BlockWeights {
         &self,
         args: BlockForwardArgs<'a, 'scratch>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
+        let qkv = args.qkv;
+        let mlp_activation = args.mlp_activation;
         let mut hidden_nvfp4 = args.hidden_nvfp4;
+        let mut tape = args.tape;
+
+        if let Some(tape) = tape.as_mut() {
+            tape.save_residual_in(args.hidden.stream, args.hidden.residual)?;
+        }
+
         let hidden = self.ln_1.forward(LayerNormWeights::input_from_block(
             args.layer_norm_module,
             args.ln_1,
             args.hidden,
         ))?;
 
+        if let Some(tape) = tape.as_mut() {
+            tape.ln_1.save(
+                hidden.stream,
+                hidden.residual,
+                hidden.normalized,
+                hidden.normalized_amax,
+            )?;
+        }
+
         let hidden = AttentionWeights::forward(AttentionWeights::input_from_embeddings(
             args.attention_module,
             args.quant_module,
             hidden_nvfp4.reborrow(),
             args.projections,
-            args.qkv,
+            &mut *qkv,
             hidden,
         ))?;
+
+        if let Some(tape) = tape.as_mut() {
+            tape.save_qkv(hidden.stream, qkv)?;
+            tape.save_attention_out(hidden.stream, hidden.normalized)?;
+            tape.save_residual_after_attention(hidden.stream, hidden.residual)?;
+        }
 
         let hidden = self.ln_2.forward(LayerNormWeights::input_from_block(
             args.layer_norm_module,
@@ -72,13 +96,22 @@ impl Gpt2BlockWeights {
             hidden,
         ))?;
 
+        if let Some(tape) = tape.as_mut() {
+            tape.ln_2.save(
+                hidden.stream,
+                hidden.residual,
+                hidden.normalized,
+                hidden.normalized_amax,
+            )?;
+        }
+
         MlpWeights::forward(MlpWeights::input_from_attention(
             args.mlp_module,
             args.quant_module,
             MlpScratch {
                 input_nvfp4: hidden_nvfp4.reborrow(),
                 activation_nvfp4: args.mlp_activation_nvfp4,
-                activation: args.mlp_activation,
+                activation: &mut *mlp_activation,
             },
             MlpProjectionTensors {
                 up: args.mlp_up,
@@ -86,5 +119,13 @@ impl Gpt2BlockWeights {
             },
             hidden,
         ))
+        .and_then(|hidden| {
+            if let Some(tape) = tape.as_mut() {
+                tape.save_mlp_activation(hidden.stream, mlp_activation)?;
+                tape.save_residual_out(hidden.stream, hidden.residual)?;
+            }
+
+            Ok(hidden)
+        })
     }
 }
