@@ -1,6 +1,8 @@
 use cuda_device::{DisjointSlice, SharedArray, thread, warp};
 
-use super::layout::{d_out_value, qkv_index, softmax_d_value, softmax_prob, v_value};
+use crate::float_ptx::exp_f32;
+
+use super::layout::{d_out_value, log_sum_exp_value, qkv_index, softmax_d_value, v_value};
 use super::reductions::{HEAD_REDUCE_PAIR_LEN, reduce_head_pair};
 use super::rope::{k_value, q_value, rope_raw_grad};
 use super::types::{CAUSAL_BACKWARD_HEAD_DIM_THREADS, CausalAttentionBackwardParams};
@@ -38,6 +40,16 @@ pub(super) fn dq_body(
     } else {
         0.0
     };
+    let query_log_sum_exp = if dim == 0 {
+        log_sum_exp_value(log_sum_exp, batch, query, head, &params)
+    } else {
+        0.0
+    };
+    let query_softmax_d = if dim == 0 {
+        softmax_d_value(softmax_d, batch, query, head, &params)
+    } else {
+        0.0
+    };
     let mut grad = 0.0;
     let mut key = 0;
     while key <= query {
@@ -55,8 +67,8 @@ pub(super) fn dq_body(
         let local_dp = d_out_query * value_value;
         let (score, dp) = reduce_head_pair(local_score, local_dp, lane, warp_in_head, reduce);
         if dim == 0 {
-            let p = softmax_prob(score, batch, query, head, log_sum_exp, &params);
-            ds[0] = p * (dp - softmax_d_value(softmax_d, batch, query, head, &params));
+            let p = exp_f32(score * params.scale - query_log_sum_exp);
+            ds[0] = p * (dp - query_softmax_d);
         }
         thread::sync_threads();
         if valid_dim {
