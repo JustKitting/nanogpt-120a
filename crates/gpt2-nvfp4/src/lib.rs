@@ -1,4 +1,5 @@
 mod activations;
+mod backward;
 mod config;
 mod random;
 mod tensor;
@@ -8,6 +9,10 @@ pub use activations::{
     AttentionScores, AttentionScoresShape, BufferShape, F32Buffer, HiddenState, HiddenStateShape,
     Logits, LogitsShape, MlpActivation, MlpActivationShape, QkvActivation, QkvActivationShape,
     TokenIds, TokenIdsShape, U32Buffer,
+};
+
+pub use backward::{
+    FinalHeadBackwardArgs, FinalHeadBackwardModules, FinalHeadBackwardScratch, final_head_backward,
 };
 
 pub use config::{

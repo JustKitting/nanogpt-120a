@@ -26,6 +26,8 @@ pub mod nvfp4_cast;
 pub mod nvfp4_quant;
 #[path = "utils/shuffle.rs"]
 pub mod shuffle;
+#[path = "utils/transpose.rs"]
+pub mod transpose;
 #[path = "utils/warp_reduce.rs"]
 pub mod warp_reduce;
 
@@ -35,7 +37,8 @@ pub mod gpt {
 
 pub mod utils {
     pub use crate::{
-        float_ptx, layer_norm_utils, mma, nvfp4, nvfp4_cast, nvfp4_quant, shuffle, warp_reduce,
+        float_ptx, layer_norm_utils, mma, nvfp4, nvfp4_cast, nvfp4_quant, shuffle, transpose,
+        warp_reduce,
     };
 }
 
