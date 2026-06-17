@@ -11,6 +11,9 @@ pub struct Gpt2BackwardContext<'a> {
 #[derive(Clone, Copy)]
 pub struct Gpt2ForwardSaved<'a> {
     pub tokens: &'a DeviceBuffer<u32>,
+    pub batch_size: u32,
+    pub seq_len: u32,
+    pub row_count: u32,
     pub embedding_residual: &'a DeviceBuffer<f32>,
     pub blocks: [BlockForwardSaved<'a>; GPT2_N_LAYER],
     pub final_norm: LayerNormSaved<'a>,
@@ -20,12 +23,15 @@ pub struct Gpt2ForwardSaved<'a> {
 
 #[derive(Clone, Copy)]
 pub struct BlockForwardSaved<'a> {
+    pub batch_size: u32,
+    pub seq_len: u32,
+    pub row_count: u32,
     pub residual_in: &'a DeviceBuffer<f32>,
     pub ln_1: LayerNormSaved<'a>,
     pub qkv_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub qkv: &'a DeviceBuffer<f32>,
     pub attention_out: &'a DeviceBuffer<f32>,
-    pub attention_lse: &'a DeviceBuffer<f32>,
+    pub attention_log_sum_exp: &'a DeviceBuffer<f32>,
     pub c_proj_input_nvfp4: Nvfp4RowwiseDeviceTensor<'a>,
     pub residual_after_attention: &'a DeviceBuffer<f32>,
     pub ln_2: LayerNormSaved<'a>,
@@ -38,6 +44,7 @@ pub struct BlockForwardSaved<'a> {
 
 #[derive(Clone, Copy)]
 pub struct LayerNormSaved<'a> {
+    pub row_count: u32,
     pub residual: &'a DeviceBuffer<f32>,
     pub normalized: &'a DeviceBuffer<f32>,
     pub mean: &'a DeviceBuffer<f32>,

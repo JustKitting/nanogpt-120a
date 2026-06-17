@@ -7,6 +7,9 @@ pub struct TokenEmbeddingArgs<'a> {
     pub stream: &'a CudaStream,
     pub tokens: &'a DeviceBuffer<u32>,
     pub token_embedding: Nvfp4DeviceTensor<'a>,
+    pub batch_size: u32,
+    pub seq_len: u32,
+    pub row_count: u32,
     pub residual: &'a mut DeviceBuffer<f32>,
     pub normalized: &'a mut DeviceBuffer<f32>,
     pub normalized_amax: &'a mut DeviceBuffer<f32>,
@@ -16,6 +19,9 @@ pub struct TokenEmbeddingArgs<'a> {
 
 pub struct HiddenStateDevice<'a> {
     pub stream: &'a CudaStream,
+    pub batch_size: u32,
+    pub seq_len: u32,
+    pub row_count: u32,
     pub residual: &'a mut DeviceBuffer<f32>,
     pub normalized: &'a mut DeviceBuffer<f32>,
     pub normalized_amax: &'a mut DeviceBuffer<f32>,

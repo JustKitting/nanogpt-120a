@@ -17,6 +17,6 @@ fn reborrow_operand<'a, 'b>(operand: &'b mut MsEdenOperandScratch<'a>) -> MsEden
         scales: &mut *operand.scales,
         global_scales: &mut *operand.global_scales,
         chunk_amax: &mut *operand.chunk_amax,
-        global_scale: operand.global_scale,
+        global_scale: &mut *operand.global_scale,
     }
 }

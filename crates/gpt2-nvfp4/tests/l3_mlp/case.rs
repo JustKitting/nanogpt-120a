@@ -2,8 +2,8 @@ use std::error::Error;
 
 use cuda_core::CudaContext;
 use gpt2_nvfp4::{
-    HiddenStateDevice, HiddenStateNvfp4, MlpActivationNvfp4, MlpProjectionTensors, MlpScratch,
-    MlpWeights,
+    GPT2_CONTEXT_LEN, HiddenStateDevice, HiddenStateNvfp4, MlpActivationNvfp4,
+    MlpProjectionTensors, MlpScratch, MlpWeights,
 };
 use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
@@ -50,6 +50,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         },
         HiddenStateDevice {
             stream: &stream,
+            batch_size: 1,
+            seq_len: GPT2_CONTEXT_LEN as u32,
+            row_count: GPT2_CONTEXT_LEN as u32,
             residual: &mut scratch.residual,
             normalized: &mut scratch.normalized,
             normalized_amax: &mut scratch.amax,

@@ -26,7 +26,7 @@ impl AttentionWeights {
         input_nvfp4: HiddenStateNvfp4<'scratch>,
         projections: AttentionProjectionTensors<'a>,
         qkv: &'scratch mut cuda_core::DeviceBuffer<f32>,
-        attention_lse: &'scratch mut cuda_core::DeviceBuffer<f32>,
+        attention_log_sum_exp: &'scratch mut cuda_core::DeviceBuffer<f32>,
         hidden: HiddenStateDevice<'a>,
     ) -> AttentionForwardArgs<'a, 'scratch> {
         Self::input_from_embeddings_with_tape(
@@ -35,7 +35,7 @@ impl AttentionWeights {
             input_nvfp4,
             projections,
             qkv,
-            attention_lse,
+            attention_log_sum_exp,
             hidden,
             None,
         )
@@ -48,7 +48,7 @@ impl AttentionWeights {
         input_nvfp4: HiddenStateNvfp4<'scratch>,
         projections: AttentionProjectionTensors<'a>,
         qkv: &'scratch mut cuda_core::DeviceBuffer<f32>,
-        attention_lse: &'scratch mut cuda_core::DeviceBuffer<f32>,
+        attention_log_sum_exp: &'scratch mut cuda_core::DeviceBuffer<f32>,
         hidden: HiddenStateDevice<'a>,
         tape: Option<AttentionForwardTape<'scratch>>,
     ) -> AttentionForwardArgs<'a, 'scratch> {
@@ -58,7 +58,7 @@ impl AttentionWeights {
             input_nvfp4,
             projections,
             qkv,
-            attention_lse,
+            attention_log_sum_exp,
             hidden,
             tape,
         }

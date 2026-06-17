@@ -1,4 +1,4 @@
-use gpt2_nvfp4::{GPT2_CONTEXT_LEN, GPT2_VOCAB_SIZE};
+use gpt2_nvfp4::GPT2_VOCAB_SIZE;
 use rust_kernels_cuda::loss::CrossEntropyArgs;
 
 use super::{TokenBatch, Trainer};
@@ -15,11 +15,12 @@ impl Trainer {
             targets: &batch.targets,
             losses: &mut self.buffers.backward.losses,
             dlogits: &mut self.buffers.backward.dlogits,
-            token_count: GPT2_CONTEXT_LEN as u32,
+            token_count: batch.token_count as u32,
             vocab_size: GPT2_VOCAB_SIZE as u32,
         })?;
 
         let losses = self.buffers.backward.losses.to_host_vec(stream)?;
-        Ok(losses.iter().sum::<f32>() / losses.len() as f32)
+        let active_losses = &losses[..batch.token_count];
+        Ok(active_losses.iter().sum::<f32>() / active_losses.len() as f32)
     }
 }

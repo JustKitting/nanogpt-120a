@@ -25,7 +25,7 @@ fn causal_attention_backward_matches_rope_reference() -> Result<(), Box<dyn Erro
     let qkv = DeviceBuffer::from_host(&stream, &case.qkv)?;
     let out = DeviceBuffer::from_host(&stream, &case.out)?;
     let d_out = DeviceBuffer::from_host(&stream, &case.d_out)?;
-    let lse = DeviceBuffer::from_host(&stream, &case.lse)?;
+    let log_sum_exp = DeviceBuffer::from_host(&stream, &case.log_sum_exp)?;
     let mut softmax_d = DeviceBuffer::<f32>::zeroed(&stream, shape::TOKEN_COUNT * shape::HEADS)?;
     let mut d_qkv = DeviceBuffer::<f32>::zeroed(&stream, shape::TOKEN_COUNT * shape::QKV_DIM)?;
 
@@ -34,10 +34,12 @@ fn causal_attention_backward_matches_rope_reference() -> Result<(), Box<dyn Erro
         qkv: &qkv,
         attention_out: &out,
         d_out: &d_out,
-        lse: &lse,
+        log_sum_exp: &log_sum_exp,
         softmax_d: &mut softmax_d,
         d_qkv: &mut d_qkv,
-        token_count: shape::TOKEN_COUNT as u32,
+        row_count: shape::TOKEN_COUNT as u32,
+        seq_len: shape::TOKEN_COUNT as u32,
+        batch_size: 1,
         embedding_dim: shape::EMBEDDING as u32,
         qkv_dim: shape::QKV_DIM as u32,
         head_count: shape::HEADS as u32,

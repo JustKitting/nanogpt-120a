@@ -16,7 +16,12 @@ impl Trainer {
 
         let backward_start = Instant::now();
         {
-            let saved = self.buffers.tape.saved(&batch.tokens);
+            let saved = self.buffers.tape.saved(
+                &batch.tokens,
+                batch.batch_size as u32,
+                batch.seq_len as u32,
+                batch.token_count as u32,
+            );
             let weights = backward_weights(&self.uploaded);
             let mut backward = self.buffers.backward.parts();
             super::grad_clear::clear_backward_parts(stream, &mut backward)?;
@@ -34,13 +39,14 @@ impl Trainer {
                 seeds: Gpt2BackwardSeeds::from_rng(&mut self.rng),
             })?;
         }
-        stats.backward_ms = backward_start.elapsed().as_secs_f64() * 1000.0;
+        stats.backward_enqueue_ms = backward_start.elapsed().as_secs_f64() * 1000.0;
 
         let loss_sync_start = Instant::now();
         let losses = self.buffers.backward.losses.to_host_vec(stream)?;
-        stats.loss = losses.iter().sum::<f32>() / losses.len() as f32;
-        stats.finite &= losses.iter().all(|value| value.is_finite());
-        stats.nonzero |= losses.iter().any(|value| value.abs() > 0.0);
+        let active_losses = &losses[..batch.token_count];
+        stats.loss = active_losses.iter().sum::<f32>() / active_losses.len() as f32;
+        stats.finite &= active_losses.iter().all(|value| value.is_finite());
+        stats.nonzero |= active_losses.iter().any(|value| value.abs() > 0.0);
         stats.loss_sync_ms = loss_sync_start.elapsed().as_secs_f64() * 1000.0;
 
         let optimizer_start = Instant::now();

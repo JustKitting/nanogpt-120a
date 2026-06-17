@@ -20,15 +20,17 @@ fn main() -> AppResult {
     let log_interval = train_log_interval();
     let eval_interval = train_eval_interval();
     let validation_tokens = data.validation_tokens()?;
-    let validation_batch = trainer.batch_from_token_window(&validation_tokens)?;
+    let validation_batch = trainer.batch_from_default_windows(&validation_tokens)?;
 
     println!("training_tokens={} steps={steps}", data.token_count());
 
     for step in 0..steps {
-        let window = data.next_window()?;
+        let window = data.next_batch()?;
         let offset = window.offset;
         let source = window.source.display().to_string();
-        let batch = trainer.batch_from_token_window(window.tokens)?;
+        let window_batch_size = window.batch_size;
+        let window_seq_len = window.seq_len;
+        let batch = trainer.batch_from_default_windows(&window.tokens)?;
         let stats = trainer.train_step(&batch)?;
         let delta = previous_loss
             .map(|loss| format!("{:+.6}", stats.loss - loss))
@@ -37,7 +39,7 @@ fn main() -> AppResult {
 
         if should_log_step(step, steps, log_interval) {
             println!(
-                "step={step} source={source} offset={offset} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_sync_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
+                "step={step} source={source} offset={offset} batch_size={window_batch_size} seq_len={window_seq_len} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_sync_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
                 stats.tokens,
                 stats.logits,
                 stats.loss,
@@ -47,7 +49,7 @@ fn main() -> AppResult {
                 stats.nonzero,
                 stats.optimizer.adam_lr,
                 stats.forward_ms,
-                stats.backward_ms,
+                stats.backward_enqueue_ms,
                 stats.loss_sync_ms,
                 stats.optimizer_ms,
                 stats.optimizer.aurora_ms,

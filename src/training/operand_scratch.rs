@@ -6,6 +6,7 @@ pub(super) struct OperandScratch {
     scales: DeviceBuffer<u8>,
     global_scales: DeviceBuffer<f32>,
     chunk_amax: DeviceBuffer<f32>,
+    global_scale: DeviceBuffer<f32>,
 }
 
 impl OperandScratch {
@@ -19,6 +20,7 @@ impl OperandScratch {
             scales: DeviceBuffer::zeroed(stream, elements.div_ceil(16))?,
             global_scales: DeviceBuffer::zeroed(stream, rows)?,
             chunk_amax: DeviceBuffer::zeroed(stream, elements.div_ceil(32))?,
+            global_scale: DeviceBuffer::zeroed(stream, 1)?,
         })
     }
 
@@ -28,7 +30,7 @@ impl OperandScratch {
             scales: &mut self.scales,
             global_scales: &mut self.global_scales,
             chunk_amax: &mut self.chunk_amax,
-            global_scale: 1.0,
+            global_scale: &mut self.global_scale,
         }
     }
 }

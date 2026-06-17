@@ -50,6 +50,7 @@ pub struct FinalHeadBackwardArgs<'a, 'scratch, 'out> {
     pub dlogits: &'out mut DeviceBuffer<f32>,
     pub d_final_normalized: &'out mut DeviceBuffer<f32>,
     pub d_lm_head_weight: &'out mut DeviceBuffer<f32>,
+    pub row_count: u32,
     pub scratch: FinalHeadBackwardScratch<'scratch>,
     pub seeds: FinalHeadBackwardSeeds,
 }

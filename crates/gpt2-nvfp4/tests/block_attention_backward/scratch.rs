@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    AttentionCProjScratch, AttentionCoreScratch, BlockAttentionBackwardScratch, GPT2_CONTEXT_LEN,
-    GPT2_N_EMBD, GPT2_QKV,
+    AttentionCProjScratch, AttentionCoreScratch, BlockAttentionBackwardScratch, GPT2_N_EMBD,
+    GPT2_QKV, GPT2_TOKEN_ROWS,
 };
 use rust_kernels_cuda::linear_backward::{LinearBackwardMsEdenScratch, MsEdenOperandScratch};
 
@@ -16,7 +16,7 @@ impl BlockAttentionScratch {
         Ok(Self {
             c_proj: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_N_EMBD)?,
             qkv: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_QKV)?,
-            softmax_d: DeviceBuffer::zeroed(stream, gpt2_nvfp4::AttentionLse::LEN)?,
+            softmax_d: DeviceBuffer::zeroed(stream, gpt2_nvfp4::AttentionLogSumExp::LEN)?,
         })
     }
 
@@ -44,13 +44,13 @@ struct LinearScratch {
 impl LinearScratch {
     fn new(stream: &CudaStream, input_dim: usize, output_dim: usize) -> Result<Self, DriverError> {
         Ok(Self {
-            error_t: DeviceBuffer::zeroed(stream, output_dim * GPT2_CONTEXT_LEN)?,
+            error_t: DeviceBuffer::zeroed(stream, output_dim * GPT2_TOKEN_ROWS)?,
             weight_t: DeviceBuffer::zeroed(stream, output_dim * input_dim)?,
-            input_t: DeviceBuffer::zeroed(stream, input_dim * GPT2_CONTEXT_LEN)?,
-            e: OperandScratch::new(stream, GPT2_CONTEXT_LEN * output_dim, GPT2_CONTEXT_LEN)?,
+            input_t: DeviceBuffer::zeroed(stream, input_dim * GPT2_TOKEN_ROWS)?,
+            e: OperandScratch::new(stream, GPT2_TOKEN_ROWS * output_dim, GPT2_TOKEN_ROWS)?,
             weight_t_h: OperandScratch::new(stream, input_dim * output_dim, input_dim)?,
-            e_t: OperandScratch::new(stream, output_dim * GPT2_CONTEXT_LEN, output_dim)?,
-            input_t_h: OperandScratch::new(stream, input_dim * GPT2_CONTEXT_LEN, input_dim)?,
+            e_t: OperandScratch::new(stream, output_dim * GPT2_TOKEN_ROWS, output_dim)?,
+            input_t_h: OperandScratch::new(stream, input_dim * GPT2_TOKEN_ROWS, input_dim)?,
         })
     }
 
@@ -74,6 +74,7 @@ struct OperandScratch {
     scales: DeviceBuffer<u8>,
     global_scales: DeviceBuffer<f32>,
     chunk_amax: DeviceBuffer<f32>,
+    global_scale: DeviceBuffer<f32>,
 }
 
 impl OperandScratch {
@@ -83,6 +84,7 @@ impl OperandScratch {
             scales: DeviceBuffer::zeroed(stream, elements / 16)?,
             global_scales: DeviceBuffer::zeroed(stream, rows)?,
             chunk_amax: DeviceBuffer::zeroed(stream, elements / 32)?,
+            global_scale: DeviceBuffer::zeroed(stream, 1)?,
         })
     }
 
@@ -92,7 +94,7 @@ impl OperandScratch {
             scales: &mut self.scales,
             global_scales: &mut self.global_scales,
             chunk_amax: &mut self.chunk_amax,
-            global_scale: 1.0,
+            global_scale: &mut self.global_scale,
         }
     }
 }

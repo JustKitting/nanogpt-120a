@@ -1,4 +1,6 @@
-use gpt2_nvfp4::{AttentionLse, GPT2_CONTEXT_LEN, HiddenState};
+use gpt2_nvfp4::{
+    AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, HiddenState,
+};
 
 pub const E2M1_MIN_PAIR: u8 = 0x11;
 pub const E2M1_ONE_PAIR: u8 = 0x22;
@@ -10,20 +12,23 @@ pub fn hidden_values() -> Vec<f32> {
         .collect()
 }
 
-pub fn attention_lse_values() -> Vec<f32> {
-    let mut lse = vec![0.0_f32; AttentionLse::LEN];
-    for head in 0..gpt2_nvfp4::GPT2_N_HEAD {
-        for token in 0..GPT2_CONTEXT_LEN {
-            lse[head * GPT2_CONTEXT_LEN + token] = ((token + 1) as f32).ln();
+pub fn attention_log_sum_exp_values() -> Vec<f32> {
+    let mut log_sum_exp = vec![0.0_f32; AttentionLogSumExp::LEN];
+    for batch in 0..GPT2_BATCH_SIZE {
+        for head in 0..GPT2_N_HEAD {
+            for token in 0..GPT2_SEQ_LEN {
+                let index = (batch * GPT2_N_HEAD + head) * GPT2_SEQ_LEN + token;
+                log_sum_exp[index] = ((token + 1) as f32).ln();
+            }
         }
     }
-    lse
+    log_sum_exp
 }
 
 pub fn row_global_scales() -> Vec<f32> {
-    vec![1.0; GPT2_CONTEXT_LEN]
+    vec![1.0; GPT2_TOKEN_ROWS]
 }
 
 pub fn inv_std_values() -> Vec<f32> {
-    vec![1.0; GPT2_CONTEXT_LEN]
+    vec![1.0; GPT2_TOKEN_ROWS]
 }

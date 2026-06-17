@@ -32,6 +32,9 @@ pub(super) fn finish_forward<'a>(
 
     let HiddenStateDevice {
         stream,
+        batch_size,
+        seq_len,
+        row_count,
         residual,
         normalized,
         normalized_amax,
@@ -52,7 +55,7 @@ pub(super) fn finish_forward<'a>(
             out_fp4: &mut *hidden_nvfp4.bytes,
             out_scales: &mut *hidden_nvfp4.scales,
             out_global_scale: &mut *hidden_nvfp4.global_scales,
-            group_count: (crate::HiddenState::LEN / 16) as u32,
+            group_count: row_count * crate::GPT2_N_EMBD as u32 / 16,
             row_len: crate::GPT2_N_EMBD as u32,
         })?;
 
@@ -70,7 +73,7 @@ pub(super) fn finish_forward<'a>(
         input,
         weight: args.lm_head_weight,
         logits: &mut *args.logits,
-        token_count: crate::GPT2_CONTEXT_LEN as u32,
+        token_count: row_count,
         input_dim: crate::GPT2_N_EMBD as u32,
         vocab_size: crate::GPT2_VOCAB_SIZE as u32,
     })?;
@@ -81,6 +84,9 @@ pub(super) fn finish_forward<'a>(
 
     Ok(HiddenStateDevice {
         stream,
+        batch_size,
+        seq_len,
+        row_count,
         residual,
         normalized,
         normalized_amax,

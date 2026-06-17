@@ -14,14 +14,21 @@ pub(super) fn score_local(
     active: bool,
 ) -> f32 {
     if active {
-        q_value(qkv, query, thread_state.head, thread_state.dim, params)
-            * k_value(
-                qkv,
-                thread_state.key(),
-                thread_state.head,
-                thread_state.dim,
-                params,
-            )
+        q_value(
+            qkv,
+            thread_state.batch,
+            query,
+            thread_state.head,
+            thread_state.dim,
+            params,
+        ) * k_value(
+            qkv,
+            thread_state.batch,
+            thread_state.key(),
+            thread_state.head,
+            thread_state.dim,
+            params,
+        )
     } else {
         0.0
     }
@@ -37,14 +44,21 @@ pub(super) fn dp_local(
     active: bool,
 ) -> f32 {
     if active {
-        d_out_value(d_out, query, thread_state.head, thread_state.dim, params)
-            * v_value(
-                qkv,
-                thread_state.key(),
-                thread_state.head,
-                thread_state.dim,
-                params,
-            )
+        d_out_value(
+            d_out,
+            thread_state.batch,
+            query,
+            thread_state.head,
+            thread_state.dim,
+            params,
+        ) * v_value(
+            qkv,
+            thread_state.batch,
+            thread_state.key(),
+            thread_state.head,
+            thread_state.dim,
+            params,
+        )
     } else {
         0.0
     }
@@ -52,7 +66,7 @@ pub(super) fn dp_local(
 
 #[inline(always)]
 pub(super) fn write_query_scalars(
-    lse: &[f32],
+    log_sum_exp: &[f32],
     softmax_d: &[f32],
     params: &CausalAttentionBackwardParams,
     thread_state: KeyThread,
@@ -62,11 +76,25 @@ pub(super) fn write_query_scalars(
     ds: &mut SharedArray<f32, { CAUSAL_BACKWARD_KEY_BLOCK as usize }>,
 ) {
     let p = if thread_state.active(query, params) {
-        softmax_prob(score_dp.0, query, thread_state.head, lse, params)
+        softmax_prob(
+            score_dp.0,
+            thread_state.batch,
+            query,
+            thread_state.head,
+            log_sum_exp,
+            params,
+        )
     } else {
         0.0
     };
     prob[thread_state.key_offset as usize] = p;
-    ds[thread_state.key_offset as usize] =
-        p * (score_dp.1 - softmax_d_value(softmax_d, query, thread_state.head, params));
+    ds[thread_state.key_offset as usize] = p
+        * (score_dp.1
+            - softmax_d_value(
+                softmax_d,
+                thread_state.batch,
+                query,
+                thread_state.head,
+                params,
+            ));
 }

@@ -6,7 +6,6 @@ use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use super::args::MlpBackwardModules;
 use super::linear::{MlpLinearBackwardCall, run_linear_backward};
 use super::transforms::{decode_rowwise_t, decode_weight_t, transpose_f32};
-use crate::GPT2_CONTEXT_LEN;
 
 pub(super) struct LinearPass<'a, 'scratch, 'out> {
     pub e: &'a DeviceBuffer<f32>,
@@ -19,6 +18,7 @@ pub(super) struct LinearPass<'a, 'scratch, 'out> {
     pub dinput: &'out mut DeviceBuffer<f32>,
     pub dweight: &'out mut DeviceBuffer<f32>,
     pub dbias: &'out mut DeviceBuffer<f32>,
+    pub row_count: u32,
     pub input_dim: u32,
     pub output_dim: u32,
     pub sign_seed: u32,
@@ -30,6 +30,7 @@ pub(super) fn run_linear_pass(
     stream: &CudaStream,
     pass: LinearPass<'_, '_, '_>,
 ) -> Result<(), DriverError> {
+    let row_count = pass.row_count;
     decode_weight_t(
         modules.decode,
         stream,
@@ -43,7 +44,7 @@ pub(super) fn run_linear_pass(
         stream,
         pass.e,
         pass.error_t,
-        GPT2_CONTEXT_LEN,
+        row_count as usize,
         pass.output_dim as usize,
     )?;
     decode_rowwise_t(
@@ -51,7 +52,7 @@ pub(super) fn run_linear_pass(
         stream,
         pass.saved_input,
         pass.input_t,
-        GPT2_CONTEXT_LEN,
+        row_count as usize,
         pass.input_dim as usize,
     )?;
     run_linear_backward(
@@ -69,6 +70,7 @@ pub(super) fn run_linear_pass(
             dbias: pass.dbias,
             input_dim: pass.input_dim,
             output_dim: pass.output_dim,
+            token_count: row_count,
             sign_seed: pass.sign_seed,
             scale_seed: pass.scale_seed,
         },

@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::{GPT2_CONTEXT_LEN, GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, GPT2_VOCAB_SIZE};
+use crate::{
+    GPT2_BATCH_SIZE, GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    GPT2_VOCAB_SIZE,
+};
 
 pub trait BufferShape<T> {
     const LEN: usize;
@@ -69,22 +72,26 @@ macro_rules! buffer_shape {
     };
 }
 
-buffer_shape!(TokenIdsShape, u32, GPT2_CONTEXT_LEN);
-buffer_shape!(HiddenStateShape, f32, GPT2_CONTEXT_LEN * GPT2_N_EMBD);
-buffer_shape!(QkvActivationShape, f32, GPT2_CONTEXT_LEN * GPT2_QKV);
+buffer_shape!(TokenIdsShape, u32, GPT2_TOKEN_ROWS);
+buffer_shape!(HiddenStateShape, f32, GPT2_TOKEN_ROWS * GPT2_N_EMBD);
+buffer_shape!(QkvActivationShape, f32, GPT2_TOKEN_ROWS * GPT2_QKV);
 buffer_shape!(
     AttentionScoresShape,
     f32,
-    GPT2_N_HEAD * GPT2_CONTEXT_LEN * GPT2_CONTEXT_LEN
+    GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN * GPT2_SEQ_LEN
 );
-buffer_shape!(AttentionLseShape, f32, GPT2_N_HEAD * GPT2_CONTEXT_LEN);
-buffer_shape!(MlpActivationShape, f32, GPT2_CONTEXT_LEN * GPT2_MLP);
-buffer_shape!(LogitsShape, f32, GPT2_CONTEXT_LEN * GPT2_VOCAB_SIZE);
+buffer_shape!(
+    AttentionLogSumExpShape,
+    f32,
+    GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN
+);
+buffer_shape!(MlpActivationShape, f32, GPT2_TOKEN_ROWS * GPT2_MLP);
+buffer_shape!(LogitsShape, f32, GPT2_TOKEN_ROWS * GPT2_VOCAB_SIZE);
 
 pub type TokenIds = U32Buffer<TokenIdsShape>;
 pub type HiddenState = F32Buffer<HiddenStateShape>;
 pub type QkvActivation = F32Buffer<QkvActivationShape>;
 pub type AttentionScores = F32Buffer<AttentionScoresShape>;
-pub type AttentionLse = F32Buffer<AttentionLseShape>;
+pub type AttentionLogSumExp = F32Buffer<AttentionLogSumExpShape>;
 pub type MlpActivation = F32Buffer<MlpActivationShape>;
 pub type Logits = F32Buffer<LogitsShape>;

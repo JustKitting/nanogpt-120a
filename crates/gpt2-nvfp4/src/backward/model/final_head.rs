@@ -31,6 +31,7 @@ pub(super) fn run_final_head<'a, 'scratch, 'out>(
         dlogits,
         d_final_normalized,
         d_lm_head_weight,
+        row_count: saved.row_count,
         scratch,
         seeds,
     })

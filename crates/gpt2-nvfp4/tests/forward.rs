@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use cuda_core::{CudaContext, CudaStream, DeviceBuffer};
 use gpt2_nvfp4::{
-    AttentionLse, GPT2_CONTEXT_LEN, Gpt2, Gpt2BlockWeights, Gpt2ForwardArgs, HiddenState,
-    HiddenStateNvfp4, LayerNormTensors, LayerNormWeights, Logits, MlpActivation,
-    MlpActivationNvfp4, MlpDownTensors, MlpUpTensors, Nvfp4Shape, Nvfp4Tensor, QkvActivation,
-    TokenEmbeddingArgs,
+    AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, Gpt2, Gpt2BlockWeights,
+    Gpt2ForwardArgs, HiddenState, HiddenStateNvfp4, LayerNormTensors, LayerNormWeights, Logits,
+    MlpActivation, MlpActivationNvfp4, MlpDownTensors, MlpUpTensors, Nvfp4Shape, Nvfp4Tensor,
+    QkvActivation, TokenEmbeddingArgs,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::embedding::EmbeddingModule;
@@ -54,21 +54,22 @@ fn run_forward() -> TestResult {
     let tokens_dev = DeviceBuffer::from_host(&stream, &tokens)?;
     let mut residual_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut normalized_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
-    let mut normalized_amax_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
-    let mut mean_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
-    let mut inv_std_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
+    let mut normalized_amax_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
+    let mut mean_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
+    let mut inv_std_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
     let mut hidden_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 2)?;
     let mut hidden_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 16)?;
-    let mut hidden_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
+    let mut hidden_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
     let mut mlp_pre_activation_dev = DeviceBuffer::<f32>::zeroed(&stream, MlpActivation::LEN)?;
     let mut mlp_activation_dev = DeviceBuffer::<f32>::zeroed(&stream, MlpActivation::LEN)?;
     let mut mlp_activation_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, MlpActivation::LEN / 2)?;
     let mut mlp_activation_scales_dev =
         DeviceBuffer::<u8>::zeroed(&stream, MlpActivation::LEN / 16)?;
     let mut mlp_activation_global_scales_dev =
-        DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
+        DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
-    let mut attention_lse_dev = DeviceBuffer::<f32>::zeroed(&stream, AttentionLse::LEN)?;
+    let mut attention_log_sum_exp_dev =
+        DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
     let mut logits_dev = DeviceBuffer::<f32>::zeroed(&stream, Logits::LEN)?;
 
     model.forward(Gpt2ForwardArgs {
@@ -77,6 +78,9 @@ fn run_forward() -> TestResult {
             stream: &stream,
             tokens: &tokens_dev,
             token_embedding: token_embedding.device(),
+            batch_size: GPT2_BATCH_SIZE as u32,
+            seq_len: GPT2_SEQ_LEN as u32,
+            row_count: GPT2_TOKEN_ROWS as u32,
             residual: &mut residual_dev,
             normalized: &mut normalized_dev,
             normalized_amax: &mut normalized_amax_dev,
@@ -114,7 +118,7 @@ fn run_forward() -> TestResult {
         }),
         ln_f: ln_f.tensors(),
         attention_qkv: &mut qkv_dev,
-        attention_lse: &mut attention_lse_dev,
+        attention_log_sum_exp: &mut attention_log_sum_exp_dev,
         mlp_pre_activation: &mut mlp_pre_activation_dev,
         mlp_activation: &mut mlp_activation_dev,
         logits: &mut logits_dev,
@@ -128,7 +132,7 @@ fn run_forward() -> TestResult {
 }
 
 fn token_ids() -> Vec<u32> {
-    (0..GPT2_CONTEXT_LEN).map(|i| (i % 127) as u32).collect()
+    (0..GPT2_TOKEN_ROWS).map(|i| (i % 127) as u32).collect()
 }
 
 struct UploadedNvfp4 {

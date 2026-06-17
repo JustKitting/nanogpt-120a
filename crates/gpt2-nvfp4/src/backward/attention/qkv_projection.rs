@@ -31,6 +31,7 @@ pub fn qkv_projection_backward(
             dinput: d_ln_1_normalized,
             dweight: d_attn_qkv_weight,
             dbias: d_attn_qkv_bias,
+            row_count: saved.row_count,
             input_dim: GPT2_N_EMBD as u32,
             output_dim: GPT2_QKV as u32,
             sign_seed: seeds.sign,

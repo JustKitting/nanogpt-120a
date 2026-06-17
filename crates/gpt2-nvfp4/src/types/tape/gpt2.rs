@@ -5,12 +5,23 @@ use super::types::{BlockForwardTape, Gpt2ForwardTape};
 use crate::types::Gpt2ForwardSaved;
 
 impl<'a> Gpt2ForwardTape<'a> {
-    pub fn saved<'t>(&'t self, tokens: &'t DeviceBuffer<u32>) -> Gpt2ForwardSaved<'t> {
+    pub fn saved<'t>(
+        &'t self,
+        tokens: &'t DeviceBuffer<u32>,
+        batch_size: u32,
+        seq_len: u32,
+        row_count: u32,
+    ) -> Gpt2ForwardSaved<'t> {
         Gpt2ForwardSaved {
             tokens,
+            batch_size,
+            seq_len,
+            row_count,
             embedding_residual: &*self.embedding_residual,
-            blocks: std::array::from_fn(|index| self.blocks[index].saved()),
-            final_norm: self.final_norm.saved(),
+            blocks: std::array::from_fn(|index| {
+                self.blocks[index].saved(batch_size, seq_len, row_count)
+            }),
+            final_norm: self.final_norm.saved(row_count),
             lm_head_input_nvfp4: self.lm_head_input_nvfp4.saved(),
             logits: &*self.logits,
         }

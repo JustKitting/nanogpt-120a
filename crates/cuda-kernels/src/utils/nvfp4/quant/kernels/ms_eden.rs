@@ -2,6 +2,9 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 
 use crate::float_ptx::abs_f32;
 use crate::nvfp4_cast::{e2m1_value, e4m3_value};
+use crate::quartet::{
+    QUARTET_MS_EDEN_FP4_MAX, QUARTET_MS_EDEN_FP8_MAX, QUARTET_MS_EDEN_SCALE_OVERRIDE,
+};
 use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32, warp_max_f32};
 
 use super::convert::{cvt_rn_satfinite_e2m1x2_f32, cvt_rn_satfinite_e4m3x2_f32};
@@ -26,6 +29,83 @@ pub(crate) mod module {
         mut out_scales: DisjointSlice<u8>,
         mut out_global_scales: DisjointSlice<f32>,
         mut out_chunk_amax: DisjointSlice<f32>,
+        src_row_len: u32,
+        dst_row_len: u32,
+        global_scale: f32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        fp32_to_nvfp4_ms_eden_body(
+            x,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            &mut out_chunk_amax,
+            src_row_len,
+            dst_row_len,
+            global_scale,
+            scale_override,
+            sign_seed,
+            scale_seed,
+        );
+    }
+
+    #[kernel]
+    #[allow(clippy::too_many_arguments)]
+    pub fn fp32_to_nvfp4_ms_eden_device_scale_kernel(
+        x: &[f32],
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        mut out_chunk_amax: DisjointSlice<f32>,
+        global_scale: &[f32],
+        src_row_len: u32,
+        dst_row_len: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        fp32_to_nvfp4_ms_eden_body(
+            x,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            &mut out_chunk_amax,
+            src_row_len,
+            dst_row_len,
+            global_scale[0],
+            scale_override,
+            sign_seed,
+            scale_seed,
+        );
+    }
+
+    #[kernel]
+    pub fn quartet_backward_ms_eden_global_scale_kernel(
+        amax: &[f32],
+        mut out_global_scale: DisjointSlice<f32>,
+    ) {
+        let amax = amax[0];
+        let global_scale = if amax == 0.0 {
+            1.0
+        } else {
+            amax * QUARTET_MS_EDEN_SCALE_OVERRIDE
+                / (QUARTET_MS_EDEN_FP8_MAX * QUARTET_MS_EDEN_FP4_MAX)
+        };
+        unsafe {
+            *out_global_scale.get_unchecked_mut(0) = global_scale;
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn fp32_to_nvfp4_ms_eden_body(
+        x: &[f32],
+        out_fp4: &mut DisjointSlice<'_, u8>,
+        out_scales: &mut DisjointSlice<'_, u8>,
+        out_global_scales: &mut DisjointSlice<'_, f32>,
+        out_chunk_amax: &mut DisjointSlice<'_, f32>,
         src_row_len: u32,
         dst_row_len: u32,
         global_scale: f32,

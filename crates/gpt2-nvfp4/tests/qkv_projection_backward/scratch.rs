@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{AttentionQkvScratch, GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_QKV};
+use gpt2_nvfp4::{AttentionQkvScratch, GPT2_N_EMBD, GPT2_QKV, GPT2_TOKEN_ROWS};
 use rust_kernels_cuda::linear_backward::{LinearBackwardMsEdenScratch, MsEdenOperandScratch};
 
 pub struct QkvBackwardScratch {
@@ -15,13 +15,13 @@ pub struct QkvBackwardScratch {
 impl QkvBackwardScratch {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            error_t: DeviceBuffer::<f32>::zeroed(stream, GPT2_QKV * GPT2_CONTEXT_LEN)?,
+            error_t: DeviceBuffer::<f32>::zeroed(stream, GPT2_QKV * GPT2_TOKEN_ROWS)?,
             weight_t: DeviceBuffer::<f32>::zeroed(stream, GPT2_QKV * GPT2_N_EMBD)?,
-            input_t: DeviceBuffer::<f32>::zeroed(stream, GPT2_N_EMBD * GPT2_CONTEXT_LEN)?,
-            e: OperandScratch::new(stream, GPT2_CONTEXT_LEN * GPT2_QKV, GPT2_CONTEXT_LEN)?,
+            input_t: DeviceBuffer::<f32>::zeroed(stream, GPT2_N_EMBD * GPT2_TOKEN_ROWS)?,
+            e: OperandScratch::new(stream, GPT2_TOKEN_ROWS * GPT2_QKV, GPT2_TOKEN_ROWS)?,
             weight_t_h: OperandScratch::new(stream, GPT2_N_EMBD * GPT2_QKV, GPT2_N_EMBD)?,
-            e_t: OperandScratch::new(stream, GPT2_QKV * GPT2_CONTEXT_LEN, GPT2_QKV)?,
-            input_t_h: OperandScratch::new(stream, GPT2_N_EMBD * GPT2_CONTEXT_LEN, GPT2_N_EMBD)?,
+            e_t: OperandScratch::new(stream, GPT2_QKV * GPT2_TOKEN_ROWS, GPT2_QKV)?,
+            input_t_h: OperandScratch::new(stream, GPT2_N_EMBD * GPT2_TOKEN_ROWS, GPT2_N_EMBD)?,
         })
     }
 
@@ -45,6 +45,7 @@ struct OperandScratch {
     scales: DeviceBuffer<u8>,
     global_scales: DeviceBuffer<f32>,
     chunk_amax: DeviceBuffer<f32>,
+    global_scale: DeviceBuffer<f32>,
 }
 
 impl OperandScratch {
@@ -54,6 +55,7 @@ impl OperandScratch {
             scales: DeviceBuffer::<u8>::zeroed(stream, elements / 16)?,
             global_scales: DeviceBuffer::<f32>::zeroed(stream, rows)?,
             chunk_amax: DeviceBuffer::<f32>::zeroed(stream, elements / 32)?,
+            global_scale: DeviceBuffer::<f32>::zeroed(stream, 1)?,
         })
     }
 
@@ -63,7 +65,7 @@ impl OperandScratch {
             scales: &mut self.scales,
             global_scales: &mut self.global_scales,
             chunk_amax: &mut self.chunk_amax,
-            global_scale: 1.0,
+            global_scale: &mut self.global_scale,
         }
     }
 }

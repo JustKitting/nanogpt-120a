@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_LAYER, GPT2_VOCAB_SIZE, Gpt2BackwardGrads, HiddenState,
+    GPT2_N_EMBD, GPT2_N_LAYER, GPT2_TOKEN_ROWS, GPT2_VOCAB_SIZE, Gpt2BackwardGrads, HiddenState,
     Logits,
 };
 
@@ -25,7 +25,7 @@ pub struct BackwardParts<'a> {
 impl BackwardBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            losses: zero(stream, GPT2_CONTEXT_LEN)?,
+            losses: zero(stream, GPT2_TOKEN_ROWS)?,
             d_lm_head_weight: zero(stream, GPT2_VOCAB_SIZE * GPT2_N_EMBD)?,
             dlogits: zero(stream, Logits::LEN)?,
             d_embedding_residual: zero(stream, HiddenState::LEN)?,

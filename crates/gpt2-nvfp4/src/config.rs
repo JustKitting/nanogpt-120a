@@ -1,5 +1,8 @@
 pub const GPT2_VOCAB_SIZE: usize = 50_257;
-pub const GPT2_CONTEXT_LEN: usize = 1024;
+pub const GPT2_SEQ_LEN: usize = 1024;
+pub const GPT2_BATCH_SIZE: usize = 8;
+pub const GPT2_TOKEN_ROWS: usize = GPT2_BATCH_SIZE * GPT2_SEQ_LEN;
+pub const GPT2_CONTEXT_LEN: usize = GPT2_SEQ_LEN;
 
 pub const GPT2_N_LAYER: usize = 12;
 pub const GPT2_N_HEAD: usize = 12;
@@ -22,7 +25,7 @@ impl Gpt2Config {
     }
 
     pub const fn max_seq_len(self) -> usize {
-        GPT2_CONTEXT_LEN
+        GPT2_SEQ_LEN
     }
 
     pub const fn head_dim(self) -> usize {

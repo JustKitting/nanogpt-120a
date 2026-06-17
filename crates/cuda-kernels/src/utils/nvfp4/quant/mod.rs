@@ -4,7 +4,7 @@ mod kernels;
 mod launcher;
 
 pub use args::{
-    MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs, QuartetBackwardMsEdenQuantArgs,
-    RowAmaxArgs,
+    MsEdenDeviceScaleQuantArgs, MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs,
+    QuartetBackwardMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenQuantArgs, RowAmaxArgs,
 };
 pub use launcher::Nvfp4QuantModule;

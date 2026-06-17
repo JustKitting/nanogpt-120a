@@ -4,7 +4,7 @@ use rust_kernels_cuda::loss::{CrossEntropyArgs, LossModule};
 
 use super::args::{FinalHeadBackwardArgs, FinalHeadBackwardScratch};
 use super::transpose::{decode_final_normalized, decode_lm_head_weight, transpose_dlogits};
-use crate::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_VOCAB_SIZE};
+use crate::{GPT2_N_EMBD, GPT2_VOCAB_SIZE};
 
 pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
     let FinalHeadBackwardArgs {
@@ -18,16 +18,26 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         dlogits,
         d_final_normalized,
         d_lm_head_weight,
+        row_count,
         scratch,
         seeds,
     } = args;
 
-    run_loss(modules.loss, stream, logits, targets, losses, dlogits)?;
+    run_loss(
+        modules.loss,
+        stream,
+        logits,
+        targets,
+        losses,
+        dlogits,
+        row_count,
+    )?;
     transpose_dlogits(
         modules.transpose,
         stream,
         &*dlogits,
         &mut *scratch.dlogits_t,
+        row_count,
     )?;
     decode_lm_head_weight(
         modules.decode,
@@ -40,6 +50,7 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         stream,
         final_normalized,
         &mut *scratch.final_normalized_t,
+        row_count,
     )?;
     run_linear_backward(
         modules.linear,
@@ -50,6 +61,7 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
             d_final_normalized,
             d_lm_head_weight,
             scratch,
+            row_count,
             sign_seed: seeds.sign,
             scale_seed: seeds.scale,
         },
@@ -63,6 +75,7 @@ fn run_loss(
     targets: &DeviceBuffer<u32>,
     losses: &mut DeviceBuffer<f32>,
     dlogits: &mut DeviceBuffer<f32>,
+    row_count: u32,
 ) -> Result<(), DriverError> {
     module.cross_entropy(CrossEntropyArgs {
         stream,
@@ -70,7 +83,7 @@ fn run_loss(
         targets,
         losses,
         dlogits,
-        token_count: GPT2_CONTEXT_LEN as u32,
+        token_count: row_count,
         vocab_size: GPT2_VOCAB_SIZE as u32,
     })
 }
@@ -80,6 +93,7 @@ struct LinearBackwardInputs<'scratch, 'out> {
     d_final_normalized: &'out mut DeviceBuffer<f32>,
     d_lm_head_weight: &'out mut DeviceBuffer<f32>,
     scratch: FinalHeadBackwardScratch<'scratch>,
+    row_count: u32,
     sign_seed: u32,
     scale_seed: u32,
 }
@@ -101,7 +115,7 @@ fn run_linear_backward(
         dinput: inputs.d_final_normalized,
         dweight: inputs.d_lm_head_weight,
         dbias: None,
-        token_count: GPT2_CONTEXT_LEN as u32,
+        token_count: inputs.row_count,
         input_dim: GPT2_N_EMBD as u32,
         output_dim: GPT2_VOCAB_SIZE as u32,
         sign_seed: inputs.sign_seed,

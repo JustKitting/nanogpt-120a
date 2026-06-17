@@ -6,23 +6,25 @@ use super::types::CausalAttentionBackwardParams;
 #[inline(always)]
 pub(super) fn q_value(
     qkv: &[f32],
+    batch: u32,
     token: u32,
     head: u32,
     dim: u32,
     params: &CausalAttentionBackwardParams,
 ) -> f32 {
-    rope_value(qkv, token, head, dim, 0, params)
+    rope_value(qkv, batch, token, head, dim, 0, params)
 }
 
 #[inline(always)]
 pub(super) fn k_value(
     qkv: &[f32],
+    batch: u32,
     token: u32,
     head: u32,
     dim: u32,
     params: &CausalAttentionBackwardParams,
 ) -> f32 {
-    rope_value(qkv, token, head, dim, params.embedding_dim, params)
+    rope_value(qkv, batch, token, head, dim, params.embedding_dim, params)
 }
 
 #[inline(always)]
@@ -44,14 +46,15 @@ pub(super) fn rope_raw_grad(
 #[inline(always)]
 fn rope_value(
     qkv: &[f32],
+    batch: u32,
     token: u32,
     head: u32,
     dim: u32,
     section_offset: u32,
     params: &CausalAttentionBackwardParams,
 ) -> f32 {
-    let value = qkv[qkv_index(token, head, dim, section_offset, params)];
-    let paired = qkv[qkv_index(token, head, dim ^ 1, section_offset, params)];
+    let value = qkv[qkv_index(batch, token, head, dim, section_offset, params)];
+    let paired = qkv[qkv_index(batch, token, head, dim ^ 1, section_offset, params)];
     let (sin, cos) = sincos_f32(token as f32 * rope_inv_freq(dim, params.head_dim));
 
     if dim & 1 == 0 {

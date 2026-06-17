@@ -12,6 +12,6 @@ pub fn hidden_index(token: usize, head: usize, dim: usize) -> usize {
     token * EMBEDDING + head * HEAD_DIM + dim
 }
 
-pub fn lse_index(token: usize, head: usize) -> usize {
+pub fn log_sum_exp_index(token: usize, head: usize) -> usize {
     head * TOKEN_COUNT + token
 }

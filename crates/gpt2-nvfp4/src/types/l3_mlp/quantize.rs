@@ -9,12 +9,13 @@ pub(super) fn quantize_activation(
     activation: &DeviceBuffer<f32>,
     activation_nvfp4: MlpActivationNvfp4<'_>,
     normalized_amax: &mut DeviceBuffer<f32>,
+    row_count: u32,
 ) -> Result<(), DriverError> {
     quant_module.row_amax_f32(RowAmaxArgs {
         stream,
         x: activation,
         out: normalized_amax,
-        row_count: crate::GPT2_CONTEXT_LEN as u32,
+        row_count,
         row_len: crate::GPT2_MLP as u32,
     })?;
 
@@ -25,7 +26,7 @@ pub(super) fn quantize_activation(
         out_fp4: &mut *activation_nvfp4.bytes,
         out_scales: &mut *activation_nvfp4.scales,
         out_global_scale: &mut *activation_nvfp4.global_scales,
-        group_count: (crate::MlpActivation::LEN / 16) as u32,
+        group_count: row_count * crate::GPT2_MLP as u32 / 16,
         row_len: crate::GPT2_MLP as u32,
     })
 }

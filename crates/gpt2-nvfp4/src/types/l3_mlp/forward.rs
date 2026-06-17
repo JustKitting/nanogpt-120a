@@ -15,6 +15,9 @@ pub(super) fn forward<'a, 'scratch>(
     let mut tape = args.tape;
     let HiddenStateDevice {
         stream,
+        batch_size,
+        seq_len,
+        row_count,
         residual,
         normalized,
         normalized_amax,
@@ -30,7 +33,7 @@ pub(super) fn forward<'a, 'scratch>(
             out_fp4: &mut *input_nvfp4.bytes,
             out_scales: &mut *input_nvfp4.scales,
             out_global_scale: &mut *input_nvfp4.global_scales,
-            group_count: (crate::HiddenState::LEN / 16) as u32,
+            group_count: row_count * crate::GPT2_N_EMBD as u32 / 16,
             row_len: crate::GPT2_N_EMBD as u32,
         })?;
 
@@ -50,7 +53,7 @@ pub(super) fn forward<'a, 'scratch>(
         bias: args.projections.up.bias,
         pre_activation: args.scratch.pre_activation,
         out: args.scratch.activation,
-        token_count: crate::GPT2_CONTEXT_LEN as u32,
+        token_count: row_count,
         input_dim: crate::GPT2_N_EMBD as u32,
         output_dim: crate::GPT2_MLP as u32,
     })?;
@@ -61,6 +64,7 @@ pub(super) fn forward<'a, 'scratch>(
         args.scratch.activation,
         activation_nvfp4.reborrow(),
         normalized_amax,
+        row_count,
     )?;
 
     let input = Nvfp4RowwiseDeviceTensor {
@@ -78,13 +82,16 @@ pub(super) fn forward<'a, 'scratch>(
         weight: args.projections.down.weight,
         bias: args.projections.down.bias,
         residual,
-        token_count: crate::GPT2_CONTEXT_LEN as u32,
+        token_count: row_count,
         input_dim: crate::GPT2_MLP as u32,
         output_dim: crate::GPT2_N_EMBD as u32,
     })?;
 
     Ok(HiddenStateDevice {
         stream,
+        batch_size,
+        seq_len,
+        row_count,
         residual,
         normalized,
         normalized_amax,

@@ -3,7 +3,7 @@ use rust_kernels_cuda::layer_norm::GptLayerNormArgs;
 
 use super::args::{LayerNormForwardArgs, LayerNormTensors};
 use crate::types::{HiddenStateDevice, HiddenVectorShape, LayerNormTensor, Nvfp4ShapeInit};
-use crate::{GPT2_CONTEXT_LEN, GPT2_LAYER_NORM_EPSILON, GPT2_N_EMBD};
+use crate::{GPT2_LAYER_NORM_EPSILON, GPT2_N_EMBD};
 
 #[derive(Clone, Debug)]
 pub struct LayerNormWeights {
@@ -37,6 +37,9 @@ impl LayerNormWeights {
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
         let HiddenStateDevice {
             stream,
+            batch_size,
+            seq_len,
+            row_count,
             residual,
             normalized,
             normalized_amax,
@@ -53,13 +56,16 @@ impl LayerNormWeights {
             normalized_amax,
             mean,
             inv_std,
-            row_count: GPT2_CONTEXT_LEN as u32,
+            row_count,
             embedding_dim: GPT2_N_EMBD as u32,
             epsilon: GPT2_LAYER_NORM_EPSILON,
         })?;
 
         Ok(HiddenStateDevice {
             stream,
+            batch_size,
+            seq_len,
+            row_count,
             residual,
             normalized,
             normalized_amax,

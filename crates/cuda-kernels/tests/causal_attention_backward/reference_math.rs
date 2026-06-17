@@ -23,7 +23,7 @@ pub fn logsumexp(values: &[f32]) -> f32 {
         .ln()
 }
 
-pub fn backward(qkv: &[f32], out: &[f32], d_out: &[f32], lse: &[f32]) -> Vec<f32> {
+pub fn backward(qkv: &[f32], out: &[f32], d_out: &[f32], log_sum_exp: &[f32]) -> Vec<f32> {
     let mut dq_rot = vec![0.0_f32; TOKEN_COUNT * EMBEDDING];
     let mut dk_rot = vec![0.0_f32; TOKEN_COUNT * EMBEDDING];
     let mut grad = vec![0.0_f32; TOKEN_COUNT * QKV_DIM];
@@ -34,7 +34,7 @@ pub fn backward(qkv: &[f32], out: &[f32], d_out: &[f32], lse: &[f32]) -> Vec<f32
             let row_d = softmax_d(out, d_out, query, head);
             let row_scores = scores(qkv, query, head);
             for key in 0..=query {
-                let p = (row_scores[key] - lse[lse_index(query, head)]).exp();
+                let p = (row_scores[key] - log_sum_exp[log_sum_exp_index(query, head)]).exp();
                 let ds = p * (d_out_dot_v(qkv, d_out, query, key, head) - row_d);
                 for dim in 0..HEAD_DIM {
                     let h = hidden_index(query, head, dim);

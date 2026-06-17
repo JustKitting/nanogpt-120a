@@ -10,4 +10,4 @@ pub use projection::{
     nvfp4_projection_nobias_kernel_body, nvfp4_projection_relu2_kernel_body,
     nvfp4_projection_residual_kernel_body, projection_grid_dim,
 };
-pub use tensors::Nvfp4FourSixMmaWeightTensor;
+pub use tensors::{Nvfp4DeviceScaleMmaWeightTensor, Nvfp4FourSixMmaWeightTensor};

@@ -1,6 +1,6 @@
 use gpt2_nvfp4::{
-    Gpt2ForwardArgs, HiddenStateNvfp4, Logits, MlpActivationNvfp4, MlpDownTensors, MlpUpTensors,
-    TokenEmbeddingArgs,
+    GPT2_VOCAB_SIZE, Gpt2ForwardArgs, HiddenStateNvfp4, MlpActivationNvfp4, MlpDownTensors,
+    MlpUpTensors, TokenEmbeddingArgs,
 };
 
 use super::{OptimizerTrace, TokenBatch, TrainStats, Trainer};
@@ -18,6 +18,9 @@ impl Trainer {
                 stream,
                 tokens: &batch.tokens,
                 token_embedding: uploaded.token_embedding.device(),
+                batch_size: batch.batch_size as u32,
+                seq_len: batch.seq_len as u32,
+                row_count: batch.token_count as u32,
                 residual: &mut buffers.residual,
                 normalized: &mut buffers.normalized,
                 normalized_amax: &mut buffers.normalized_amax,
@@ -63,7 +66,7 @@ impl Trainer {
             }),
             ln_f: uploaded.ln_f.tensors(),
             attention_qkv: &mut buffers.qkv,
-            attention_lse: &mut buffers.lse,
+            attention_log_sum_exp: &mut buffers.log_sum_exp,
             mlp_pre_activation: &mut buffers.mlp_pre,
             mlp_activation: &mut buffers.mlp_act,
             logits: &mut buffers.logits,
@@ -72,12 +75,12 @@ impl Trainer {
 
         Ok(TrainStats {
             tokens: batch.token_count,
-            logits: Logits::LEN,
+            logits: batch.token_count * GPT2_VOCAB_SIZE,
             finite: true,
             nonzero: false,
             loss: 0.0,
             forward_ms: 0.0,
-            backward_ms: 0.0,
+            backward_enqueue_ms: 0.0,
             loss_sync_ms: 0.0,
             optimizer_ms: 0.0,
             optimizer: OptimizerTrace::default(),

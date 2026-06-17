@@ -29,7 +29,7 @@ pub(super) mod module {
     pub fn dq_kernel(
         qkv: &[f32],
         d_out: &[f32],
-        lse: &[f32],
+        log_sum_exp: &[f32],
         softmax_d: &[f32],
         d_qkv: DisjointSlice<f32>,
         params: CausalAttentionBackwardParams,
@@ -41,7 +41,7 @@ pub(super) mod module {
         dq_body(
             qkv,
             d_out,
-            lse,
+            log_sum_exp,
             softmax_d,
             d_qkv,
             params,
@@ -55,7 +55,7 @@ pub(super) mod module {
     pub fn dkv_kernel(
         qkv: &[f32],
         d_out: &[f32],
-        lse: &[f32],
+        log_sum_exp: &[f32],
         softmax_d: &[f32],
         d_qkv: DisjointSlice<f32>,
         params: CausalAttentionBackwardParams,
@@ -70,7 +70,7 @@ pub(super) mod module {
         dkv_body(
             qkv,
             d_out,
-            lse,
+            log_sum_exp,
             softmax_d,
             d_qkv,
             params,

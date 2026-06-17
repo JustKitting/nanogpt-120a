@@ -2,13 +2,13 @@ use cuda_core::DriverError;
 use rust_kernels_cuda::residual::{ResidualBackwardModule, ResidualGradAddArgs};
 
 use super::types::BlockAttentionBackwardArgs;
+use crate::GPT2_N_EMBD;
 use crate::backward::{
     AttentionCProjBackwardArgs, AttentionCoreBackwardArgs, AttentionQkvBackwardArgs,
     Gpt2LayerNormBackwardArgs, attention_c_proj_backward, causal_attention_backward,
     layer_norm_backward, qkv_projection_backward,
 };
 use crate::types::{BlockBackwardGrads, LayerNormGrads};
-use crate::{GPT2_CONTEXT_LEN, GPT2_N_EMBD};
 
 pub fn attention_side_backward(
     args: BlockAttentionBackwardArgs<'_, '_, '_>,
@@ -93,6 +93,7 @@ pub fn attention_side_backward(
         &*d_residual_after_attention,
         &*d_ln_1_residual,
         d_residual_in,
+        saved.row_count,
     )
 }
 
@@ -102,12 +103,13 @@ fn residual_add(
     direct: &cuda_core::DeviceBuffer<f32>,
     branch: &cuda_core::DeviceBuffer<f32>,
     out: &mut cuda_core::DeviceBuffer<f32>,
+    row_count: u32,
 ) -> Result<(), DriverError> {
     module.grad_add(ResidualGradAddArgs {
         stream,
         direct,
         branch,
         out,
-        len: (GPT2_CONTEXT_LEN * GPT2_N_EMBD) as u32,
+        len: row_count * GPT2_N_EMBD as u32,
     })
 }

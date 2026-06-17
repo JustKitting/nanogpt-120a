@@ -21,7 +21,7 @@ pub struct AttentionForwardArgs<'a, 'scratch> {
     pub input_nvfp4: HiddenStateNvfp4<'scratch>,
     pub projections: AttentionProjectionTensors<'a>,
     pub qkv: &'scratch mut DeviceBuffer<f32>,
-    pub attention_lse: &'scratch mut DeviceBuffer<f32>,
+    pub attention_log_sum_exp: &'scratch mut DeviceBuffer<f32>,
     pub hidden: HiddenStateDevice<'a>,
     pub tape: Option<AttentionForwardTape<'scratch>>,
 }

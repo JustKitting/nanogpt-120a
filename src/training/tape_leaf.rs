@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_CONTEXT_LEN, HiddenState, LayerNormSaved, LayerNormTape, RowwiseNvfp4Tape};
+use gpt2_nvfp4::{GPT2_TOKEN_ROWS, HiddenState, LayerNormSaved, LayerNormTape, RowwiseNvfp4Tape};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 pub struct LayerNormTapeBuffers {
@@ -14,8 +14,8 @@ impl LayerNormTapeBuffers {
         Ok(Self {
             residual: zero(stream, HiddenState::LEN)?,
             normalized: zero(stream, HiddenState::LEN)?,
-            mean: zero(stream, GPT2_CONTEXT_LEN)?,
-            inv_std: zero(stream, GPT2_CONTEXT_LEN)?,
+            mean: zero(stream, GPT2_TOKEN_ROWS)?,
+            inv_std: zero(stream, GPT2_TOKEN_ROWS)?,
         })
     }
 
@@ -28,8 +28,9 @@ impl LayerNormTapeBuffers {
         }
     }
 
-    pub fn saved(&self) -> LayerNormSaved<'_> {
+    pub fn saved(&self, row_count: u32) -> LayerNormSaved<'_> {
         LayerNormSaved {
+            row_count,
             residual: &self.residual,
             normalized: &self.normalized,
             mean: &self.mean,

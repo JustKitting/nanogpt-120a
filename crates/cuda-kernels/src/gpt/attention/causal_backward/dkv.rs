@@ -11,7 +11,7 @@ use super::types::{
 pub(super) fn dkv_body(
     qkv: &[f32],
     d_out: &[f32],
-    lse: &[f32],
+    log_sum_exp: &[f32],
     softmax_d: &[f32],
     mut d_qkv: DisjointSlice<f32>,
     params: CausalAttentionBackwardParams,
@@ -30,12 +30,23 @@ pub(super) fn dkv_body(
         dim: tid % CAUSAL_BACKWARD_HEAD_DIM_THREADS,
         lane: warp::lane_id(),
         warp_in_key: (tid % CAUSAL_BACKWARD_HEAD_DIM_THREADS) / 32,
+        batch: thread::blockIdx_z(),
         head,
         block_key: thread::blockIdx_x() * CAUSAL_BACKWARD_KEY_BLOCK,
     };
     let valid = state.valid(&params);
 
-    let (dk_rot, dv) = accumulate_key(qkv, d_out, lse, softmax_d, &params, state, reduce, prob, ds);
+    let (dk_rot, dv) = accumulate_key(
+        qkv,
+        d_out,
+        log_sum_exp,
+        softmax_d,
+        &params,
+        state,
+        reduce,
+        prob,
+        ds,
+    );
 
     dk_rot_shared[tid as usize] = dk_rot;
     thread::sync_threads();
@@ -48,6 +59,7 @@ pub(super) fn dkv_body(
         let dk = rope_raw_grad(key, state.dim, dk_rot, paired, params.head_dim);
         unsafe {
             *d_qkv.get_unchecked_mut(qkv_index(
+                state.batch,
                 key,
                 state.head,
                 state.dim,
@@ -55,6 +67,7 @@ pub(super) fn dkv_body(
                 &params,
             )) = dk;
             *d_qkv.get_unchecked_mut(qkv_index(
+                state.batch,
                 key,
                 state.head,
                 state.dim,

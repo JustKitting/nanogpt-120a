@@ -14,6 +14,9 @@ pub(super) fn forward<'a, 'scratch>(
     let mut tape = args.tape;
     let HiddenStateDevice {
         stream,
+        batch_size,
+        seq_len,
+        row_count,
         residual,
         normalized,
         normalized_amax,
@@ -29,7 +32,7 @@ pub(super) fn forward<'a, 'scratch>(
             out_fp4: &mut *input_nvfp4.bytes,
             out_scales: &mut *input_nvfp4.scales,
             out_global_scale: &mut *input_nvfp4.global_scales,
-            group_count: (crate::HiddenState::LEN / 16) as u32,
+            group_count: row_count * crate::GPT2_N_EMBD as u32 / 16,
             row_len: crate::GPT2_N_EMBD as u32,
         })?;
 
@@ -48,7 +51,7 @@ pub(super) fn forward<'a, 'scratch>(
         weight: args.projections.qkv_weight,
         bias: args.projections.qkv_bias,
         out: args.qkv,
-        token_count: crate::GPT2_CONTEXT_LEN as u32,
+        token_count: row_count,
         input_dim: crate::GPT2_N_EMBD as u32,
         output_dim: crate::GPT2_QKV as u32,
     })?;
@@ -57,8 +60,10 @@ pub(super) fn forward<'a, 'scratch>(
         stream,
         qkv: &*args.qkv,
         out: normalized,
-        lse: args.attention_lse,
-        token_count: crate::GPT2_CONTEXT_LEN as u32,
+        log_sum_exp: args.attention_log_sum_exp,
+        row_count,
+        seq_len,
+        batch_size,
         embedding_dim: crate::GPT2_N_EMBD as u32,
         qkv_dim: crate::GPT2_QKV as u32,
         head_count: crate::GPT2_N_HEAD as u32,
@@ -71,6 +76,7 @@ pub(super) fn forward<'a, 'scratch>(
         input_nvfp4.reborrow(),
         normalized,
         normalized_amax,
+        row_count,
     )?;
 
     let input = Nvfp4RowwiseDeviceTensor {
@@ -88,12 +94,15 @@ pub(super) fn forward<'a, 'scratch>(
         weight: args.projections.c_proj_weight,
         bias: args.projections.c_proj_bias,
         residual,
-        token_count: crate::GPT2_CONTEXT_LEN as u32,
+        token_count: row_count,
         embedding_dim: crate::GPT2_N_EMBD as u32,
     })?;
 
     Ok(HiddenStateDevice {
         stream,
+        batch_size,
+        seq_len,
+        row_count,
         residual,
         normalized,
         normalized_amax,

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use fineweb_prep::fineweb::SHARDS_DIR;
 use fineweb_prep::{DATA_DIR, SHARD_FILE_PREFIX};
 use gpt2_bpe::Gpt2Bpe;
-use gpt2_nvfp4::GPT2_CONTEXT_LEN;
+use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
 
 use crate::AppResult;
 
@@ -28,10 +28,12 @@ pub struct TokenDataLoader {
     repeat_first_window: bool,
 }
 
-pub struct TokenWindow<'a> {
-    pub tokens: &'a [u16],
-    pub source: &'a Path,
+pub struct TokenWindowBatch {
+    pub tokens: Vec<u16>,
+    pub source: PathBuf,
     pub offset: usize,
+    pub batch_size: usize,
+    pub seq_len: usize,
 }
 
 impl TokenDataLoader {
@@ -56,29 +58,35 @@ impl TokenDataLoader {
         Self::from_path(path)
     }
 
-    pub fn next_window(&mut self) -> AppResult<TokenWindow<'_>> {
-        let len = GPT2_CONTEXT_LEN + 1;
+    pub fn next_batch(&mut self) -> AppResult<TokenWindowBatch> {
+        let len = GPT2_SEQ_LEN + 1;
         if self.train_end < len {
             return Err(format!("{} has fewer than {len} tokens", self.path.display()).into());
         }
+
+        let mut offsets = Vec::with_capacity(GPT2_BATCH_SIZE);
         if self.repeat_first_window {
-            return Ok(TokenWindow {
-                tokens: &self.tokens[..len],
-                source: &self.path,
-                offset: 0,
-            });
-        }
-        if self.offset + len > self.train_end {
-            self.offset = 0;
+            offsets.resize(GPT2_BATCH_SIZE, 0);
+        } else {
+            for _ in 0..GPT2_BATCH_SIZE {
+                if self.offset + len > self.train_end {
+                    self.offset = 0;
+                }
+                offsets.push(self.offset);
+                self.offset += GPT2_SEQ_LEN;
+            }
         }
 
-        let offset = self.offset;
-        self.offset += GPT2_CONTEXT_LEN;
-
-        Ok(TokenWindow {
-            tokens: &self.tokens[offset..offset + len],
-            source: &self.path,
-            offset,
+        let mut tokens = Vec::with_capacity(GPT2_BATCH_SIZE * len);
+        for &offset in &offsets {
+            tokens.extend_from_slice(&self.tokens[offset..offset + len]);
+        }
+        Ok(TokenWindowBatch {
+            tokens,
+            source: self.path.clone(),
+            offset: offsets.first().copied().unwrap_or(0),
+            batch_size: GPT2_BATCH_SIZE,
+            seq_len: GPT2_SEQ_LEN,
         })
     }
 
@@ -87,12 +95,21 @@ impl TokenDataLoader {
     }
 
     pub fn validation_tokens(&self) -> AppResult<Vec<u16>> {
-        let len = GPT2_CONTEXT_LEN + 1;
+        let len = GPT2_SEQ_LEN + 1;
         if self.tokens.len() < len {
             return Err(format!("{} has fewer than {len} tokens", self.path.display()).into());
         }
-        let start = self.tokens.len() - len;
-        Ok(self.tokens[start..].to_vec())
+        let needed = GPT2_BATCH_SIZE * len;
+        if self.tokens.len() < needed {
+            return Err(format!("{} has fewer than {needed} tokens", self.path.display()).into());
+        }
+        let start = self.tokens.len() - needed;
+        let mut tokens = Vec::with_capacity(needed);
+        for batch in 0..GPT2_BATCH_SIZE {
+            let offset = start + batch * len;
+            tokens.extend_from_slice(&self.tokens[offset..offset + len]);
+        }
+        Ok(tokens)
     }
 
     fn from_path(path: PathBuf) -> AppResult<Self> {
@@ -109,10 +126,10 @@ impl TokenDataLoader {
 }
 
 fn train_end(token_count: usize) -> usize {
-    let validation_tokens = VALIDATION_WINDOWS * GPT2_CONTEXT_LEN;
+    let validation_tokens = VALIDATION_WINDOWS * GPT2_SEQ_LEN;
     token_count
         .saturating_sub(validation_tokens)
-        .max(GPT2_CONTEXT_LEN + 1)
+        .max(GPT2_SEQ_LEN + 1)
 }
 
 fn training_dataset() -> AppResult<String> {

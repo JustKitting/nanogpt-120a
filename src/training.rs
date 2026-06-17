@@ -45,7 +45,7 @@ pub struct TrainStats {
     pub nonzero: bool,
     pub loss: f32,
     pub forward_ms: f64,
-    pub backward_ms: f64,
+    pub backward_enqueue_ms: f64,
     pub loss_sync_ms: f64,
     pub optimizer_ms: f64,
     pub optimizer: OptimizerTrace,
@@ -80,7 +80,7 @@ impl Trainer {
         })
     }
 
-    pub fn batch_from_token_window(&self, tokens: &[u16]) -> AppResult<TokenBatch> {
-        TokenBatch::from_token_window(self.runtime.stream.as_ref(), tokens)
+    pub fn batch_from_default_windows(&self, tokens: &[u16]) -> AppResult<TokenBatch> {
+        TokenBatch::from_default_batch(self.runtime.stream.as_ref(), tokens)
     }
 }

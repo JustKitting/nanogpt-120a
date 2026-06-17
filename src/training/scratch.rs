@@ -21,7 +21,7 @@ impl BackwardScratchBuffers {
             final_head: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_VOCAB_SIZE)?,
             attention_c_proj: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_N_EMBD)?,
             attention_qkv: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_QKV)?,
-            attention_softmax_d: DeviceBuffer::zeroed(stream, gpt2_nvfp4::AttentionLse::LEN)?,
+            attention_softmax_d: DeviceBuffer::zeroed(stream, gpt2_nvfp4::AttentionLogSumExp::LEN)?,
             mlp_down: LinearScratch::new(stream, GPT2_MLP, GPT2_N_EMBD)?,
             mlp_up: LinearScratch::new(stream, GPT2_N_EMBD, GPT2_MLP)?,
         })

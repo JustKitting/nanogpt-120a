@@ -6,6 +6,7 @@ pub(super) struct KeyThread {
     pub dim: u32,
     pub lane: u32,
     pub warp_in_key: u32,
+    pub batch: u32,
     pub head: u32,
     pub block_key: u32,
 }
@@ -18,11 +19,16 @@ impl KeyThread {
 
     #[inline(always)]
     pub(super) fn valid(self, params: &CausalAttentionBackwardParams) -> bool {
-        self.key() < params.token_count && self.dim < params.head_dim
+        let row = self.batch * params.seq_len + self.key();
+        self.key() < params.seq_len && row < params.row_count && self.dim < params.head_dim
     }
 
     #[inline(always)]
     pub(super) fn active(self, query: u32, params: &CausalAttentionBackwardParams) -> bool {
-        self.valid(params) && query >= self.key()
+        let query_row = self.batch * params.seq_len + query;
+        self.valid(params)
+            && query < params.seq_len
+            && query_row < params.row_count
+            && query >= self.key()
     }
 }

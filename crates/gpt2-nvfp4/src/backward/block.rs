@@ -8,7 +8,7 @@ use super::mlp::{
     backward as mlp_backward,
 };
 use crate::types::{BlockBackwardGrads, BlockForwardSaved, LayerNormGrads};
-use crate::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, LayerNormTensors, MlpProjectionTensors};
+use crate::{GPT2_N_EMBD, LayerNormTensors, MlpProjectionTensors};
 
 #[derive(Clone, Copy)]
 pub struct BlockMlpBackwardModules<'a> {
@@ -95,6 +95,6 @@ pub fn mlp_side_backward(args: BlockMlpBackwardArgs<'_, '_, '_>) -> Result<(), D
         direct: &*d_residual_out,
         branch: &*d_ln_2_residual,
         out: d_residual_after_attention,
-        len: (GPT2_CONTEXT_LEN * GPT2_N_EMBD) as u32,
+        len: saved.row_count * GPT2_N_EMBD as u32,
     })
 }

@@ -5,7 +5,6 @@ use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use super::transforms::{decode_rowwise_t, decode_weight_t, transpose_f32};
 use super::types::{AttentionBackwardModules, AttentionLinearScratch};
-use crate::GPT2_CONTEXT_LEN;
 
 pub(super) struct AttentionLinearPass<'a, 'scratch, 'out> {
     pub e: &'a DeviceBuffer<f32>,
@@ -15,6 +14,7 @@ pub(super) struct AttentionLinearPass<'a, 'scratch, 'out> {
     pub dinput: &'out mut DeviceBuffer<f32>,
     pub dweight: &'out mut DeviceBuffer<f32>,
     pub dbias: &'out mut DeviceBuffer<f32>,
+    pub row_count: u32,
     pub input_dim: u32,
     pub output_dim: u32,
     pub sign_seed: u32,
@@ -26,6 +26,7 @@ pub(super) fn run_attention_linear_pass(
     stream: &CudaStream,
     pass: AttentionLinearPass<'_, '_, '_>,
 ) -> Result<(), DriverError> {
+    let row_count = pass.row_count;
     decode_weight_t(
         modules.decode,
         stream,
@@ -39,7 +40,7 @@ pub(super) fn run_attention_linear_pass(
         stream,
         pass.e,
         pass.scratch.error_t,
-        GPT2_CONTEXT_LEN,
+        row_count as usize,
         pass.output_dim as usize,
     )?;
     decode_rowwise_t(
@@ -47,7 +48,7 @@ pub(super) fn run_attention_linear_pass(
         stream,
         pass.saved_input,
         pass.scratch.input_t,
-        GPT2_CONTEXT_LEN,
+        row_count as usize,
         pass.input_dim as usize,
     )?;
 
@@ -62,7 +63,7 @@ pub(super) fn run_attention_linear_pass(
         dinput: pass.dinput,
         dweight: pass.dweight,
         dbias: Some(pass.dbias),
-        token_count: GPT2_CONTEXT_LEN as u32,
+        token_count: row_count,
         input_dim: pass.input_dim,
         output_dim: pass.output_dim,
         sign_seed: pass.sign_seed,

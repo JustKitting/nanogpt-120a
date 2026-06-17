@@ -3,8 +3,8 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig, memory};
 
 use super::args::{
-    MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs, QuartetBackwardMsEdenQuantArgs,
-    RowAmaxArgs,
+    MsEdenDeviceScaleQuantArgs, MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs,
+    QuartetBackwardMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenQuantArgs, RowAmaxArgs,
 };
 use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK};
 use super::kernels;
@@ -114,6 +114,32 @@ impl Nvfp4QuantModule {
         )
     }
 
+    pub fn fp32_to_nvfp4_ms_eden_device_scale(
+        &self,
+        args: MsEdenDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let element_count = args.row_count * args.dst_row_len;
+        self.ms_eden.fp32_to_nvfp4_ms_eden_device_scale_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (element_count.div_ceil(32), 1, 1),
+                block_dim: (32, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.x,
+            args.out_fp4,
+            args.out_scales,
+            args.out_global_scales,
+            args.out_chunk_amax,
+            args.global_scale,
+            args.src_row_len,
+            args.dst_row_len,
+            args.scale_override,
+            args.sign_seed,
+            args.scale_seed,
+        )
+    }
+
     pub fn fp32_to_nvfp4_quartet_backward_ms_eden(
         &self,
         args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
@@ -132,6 +158,47 @@ impl Nvfp4QuantModule {
             args.out_chunk_amax,
         )?);
         self.fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(args, global_scale)
+    }
+
+    pub fn fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
+        &self,
+        args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let args = args;
+        self.row_amax_f32(RowAmaxArgs {
+            stream: args.stream,
+            x: args.x,
+            out: &mut *args.out_chunk_amax,
+            row_count: 1,
+            row_len: args.row_count * args.src_row_len,
+        })?;
+
+        self.ms_eden.quartet_backward_ms_eden_global_scale_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (1, 1, 1),
+                block_dim: (1, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            &*args.out_chunk_amax,
+            &mut *args.out_global_scale,
+        )?;
+
+        self.fp32_to_nvfp4_ms_eden_device_scale(MsEdenDeviceScaleQuantArgs {
+            stream: args.stream,
+            x: args.x,
+            out_fp4: args.out_fp4,
+            out_scales: args.out_scales,
+            out_global_scales: args.out_global_scales,
+            out_chunk_amax: args.out_chunk_amax,
+            global_scale: &*args.out_global_scale,
+            row_count: args.row_count,
+            src_row_len: args.src_row_len,
+            dst_row_len: args.dst_row_len,
+            scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
+            sign_seed: args.sign_seed,
+            scale_seed: args.scale_seed,
+        })
     }
 
     pub fn fp32_to_nvfp4_quartet_backward_ms_eden_with_amax(

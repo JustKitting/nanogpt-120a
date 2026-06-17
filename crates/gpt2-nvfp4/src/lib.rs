@@ -6,9 +6,9 @@ mod tensor;
 mod types;
 
 pub use activations::{
-    AttentionLse, AttentionLseShape, AttentionScores, AttentionScoresShape, BufferShape, F32Buffer,
-    HiddenState, HiddenStateShape, Logits, LogitsShape, MlpActivation, MlpActivationShape,
-    QkvActivation, QkvActivationShape, TokenIds, TokenIdsShape, U32Buffer,
+    AttentionLogSumExp, AttentionLogSumExpShape, AttentionScores, AttentionScoresShape,
+    BufferShape, F32Buffer, HiddenState, HiddenStateShape, Logits, LogitsShape, MlpActivation,
+    MlpActivationShape, QkvActivation, QkvActivationShape, TokenIds, TokenIdsShape, U32Buffer,
 };
 
 pub use backward::{
@@ -27,8 +27,8 @@ pub use backward::{
 };
 
 pub use config::{
-    GPT2_CONTEXT_LEN, GPT2_LAYER_NORM_EPSILON, GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_N_LAYER,
-    GPT2_QKV, GPT2_VOCAB_SIZE, Gpt2Config,
+    GPT2_BATCH_SIZE, GPT2_CONTEXT_LEN, GPT2_LAYER_NORM_EPSILON, GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD,
+    GPT2_N_LAYER, GPT2_QKV, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, GPT2_VOCAB_SIZE, Gpt2Config,
 };
 
 pub use tensor::{FixedBytes, Nvfp4Shape, Nvfp4Tensor};

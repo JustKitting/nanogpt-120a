@@ -6,11 +6,11 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 use crate::layer_norm_reduce::{layer_norm_block_reduce, layer_norm_store_row};
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_THREADS_PER_BLOCK,
-    Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionParams, nvfp4_projection_nobias_kernel_body,
-    projection_grid_dim,
+    Nvfp4DeviceScaleMmaWeightTensor, Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionParams,
+    nvfp4_projection_nobias_kernel_body, projection_grid_dim,
 };
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
-use crate::nvfp4_quant::{Nvfp4QuantModule, QuartetBackwardMsEdenQuantArgs};
+use crate::nvfp4_quant::{Nvfp4QuantModule, QuartetBackwardMsEdenDeviceScaleQuantArgs};
 use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 use crate::warp_reduce::warp_sum_f32;
 
@@ -35,12 +35,25 @@ pub struct LinearBackwardArgs<'a, 'out> {
     pub output_dim: u32,
 }
 
+pub struct LinearBackwardDeviceScaleArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub e_h: Nvfp4RowwiseDeviceTensor<'a>,
+    pub weight_t_h: Nvfp4DeviceScaleMmaWeightTensor<'a>,
+    pub e_t_h: Nvfp4RowwiseDeviceTensor<'a>,
+    pub input_t_h: Nvfp4DeviceScaleMmaWeightTensor<'a>,
+    pub dinput: &'out mut DeviceBuffer<f32>,
+    pub dweight: &'out mut DeviceBuffer<f32>,
+    pub token_count: u32,
+    pub input_dim: u32,
+    pub output_dim: u32,
+}
+
 pub struct MsEdenOperandScratch<'a> {
     pub bytes: &'a mut DeviceBuffer<u8>,
     pub scales: &'a mut DeviceBuffer<u8>,
     pub global_scales: &'a mut DeviceBuffer<f32>,
     pub chunk_amax: &'a mut DeviceBuffer<f32>,
-    pub global_scale: f32,
+    pub global_scale: &'a mut DeviceBuffer<f32>,
 }
 
 impl<'a> MsEdenOperandScratch<'a> {
@@ -52,11 +65,11 @@ impl<'a> MsEdenOperandScratch<'a> {
         }
     }
 
-    fn mma_weight(&self) -> Nvfp4FourSixMmaWeightTensor<'_> {
-        Nvfp4FourSixMmaWeightTensor {
+    fn device_scale_mma_weight(&self) -> Nvfp4DeviceScaleMmaWeightTensor<'_> {
+        Nvfp4DeviceScaleMmaWeightTensor {
             bytes: &*self.bytes,
             scales: &*self.scales,
-            global_scale: self.global_scale,
+            global_scale: &*self.global_scale,
         }
     }
 }
@@ -150,6 +163,64 @@ impl LinearBackwardModule {
         )
     }
 
+    pub fn backward_device_scale(
+        &self,
+        args: LinearBackwardDeviceScaleArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
+        let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
+
+        self.module.linear_backward_projection_device_scale_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: projection_grid_dim(args.token_count, args.input_dim),
+                block_dim: (NVFP4_PROJECTION_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.e_h.bytes,
+            args.e_h.scales,
+            args.e_h.global_scales,
+            args.weight_t_h.bytes,
+            args.weight_t_h.scales,
+            args.weight_t_h.global_scale,
+            args.dinput,
+            Nvfp4ProjectionParams {
+                token_count: args.token_count,
+                input_dim: dinput_k,
+                output_dim: args.input_dim,
+                weight_global_scale: 1.0,
+                bias_global_scale: 0.0,
+                residual_add: 0,
+                activation: NVFP4_PROJECTION_ACTIVATION_NONE,
+            },
+        )?;
+
+        self.module.linear_backward_projection_device_scale_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: projection_grid_dim(args.output_dim, args.input_dim),
+                block_dim: (NVFP4_PROJECTION_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.e_t_h.bytes,
+            args.e_t_h.scales,
+            args.e_t_h.global_scales,
+            args.input_t_h.bytes,
+            args.input_t_h.scales,
+            args.input_t_h.global_scale,
+            args.dweight,
+            Nvfp4ProjectionParams {
+                token_count: args.output_dim,
+                input_dim: dweight_k,
+                output_dim: args.input_dim,
+                weight_global_scale: 1.0,
+                bias_global_scale: 0.0,
+                residual_add: 0,
+                activation: NVFP4_PROJECTION_ACTIVATION_NONE,
+            },
+        )
+    }
+
     pub fn backward_ms_eden(
         &self,
         args: LinearBackwardMsEdenArgs<'_, '_, '_>,
@@ -169,11 +240,11 @@ impl LinearBackwardModule {
             )?;
         }
 
-        let mut scratch = args.scratch;
+        let scratch = args.scratch;
         let output_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let token_k = nvfp4_tc_matmul_padded_k(args.token_count);
 
-        scratch.e_h.global_scale = quantize_operand(
+        quantize_operand(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -182,6 +253,7 @@ impl LinearBackwardModule {
                 scales: &mut *scratch.e_h.scales,
                 global_scales: &mut *scratch.e_h.global_scales,
                 chunk_amax: &mut *scratch.e_h.chunk_amax,
+                global_scale: &mut *scratch.e_h.global_scale,
                 row_count: args.token_count,
                 src_row_len: args.output_dim,
                 dst_row_len: output_k,
@@ -189,7 +261,7 @@ impl LinearBackwardModule {
                 scale_seed: args.scale_seed,
             },
         )?;
-        scratch.weight_t_h.global_scale = quantize_operand(
+        quantize_operand(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -198,6 +270,7 @@ impl LinearBackwardModule {
                 scales: &mut *scratch.weight_t_h.scales,
                 global_scales: &mut *scratch.weight_t_h.global_scales,
                 chunk_amax: &mut *scratch.weight_t_h.chunk_amax,
+                global_scale: &mut *scratch.weight_t_h.global_scale,
                 row_count: args.input_dim,
                 src_row_len: args.output_dim,
                 dst_row_len: output_k,
@@ -205,7 +278,7 @@ impl LinearBackwardModule {
                 scale_seed: args.scale_seed ^ 0x9e37_79b9,
             },
         )?;
-        scratch.e_t_h.global_scale = quantize_operand(
+        quantize_operand(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -214,6 +287,7 @@ impl LinearBackwardModule {
                 scales: &mut *scratch.e_t_h.scales,
                 global_scales: &mut *scratch.e_t_h.global_scales,
                 chunk_amax: &mut *scratch.e_t_h.chunk_amax,
+                global_scale: &mut *scratch.e_t_h.global_scale,
                 row_count: args.output_dim,
                 src_row_len: args.token_count,
                 dst_row_len: token_k,
@@ -221,7 +295,7 @@ impl LinearBackwardModule {
                 scale_seed: args.scale_seed ^ 0x85eb_ca6b,
             },
         )?;
-        scratch.input_t_h.global_scale = quantize_operand(
+        quantize_operand(
             args.quant_module,
             QuantizeOperandArgs {
                 stream: args.stream,
@@ -230,6 +304,7 @@ impl LinearBackwardModule {
                 scales: &mut *scratch.input_t_h.scales,
                 global_scales: &mut *scratch.input_t_h.global_scales,
                 chunk_amax: &mut *scratch.input_t_h.chunk_amax,
+                global_scale: &mut *scratch.input_t_h.global_scale,
                 row_count: args.input_dim,
                 src_row_len: args.token_count,
                 dst_row_len: token_k,
@@ -238,15 +313,14 @@ impl LinearBackwardModule {
             },
         )?;
 
-        self.backward(LinearBackwardArgs {
+        self.backward_device_scale(LinearBackwardDeviceScaleArgs {
             stream: args.stream,
             e_h: scratch.e_h.rowwise(),
-            weight_t_h: scratch.weight_t_h.mma_weight(),
+            weight_t_h: scratch.weight_t_h.device_scale_mma_weight(),
             e_t_h: scratch.e_t_h.rowwise(),
-            input_t_h: scratch.input_t_h.mma_weight(),
+            input_t_h: scratch.input_t_h.device_scale_mma_weight(),
             dinput: args.dinput,
             dweight: args.dweight,
-            dbias: None,
             token_count: args.token_count,
             input_dim: args.input_dim,
             output_dim: args.output_dim,
@@ -261,6 +335,7 @@ struct QuantizeOperandArgs<'a, 'out> {
     scales: &'out mut DeviceBuffer<u8>,
     global_scales: &'out mut DeviceBuffer<f32>,
     chunk_amax: &'out mut DeviceBuffer<f32>,
+    global_scale: &'out mut DeviceBuffer<f32>,
     row_count: u32,
     src_row_len: u32,
     dst_row_len: u32,
@@ -271,20 +346,23 @@ struct QuantizeOperandArgs<'a, 'out> {
 fn quantize_operand(
     module: &Nvfp4QuantModule,
     args: QuantizeOperandArgs<'_, '_>,
-) -> Result<f32, DriverError> {
-    module.fp32_to_nvfp4_quartet_backward_ms_eden(QuartetBackwardMsEdenQuantArgs {
-        stream: args.stream,
-        x: args.x,
-        out_fp4: args.scratch,
-        out_scales: args.scales,
-        out_global_scales: args.global_scales,
-        out_chunk_amax: args.chunk_amax,
-        row_count: args.row_count,
-        src_row_len: args.src_row_len,
-        dst_row_len: args.dst_row_len,
-        sign_seed: args.sign_seed,
-        scale_seed: args.scale_seed,
-    })
+) -> Result<(), DriverError> {
+    module.fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
+        QuartetBackwardMsEdenDeviceScaleQuantArgs {
+            stream: args.stream,
+            x: args.x,
+            out_fp4: args.scratch,
+            out_scales: args.scales,
+            out_global_scales: args.global_scales,
+            out_chunk_amax: args.chunk_amax,
+            out_global_scale: args.global_scale,
+            row_count: args.row_count,
+            src_row_len: args.src_row_len,
+            dst_row_len: args.dst_row_len,
+            sign_seed: args.sign_seed,
+            scale_seed: args.scale_seed,
+        },
+    )
 }
 
 #[allow(static_mut_refs)]
@@ -302,6 +380,29 @@ mod kernels {
         mut out: DisjointSlice<f32>,
         params: Nvfp4ProjectionParams,
     ) {
+        nvfp4_projection_nobias_kernel_body(
+            input_bytes,
+            input_scales,
+            input_global_scales,
+            weight_bytes,
+            weight_scales,
+            &mut out,
+            params,
+        );
+    }
+
+    #[kernel]
+    pub fn linear_backward_projection_device_scale_kernel(
+        input_bytes: &[u8],
+        input_scales: &[u8],
+        input_global_scales: &[f32],
+        weight_bytes: &[u8],
+        weight_scales: &[u8],
+        weight_global_scale: &[f32],
+        mut out: DisjointSlice<f32>,
+        mut params: Nvfp4ProjectionParams,
+    ) {
+        params.weight_global_scale = weight_global_scale[0];
         nvfp4_projection_nobias_kernel_body(
             input_bytes,
             input_scales,

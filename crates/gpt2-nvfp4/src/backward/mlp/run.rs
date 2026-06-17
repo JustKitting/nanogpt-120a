@@ -3,7 +3,7 @@ use rust_kernels_cuda::mlp::Relu2BackwardArgs;
 
 use super::args::{MlpBackwardArgs, MlpBackwardGrads, MlpBackwardScratch};
 use super::pass::{LinearPass, run_linear_pass};
-use crate::{GPT2_MLP, GPT2_N_EMBD, MlpActivation};
+use crate::{GPT2_MLP, GPT2_N_EMBD};
 
 pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
     let MlpBackwardArgs {
@@ -50,6 +50,7 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
             dinput: d_mlp_relu2,
             dweight: d_c_proj_weight,
             dbias: d_c_proj_bias,
+            row_count: saved.row_count,
             input_dim: GPT2_MLP as u32,
             output_dim: GPT2_N_EMBD as u32,
             sign_seed: seeds.down_sign,
@@ -62,7 +63,7 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         pre_activation: saved.mlp_up,
         d_out: d_mlp_relu2,
         d_pre_activation: d_mlp_up,
-        len: MlpActivation::LEN as u32,
+        len: saved.row_count * GPT2_MLP as u32,
     })?;
 
     run_linear_pass(
@@ -79,6 +80,7 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
             dinput: d_ln_2_normalized,
             dweight: d_c_fc_weight,
             dbias: d_c_fc_bias,
+            row_count: saved.row_count,
             input_dim: GPT2_N_EMBD as u32,
             output_dim: GPT2_MLP as u32,
             sign_seed: seeds.up_sign,

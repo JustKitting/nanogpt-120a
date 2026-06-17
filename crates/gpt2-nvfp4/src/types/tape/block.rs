@@ -5,17 +5,25 @@ use super::types::BlockForwardTape;
 use crate::types::BlockForwardSaved;
 
 impl<'a> BlockForwardTape<'a> {
-    pub(super) fn saved(&self) -> BlockForwardSaved<'_> {
+    pub(super) fn saved(
+        &self,
+        batch_size: u32,
+        seq_len: u32,
+        row_count: u32,
+    ) -> BlockForwardSaved<'_> {
         BlockForwardSaved {
+            batch_size,
+            seq_len,
+            row_count,
             residual_in: &*self.residual_in,
-            ln_1: self.ln_1.saved(),
+            ln_1: self.ln_1.saved(row_count),
             qkv_input_nvfp4: self.qkv_input_nvfp4.saved(),
             qkv: &*self.qkv,
             attention_out: &*self.attention_out,
-            attention_lse: &*self.attention_lse,
+            attention_log_sum_exp: &*self.attention_log_sum_exp,
             c_proj_input_nvfp4: self.c_proj_input_nvfp4.saved(),
             residual_after_attention: &*self.residual_after_attention,
-            ln_2: self.ln_2.saved(),
+            ln_2: self.ln_2.saved(row_count),
             mlp_up_input_nvfp4: self.mlp_up_input_nvfp4.saved(),
             mlp_up: &*self.mlp_up,
             mlp_relu2: &*self.mlp_relu2,
@@ -31,7 +39,7 @@ impl<'a> BlockForwardTape<'a> {
             qkv_input_nvfp4: self.qkv_input_nvfp4.reborrow(),
             qkv: &mut *self.qkv,
             attention_out: &mut *self.attention_out,
-            attention_lse: &mut *self.attention_lse,
+            attention_log_sum_exp: &mut *self.attention_log_sum_exp,
             c_proj_input_nvfp4: self.c_proj_input_nvfp4.reborrow(),
             residual_after_attention: &mut *self.residual_after_attention,
             ln_2: self.ln_2.reborrow(),
@@ -67,12 +75,12 @@ impl<'a> BlockForwardTape<'a> {
         copy_device(stream, out, self.attention_out)
     }
 
-    pub(crate) fn save_attention_lse(
+    pub(crate) fn save_attention_log_sum_exp(
         &mut self,
         stream: &CudaStream,
-        lse: &DeviceBuffer<f32>,
+        log_sum_exp: &DeviceBuffer<f32>,
     ) -> Result<(), DriverError> {
-        copy_device(stream, lse, self.attention_lse)
+        copy_device(stream, log_sum_exp, self.attention_log_sum_exp)
     }
 
     pub(crate) fn save_residual_after_attention(

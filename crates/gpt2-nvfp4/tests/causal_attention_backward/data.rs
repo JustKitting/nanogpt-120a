@@ -1,13 +1,14 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionLse, BlockForwardSaved, GPT2_CONTEXT_LEN, GPT2_N_HEAD, HiddenState, LayerNormSaved,
+    AttentionLogSumExp, BlockForwardSaved, GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN,
+    GPT2_TOKEN_ROWS, HiddenState, LayerNormSaved,
 };
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 pub fn saved_block<'a>(
     qkv: &'a DeviceBuffer<f32>,
     attention_out: &'a DeviceBuffer<f32>,
-    attention_lse: &'a DeviceBuffer<f32>,
+    attention_log_sum_exp: &'a DeviceBuffer<f32>,
     dummy: &'a DeviceBuffer<f32>,
     dummy_bytes: &'a DeviceBuffer<u8>,
     dummy_scales: &'a DeviceBuffer<u8>,
@@ -19,6 +20,7 @@ pub fn saved_block<'a>(
         global_scales: dummy_global_scales,
     };
     let layer_norm = LayerNormSaved {
+        row_count: GPT2_TOKEN_ROWS as u32,
         residual: dummy,
         normalized: dummy,
         mean: dummy,
@@ -26,12 +28,15 @@ pub fn saved_block<'a>(
     };
 
     BlockForwardSaved {
+        batch_size: GPT2_BATCH_SIZE as u32,
+        seq_len: GPT2_SEQ_LEN as u32,
+        row_count: GPT2_TOKEN_ROWS as u32,
         residual_in: dummy,
         ln_1: layer_norm,
         qkv_input_nvfp4: rowwise,
         qkv,
         attention_out,
-        attention_lse,
+        attention_log_sum_exp,
         c_proj_input_nvfp4: rowwise,
         residual_after_attention: dummy,
         ln_2: layer_norm,
@@ -49,12 +54,15 @@ pub fn d_out_values() -> Vec<f32> {
         .collect()
 }
 
-pub fn lse_values() -> Vec<f32> {
-    let mut lse = vec![0.0_f32; AttentionLse::LEN];
-    for head in 0..GPT2_N_HEAD {
-        for token in 0..GPT2_CONTEXT_LEN {
-            lse[head * GPT2_CONTEXT_LEN + token] = ((token + 1) as f32).ln();
+pub fn log_sum_exp_values() -> Vec<f32> {
+    let mut log_sum_exp = vec![0.0_f32; AttentionLogSumExp::LEN];
+    for batch in 0..GPT2_BATCH_SIZE {
+        for head in 0..GPT2_N_HEAD {
+            for token in 0..GPT2_SEQ_LEN {
+                let index = (batch * GPT2_N_HEAD + head) * GPT2_SEQ_LEN + token;
+                log_sum_exp[index] = ((token + 1) as f32).ln();
+            }
         }
     }
-    lse
+    log_sum_exp
 }

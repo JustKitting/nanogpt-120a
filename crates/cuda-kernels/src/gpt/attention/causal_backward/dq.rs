@@ -8,7 +8,7 @@ use super::types::{CAUSAL_BACKWARD_HEAD_DIM_THREADS, CausalAttentionBackwardPara
 pub(super) fn dq_body(
     qkv: &[f32],
     d_out: &[f32],
-    lse: &[f32],
+    log_sum_exp: &[f32],
     softmax_d: &[f32],
     mut d_qkv: DisjointSlice<f32>,
     params: CausalAttentionBackwardParams,
@@ -18,7 +18,12 @@ pub(super) fn dq_body(
 ) {
     let query = thread::blockIdx_x();
     let head = thread::blockIdx_y();
+    let batch = thread::blockIdx_z();
     let dim = thread::threadIdx_x();
+    let row = batch * params.seq_len + query;
+    if query >= params.seq_len || head >= params.head_count || row >= params.row_count {
+        return;
+    }
     let valid_dim = dim < params.head_dim;
 
     let lane = warp::lane_id();
@@ -27,24 +32,26 @@ pub(super) fn dq_body(
     let mut key = 0;
     while key <= query {
         let local_score = if valid_dim {
-            q_value(qkv, query, head, dim, &params) * k_value(qkv, key, head, dim, &params)
+            q_value(qkv, batch, query, head, dim, &params)
+                * k_value(qkv, batch, key, head, dim, &params)
         } else {
             0.0
         };
         let local_dp = if valid_dim {
-            d_out_value(d_out, query, head, dim, &params) * v_value(qkv, key, head, dim, &params)
+            d_out_value(d_out, batch, query, head, dim, &params)
+                * v_value(qkv, batch, key, head, dim, &params)
         } else {
             0.0
         };
         let score = reduce_head(local_score, lane, warp_in_head, reduce);
         let dp = reduce_head(local_dp, lane, warp_in_head, reduce);
         if dim == 0 {
-            let p = softmax_prob(score, query, head, lse, &params);
-            ds[0] = p * (dp - softmax_d_value(softmax_d, query, head, &params));
+            let p = softmax_prob(score, batch, query, head, log_sum_exp, &params);
+            ds[0] = p * (dp - softmax_d_value(softmax_d, batch, query, head, &params));
         }
         thread::sync_threads();
         if valid_dim {
-            grad += ds[0] * k_value(qkv, key, head, dim, &params) * params.scale;
+            grad += ds[0] * k_value(qkv, batch, key, head, dim, &params) * params.scale;
         }
         key += 1;
     }
@@ -61,7 +68,7 @@ pub(super) fn dq_body(
             params.head_dim,
         );
         unsafe {
-            *d_qkv.get_unchecked_mut(qkv_index(query, head, dim, 0, &params)) = value;
+            *d_qkv.get_unchecked_mut(qkv_index(batch, query, head, dim, 0, &params)) = value;
         }
     }
 }

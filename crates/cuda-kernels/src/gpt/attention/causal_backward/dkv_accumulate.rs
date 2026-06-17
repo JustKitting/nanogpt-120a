@@ -12,7 +12,7 @@ use super::types::{CAUSAL_BACKWARD_KEY_BLOCK, CausalAttentionBackwardParams};
 pub(super) fn accumulate_key(
     qkv: &[f32],
     d_out: &[f32],
-    lse: &[f32],
+    log_sum_exp: &[f32],
     softmax_d: &[f32],
     params: &CausalAttentionBackwardParams,
     thread_state: KeyThread,
@@ -23,7 +23,7 @@ pub(super) fn accumulate_key(
     let mut dk_rot = 0.0;
     let mut dv = 0.0;
     let mut query = 0;
-    while query < params.token_count {
+    while query < params.seq_len {
         let active = thread_state.active(query, params);
         let score = reduce_key(
             score_local(qkv, params, thread_state, query, active),
@@ -42,7 +42,7 @@ pub(super) fn accumulate_key(
 
         if thread_state.dim == 0 {
             write_query_scalars(
-                lse,
+                log_sum_exp,
                 softmax_d,
                 params,
                 thread_state,
@@ -57,9 +57,23 @@ pub(super) fn accumulate_key(
         if active {
             let p = prob[thread_state.key_offset as usize];
             let d_score = ds[thread_state.key_offset as usize];
-            dv += p * d_out_value(d_out, query, thread_state.head, thread_state.dim, params);
+            dv += p * d_out_value(
+                d_out,
+                thread_state.batch,
+                query,
+                thread_state.head,
+                thread_state.dim,
+                params,
+            );
             dk_rot += d_score
-                * q_value(qkv, query, thread_state.head, thread_state.dim, params)
+                * q_value(
+                    qkv,
+                    thread_state.batch,
+                    query,
+                    thread_state.head,
+                    thread_state.dim,
+                    params,
+                )
                 * params.scale;
         }
         query += 1;

@@ -11,7 +11,9 @@ pub(crate) const CAUSAL_WARPS_PER_BLOCK: u32 = CAUSAL_ATTENTION_THREADS_PER_BLOC
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct CausalAttentionParams {
-    pub token_count: u32,
+    pub row_count: u32,
+    pub seq_len: u32,
+    pub batch_size: u32,
     pub embedding_dim: u32,
     pub qkv_dim: u32,
     pub head_count: u32,
@@ -25,8 +27,10 @@ pub struct CausalAttentionArgs<'a, 'out> {
     pub stream: &'a CudaStream,
     pub qkv: &'a DeviceBuffer<f32>,
     pub out: &'out mut DeviceBuffer<f32>,
-    pub lse: &'out mut DeviceBuffer<f32>,
-    pub token_count: u32,
+    pub log_sum_exp: &'out mut DeviceBuffer<f32>,
+    pub row_count: u32,
+    pub seq_len: u32,
+    pub batch_size: u32,
     pub embedding_dim: u32,
     pub qkv_dim: u32,
     pub head_count: u32,
@@ -38,15 +42,17 @@ impl AttentionModule {
         self.causal_attention.causal_attention_kernel(
             args.stream,
             LaunchConfig {
-                grid_dim: (args.token_count, args.head_count, 1),
+                grid_dim: (args.seq_len, args.head_count, args.batch_size),
                 block_dim: (CAUSAL_ATTENTION_THREADS_PER_BLOCK, 1, 1),
                 shared_mem_bytes: 0,
             },
             args.qkv,
             args.out,
-            args.lse,
+            args.log_sum_exp,
             CausalAttentionParams {
-                token_count: args.token_count,
+                row_count: args.row_count,
+                seq_len: args.seq_len,
+                batch_size: args.batch_size,
                 embedding_dim: args.embedding_dim,
                 qkv_dim: args.qkv_dim,
                 head_count: args.head_count,
@@ -72,28 +78,34 @@ pub mod kernels {
     pub fn causal_attention_kernel(
         qkv: &[f32],
         mut out: DisjointSlice<f32>,
-        mut lse: DisjointSlice<f32>,
+        mut log_sum_exp: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         let query = thread::blockIdx_x();
         let head = thread::blockIdx_y();
+        let batch = thread::blockIdx_z();
         let thread = thread::threadIdx_x();
         let lane = warp::lane_id();
         let warp_in_block = thread / 32;
 
-        if query >= params.token_count || head >= params.head_count {
+        let row = batch * params.seq_len + query;
+        if query >= params.seq_len
+            || head >= params.head_count
+            || batch >= params.batch_size
+            || row >= params.row_count
+        {
             return;
         }
 
         let query_value = if thread < params.head_dim {
-            rope_q_value(qkv, query, head, thread, &params)
+            rope_q_value(qkv, batch, query, head, thread, &params)
         } else {
             0.0
         };
         let mut key = 0;
         while key <= query {
             let local_dot = if thread < params.head_dim {
-                query_value * rope_k_value(qkv, key, head, thread, &params)
+                query_value * rope_k_value(qkv, batch, key, head, thread, &params)
             } else {
                 0.0
             };
@@ -129,9 +141,11 @@ pub mod kernels {
         let score_max = score_max(query, thread);
         let denom = score_denom(query, thread, score_max);
         if thread == 0 {
-            let lse_index = head as usize * params.token_count as usize + query as usize;
+            let log_sum_exp_index = (batch as usize * params.head_count as usize + head as usize)
+                * params.seq_len as usize
+                + query as usize;
             unsafe {
-                *lse.get_unchecked_mut(lse_index) = score_max + ln_f32(denom);
+                *log_sum_exp.get_unchecked_mut(log_sum_exp_index) = score_max + ln_f32(denom);
             }
         }
 
@@ -141,11 +155,15 @@ pub mod kernels {
             while key <= query {
                 let score = unsafe { SCORES[key as usize] };
                 let weight = exp_f32(score - score_max) / denom;
-                value = fma_f32(weight, v_value(qkv, key, head, thread, &params), value);
+                value = fma_f32(
+                    weight,
+                    v_value(qkv, batch, key, head, thread, &params),
+                    value,
+                );
                 key += 1;
             }
 
-            let out_index = query as usize * params.embedding_dim as usize
+            let out_index = row as usize * params.embedding_dim as usize
                 + head as usize * params.head_dim as usize
                 + thread as usize;
             unsafe {
@@ -241,28 +259,31 @@ pub mod kernels {
     #[inline(always)]
     fn rope_q_value(
         qkv: &[f32],
+        batch: u32,
         token: u32,
         head: u32,
         dim: u32,
         params: &CausalAttentionParams,
     ) -> f32 {
-        rope_value(qkv, token, head, dim, 0, params)
+        rope_value(qkv, batch, token, head, dim, 0, params)
     }
 
     #[inline(always)]
     fn rope_k_value(
         qkv: &[f32],
+        batch: u32,
         token: u32,
         head: u32,
         dim: u32,
         params: &CausalAttentionParams,
     ) -> f32 {
-        rope_value(qkv, token, head, dim, params.embedding_dim, params)
+        rope_value(qkv, batch, token, head, dim, params.embedding_dim, params)
     }
 
     #[inline(always)]
     fn rope_value(
         qkv: &[f32],
+        batch: u32,
         token: u32,
         head: u32,
         dim: u32,
@@ -270,8 +291,8 @@ pub mod kernels {
         params: &CausalAttentionParams,
     ) -> f32 {
         let paired_dim = if dim & 1 == 0 { dim + 1 } else { dim - 1 };
-        let value = qkv[qkv_index(token, head, dim, section_offset, params)];
-        let paired = qkv[qkv_index(token, head, paired_dim, section_offset, params)];
+        let value = qkv[qkv_index(batch, token, head, dim, section_offset, params)];
+        let paired = qkv[qkv_index(batch, token, head, paired_dim, section_offset, params)];
         let theta = token as f32 * rope_inv_freq(dim, params.head_dim);
         let (sin, cos) = sincos_f32(theta);
 
@@ -292,23 +313,25 @@ pub mod kernels {
     #[inline(always)]
     fn v_value(
         qkv: &[f32],
+        batch: u32,
         token: u32,
         head: u32,
         dim: u32,
         params: &CausalAttentionParams,
     ) -> f32 {
-        qkv[qkv_index(token, head, dim, params.embedding_dim * 2, params)]
+        qkv[qkv_index(batch, token, head, dim, params.embedding_dim * 2, params)]
     }
 
     #[inline(always)]
     fn qkv_index(
+        batch: u32,
         token: u32,
         head: u32,
         dim: u32,
         section_offset: u32,
         params: &CausalAttentionParams,
     ) -> usize {
-        token as usize * params.qkv_dim as usize
+        (batch as usize * params.seq_len as usize + token as usize) * params.qkv_dim as usize
             + section_offset as usize
             + head as usize * params.head_dim as usize
             + dim as usize
