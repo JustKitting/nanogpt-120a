@@ -162,3 +162,17 @@ One important note: nanoGPT inference recomputes the whole context each
 generated token. It does not use a KV cache. For a faithful first Rust port, we
 can do the same. For performance, KV cache becomes a later divergence from the
 reference.
+
+## Training Optimizer Notes
+
+For Aurora/Muon-style polar updates, dense optimizer GEMMs should use the same
+NVFP4 tensor-core path as model GEMMs:
+
+```text
+fp32 operand -> Quartet-II/MS-EDEN downcast -> NVFP4 TC GEMM -> fp32 output
+```
+
+The reusable TC matmul primitive pads incompatible `k` dimensions internally
+before MS-EDEN downcast, including vocab-width tied-head paths. More optimized
+tiling/layout work should come later after the polar update path is
+functionally wired and tested.

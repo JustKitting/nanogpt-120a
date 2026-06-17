@@ -28,6 +28,8 @@ pub mod nvfp4;
 pub mod nvfp4_cast;
 #[path = "utils/nvfp4/quant/mod.rs"]
 pub mod nvfp4_quant;
+#[path = "utils/nvfp4_tc_matmul/mod.rs"]
+pub mod nvfp4_tc_matmul;
 #[path = "gpt/optimizer/mod.rs"]
 pub mod optimizer;
 #[path = "gpt/residual.rs"]
@@ -48,8 +50,8 @@ pub mod gpt {
 
 pub mod utils {
     pub use crate::{
-        float_ptx, layer_norm_utils, mma, nvfp4, nvfp4_cast, nvfp4_quant, shuffle, transpose,
-        warp_reduce,
+        float_ptx, layer_norm_utils, mma, nvfp4, nvfp4_cast, nvfp4_quant, nvfp4_tc_matmul, shuffle,
+        transpose, warp_reduce,
     };
 }
 
