@@ -18,7 +18,7 @@ pub fn residual_input() -> Vec<f32> {
     for row in 0..GPT2_CONTEXT_LEN {
         let row_base = row * GPT2_N_EMBD;
         for col in 0..GPT2_N_EMBD {
-            residual[row_base + col] = 0.125 + row as f32 * 0.000_244_140_62 + col as f32 * 1.0e-6;
+            residual[row_base + col] = 0.125 + row as f32 * 0.000_244_140_62 + col as f32 * 1.0e-7;
         }
     }
     residual

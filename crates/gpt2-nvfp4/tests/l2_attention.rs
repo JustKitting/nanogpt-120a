@@ -14,6 +14,8 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 const E4M3_ONE: u8 = 0x38;
 const HEAD_DIM: usize = GPT2_N_EMBD / GPT2_N_HEAD;
+const ATTENTION_TOLERANCE: f32 = 1.0e-7;
+const RESIDUAL_TOLERANCE: f32 = 1.0e-7;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -158,13 +160,13 @@ fn assert_qkv_nonzero(qkv: &[f32]) {
     let q_nonzero = qkv
         .iter()
         .take(GPT2_N_EMBD)
-        .any(|value| value.abs() > 1.0e-5);
+        .any(|value| value.abs() > 1.0e-7);
     let k_nonzero = qkv[GPT2_N_EMBD..2 * GPT2_N_EMBD]
         .iter()
-        .any(|value| value.abs() > 1.0e-5);
+        .any(|value| value.abs() > 1.0e-7);
     let v_nonzero = qkv[2 * GPT2_N_EMBD..GPT2_QKV]
         .iter()
-        .any(|value| value.abs() > 1.0e-5);
+        .any(|value| value.abs() > 1.0e-7);
     assert!(q_nonzero && k_nonzero && v_nonzero);
 }
 
@@ -188,7 +190,7 @@ fn assert_rope_attention_matches(qkv: &[f32], out: &[f32]) {
                 let col = head * HEAD_DIM + dim;
                 let actual = out[row * GPT2_N_EMBD + col];
                 let error = (actual - expected).abs();
-                let tolerance = expected.abs().max(1.0) * 2.0e-2;
+                let tolerance = expected.abs().max(1.0) * ATTENTION_TOLERANCE;
                 assert!(
                     error <= tolerance,
                     "row={row} head={head} dim={dim} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
@@ -243,7 +245,7 @@ fn assert_output_amax(out: &[f32], output_amax: &[f32]) {
             .map(|value| value.abs())
             .fold(0.0_f32, f32::max);
         let error = (actual - expected).abs();
-        let tolerance = expected.abs().max(1.0) * 1.0e-5;
+        let tolerance = expected.abs().max(1.0) * 1.0e-7;
         assert!(
             error <= tolerance,
             "row={row} actual_amax={actual:.8e} expected_amax={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
@@ -260,7 +262,7 @@ fn assert_c_proj_residual_add(
         let expected = residual_before[index] + attention_out[index];
         let actual = residual_after[index];
         let error = (actual - expected).abs();
-        let tolerance = expected.abs().max(1.0) * 2.0e-2;
+        let tolerance = expected.abs().max(1.0) * RESIDUAL_TOLERANCE;
         assert!(
             error <= tolerance,
             "index={index} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"

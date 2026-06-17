@@ -1,5 +1,7 @@
 use gpt2_nvfp4::{GPT2_CONTEXT_LEN, GPT2_MLP, GPT2_N_EMBD};
 
+const TOLERANCE: f32 = 0.0;
+
 pub fn assert_relu2_samples(activation: &[f32]) {
     for row in [0, 1, 17, GPT2_CONTEXT_LEN - 1] {
         assert_positive_relu2(activation, row, 0);
@@ -24,17 +26,14 @@ fn assert_positive_relu2(activation: &[f32], row: usize, col: usize) {
     let expected = 0.25_f32;
     let error = (actual - expected).abs();
     assert!(
-        error <= 5.0e-2,
+        error <= TOLERANCE,
         "row={row} col={col} actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
     );
 }
 
 fn assert_zero_relu2(activation: &[f32], row: usize, col: usize) {
     let actual = activation[row * GPT2_MLP + col];
-    assert!(
-        actual.abs() <= 1.0e-6,
-        "row={row} col={col} actual={actual:.8e}"
-    );
+    assert_eq!(actual, 0.0, "row={row} col={col} actual={actual:.8e}");
 }
 
 fn assert_residual_delta(
@@ -48,7 +47,7 @@ fn assert_residual_delta(
     let actual_delta = residual_after[index] - residual_before[index];
     let error = (actual_delta - expected_delta).abs();
     assert!(
-        error <= 5.0e-2,
+        error <= TOLERANCE,
         "row={row} col={col} actual_delta={actual_delta:.8e} expected_delta={expected_delta:.8e} error={error:.8e}"
     );
 }

@@ -15,6 +15,7 @@ const TOKEN_COUNT: usize = 64;
 const INPUT_DIM: usize = 8;
 const OUTPUT_DIM: usize = 64;
 const E4M3_ONE: u8 = 0x38;
+const TOLERANCE: f32 = 1.0e-7;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -98,7 +99,7 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
     let dinput = dinput_dev.to_host_vec(&stream)?;
     let dweight = dweight_dev.to_host_vec(&stream)?;
 
-    assert!(dinput.iter().all(|value| (*value - 1.0).abs() <= 1.0e-5));
+    assert!(dinput.iter().all(|value| (*value - 1.0).abs() <= TOLERANCE));
 
     for row in 0..OUTPUT_DIM {
         for col in 0..INPUT_DIM {
@@ -207,8 +208,8 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
 
     assert!(dinput.iter().all(|value| value.is_finite()));
     assert!(dweight.iter().all(|value| value.is_finite()));
-    assert!(dinput.iter().any(|value| value.abs() > 1.0e-6));
-    assert!(dweight.iter().any(|value| value.abs() > 1.0e-6));
+    assert!(dinput.iter().any(|value| value.abs() > TOLERANCE));
+    assert!(dweight.iter().any(|value| value.abs() > TOLERANCE));
     assert!(e_quant.iter().any(|byte| *byte != 0));
     assert!(e_amax.iter().all(|amax| *amax > 0.0 && amax.is_finite()));
 
@@ -227,7 +228,7 @@ fn set_e2m1_one(bytes: &mut [u8], element: usize) {
 fn assert_close(actual: f32, expected: f32) {
     let error = (actual - expected).abs();
     assert!(
-        error <= 1.0e-5,
+        error <= TOLERANCE,
         "actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
     );
 }

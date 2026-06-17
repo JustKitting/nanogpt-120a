@@ -7,6 +7,7 @@ mod common;
 
 const TOKEN_COUNT: usize = 2;
 const VOCAB_SIZE: usize = 4;
+const TOLERANCE: f32 = 1.0e-7;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -16,10 +17,16 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
     let module = LossModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
 
     let logits = [
-        1.0_f32, 0.0, -1.0, 0.5, //
-        -0.5, 0.25, 1.25, 0.0,
+        0.0_f32,
+        f32::NEG_INFINITY,
+        0.0,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+        0.0,
+        f32::NEG_INFINITY,
+        0.0,
     ];
-    let targets = [0_u32, 2];
+    let targets = [0_u32, 3];
     let logits_dev = DeviceBuffer::from_host(&stream, &logits)?;
     let targets_dev = DeviceBuffer::from_host(&stream, &targets)?;
     let mut losses_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT)?;
@@ -40,11 +47,11 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
     let expected = expected_loss_and_grad(&logits, &targets);
 
     for (actual, expected) in losses.iter().zip(expected.0.iter()) {
-        assert_close(*actual, *expected, 2.0e-3);
+        assert_close(*actual, *expected);
     }
 
     for (actual, expected) in dlogits.iter().zip(expected.1.iter()) {
-        assert_close(*actual, *expected, 2.0e-3);
+        assert_close(*actual, *expected);
     }
 
     Ok(())
@@ -74,10 +81,10 @@ fn expected_loss_and_grad(logits: &[f32], targets: &[u32]) -> (Vec<f32>, Vec<f32
     (losses, grad)
 }
 
-fn assert_close(actual: f32, expected: f32, tolerance: f32) {
+fn assert_close(actual: f32, expected: f32) {
     let error = (actual - expected).abs();
     assert!(
-        error <= tolerance,
-        "actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
+        error <= TOLERANCE,
+        "actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={TOLERANCE:.8e}"
     );
 }

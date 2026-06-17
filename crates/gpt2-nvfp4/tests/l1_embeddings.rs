@@ -7,6 +7,7 @@ use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 const E4M3_ONE: u8 = 0x38;
+const TOLERANCE: f32 = 1.0e-7;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -74,7 +75,7 @@ fn set_e2m1_one(bytes: &mut [u8], element: usize) {
 fn assert_value(actual: f32, expected: f32) {
     let error = (actual - expected).abs();
     assert!(
-        error <= 1.0e-5,
+        error <= TOLERANCE,
         "actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
     );
 }

@@ -54,7 +54,7 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let dx = dx_dev.to_host_vec(&stream)?;
     let expected = reference_backward_input(&x, &d_normalized, &mean, &inv_std);
     let error = max_abs_error(&dx, &expected);
-    assert!(error <= 1.0e-4, "max_abs_error={error:.8e}");
+    assert!(error <= 1.0e-8, "max_abs_error={error:.8e}");
     Ok(())
 }
 

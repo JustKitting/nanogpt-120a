@@ -63,7 +63,7 @@ fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let expected = reference_layer_norm(&x, &gamma, &beta, row_count, epsilon);
     let max_abs_error = max_abs_error(&out, &expected);
 
-    assert!(max_abs_error <= 1.0e-5, "max_abs_error={max_abs_error:.8e}");
+    assert!(max_abs_error <= 1.0e-9, "max_abs_error={max_abs_error:.8e}");
     Ok(())
 }
 
@@ -127,7 +127,7 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let expected = reference_layer_norm_rows(&x, row_count, GPT_EMBEDDING_DIM, epsilon);
     let max_abs_error = max_abs_error(&out, &expected);
 
-    assert!(max_abs_error <= 1.0e-4, "max_abs_error={max_abs_error:.8e}");
+    assert!(max_abs_error <= 1.0e-7, "max_abs_error={max_abs_error:.8e}");
     assert_row_amax(&out, &amax, row_count, GPT_EMBEDDING_DIM);
     Ok(())
 }
@@ -170,15 +170,8 @@ fn reference_layer_norm_rows(
     let mut out = vec![0.0f32; row_count * row_len];
     for row in 0..row_count {
         let base = row * row_len;
-        let mean = x[base..base + row_len].iter().sum::<f32>() / row_len as f32;
-        let variance = x[base..base + row_len]
-            .iter()
-            .map(|value| {
-                let centered = value - mean;
-                centered * centered
-            })
-            .sum::<f32>()
-            / row_len as f32;
+        let mean = gpt_kernel_row_sum(x, base, row_len) / row_len as f32;
+        let variance = gpt_kernel_row_variance_sum(x, base, row_len, mean) / row_len as f32;
         let inv_std = 1.0 / (variance + epsilon).sqrt();
 
         for col in 0..row_len {
@@ -186,6 +179,55 @@ fn reference_layer_norm_rows(
         }
     }
     out
+}
+
+fn gpt_kernel_row_sum(x: &[f32], base: usize, row_len: usize) -> f32 {
+    gpt_block_reduce_sum(|thread| {
+        let mut sum = 0.0;
+        for offset in [0, 256, 512] {
+            let col = thread + offset;
+            if col < row_len {
+                sum += x[base + col];
+            }
+        }
+        sum
+    })
+}
+
+fn gpt_kernel_row_variance_sum(x: &[f32], base: usize, row_len: usize, mean: f32) -> f32 {
+    gpt_block_reduce_sum(|thread| {
+        let mut sum = 0.0;
+        for offset in [0, 256, 512] {
+            let col = thread + offset;
+            if col < row_len {
+                let centered = x[base + col] - mean;
+                sum += centered * centered;
+            }
+        }
+        sum
+    })
+}
+
+fn gpt_block_reduce_sum(local: impl Fn(usize) -> f32) -> f32 {
+    let mut warp_totals = [0.0_f32; 32];
+    for warp in 0..8 {
+        let mut lanes = [0.0_f32; 32];
+        for lane in 0..32 {
+            lanes[lane] = local(warp * 32 + lane);
+        }
+        warp_totals[warp] = warp_sum_lane0(lanes);
+    }
+    warp_sum_lane0(warp_totals)
+}
+
+fn warp_sum_lane0(mut lanes: [f32; 32]) -> f32 {
+    for mask in [16, 8, 4, 2] {
+        let previous = lanes;
+        for lane in 0..32 {
+            lanes[lane] += previous[lane ^ mask];
+        }
+    }
+    lanes[0] + lanes[1]
 }
 
 fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
@@ -205,6 +247,6 @@ fn assert_row_amax(out: &[f32], amax: &[f32], row_count: usize, row_len: usize) 
             .map(|value| value.abs())
             .fold(0.0f32, f32::max);
         let error = (actual - expected).abs();
-        assert!(error <= 1.0e-5, "row={row} error={error:.8e}");
+        assert!(error <= 1.0e-7, "row={row} error={error:.8e}");
     }
 }

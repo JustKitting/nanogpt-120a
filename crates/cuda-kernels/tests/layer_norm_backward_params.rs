@@ -106,5 +106,5 @@ fn assert_max_error(actual: &[f32], expected: &[f32]) {
         .fold(0.0f32, |max, (actual, expected)| {
             max.max((actual - expected).abs())
         });
-    assert!(error <= 1.0e-5, "max_abs_error={error:.8e}");
+    assert!(error <= 1.0e-7, "max_abs_error={error:.8e}");
 }
