@@ -1,4 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer};
+use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::linear_backward::{LinearBackwardModule, LinearBackwardMsEdenScratch};
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
@@ -19,6 +20,10 @@ pub struct AttentionCProjScratch<'scratch> {
     pub weight_t: &'scratch mut DeviceBuffer<f32>,
     pub input_t: &'scratch mut DeviceBuffer<f32>,
     pub linear: LinearBackwardMsEdenScratch<'scratch>,
+}
+
+pub struct AttentionCoreScratch<'scratch> {
+    pub softmax_d: &'scratch mut DeviceBuffer<f32>,
 }
 
 pub struct AttentionBackwardSeeds {
@@ -45,4 +50,13 @@ pub struct AttentionCProjBackwardArgs<'a, 'scratch, 'out> {
     pub d_attn_c_proj_weight: &'out mut DeviceBuffer<f32>,
     pub scratch: AttentionCProjScratch<'scratch>,
     pub seeds: AttentionBackwardSeeds,
+}
+
+pub struct AttentionCoreBackwardArgs<'a, 'scratch, 'out> {
+    pub stream: &'a CudaStream,
+    pub module: &'a AttentionModule,
+    pub saved: BlockForwardSaved<'a>,
+    pub d_attention_out: &'a DeviceBuffer<f32>,
+    pub d_qkv: &'out mut DeviceBuffer<f32>,
+    pub scratch: AttentionCoreScratch<'scratch>,
 }

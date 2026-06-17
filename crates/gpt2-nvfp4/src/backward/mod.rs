@@ -6,7 +6,8 @@ mod mlp;
 
 pub use attention::{
     AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
-    AttentionCProjScratch, c_proj_backward as attention_c_proj_backward,
+    AttentionCProjScratch, AttentionCoreBackwardArgs, AttentionCoreScratch,
+    c_proj_backward as attention_c_proj_backward, causal_attention_backward,
 };
 pub use block::{BlockMlpBackwardArgs, BlockMlpBackwardModules, mlp_side_backward};
 pub use final_head::{
