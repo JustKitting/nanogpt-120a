@@ -59,8 +59,9 @@ pub struct BlockBackwardGrads<'a> {
     pub ln_2: LayerNormGrads<'a>,
     pub d_mlp_up: &'a mut DeviceBuffer<f32>,
     pub d_mlp_relu2: &'a mut DeviceBuffer<f32>,
-    pub d_c_fc_weight: &'a mut DeviceBuffer<f32>,
-    pub d_c_proj_weight: &'a mut DeviceBuffer<f32>,
+    pub d_attn_c_proj_weight: &'a mut DeviceBuffer<f32>,
+    pub d_mlp_c_fc_weight: &'a mut DeviceBuffer<f32>,
+    pub d_mlp_c_proj_weight: &'a mut DeviceBuffer<f32>,
     pub d_residual_out: &'a mut DeviceBuffer<f32>,
 }
 

@@ -12,11 +12,12 @@ pub use activations::{
 };
 
 pub use backward::{
-    BlockMlpBackwardArgs, BlockMlpBackwardModules, FinalHeadBackwardArgs, FinalHeadBackwardModules,
-    FinalHeadBackwardScratch, FinalHeadBackwardSeeds, Gpt2LayerNormBackwardArgs,
-    Gpt2LayerNormBackwardInputArgs, Gpt2LayerNormBackwardParamArgs, MlpBackwardArgs,
-    MlpBackwardGrads, MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds,
-    final_head_backward, layer_norm_backward, layer_norm_backward_input,
+    AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
+    AttentionCProjScratch, BlockMlpBackwardArgs, BlockMlpBackwardModules, FinalHeadBackwardArgs,
+    FinalHeadBackwardModules, FinalHeadBackwardScratch, FinalHeadBackwardSeeds,
+    Gpt2LayerNormBackwardArgs, Gpt2LayerNormBackwardInputArgs, Gpt2LayerNormBackwardParamArgs,
+    MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds,
+    attention_c_proj_backward, final_head_backward, layer_norm_backward, layer_norm_backward_input,
     layer_norm_backward_params, mlp_backward, mlp_side_backward,
 };
 

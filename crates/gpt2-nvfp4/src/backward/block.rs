@@ -43,8 +43,8 @@ pub fn mlp_side_backward(args: BlockMlpBackwardArgs<'_, '_, '_>) -> Result<(), D
         ln_2: ln_2_grads,
         d_mlp_up,
         d_mlp_relu2,
-        d_c_fc_weight,
-        d_c_proj_weight,
+        d_mlp_c_fc_weight,
+        d_mlp_c_proj_weight,
         d_residual_out,
         ..
     } = grads;
@@ -65,8 +65,8 @@ pub fn mlp_side_backward(args: BlockMlpBackwardArgs<'_, '_, '_>) -> Result<(), D
             d_mlp_relu2,
             d_mlp_up,
             d_ln_2_normalized: &mut *d_ln_2_normalized,
-            d_c_proj_weight,
-            d_c_fc_weight,
+            d_c_proj_weight: d_mlp_c_proj_weight,
+            d_c_fc_weight: d_mlp_c_fc_weight,
         },
         scratch,
         seeds,

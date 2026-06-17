@@ -1,8 +1,13 @@
+mod attention;
 mod block;
 pub mod final_head;
 mod layer_norm;
 mod mlp;
 
+pub use attention::{
+    AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
+    AttentionCProjScratch, c_proj_backward as attention_c_proj_backward,
+};
 pub use block::{BlockMlpBackwardArgs, BlockMlpBackwardModules, mlp_side_backward};
 pub use final_head::{
     FinalHeadBackwardArgs, FinalHeadBackwardModules, FinalHeadBackwardScratch,
