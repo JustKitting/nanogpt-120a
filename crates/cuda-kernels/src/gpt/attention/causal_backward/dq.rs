@@ -28,21 +28,31 @@ pub(super) fn dq_body(
 
     let lane = warp::lane_id();
     let warp_in_head = dim / 32;
+    let query_value = if valid_dim {
+        q_value(qkv, batch, query, head, dim, &params)
+    } else {
+        0.0
+    };
+    let d_out_query = if valid_dim {
+        d_out_value(d_out, batch, query, head, dim, &params)
+    } else {
+        0.0
+    };
     let mut grad = 0.0;
     let mut key = 0;
     while key <= query {
-        let local_score = if valid_dim {
-            q_value(qkv, batch, query, head, dim, &params)
-                * k_value(qkv, batch, key, head, dim, &params)
+        let key_value = if valid_dim {
+            k_value(qkv, batch, key, head, dim, &params)
         } else {
             0.0
         };
-        let local_dp = if valid_dim {
-            d_out_value(d_out, batch, query, head, dim, &params)
-                * v_value(qkv, batch, key, head, dim, &params)
+        let value_value = if valid_dim {
+            v_value(qkv, batch, key, head, dim, &params)
         } else {
             0.0
         };
+        let local_score = query_value * key_value;
+        let local_dp = d_out_query * value_value;
         let score = reduce_head(local_score, lane, warp_in_head, reduce);
         let dp = reduce_head(local_dp, lane, warp_in_head, reduce);
         if dim == 0 {
@@ -51,7 +61,7 @@ pub(super) fn dq_body(
         }
         thread::sync_threads();
         if valid_dim {
-            grad += ds[0] * k_value(qkv, batch, key, head, dim, &params) * params.scale;
+            grad += ds[0] * key_value * params.scale;
         }
         key += 1;
     }
