@@ -6,7 +6,7 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, DriverError};
 
 pub use causal::{CausalAttentionArgs, CausalAttentionParams};
-pub use qkv_projection::{CProjArgs, QkvProjectionArgs, QkvProjectionParams};
+pub use qkv_projection::{CProjArgs, CProjTapeArgs, QkvProjectionArgs, QkvProjectionParams};
 
 pub struct AttentionModule {
     qkv_projection: qkv_projection::kernels::LoadedModule,

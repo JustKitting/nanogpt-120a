@@ -14,7 +14,7 @@ pub mod linear_backward;
 pub mod lm_head;
 #[path = "gpt/loss.rs"]
 pub mod loss;
-#[path = "gpt/mlp.rs"]
+#[path = "gpt/mlp/mod.rs"]
 pub mod mlp;
 #[path = "utils/mma/mod.rs"]
 pub mod mma;

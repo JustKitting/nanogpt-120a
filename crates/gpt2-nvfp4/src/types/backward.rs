@@ -22,14 +22,14 @@ pub struct BlockForwardSaved<'a> {
     pub attention_out: &'a DeviceBuffer<f32>,
     pub residual_after_attention: &'a DeviceBuffer<f32>,
     pub ln_2: LayerNormSaved<'a>,
-    pub mlp_activation: &'a DeviceBuffer<f32>,
+    pub mlp_up: &'a DeviceBuffer<f32>,
+    pub mlp_relu2: &'a DeviceBuffer<f32>,
     pub residual_out: &'a DeviceBuffer<f32>,
 }
 
 pub struct LayerNormSaved<'a> {
     pub residual: &'a DeviceBuffer<f32>,
     pub normalized: &'a DeviceBuffer<f32>,
-    pub normalized_amax: &'a DeviceBuffer<f32>,
 }
 
 pub struct Gpt2BackwardGrads<'a> {
@@ -46,7 +46,8 @@ pub struct BlockBackwardGrads<'a> {
     pub d_attention_out: &'a mut DeviceBuffer<f32>,
     pub d_residual_after_attention: &'a mut DeviceBuffer<f32>,
     pub ln_2: LayerNormGrads<'a>,
-    pub d_mlp_activation: &'a mut DeviceBuffer<f32>,
+    pub d_mlp_up: &'a mut DeviceBuffer<f32>,
+    pub d_mlp_relu2: &'a mut DeviceBuffer<f32>,
     pub d_residual_out: &'a mut DeviceBuffer<f32>,
 }
 

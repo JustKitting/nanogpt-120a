@@ -1,22 +1,9 @@
 use cuda_core::DriverError;
-use rust_kernels_cuda::layer_norm::{GptLayerNormArgs, LayerNormModule};
-use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
+use rust_kernels_cuda::layer_norm::GptLayerNormArgs;
 
+use super::args::{LayerNormForwardArgs, LayerNormTensors};
+use crate::types::{HiddenStateDevice, HiddenVectorShape, LayerNormTensor, Nvfp4ShapeInit};
 use crate::{GPT2_CONTEXT_LEN, GPT2_LAYER_NORM_EPSILON, GPT2_N_EMBD};
-
-use super::{HiddenStateDevice, HiddenVectorShape, LayerNormTensor, Nvfp4ShapeInit};
-
-#[derive(Clone, Copy)]
-pub struct LayerNormTensors<'a> {
-    pub weight: Nvfp4DeviceTensor<'a>,
-    pub bias: Nvfp4DeviceTensor<'a>,
-}
-
-pub struct LayerNormForwardArgs<'a> {
-    pub module: &'a LayerNormModule,
-    pub tensors: LayerNormTensors<'a>,
-    pub hidden: HiddenStateDevice<'a>,
-}
 
 #[derive(Clone, Debug)]
 pub struct LayerNormWeights {
@@ -33,7 +20,7 @@ impl LayerNormWeights {
     }
 
     pub fn input_from_block<'a>(
-        module: &'a LayerNormModule,
+        module: &'a rust_kernels_cuda::layer_norm::LayerNormModule,
         tensors: LayerNormTensors<'a>,
         hidden: HiddenStateDevice<'a>,
     ) -> LayerNormForwardArgs<'a> {

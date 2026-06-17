@@ -1,28 +1,10 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
-use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
+use cuda_core::DriverError;
+use rust_kernels_cuda::embedding::EmbeddingArgs;
 
+use super::args::{HiddenStateDevice, TokenEmbeddingArgs};
 use crate::random::InitRng;
+use crate::types::{Nvfp4ShapeInit, TokenEmbeddingShape};
 use crate::{HiddenState, TokenEmbedding};
-
-use super::{Nvfp4ShapeInit, TokenEmbeddingShape};
-
-pub struct TokenEmbeddingArgs<'a> {
-    pub module: &'a EmbeddingModule,
-    pub stream: &'a CudaStream,
-    pub tokens: &'a DeviceBuffer<u32>,
-    pub token_embedding: Nvfp4DeviceTensor<'a>,
-    pub residual: &'a mut DeviceBuffer<f32>,
-    pub normalized: &'a mut DeviceBuffer<f32>,
-    pub normalized_amax: &'a mut DeviceBuffer<f32>,
-}
-
-pub struct HiddenStateDevice<'a> {
-    pub stream: &'a CudaStream,
-    pub residual: &'a mut DeviceBuffer<f32>,
-    pub normalized: &'a mut DeviceBuffer<f32>,
-    pub normalized_amax: &'a mut DeviceBuffer<f32>,
-}
 
 #[derive(Clone, Debug)]
 pub struct EmbeddingWeights {
