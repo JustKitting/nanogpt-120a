@@ -22,12 +22,13 @@ pub(super) fn accumulate_key(
 ) -> (f32, f32) {
     let mut dk_rot = 0.0;
     let mut dv = 0.0;
+    let key = thread_state.key();
     let key_valid = thread_state.valid(params);
     let key_value = if key_valid {
         k_value(
             qkv,
             thread_state.batch,
-            thread_state.key(),
+            key,
             thread_state.head,
             thread_state.dim,
             params,
@@ -39,7 +40,7 @@ pub(super) fn accumulate_key(
         v_value(
             qkv,
             thread_state.batch,
-            thread_state.key(),
+            key,
             thread_state.head,
             thread_state.dim,
             params,
@@ -47,18 +48,42 @@ pub(super) fn accumulate_key(
     } else {
         0.0
     };
-    let mut query = thread_state.key();
+    let mut query = key;
     while query < params.seq_len {
         let active = thread_state.active(query, params);
+        let query_value = if active {
+            q_value(
+                qkv,
+                thread_state.batch,
+                query,
+                thread_state.head,
+                thread_state.dim,
+                params,
+            )
+        } else {
+            0.0
+        };
+        let d_out_query = if active {
+            d_out_value(
+                d_out,
+                thread_state.batch,
+                query,
+                thread_state.head,
+                thread_state.dim,
+                params,
+            )
+        } else {
+            0.0
+        };
         let score = reduce_key(
-            score_local(qkv, params, thread_state, query, active, key_value),
+            score_local(query_value, active, key_value),
             thread_state.key_offset,
             thread_state.lane,
             thread_state.warp_in_key,
             reduce,
         );
         let dp = reduce_key(
-            dp_local(d_out, params, thread_state, query, active, value_value),
+            dp_local(d_out_query, active, value_value),
             thread_state.key_offset,
             thread_state.lane,
             thread_state.warp_in_key,
@@ -72,6 +97,7 @@ pub(super) fn accumulate_key(
                 params,
                 thread_state,
                 query,
+                active,
                 (score, dp),
                 prob,
                 ds,
@@ -82,24 +108,8 @@ pub(super) fn accumulate_key(
         if active {
             let p = prob[thread_state.key_offset as usize];
             let d_score = ds[thread_state.key_offset as usize];
-            dv += p * d_out_value(
-                d_out,
-                thread_state.batch,
-                query,
-                thread_state.head,
-                thread_state.dim,
-                params,
-            );
-            dk_rot += d_score
-                * q_value(
-                    qkv,
-                    thread_state.batch,
-                    query,
-                    thread_state.head,
-                    thread_state.dim,
-                    params,
-                )
-                * params.scale;
+            dv += p * d_out_query;
+            dk_rot += d_score * query_value * params.scale;
         }
         query += 1;
     }
