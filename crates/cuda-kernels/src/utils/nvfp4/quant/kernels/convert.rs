@@ -54,3 +54,18 @@ pub(super) fn cvt_rn_satfinite_e2m1x2_f32(hi: f32, lo: f32) -> u8 {
     }
     packed as u8
 }
+
+#[inline(always)]
+pub(super) fn cvt_rn_satfinite_e4m3x2_f32(hi: f32, lo: f32) -> u8 {
+    let packed: u16;
+    unsafe {
+        ptx_asm!(
+            "cvt.rn.satfinite.e4m3x2.f32 %0, %1, %2;",
+            out("=h") packed,
+            in("f") hi,
+            in("f") lo,
+            options(register_only),
+        );
+    }
+    packed as u8
+}
