@@ -8,7 +8,7 @@ use super::{TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
 
 impl Trainer {
-    pub fn train_step(&mut self, batch: &TokenBatch) -> AppResult<TrainStats> {
+    pub fn train_step(&mut self, batch: &TokenBatch, sync_loss: bool) -> AppResult<TrainStats> {
         let forward_start = Instant::now();
         let mut stats = self.forward_step(batch)?;
         stats.forward_ms = forward_start.elapsed().as_secs_f64() * 1000.0;
@@ -41,13 +41,15 @@ impl Trainer {
         }
         stats.backward_enqueue_ms = backward_start.elapsed().as_secs_f64() * 1000.0;
 
-        let loss_sync_start = Instant::now();
-        let losses = self.buffers.backward.losses.to_host_vec(stream)?;
-        let active_losses = &losses[..batch.token_count];
-        stats.loss = active_losses.iter().sum::<f32>() / active_losses.len() as f32;
-        stats.finite &= active_losses.iter().all(|value| value.is_finite());
-        stats.nonzero |= active_losses.iter().any(|value| value.abs() > 0.0);
-        stats.loss_sync_ms = loss_sync_start.elapsed().as_secs_f64() * 1000.0;
+        if sync_loss {
+            let loss_sync_start = Instant::now();
+            let losses = self.buffers.backward.losses.to_host_vec(stream)?;
+            let active_losses = &losses[..batch.token_count];
+            stats.loss = active_losses.iter().sum::<f32>() / active_losses.len() as f32;
+            stats.finite &= active_losses.iter().all(|value| value.is_finite());
+            stats.nonzero |= active_losses.iter().any(|value| value.abs() > 0.0);
+            stats.loss_sync_ms = loss_sync_start.elapsed().as_secs_f64() * 1000.0;
+        }
 
         let optimizer_start = Instant::now();
         let updates = super::optimizer_apply::apply_weight_updates(

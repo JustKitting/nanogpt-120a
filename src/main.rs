@@ -25,19 +25,20 @@ fn main() -> AppResult {
     println!("training_tokens={} steps={steps}", data.token_count());
 
     for step in 0..steps {
+        let log_step = should_log_step(step, steps, log_interval);
         let window = data.next_batch()?;
         let offset = window.offset;
         let source = window.source.display().to_string();
         let window_batch_size = window.batch_size;
         let window_seq_len = window.seq_len;
         let batch = trainer.batch_from_default_windows(&window.tokens)?;
-        let stats = trainer.train_step(&batch)?;
-        let delta = previous_loss
-            .map(|loss| format!("{:+.6}", stats.loss - loss))
-            .unwrap_or_else(|| "n/a".to_string());
-        let ema = update_loss_ema(&mut loss_ema, stats.loss);
+        let stats = trainer.train_step(&batch, log_step)?;
 
-        if should_log_step(step, steps, log_interval) {
+        if log_step {
+            let delta = previous_loss
+                .map(|loss| format!("{:+.6}", stats.loss - loss))
+                .unwrap_or_else(|| "n/a".to_string());
+            let ema = update_loss_ema(&mut loss_ema, stats.loss);
             println!(
                 "step={step} source={source} offset={offset} batch_size={window_batch_size} seq_len={window_seq_len} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} aurora_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_sync_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
                 stats.tokens,
@@ -60,6 +61,7 @@ fn main() -> AppResult {
                 stats.optimizer.final_norm_ms,
                 stats.optimizer.blocks_ms,
             );
+            previous_loss = Some(stats.loss);
         }
         if should_eval_step(step, steps, eval_interval) {
             let val_loss = trainer.eval_loss(&validation_batch)?;
@@ -112,7 +114,6 @@ fn main() -> AppResult {
                 );
             }
         }
-        previous_loss = Some(stats.loss);
     }
 
     Ok(())
