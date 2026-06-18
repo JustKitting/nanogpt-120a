@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 
-use super::super::kernels::MATRIX_THREADS_PER_BLOCK;
+use super::super::threads::MATRIX_THREADS_PER_BLOCK;
 use super::{OptimizerModule, matrix_config};
 
 impl OptimizerModule {
@@ -13,7 +13,7 @@ impl OptimizerModule {
         rows: u32,
         cols: u32,
     ) -> Result<(), DriverError> {
-        self.apply.row.row_scale_apply_kernel(
+        self.apply.aurora.row.row_scale_apply_kernel(
             stream,
             matrix_config(rows * cols),
             x,
@@ -34,7 +34,7 @@ impl OptimizerModule {
         target_row_sq: f32,
         eps: f32,
     ) -> Result<(), DriverError> {
-        self.apply.row.row_scale_refine_kernel(
+        self.apply.aurora.row.row_scale_refine_kernel(
             stream,
             LaunchConfig {
                 grid_dim: (rows, 1, 1),

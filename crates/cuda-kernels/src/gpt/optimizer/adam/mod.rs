@@ -2,7 +2,7 @@ use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
 use crate::float_ptx::sqrt_f32;
 
-use super::APPLY_THREADS_PER_BLOCK;
+use super::threads::APPLY_THREADS_PER_BLOCK;
 
 #[cuda_module]
 pub(super) mod module {

@@ -2,7 +2,7 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 
 use crate::float_ptx::sqrt_f32;
 
-use super::{MATRIX_THREADS_PER_BLOCK, WARP_SIZE, WARPS_PER_BLOCK};
+use super::super::threads::{MATRIX_THREADS_PER_BLOCK, WARP_SIZE, WARPS_PER_BLOCK};
 
 #[allow(static_mut_refs)]
 #[cuda_module]

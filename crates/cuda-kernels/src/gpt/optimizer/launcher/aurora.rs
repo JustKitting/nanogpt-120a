@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 
-use super::super::kernels::MATRIX_THREADS_PER_BLOCK;
+use super::super::threads::MATRIX_THREADS_PER_BLOCK;
 use super::{OptimizerModule, matrix_config};
 
 impl OptimizerModule {
@@ -13,7 +13,7 @@ impl OptimizerModule {
         mu: f32,
         len: u32,
     ) -> Result<(), DriverError> {
-        self.apply.aurora.aurora_momentum_kernel(
+        self.apply.aurora.momentum.aurora_momentum_kernel(
             stream,
             matrix_config(len),
             grad,
@@ -31,7 +31,7 @@ impl OptimizerModule {
         out: &mut DeviceBuffer<f32>,
         len: u32,
     ) -> Result<(), DriverError> {
-        self.apply.matrix.matrix_frobenius_norm_kernel(
+        self.apply.aurora.matrix.matrix_frobenius_norm_kernel(
             stream,
             LaunchConfig {
                 grid_dim: (1, 1, 1),
@@ -51,9 +51,13 @@ impl OptimizerModule {
         norm: &DeviceBuffer<f32>,
         len: u32,
     ) -> Result<(), DriverError> {
-        self.apply
-            .matrix
-            .matrix_scale_in_place_kernel(stream, matrix_config(len), x, norm, len)
+        self.apply.aurora.matrix.matrix_scale_in_place_kernel(
+            stream,
+            matrix_config(len),
+            x,
+            norm,
+            len,
+        )
     }
 
     pub fn matrix_combine(
@@ -66,7 +70,7 @@ impl OptimizerModule {
         b_scale: f32,
         len: u32,
     ) -> Result<(), DriverError> {
-        self.apply.matrix.matrix_combine_kernel(
+        self.apply.aurora.matrix.matrix_combine_kernel(
             stream,
             matrix_config(len),
             a,
@@ -87,7 +91,7 @@ impl OptimizerModule {
         cols: u32,
         eps: f32,
     ) -> Result<(), DriverError> {
-        self.apply.row.row_inv_norm_kernel(
+        self.apply.aurora.row.row_inv_norm_kernel(
             stream,
             LaunchConfig {
                 grid_dim: (rows, 1, 1),

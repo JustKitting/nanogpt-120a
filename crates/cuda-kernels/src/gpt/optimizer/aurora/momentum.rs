@@ -1,6 +1,6 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
-use super::MATRIX_THREADS_PER_BLOCK;
+use super::super::threads::MATRIX_THREADS_PER_BLOCK;
 
 #[cuda_module]
 pub(super) mod module {

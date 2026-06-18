@@ -1,6 +1,11 @@
+mod adam;
 mod args;
-mod kernels;
+mod aurora;
+mod embedding;
 mod launcher;
+mod modules;
+mod schedule_free;
+mod threads;
 
 pub use args::{
     AdamWUpdateArgs, EmbeddingLookupGradArgs, Nvfp4WeightUpdateArgs, ScheduleFreeAverageArgs,

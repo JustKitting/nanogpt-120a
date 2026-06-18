@@ -1,7 +1,7 @@
 use cuda_core::{DriverError, LaunchConfig};
 
 use super::super::args::{AdamWUpdateArgs, ScheduleFreeAverageArgs};
-use super::super::kernels::APPLY_THREADS_PER_BLOCK;
+use super::super::threads::APPLY_THREADS_PER_BLOCK;
 use super::OptimizerModule;
 
 impl OptimizerModule {

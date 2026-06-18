@@ -2,7 +2,7 @@ use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
 use crate::atomic::atomic_add_f32;
 
-use super::EMBEDDING_GRAD_THREADS_PER_BLOCK;
+use super::threads::EMBEDDING_GRAD_THREADS_PER_BLOCK;
 
 #[cuda_module]
 pub(super) mod module {

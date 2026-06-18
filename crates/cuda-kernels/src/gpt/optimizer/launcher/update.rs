@@ -3,7 +3,7 @@ use cuda_core::{DriverError, LaunchConfig};
 use super::super::args::{
     Nvfp4WeightUpdateArgs, ScheduleFreeAverageArgs, ScheduleFreeMaterializeArgs,
 };
-use super::super::kernels::APPLY_THREADS_PER_BLOCK;
+use super::super::threads::APPLY_THREADS_PER_BLOCK;
 use super::OptimizerModule;
 
 impl OptimizerModule {
@@ -16,7 +16,7 @@ impl OptimizerModule {
         assert!(args.x_master.len() >= args.len as usize);
         assert!(args.aurora_update.len() >= args.len as usize);
 
-        self.apply.update.fp32_weight_update_kernel(
+        self.apply.aurora.update.fp32_weight_update_kernel(
             args.stream,
             LaunchConfig {
                 grid_dim: (args.len.div_ceil(APPLY_THREADS_PER_BLOCK), 1, 1),
@@ -59,7 +59,7 @@ impl OptimizerModule {
         assert!(args.x_master.len() >= args.len as usize);
         assert!(args.materialized.len() >= args.len as usize);
 
-        self.apply.update.schedule_free_interpolate_kernel(
+        self.apply.schedule_free.schedule_free_interpolate_kernel(
             args.stream,
             LaunchConfig {
                 grid_dim: (args.len.div_ceil(APPLY_THREADS_PER_BLOCK), 1, 1),
@@ -92,7 +92,7 @@ impl OptimizerModule {
         assert!(args.x_master.len() >= args.len as usize);
         assert!(args.z_master.len() >= args.len as usize);
 
-        self.apply.update.schedule_free_average_kernel(
+        self.apply.schedule_free.schedule_free_average_kernel(
             args.stream,
             LaunchConfig {
                 grid_dim: (args.len.div_ceil(APPLY_THREADS_PER_BLOCK), 1, 1),

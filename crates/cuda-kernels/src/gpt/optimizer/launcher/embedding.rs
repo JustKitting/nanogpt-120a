@@ -1,7 +1,7 @@
 use cuda_core::{DriverError, LaunchConfig};
 
 use super::super::args::EmbeddingLookupGradArgs;
-use super::super::kernels::EMBEDDING_GRAD_THREADS_PER_BLOCK;
+use super::super::threads::EMBEDDING_GRAD_THREADS_PER_BLOCK;
 use super::OptimizerModule;
 
 impl OptimizerModule {

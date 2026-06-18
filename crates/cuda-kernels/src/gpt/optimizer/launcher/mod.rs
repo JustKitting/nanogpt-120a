@@ -8,18 +8,19 @@ use std::sync::Arc;
 
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 
-use super::kernels::{self, MATRIX_THREADS_PER_BLOCK};
+use super::modules;
+use super::threads::MATRIX_THREADS_PER_BLOCK;
 use crate::nvfp4_quant::{Nvfp4QuantArgs, Nvfp4QuantModule, TensorAmaxArgs};
 
 pub struct OptimizerModule {
-    pub(super) apply: kernels::LoadedModule,
+    pub(super) apply: modules::LoadedModule,
     quant: Nvfp4QuantModule,
 }
 
 impl OptimizerModule {
     pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
         Ok(Self {
-            apply: kernels::from_module(module.clone())?,
+            apply: modules::from_module(module.clone())?,
             quant: Nvfp4QuantModule::from_module(module)?,
         })
     }
