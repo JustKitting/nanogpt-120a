@@ -78,13 +78,6 @@ fn apply_b(
         coefficients.a,
         1.0,
     )?;
-    args.modules.optimizer.elementwise_linear_combination(
-        args.stream,
-        &args.scratch.oriented,
-        &args.scratch.oriented,
-        &mut args.scratch.polar_x,
-        1.0,
-        0.0,
-        rows * cols,
-    )
+    std::mem::swap(&mut args.scratch.polar_x, &mut args.scratch.oriented);
+    Ok(())
 }
