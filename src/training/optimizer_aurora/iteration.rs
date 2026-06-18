@@ -1,9 +1,7 @@
 use cuda_core::DriverError;
-use rust_kernels_cuda::transpose::TransposeF32Args;
 
 use super::AuroraMatrixArgs;
-use super::polar::POLAR_ITERATIONS;
-use super::tc::{tc_matmul_add, tc_self_matmul_symmetric};
+use super::tc::{tc_matmul_add, tc_matmul_add_rhs_transposed_in_place, tc_self_matmul_symmetric};
 
 pub(super) fn polar_iteration(
     args: &mut AuroraMatrixArgs<'_, '_>,
@@ -13,19 +11,7 @@ pub(super) fn polar_iteration(
 ) -> Result<(), DriverError> {
     build_a(args, rows, cols, iter)?;
     build_b(args, rows, iter)?;
-    apply_b(args, rows, cols, iter)?;
-    if iter + 1 < POLAR_ITERATIONS {
-        args.modules.optimizer.matrix_combine(
-            args.stream,
-            &args.scratch.polar_next,
-            &args.scratch.polar_next,
-            &mut args.scratch.polar_x,
-            1.0,
-            0.0,
-            rows * cols,
-        )?;
-    }
-    Ok(())
+    apply_b(args, rows, cols)
 }
 
 fn build_a(
@@ -66,33 +52,17 @@ fn build_b(args: &mut AuroraMatrixArgs<'_, '_>, rows: u32, iter: usize) -> Resul
     )
 }
 
-fn apply_b(
-    args: &mut AuroraMatrixArgs<'_, '_>,
-    rows: u32,
-    cols: u32,
-    iter: usize,
-) -> Result<(), DriverError> {
-    args.modules.transpose.transpose_f32(TransposeF32Args {
-        stream: args.stream,
-        input: &args.scratch.polar_x,
-        output: &mut args.scratch.polar_xt,
-        rows,
-        cols,
-    })?;
-    tc_matmul_add(
+fn apply_b(args: &mut AuroraMatrixArgs<'_, '_>, rows: u32, cols: u32) -> Result<(), DriverError> {
+    tc_matmul_add_rhs_transposed_in_place(
         args.stream,
         args.modules,
         &mut args.scratch.tc,
         &args.scratch.b,
-        &args.scratch.polar_xt,
-        &args.scratch.polar_x,
-        &mut args.scratch.polar_next,
+        &mut args.scratch.polar_x,
         rows,
         cols,
         rows,
         2.0,
         1.0,
-        args.seed,
-        0x3000 + iter as u32,
     )
 }

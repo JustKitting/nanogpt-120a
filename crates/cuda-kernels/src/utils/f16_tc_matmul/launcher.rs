@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
-use super::args::{F16TcMatmulAddArgs, F16TcMatmulArgs, F16TcSymmetricMatmulArgs};
+use super::args::{F16TcMatmulArgs, F16TcSymmetricMatmulArgs};
+use super::cta_tile::{CTA_M, CTA_N, CTA_THREADS};
 use super::kernels;
 use super::prepare::{prepare_halves, prepare_self_halves};
 
 pub struct F16TcMatmulModule {
-    module: kernels::module::LoadedModule,
+    pub(super) module: kernels::module::LoadedModule,
 }
 
 impl F16TcMatmulModule {
@@ -32,13 +33,9 @@ impl F16TcMatmulModule {
             args.k,
         )?;
 
-        self.module.f16_batched_tc_matmul_kernel(
+        self.module.f16_cta_tc_matmul_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.n.div_ceil(8), args.m.div_ceil(16), args.batch_count),
-                block_dim: (32, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            cta_config(args.m, args.n, args.batch_count),
             scratch.a_halves,
             scratch.b_t_halves,
             args.out,
@@ -46,45 +43,6 @@ impl F16TcMatmulModule {
             args.m,
             args.n,
             k,
-        )
-    }
-
-    pub fn batched_matmul_add(
-        &self,
-        args: F16TcMatmulAddArgs<'_, '_, '_>,
-    ) -> Result<(), DriverError> {
-        assert!(args.base.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
-        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
-
-        let (scratch, k) = prepare_halves(
-            &self.module,
-            args.stream,
-            args.a,
-            args.b_t,
-            args.scratch,
-            args.batch_count,
-            args.m,
-            args.n,
-            args.k,
-        )?;
-
-        self.module.f16_batched_tc_matmul_add_kernel(
-            args.stream,
-            LaunchConfig {
-                grid_dim: (args.n.div_ceil(8), args.m.div_ceil(16), args.batch_count),
-                block_dim: (32, 1, 1),
-                shared_mem_bytes: 0,
-            },
-            scratch.a_halves,
-            scratch.b_t_halves,
-            args.base,
-            args.out,
-            args.batch_count,
-            args.m,
-            args.n,
-            k,
-            args.base_scale,
-            args.matmul_scale,
         )
     }
 
@@ -113,5 +71,13 @@ impl F16TcMatmulModule {
             args.rows,
             cols,
         )
+    }
+}
+
+pub(super) fn cta_config(m: u32, n: u32, batch_count: u32) -> LaunchConfig {
+    LaunchConfig {
+        grid_dim: (n.div_ceil(CTA_N), m.div_ceil(CTA_M), batch_count),
+        block_dim: (CTA_THREADS, 1, 1),
+        shared_mem_bytes: 0,
     }
 }

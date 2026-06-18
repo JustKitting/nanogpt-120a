@@ -24,7 +24,7 @@ pub(super) fn polar(
         polar_wide(args, cols, rows)?;
         return args.modules.transpose.transpose_f32(TransposeF32Args {
             stream: args.stream,
-            input: &args.scratch.polar_next,
+            input: &args.scratch.polar_x,
             output: &mut args.scratch.u,
             rows: cols,
             cols: rows,
@@ -35,8 +35,8 @@ pub(super) fn polar(
     polar_wide(args, rows, cols)?;
     args.modules.optimizer.matrix_combine(
         args.stream,
-        &args.scratch.polar_next,
-        &args.scratch.polar_next,
+        &args.scratch.polar_x,
+        &args.scratch.polar_x,
         &mut args.scratch.u,
         1.0,
         0.0,
@@ -63,20 +63,10 @@ fn normalize(args: &mut AuroraMatrixArgs<'_, '_>, len: u32) -> Result<(), Driver
         &mut args.scratch.norm,
         len,
     )?;
-    args.modules.optimizer.matrix_scale(
+    args.modules.optimizer.matrix_scale_in_place(
         args.stream,
-        &args.scratch.polar_x,
-        &args.scratch.norm,
-        &mut args.scratch.polar_next,
-        len,
-    )?;
-    args.modules.optimizer.matrix_combine(
-        args.stream,
-        &args.scratch.polar_next,
-        &args.scratch.polar_next,
         &mut args.scratch.polar_x,
-        1.0,
-        0.0,
+        &args.scratch.norm,
         len,
     )
 }

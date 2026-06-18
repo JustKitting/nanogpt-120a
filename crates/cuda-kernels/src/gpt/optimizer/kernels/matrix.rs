@@ -34,11 +34,12 @@ pub(super) mod module {
     }
 
     #[kernel]
-    pub fn matrix_scale_kernel(x: &[f32], norm: &[f32], mut out: DisjointSlice<f32>, len: u32) {
+    pub fn matrix_scale_in_place_kernel(mut x: DisjointSlice<f32>, norm: &[f32], len: u32) {
         let index = thread::blockIdx_x() * MATRIX_THREADS_PER_BLOCK + thread::threadIdx_x();
         if index < len {
             unsafe {
-                *out.get_unchecked_mut(index as usize) = x[index as usize] / norm[0];
+                let value = x.get_unchecked_mut(index as usize);
+                *value /= norm[0];
             }
         }
     }

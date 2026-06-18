@@ -44,17 +44,16 @@ impl OptimizerModule {
         )
     }
 
-    pub fn matrix_scale(
+    pub fn matrix_scale_in_place(
         &self,
         stream: &CudaStream,
-        x: &DeviceBuffer<f32>,
+        x: &mut DeviceBuffer<f32>,
         norm: &DeviceBuffer<f32>,
-        out: &mut DeviceBuffer<f32>,
         len: u32,
     ) -> Result<(), DriverError> {
         self.apply
             .matrix
-            .matrix_scale_kernel(stream, matrix_config(len), x, norm, out, len)
+            .matrix_scale_in_place_kernel(stream, matrix_config(len), x, norm, len)
     }
 
     pub fn matrix_combine(
