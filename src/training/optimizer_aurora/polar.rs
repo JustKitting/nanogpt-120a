@@ -57,7 +57,11 @@ fn polar_wide(
 }
 
 fn normalize_polar_x(args: &mut AuroraMatrixArgs<'_, '_>, len: u32) -> Result<(), DriverError> {
-    args.modules
-        .optimizer
-        .polar_normalize_in_place(args.stream, &mut args.scratch.polar_x, len)
+    args.modules.optimizer.polar_normalize_in_place(
+        args.stream,
+        &mut args.scratch.polar_x,
+        &mut args.scratch.polar_chunks,
+        &mut args.scratch.polar_inv_norm,
+        len,
+    )
 }

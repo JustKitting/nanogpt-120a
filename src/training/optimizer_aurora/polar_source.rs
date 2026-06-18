@@ -38,12 +38,16 @@ pub(super) fn normalize_source_to_polar_x(
             args.stream,
             &args.scratch.oriented,
             &mut args.scratch.polar_x,
+            &mut args.scratch.polar_chunks,
+            &mut args.scratch.polar_inv_norm,
             len,
         ),
         PolarSource::Scaled => args.modules.optimizer.polar_normalize(
             args.stream,
             &args.scratch.scaled,
             &mut args.scratch.polar_x,
+            &mut args.scratch.polar_chunks,
+            &mut args.scratch.polar_inv_norm,
             len,
         ),
     }

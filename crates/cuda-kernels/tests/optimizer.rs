@@ -3,12 +3,13 @@ use std::error::Error;
 use cuda_core::{CudaContext, DeviceBuffer};
 use rust_kernels_cuda::optimizer::{
     AdamWUpdateArgs, EmbeddingLookupGradArgs, Nvfp4WeightUpdateArgs, OptimizerModule,
+    polar_normalize_chunks,
 };
 
 mod common;
 
 const LEN: usize = 32;
-const POLAR_LEN: usize = 1024;
+const POLAR_LEN: usize = 4096;
 const E2M1_ONE_PAIR: u8 = 0x22;
 const E4M3_ONE: u8 = 0x38;
 
@@ -22,8 +23,17 @@ fn aurora_polar_normalize_broadcasts_block_sum_to_all_threads() -> Result<(), Bo
 
     let x = DeviceBuffer::from_host(&stream, &[1.0_f32; POLAR_LEN])?;
     let mut out = DeviceBuffer::<f32>::zeroed(&stream, POLAR_LEN)?;
+    let mut chunks = DeviceBuffer::<f32>::zeroed(&stream, polar_normalize_chunks(POLAR_LEN))?;
+    let mut inv_norm = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
 
-    module.polar_normalize(&stream, &x, &mut out, POLAR_LEN as u32)?;
+    module.polar_normalize(
+        &stream,
+        &x,
+        &mut out,
+        &mut chunks,
+        &mut inv_norm,
+        POLAR_LEN as u32,
+    )?;
 
     let actual = out.to_host_vec(&stream)?;
     let expected = 1.0 / ((POLAR_LEN as f32).sqrt() * 1.01 + 1.0e-7);

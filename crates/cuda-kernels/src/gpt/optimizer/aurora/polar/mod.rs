@@ -1,4 +1,5 @@
 mod kernels;
-mod normalize;
+mod reduce;
+mod scale;
 
 pub(super) use kernels::module;

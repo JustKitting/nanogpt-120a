@@ -1,6 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD};
 use rust_kernels_cuda::f16_tc_matmul::{F16TcMatmulScratch, f16_tc_matmul_elements};
+use rust_kernels_cuda::optimizer::polar_normalize_chunks;
 
 pub struct AuroraScratchBuffers {
     pub(super) update: DeviceBuffer<f32>,
@@ -8,6 +9,8 @@ pub struct AuroraScratchBuffers {
     pub(super) scaled: DeviceBuffer<f32>,
     pub(super) u: DeviceBuffer<f32>,
     pub(super) polar_x: DeviceBuffer<f32>,
+    pub(super) polar_chunks: DeviceBuffer<f32>,
+    pub(super) polar_inv_norm: DeviceBuffer<f32>,
     pub(super) a: DeviceBuffer<f32>,
     pub(super) b: DeviceBuffer<f32>,
     pub(super) row_scale: DeviceBuffer<f32>,
@@ -29,6 +32,8 @@ impl AuroraScratchBuffers {
             scaled: DeviceBuffer::zeroed(stream, max_matrix())?,
             u: DeviceBuffer::zeroed(stream, max_matrix())?,
             polar_x: DeviceBuffer::zeroed(stream, max_matrix())?,
+            polar_chunks: DeviceBuffer::zeroed(stream, polar_normalize_chunks(max_matrix()))?,
+            polar_inv_norm: DeviceBuffer::zeroed(stream, 1)?,
             a: DeviceBuffer::zeroed(stream, small_square())?,
             b: DeviceBuffer::zeroed(stream, small_square())?,
             row_scale: DeviceBuffer::zeroed(stream, GPT2_MLP)?,
