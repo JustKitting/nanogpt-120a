@@ -85,23 +85,6 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    pub fn quartet_backward_ms_eden_global_scale_kernel(
-        amax: &[f32],
-        mut out_global_scale: DisjointSlice<f32>,
-    ) {
-        let amax = amax[0];
-        let global_scale = if amax == 0.0 {
-            1.0
-        } else {
-            amax * QUARTET_MS_EDEN_SCALE_OVERRIDE
-                / (QUARTET_MS_EDEN_FP8_MAX * QUARTET_MS_EDEN_FP4_MAX)
-        };
-        unsafe {
-            *out_global_scale.get_unchecked_mut(0) = global_scale;
-        }
-    }
-
-    #[kernel]
     pub fn quartet_backward_ms_eden_global_scale_from_chunks_kernel(
         chunk_amax: &[f32],
         mut out_global_scale: DisjointSlice<f32>,

@@ -461,27 +461,6 @@ mod kernels {
     use super::*;
 
     #[kernel]
-    pub fn linear_backward_projection_kernel(
-        input_bytes: &[u8],
-        input_scales: &[u8],
-        input_global_scales: &[f32],
-        weight_bytes: &[u8],
-        weight_scales: &[u8],
-        mut out: DisjointSlice<f32>,
-        params: Nvfp4ProjectionParams,
-    ) {
-        nvfp4_projection_nobias_kernel_body(
-            input_bytes,
-            input_scales,
-            input_global_scales,
-            weight_bytes,
-            weight_scales,
-            &mut out,
-            params,
-        );
-    }
-
-    #[kernel]
     pub fn linear_backward_projection_device_scale_kernel(
         input_bytes: &[u8],
         input_scales: &[u8],
