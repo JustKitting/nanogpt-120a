@@ -7,9 +7,10 @@ use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
 use crate::mma::mma_m16n8k16_f16_f16_f32;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn cta_matmul_add_f32_rhs_transposed_body(
+pub(super) fn cta_matmul_add_f32_rhs_transposed_base_body(
     a: &[f32],
-    rhs_base: &[f32],
+    rhs: &[f32],
+    base: &[f32],
     mut out: DisjointSlice<f32>,
     a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
     b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
@@ -32,7 +33,7 @@ pub(super) fn cta_matmul_add_f32_rhs_transposed_body(
     let mut acc3 = [0.0_f32; 4];
     let mut k_base = 0;
     while k_base < k {
-        stage_tiles_f32_rhs_transposed(a, rhs_base, a_tile, b_tile, tile, m, n, k, k_base);
+        stage_tiles_f32_rhs_transposed(a, rhs, a_tile, b_tile, tile, m, n, k, k_base);
         thread::sync_threads();
         let a_fragments = load_a_fragments(a_tile, tile);
         mma_m16n8k16_f16_f16_f32(
@@ -62,7 +63,7 @@ pub(super) fn cta_matmul_add_f32_rhs_transposed_body(
         acc0,
         tile,
         tile.warp_n0,
-        rhs_base,
+        base,
         &mut out,
         m,
         n,
@@ -73,7 +74,7 @@ pub(super) fn cta_matmul_add_f32_rhs_transposed_body(
         acc1,
         tile,
         tile.warp_n0 + 1,
-        rhs_base,
+        base,
         &mut out,
         m,
         n,
@@ -84,7 +85,7 @@ pub(super) fn cta_matmul_add_f32_rhs_transposed_body(
         acc2,
         tile,
         tile.warp_n0 + 2,
-        rhs_base,
+        base,
         &mut out,
         m,
         n,
@@ -95,7 +96,7 @@ pub(super) fn cta_matmul_add_f32_rhs_transposed_body(
         acc3,
         tile,
         tile.warp_n0 + 3,
-        rhs_base,
+        base,
         &mut out,
         m,
         n,

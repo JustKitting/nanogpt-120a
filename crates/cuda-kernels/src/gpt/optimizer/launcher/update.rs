@@ -5,6 +5,7 @@ use super::super::args::{
 };
 use super::super::threads::APPLY_THREADS_PER_BLOCK;
 use super::OptimizerModule;
+use crate::nvfp4_quant::nvfp4_tensor_amax_chunks;
 
 impl OptimizerModule {
     pub fn apply_nvfp4_weight_update(
@@ -16,36 +17,35 @@ impl OptimizerModule {
         assert!(args.x_master.len() >= args.len as usize);
         assert!(args.aurora_update.len() >= args.len as usize);
 
-        self.apply.aurora.update.fp32_weight_update_kernel(
-            args.stream,
-            LaunchConfig {
-                grid_dim: (args.len.div_ceil(APPLY_THREADS_PER_BLOCK), 1, 1),
-                block_dim: (APPLY_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
-            args.z_master,
-            args.aurora_update,
-            args.learning_rate,
-            args.weight_decay,
-            args.len,
-        )?;
+        let chunk_count = nvfp4_tensor_amax_chunks(args.len as usize) as u32;
+        self.apply
+            .aurora
+            .update
+            .fp32_weight_update_average_chunk_amax_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: (chunk_count, 1, 1),
+                    block_dim: (APPLY_THREADS_PER_BLOCK, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                args.z_master,
+                args.x_master,
+                args.aurora_update,
+                args.chunk_amax,
+                args.learning_rate,
+                args.weight_decay,
+                args.average_coefficient,
+                args.len,
+            )?;
 
-        self.update_schedule_free_average(ScheduleFreeAverageArgs {
-            stream: args.stream,
-            x_master: args.x_master,
-            z_master: &*args.z_master,
-            len: args.len,
-            coefficient: args.average_coefficient,
-        })?;
-
-        self.requantize(
+        self.requantize_from_chunk_amax(
             args.stream,
             args.bytes,
             args.scales,
             args.global_scale,
             &*args.x_master,
             args.amax,
-            args.chunk_amax,
+            &*args.chunk_amax,
             args.len,
         )
     }

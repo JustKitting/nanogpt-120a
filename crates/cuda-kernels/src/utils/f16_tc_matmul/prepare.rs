@@ -49,32 +49,3 @@ pub(super) fn prepare_halves<'scratch>(
     )?;
     Ok((scratch, padded_k))
 }
-
-pub(super) fn prepare_self_halves<'scratch>(
-    module: &LoadedModule,
-    stream: &CudaStream,
-    x: &DeviceBuffer<f32>,
-    scratch: F16TcMatmulScratch<'scratch>,
-    rows: u32,
-    cols: u32,
-) -> Result<(F16TcMatmulScratch<'scratch>, u32), DriverError> {
-    let padded_cols = f16_tc_matmul_padded_k(cols);
-    assert!(x.len() >= rows as usize * cols as usize);
-    assert!(scratch.a_halves.len() >= rows as usize * padded_cols as usize);
-
-    if padded_cols == cols {
-        convert(module, stream, x, scratch.a_halves, rows * cols)?;
-        return Ok((scratch, cols));
-    }
-
-    assert!(scratch.a_padded.len() >= rows as usize * padded_cols as usize);
-    pad_rows(module, stream, x, scratch.a_padded, rows, cols, padded_cols)?;
-    convert(
-        module,
-        stream,
-        scratch.a_padded,
-        scratch.a_halves,
-        rows * padded_cols,
-    )?;
-    Ok((scratch, padded_cols))
-}

@@ -1,5 +1,6 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
+use crate::amax::{amax4_f32, max4_f32};
 use crate::float_ptx::{abs_f32, max_f32};
 use crate::warp_reduce::warp_max_f32;
 
@@ -81,20 +82,18 @@ pub(crate) mod module {
         let i3 = i2 + stride;
 
         let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
-            max_f32(
-                max_f32(abs_f32(x[i0 as usize]), abs_f32(x[i1 as usize])),
-                max_f32(abs_f32(x[i2 as usize]), abs_f32(x[i3 as usize])),
+            amax4_f32(
+                x[i0 as usize],
+                x[i1 as usize],
+                x[i2 as usize],
+                x[i3 as usize],
             )
         } else {
-            max_f32(
-                max_f32(
-                    checked_abs_f32(x, i0, element_count),
-                    checked_abs_f32(x, i1, element_count),
-                ),
-                max_f32(
-                    checked_abs_f32(x, i2, element_count),
-                    checked_abs_f32(x, i3, element_count),
-                ),
+            max4_f32(
+                checked_abs_f32(x, i0, element_count),
+                checked_abs_f32(x, i1, element_count),
+                checked_abs_f32(x, i2, element_count),
+                checked_abs_f32(x, i3, element_count),
             )
         };
 

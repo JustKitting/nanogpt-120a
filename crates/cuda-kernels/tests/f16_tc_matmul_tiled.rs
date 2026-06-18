@@ -2,7 +2,8 @@ use std::error::Error;
 
 use cuda_core::{CudaContext, CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::f16_tc_matmul::{
-    F16TcMatmulAddArgs, F16TcMatmulModule, F16TcMatmulScratch, f16_tc_matmul_elements,
+    F16TcMatmulAddArgs, F16TcMatmulAddRhsTransposeBaseArgs, F16TcMatmulModule, F16TcMatmulScratch,
+    f16_tc_matmul_elements,
 };
 
 mod common;
@@ -32,6 +33,37 @@ fn cta_tiled_f16_tc_matmul_add_matches_reference() -> Result<(), Box<dyn Error>>
         base: &base,
         out: &mut out,
         scratch: scratch.args(),
+        batch_count: BATCH as u32,
+        m: M as u32,
+        n: N as u32,
+        k: K as u32,
+        base_scale: 2.0,
+        matmul_scale: 3.0,
+    })?;
+
+    for value in out.to_host_vec(&stream)? {
+        assert_close(value, 4.0);
+    }
+    Ok(())
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn cta_tiled_f16_tc_rhs_transposed_base_matches_reference() -> Result<(), Box<dyn Error>> {
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let module = F16TcMatmulModule::from_module(ctx.load_module_from_file(&common::ptx_path())?)?;
+    let a = DeviceBuffer::from_host(&stream, &vec![0.125_f32; BATCH * M * K])?;
+    let rhs = DeviceBuffer::from_host(&stream, &vec![0.25_f32; BATCH * K * N])?;
+    let base = DeviceBuffer::from_host(&stream, &vec![0.5_f32; BATCH * M * N])?;
+    let mut out = DeviceBuffer::<f32>::zeroed(&stream, BATCH * M * N)?;
+
+    module.batched_matmul_add_rhs_transposed_base(F16TcMatmulAddRhsTransposeBaseArgs {
+        stream: &stream,
+        a: &a,
+        rhs: &rhs,
+        base: &base,
+        out: &mut out,
         batch_count: BATCH as u32,
         m: M as u32,
         n: N as u32,

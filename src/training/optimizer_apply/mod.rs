@@ -11,4 +11,4 @@ mod utils;
 
 pub(crate) use adam::adam_debug_config;
 pub use apply::apply_weight_updates;
-use utils::{elapsed_ms, seed};
+use utils::elapsed_ms;

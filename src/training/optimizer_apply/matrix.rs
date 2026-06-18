@@ -18,7 +18,6 @@ pub(super) fn update_matrix_tensor(
     aurora: &mut AuroraScratchBuffers,
     rows: u32,
     cols: u32,
-    seed: u32,
     step: u32,
     average_coefficient: f32,
 ) -> Result<(), DriverError> {
@@ -26,8 +25,8 @@ pub(super) fn update_matrix_tensor(
         stream,
         modules: AuroraModules {
             optimizer: &runtime.optimizer,
-            tc: &runtime.f16_tc_matmul,
             transpose: &runtime.transpose,
+            f16_tc: &runtime.f16_tc_matmul,
         },
         tensor,
         grad,
@@ -36,7 +35,6 @@ pub(super) fn update_matrix_tensor(
         optimizer_scratch: scratch,
         rows,
         cols,
-        seed,
         step,
         average_coefficient,
     })

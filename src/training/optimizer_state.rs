@@ -1,4 +1,4 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError, memory};
 use gpt2_nvfp4::GPT2_N_LAYER;
 use rust_kernels_cuda::nvfp4::{Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4DeviceTensor};
 
@@ -176,7 +176,19 @@ fn clone_device(
     stream: &CudaStream,
     buffer: &DeviceBuffer<f32>,
 ) -> Result<DeviceBuffer<f32>, DriverError> {
-    DeviceBuffer::from_host(stream, &buffer.to_host_vec(stream)?)
+    let cloned = DeviceBuffer::zeroed(stream, buffer.len())?;
+    stream.context().bind_to_thread()?;
+
+    unsafe {
+        memory::memcpy_dtod_async(
+            cloned.cu_deviceptr(),
+            buffer.cu_deviceptr(),
+            buffer.num_bytes(),
+            stream.cu_stream(),
+        )?;
+    }
+
+    Ok(cloned)
 }
 
 fn block_array<F, T>(mut f: F) -> Result<[T; GPT2_N_LAYER], DriverError>

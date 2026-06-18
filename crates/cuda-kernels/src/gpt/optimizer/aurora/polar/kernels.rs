@@ -1,5 +1,6 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
+use crate::block_reduce::block_sum_f32;
 use crate::float_ptx::sqrt_f32;
 
 use super::super::super::threads::{WARP_SIZE, WARPS_PER_BLOCK};
@@ -22,7 +23,7 @@ pub(crate) mod module {
         let warp_in_block = tid / WARP_SIZE;
         let base = thread::blockIdx_x() * crate::optimizer::POLAR_SUM_VALUES_PER_BLOCK as u32;
         let local = reduce::input_chunk_sum(x, base, tid, len);
-        let sum = block_sum!(WARP_SUMS, local, lane, warp_in_block);
+        let sum = block_sum_f32!(WARP_SUMS, local, lane, warp_in_block, WARPS_PER_BLOCK);
 
         if tid == 0 {
             unsafe {
@@ -43,7 +44,7 @@ pub(crate) mod module {
         let lane = warp::lane_id();
         let warp_in_block = tid / WARP_SIZE;
         let local = reduce::chunk_sum(chunks, tid, chunk_count);
-        let sum = block_sum!(WARP_SUMS, local, lane, warp_in_block);
+        let sum = block_sum_f32!(WARP_SUMS, local, lane, warp_in_block, WARPS_PER_BLOCK);
 
         if tid == 0 {
             unsafe {

@@ -75,15 +75,25 @@ impl Nvfp4QuantModule {
     pub fn tensor_amax_f32(&self, args: TensorAmaxArgs<'_, '_>) -> Result<(), DriverError> {
         let chunk_count =
             self.tensor_chunk_amax_f32(args.stream, args.x, args.chunk_amax, args.element_count)?;
+        self.tensor_amax_from_chunks_f32(args.stream, &*args.chunk_amax, args.out, chunk_count)
+    }
+
+    pub fn tensor_amax_from_chunks_f32(
+        &self,
+        stream: &CudaStream,
+        chunk_amax: &DeviceBuffer<f32>,
+        out: &mut DeviceBuffer<f32>,
+        chunk_count: u32,
+    ) -> Result<(), DriverError> {
         self.row_amax.tensor_amax_from_chunks_f32_kernel(
-            args.stream,
+            stream,
             LaunchConfig {
                 grid_dim: (1, 1, 1),
                 block_dim: (THREADS_PER_BLOCK, 1, 1),
                 shared_mem_bytes: 0,
             },
-            &*args.chunk_amax,
-            args.out,
+            chunk_amax,
+            out,
             chunk_count,
         )
     }

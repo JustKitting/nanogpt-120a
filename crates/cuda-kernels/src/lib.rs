@@ -1,7 +1,11 @@
+#[path = "utils/amax.rs"]
+pub(crate) mod amax;
 #[path = "utils/atomic.rs"]
 pub mod atomic;
 #[path = "gpt/attention/mod.rs"]
 pub mod attention;
+#[path = "utils/block_reduce.rs"]
+pub(crate) mod block_reduce;
 #[path = "gpt/embedding.rs"]
 pub mod embedding;
 #[path = "utils/f16_tc_matmul/mod.rs"]

@@ -12,7 +12,6 @@ use super::super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::adam::update_adam_tensor;
 use super::elapsed_ms;
 use super::matrix::update_matrix_tensor;
-use super::seed;
 use std::time::Instant;
 
 pub(super) fn update_mlp(
@@ -39,7 +38,6 @@ pub(super) fn update_mlp(
         aurora,
         GPT2_N_EMBD as u32,
         GPT2_MLP as u32,
-        seed(step, 0x37),
         step,
         average_coefficient,
     )?;
@@ -69,7 +67,6 @@ pub(super) fn update_mlp(
         aurora,
         GPT2_MLP as u32,
         GPT2_N_EMBD as u32,
-        seed(step, 0x41),
         step,
         average_coefficient,
     )?;

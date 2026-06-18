@@ -1,7 +1,7 @@
 use cuda_core::DriverError;
 
 use super::polar::{PolarSource, polar};
-use super::{AuroraMatrixArgs, EPS, PP_ITERATIONS};
+use super::{AuroraMatrixArgs, EPS};
 
 pub(super) fn aurora_oriented(
     args: &mut AuroraMatrixArgs<'_, '_>,
@@ -20,35 +20,13 @@ pub(super) fn aurora_oriented(
         cols,
         EPS,
     )?;
-    for iter in 0..PP_ITERATIONS {
-        args.modules.optimizer.row_scale_apply(
-            args.stream,
-            &args.scratch.oriented,
-            &args.scratch.row_scale,
-            &mut args.scratch.scaled,
-            rows,
-            cols,
-        )?;
-        polar(args, PolarSource::Scaled, rows, cols)?;
-        if iter + 1 < PP_ITERATIONS {
-            refine_row_scale(args, rows, cols)?;
-        }
-    }
-    Ok(())
-}
-
-fn refine_row_scale(
-    args: &mut AuroraMatrixArgs<'_, '_>,
-    rows: u32,
-    cols: u32,
-) -> Result<(), DriverError> {
-    args.modules.optimizer.row_scale_refine(
+    args.modules.optimizer.row_scale_apply(
         args.stream,
-        &args.scratch.u,
-        &mut args.scratch.row_scale,
+        &args.scratch.oriented,
+        &args.scratch.row_scale,
+        &mut args.scratch.scaled,
         rows,
         cols,
-        cols as f32 / rows as f32,
-        EPS,
-    )
+    )?;
+    polar(args, PolarSource::Scaled, rows, cols)
 }

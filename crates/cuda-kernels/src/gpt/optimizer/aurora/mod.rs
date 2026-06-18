@@ -6,10 +6,7 @@
 //! - `row_balance`: computes and applies the diagonal row-balancing state `D_k`.
 //! - `elementwise`: f32 glue kernels such as `out = alpha * a + beta * b`.
 //! - `update`: applies the final Aurora update to the FP32 master weights.
-//! - `reduce`: local block reductions shared by the Aurora kernels.
 
-#[macro_use]
-mod reduce;
 pub(super) mod elementwise;
 mod momentum;
 pub(super) mod polar;

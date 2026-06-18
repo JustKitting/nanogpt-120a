@@ -5,26 +5,6 @@ use super::{OptimizerModule, matrix_config};
 use crate::optimizer::polar_normalize_chunks;
 
 impl OptimizerModule {
-    pub fn aurora_momentum(
-        &self,
-        stream: &CudaStream,
-        grad: &DeviceBuffer<f32>,
-        momentum: &mut DeviceBuffer<f32>,
-        update: &mut DeviceBuffer<f32>,
-        mu: f32,
-        len: u32,
-    ) -> Result<(), DriverError> {
-        self.apply.aurora.momentum.aurora_momentum_kernel(
-            stream,
-            matrix_config(len),
-            grad,
-            momentum,
-            update,
-            mu,
-            len,
-        )
-    }
-
     pub fn polar_normalize(
         &self,
         stream: &CudaStream,
@@ -125,29 +105,5 @@ impl OptimizerModule {
                 b_scale,
                 len,
             )
-    }
-
-    pub fn row_inv_norm(
-        &self,
-        stream: &CudaStream,
-        x: &DeviceBuffer<f32>,
-        row_scale: &mut DeviceBuffer<f32>,
-        rows: u32,
-        cols: u32,
-        eps: f32,
-    ) -> Result<(), DriverError> {
-        self.apply.aurora.row_balance.row_inv_norm_kernel(
-            stream,
-            LaunchConfig {
-                grid_dim: (rows, 1, 1),
-                block_dim: (MATRIX_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
-            x,
-            row_scale,
-            rows,
-            cols,
-            eps,
-        )
     }
 }

@@ -4,12 +4,10 @@
 mod apply;
 mod balance;
 mod finalize;
-mod orient;
 mod polar;
 mod polar_express;
 mod polar_express_coefficients;
 mod polar_source;
-mod tc;
 
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
@@ -25,9 +23,7 @@ use super::optimizer_tc_scratch::AuroraScratchBuffers;
 use apply::apply_update;
 use balance::aurora_oriented;
 use finalize::finalize_update;
-use orient::orient_update;
 
-pub(super) const PP_ITERATIONS: usize = 1;
 pub(super) const EPS: f32 = 1.0e-7;
 
 const MU: f32 = 0.95;
@@ -37,8 +33,8 @@ pub(super) const AURORA_WEIGHT_DECAY: f32 = 0.025;
 #[derive(Clone, Copy)]
 pub(super) struct AuroraModules<'a> {
     pub(super) optimizer: &'a OptimizerModule,
-    pub(super) tc: &'a F16TcMatmulModule,
     pub(super) transpose: &'a TransposeModule,
+    pub(super) f16_tc: &'a F16TcMatmulModule,
 }
 
 pub(super) struct AuroraMatrixArgs<'a, 'scratch> {
@@ -51,7 +47,6 @@ pub(super) struct AuroraMatrixArgs<'a, 'scratch> {
     pub(super) optimizer_scratch: &'a mut OptimizerScratch,
     pub(super) rows: u32,
     pub(super) cols: u32,
-    pub(super) seed: u32,
     pub(super) step: u32,
     pub(super) average_coefficient: f32,
 }
@@ -63,16 +58,17 @@ pub(super) fn aurora_learning_rate(step: u32) -> f32 {
 pub(super) fn apply_aurora_matrix(args: AuroraMatrixArgs<'_, '_>) -> Result<(), DriverError> {
     let mut args = args;
     let len = args.rows * args.cols;
-    args.modules.optimizer.aurora_momentum(
-        args.stream,
-        args.grad,
-        &mut args.state.momentum,
-        &mut args.scratch.update,
-        MU,
-        len,
-    )?;
+    let (oriented_rows, oriented_cols, transposed) =
+        args.modules.optimizer.aurora_momentum_orient(
+            args.stream,
+            args.grad,
+            &mut args.state.momentum,
+            &mut args.scratch.oriented,
+            MU,
+            args.rows,
+            args.cols,
+        )?;
 
-    let (oriented_rows, oriented_cols, transposed) = orient_update(&mut args)?;
     aurora_oriented(&mut args, oriented_rows, oriented_cols)?;
     finalize_update(&mut args, len, transposed)?;
     apply_update(args, len)
