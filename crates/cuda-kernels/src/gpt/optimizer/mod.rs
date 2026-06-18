@@ -17,15 +17,13 @@ mod launcher;
 mod modules;
 mod schedule_free;
 mod threads;
+mod work_grid;
 
 pub use args::{
-    AdamWUpdateArgs, EmbeddingLookupGradArgs, Nvfp4WeightUpdateArgs, ScheduleFreeAverageArgs,
+    AdamWUpdateArgs, AuroraMegaUpdateArgs, EmbeddingLookupGradArgs, ScheduleFreeAverageArgs,
     ScheduleFreeMaterializeArgs,
 };
 pub use launcher::OptimizerModule;
 
-pub const POLAR_SUM_VALUES_PER_BLOCK: usize = 1024;
-
-pub fn polar_normalize_chunks(element_count: usize) -> usize {
-    element_count.div_ceil(POLAR_SUM_VALUES_PER_BLOCK)
-}
+pub const AURORA_COOPERATIVE_BLOCKS: usize = 120;
+pub const AURORA_MATRIX_PHASES: usize = 16;

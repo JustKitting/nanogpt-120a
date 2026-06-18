@@ -69,6 +69,7 @@ impl Trainer {
             &mut self.buffers.optimizer,
             &mut self.buffers.optimizer_state,
             &mut self.buffers.aurora,
+            &self.buffers.aurora_tables,
         )?;
         stats.optimizer = updates.trace;
         stats.optimizer_ms = optimizer_start.elapsed().as_secs_f64() * 1000.0;

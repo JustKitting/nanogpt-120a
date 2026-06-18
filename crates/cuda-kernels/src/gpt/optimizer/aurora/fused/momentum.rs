@@ -1,0 +1,30 @@
+use super::super::super::work_grid::WorkGrid;
+use crate::device_ptr::write_f32;
+
+pub(super) fn momentum_orient(
+    grad: *const f32,
+    momentum: *mut f32,
+    oriented: *mut f32,
+    work: WorkGrid,
+    rows: u32,
+    cols: u32,
+    mu: f32,
+    transposed: bool,
+) {
+    let len = rows * cols;
+    let mut index = work.thread();
+    while index < len {
+        let row = index / cols;
+        let col = index - row * cols;
+        let g = unsafe { *grad.add(index as usize) };
+        unsafe {
+            let momentum_ptr = momentum.add(index as usize);
+            let next_momentum = mu * *momentum_ptr + (1.0 - mu) * g;
+            let nesterov = mu * next_momentum + (1.0 - mu) * g;
+            *momentum_ptr = next_momentum;
+            let dst = if transposed { col * rows + row } else { index };
+            write_f32(oriented, dst, nesterov);
+        }
+        index += work.stride();
+    }
+}

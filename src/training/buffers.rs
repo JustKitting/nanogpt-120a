@@ -5,6 +5,7 @@ use gpt2_nvfp4::{
 
 use super::grads::BackwardBuffers;
 use super::optimizer::OptimizerScratch;
+use super::optimizer_aurora::AuroraPointerTables;
 use super::optimizer_state::OptimizerStateBuffers;
 use super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::scratch::BackwardScratchBuffers;
@@ -35,6 +36,7 @@ pub struct TrainBuffers {
     pub optimizer: OptimizerScratch,
     pub optimizer_state: OptimizerStateBuffers,
     pub aurora: AuroraScratchBuffers,
+    pub aurora_tables: AuroraPointerTables,
 }
 
 impl TrainBuffers {
@@ -43,6 +45,11 @@ impl TrainBuffers {
         runtime: &Runtime,
         uploaded: &UploadedModel,
     ) -> Result<Self, DriverError> {
+        let backward = BackwardBuffers::new(stream)?;
+        let optimizer_state = OptimizerStateBuffers::new(stream, &runtime.decode, uploaded)?;
+        let aurora_tables =
+            AuroraPointerTables::new(stream, uploaded, &backward, &optimizer_state)?;
+
         Ok(Self {
             residual: zero(stream, HiddenState::LEN)?,
             normalized: zero(stream, HiddenState::LEN)?,
@@ -61,11 +68,12 @@ impl TrainBuffers {
             log_sum_exp: zero(stream, AttentionLogSumExp::LEN)?,
             logits: zero(stream, Logits::LEN)?,
             tape: ForwardTapeBuffers::new(stream)?,
-            backward: BackwardBuffers::new(stream)?,
+            backward,
             scratch: BackwardScratchBuffers::new(stream)?,
             optimizer: OptimizerScratch::new(stream)?,
-            optimizer_state: OptimizerStateBuffers::new(stream, &runtime.decode, uploaded)?,
+            optimizer_state,
             aurora: AuroraScratchBuffers::new(stream)?,
+            aurora_tables,
         })
     }
 }

@@ -3,7 +3,7 @@ use cuda_device::ptx_asm;
 use crate::nvfp4_cast::{e2m1_value, e4m3_value};
 
 #[inline(always)]
-pub(super) fn candidate_error(value: f32, scale: f32, global_scale: f32) -> f32 {
+pub(crate) fn candidate_error(value: f32, scale: f32, global_scale: f32) -> f32 {
     let scale_for_payload = if scale == 0.0 { 1.0 } else { scale };
     let inv_scale = 1.0 / (scale_for_payload * global_scale);
     let dequant_scale = scale * global_scale;
@@ -14,7 +14,7 @@ pub(super) fn candidate_error(value: f32, scale: f32, global_scale: f32) -> f32 
 }
 
 #[inline(always)]
-pub(super) fn local_scale_bits(
+pub(crate) fn local_scale_bits(
     group_amax: f32,
     global_scale: f32,
     scale_override: f32,
@@ -36,12 +36,12 @@ pub(super) fn local_scale_bits(
 }
 
 #[inline(always)]
-pub(super) fn scale_value(bits: u16) -> f32 {
+pub(crate) fn scale_value(bits: u16) -> f32 {
     e4m3_value(bits)
 }
 
 #[inline(always)]
-pub(super) fn cvt_rn_satfinite_e2m1x2_f32(hi: f32, lo: f32) -> u8 {
+pub(crate) fn cvt_rn_satfinite_e2m1x2_f32(hi: f32, lo: f32) -> u8 {
     let packed: u16;
     unsafe {
         ptx_asm!(

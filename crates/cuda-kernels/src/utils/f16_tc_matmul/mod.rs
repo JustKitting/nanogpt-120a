@@ -1,13 +1,13 @@
 mod args;
-mod convert;
+pub(crate) mod convert;
 mod cta;
 mod cta_add_f32;
 mod cta_add_f32_rhs_transposed_base;
-mod cta_stage;
+pub(crate) mod cta_stage;
 mod cta_stage_f32;
 mod cta_store;
 mod cta_store_add;
-mod cta_tile;
+pub(crate) mod cta_tile;
 mod kernels;
 mod launch_ops;
 mod launcher;

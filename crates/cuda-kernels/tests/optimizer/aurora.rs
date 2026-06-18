@@ -1,0 +1,22 @@
+use std::error::Error;
+
+#[path = "aurora/fixture.rs"]
+mod fixture;
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn aurora_mega_update_matches_first_iteration_recurrence() -> Result<(), Box<dyn Error>> {
+    fixture::run_first_iteration_case(64, 64)
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn aurora_mega_update_matches_tall_rectangular_recurrence() -> Result<(), Box<dyn Error>> {
+    fixture::run_first_iteration_case(64, 32)
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn aurora_mega_update_matches_wide_rectangular_recurrence() -> Result<(), Box<dyn Error>> {
+    fixture::run_first_iteration_case(32, 64)
+}

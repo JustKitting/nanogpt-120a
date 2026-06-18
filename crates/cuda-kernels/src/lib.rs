@@ -6,6 +6,8 @@ pub mod atomic;
 pub mod attention;
 #[path = "utils/block_reduce.rs"]
 pub(crate) mod block_reduce;
+#[path = "utils/device_ptr.rs"]
+pub(crate) mod device_ptr;
 #[path = "gpt/embedding.rs"]
 pub mod embedding;
 #[path = "utils/f16_tc_matmul/mod.rs"]

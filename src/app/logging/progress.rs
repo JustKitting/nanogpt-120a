@@ -10,6 +10,7 @@ pub struct TrainingLogger {
 
 pub struct StepLogContext<'a> {
     pub step: usize,
+    pub elapsed_s: f64,
     pub source: &'a str,
     pub offset: usize,
     pub batch_size: usize,
@@ -38,7 +39,8 @@ impl TrainingLogger {
         let ema = self.update_loss_ema(stats.loss);
         self.loss_curve.push(step, stats.loss, ema);
         println!(
-            "step={step} source={} offset={} batch_size={} seq_len={} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} aurora_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_sync_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
+            "step={step} elapsed_s={:.3} source={} offset={} batch_size={} seq_len={} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} aurora_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_sync_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
+            context.elapsed_s,
             context.source,
             context.offset,
             context.batch_size,

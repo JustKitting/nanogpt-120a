@@ -7,11 +7,10 @@ use super::super::OptimizerTrace;
 use super::super::grad_block::BlockGradBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::BlockState;
-use super::super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::elapsed_ms;
 use super::layer_norm::update_layer_norm;
-use super::mlp::update_mlp;
-use super::qkv::update_qkv;
+use super::mlp::update_mlp_biases;
+use super::qkv::update_qkv_biases;
 use std::time::Instant;
 
 pub(super) fn update_block(
@@ -21,7 +20,6 @@ pub(super) fn update_block(
     grad: &BlockGradBuffers,
     scratch: &mut OptimizerScratch,
     state: &mut BlockState,
-    aurora: &mut AuroraScratchBuffers,
     step: u32,
     average_coefficient: f32,
     trace: &mut OptimizerTrace,
@@ -40,14 +38,13 @@ pub(super) fn update_block(
     )?;
     trace.adam_ms += elapsed_ms(start);
 
-    update_qkv(
+    update_qkv_biases(
         stream,
         runtime,
         block,
         grad,
         scratch,
         state,
-        aurora,
         step,
         average_coefficient,
         trace,
@@ -66,14 +63,13 @@ pub(super) fn update_block(
     )?;
     trace.adam_ms += elapsed_ms(start);
 
-    update_mlp(
+    update_mlp_biases(
         stream,
         runtime,
         block,
         grad,
         scratch,
         state,
-        aurora,
         step,
         average_coefficient,
         trace,

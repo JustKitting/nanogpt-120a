@@ -1,23 +1,21 @@
-use cuda_core::CudaStream;
-use std::time::Instant;
-
-use crate::AppResult;
-use crate::app::runtime::Runtime;
-use crate::upload::UploadedModel;
-
 use super::super::grads::BackwardBuffers;
 use super::super::optimizer::OptimizerScratch;
-use super::super::optimizer_aurora::aurora_learning_rate;
+use super::super::optimizer_aurora::{AuroraPointerTables, aurora_learning_rate};
 use super::super::optimizer_state::OptimizerStateBuffers;
 use super::super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::super::{OptimizerTrace, TokenBatch};
 use super::adam::{adam_learning_rate, update_adam_tensor};
+use super::aurora::update_aurora_groups;
 use super::block::update_block;
 use super::embedding::add_embedding_lookup_grad;
 use super::layer_norm::update_layer_norm;
 use super::result::WeightUpdateResult;
 use super::utils::elapsed_ms;
-
+use crate::AppResult;
+use crate::app::runtime::Runtime;
+use crate::upload::UploadedModel;
+use cuda_core::CudaStream;
+use std::time::Instant;
 pub fn apply_weight_updates(
     stream: &CudaStream,
     runtime: &Runtime,
@@ -27,6 +25,7 @@ pub fn apply_weight_updates(
     scratch: &mut OptimizerScratch,
     state: &mut OptimizerStateBuffers,
     aurora: &mut AuroraScratchBuffers,
+    aurora_tables: &AuroraPointerTables,
 ) -> AppResult<WeightUpdateResult> {
     let optimizer = &runtime.optimizer;
     let mut trace = OptimizerTrace::default();
@@ -34,7 +33,6 @@ pub fn apply_weight_updates(
     let average_coefficient = state.schedule_free_average_coefficient(step);
     trace.adam_lr = adam_learning_rate(step);
     trace.aurora_lr = aurora_learning_rate(step);
-
     let start = Instant::now();
     add_embedding_lookup_grad(stream, optimizer, batch, grads)?;
     trace.embedding_lookup_ms = elapsed_ms(start);
@@ -96,13 +94,22 @@ pub fn apply_weight_updates(
             grad,
             scratch,
             state,
-            aurora,
             step,
             average_coefficient,
             &mut trace,
         )?;
     }
     trace.blocks_ms = elapsed_ms(start);
+
+    update_aurora_groups(
+        stream,
+        runtime,
+        aurora_tables,
+        aurora,
+        step,
+        average_coefficient,
+        &mut trace,
+    )?;
 
     let diagnostics = diagnostics
         .map(|pending| pending.finish(stream, uploaded))

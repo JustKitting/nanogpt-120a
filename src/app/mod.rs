@@ -5,3 +5,4 @@ pub(crate) mod loss_graph;
 pub(crate) mod run_info;
 pub(crate) mod run_output;
 pub(crate) mod runtime;
+pub(crate) mod wall_clock;

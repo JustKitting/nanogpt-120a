@@ -2,15 +2,6 @@ use cuda_device::DisjointSlice;
 
 use super::cta_tile::CtaTile;
 
-macro_rules! store_four {
-    ($store:ident, $acc:ident, $tile:ident, $warp_n:expr, $($arg:expr),*) => {{
-        $store($acc[0], $tile, $warp_n, 0, $($arg),*);
-        $store($acc[1], $tile, $warp_n, 1, $($arg),*);
-        $store($acc[2], $tile, $warp_n, 2, $($arg),*);
-        $store($acc[3], $tile, $warp_n, 3, $($arg),*);
-    }};
-}
-
 #[inline(always)]
 pub(super) fn store_add(
     acc: [f32; 4],
@@ -23,29 +14,57 @@ pub(super) fn store_add(
     base_scale: f32,
     matmul_scale: f32,
 ) {
-    let scales = StoreScales {
-        base: base_scale,
-        matmul: matmul_scale,
-    };
-    store_four!(
-        store_add_one,
-        acc,
+    store_add_one(
+        acc[0],
         tile,
         warp_n,
+        0,
         base,
         out,
         rows,
         cols,
-        scales
+        base_scale,
+        matmul_scale,
+    );
+    store_add_one(
+        acc[1],
+        tile,
+        warp_n,
+        1,
+        base,
+        out,
+        rows,
+        cols,
+        base_scale,
+        matmul_scale,
+    );
+    store_add_one(
+        acc[2],
+        tile,
+        warp_n,
+        2,
+        base,
+        out,
+        rows,
+        cols,
+        base_scale,
+        matmul_scale,
+    );
+    store_add_one(
+        acc[3],
+        tile,
+        warp_n,
+        3,
+        base,
+        out,
+        rows,
+        cols,
+        base_scale,
+        matmul_scale,
     );
 }
 
-#[derive(Clone, Copy)]
-struct StoreScales {
-    base: f32,
-    matmul: f32,
-}
-
+#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn store_add_one(
     acc: f32,
@@ -56,14 +75,15 @@ fn store_add_one(
     out: &mut DisjointSlice<f32>,
     rows: u32,
     cols: u32,
-    scales: StoreScales,
+    base_scale: f32,
+    matmul_scale: f32,
 ) {
     let row = row(tile, acc_index);
     let col = col(tile, warp_n, acc_index);
     if row < rows && col < cols {
         let offset = ((tile.batch * rows + row) * cols + col) as usize;
         unsafe {
-            *out.get_unchecked_mut(offset) = scales.base * base[offset] + scales.matmul * acc;
+            *out.get_unchecked_mut(offset) = base_scale * base[offset] + matmul_scale * acc;
         }
     }
 }

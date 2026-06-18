@@ -7,6 +7,14 @@ pub fn build(dataset: &str, config: &TrainConfig) -> String {
     push_info(&mut info, "log_interval", config.log_interval);
     push_info(
         &mut info,
+        "max_seconds",
+        config
+            .max_seconds
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "none".to_string()),
+    );
+    push_info(
+        &mut info,
         "eval_interval",
         config
             .eval_interval
@@ -23,6 +31,7 @@ fn push_run_env(info: &mut String) {
         "CUDA_DEVICE_INDEX",
         "TRAIN_LOAD_MODEL",
         "TRAIN_SAVE_MODEL",
+        "TRAIN_MAX_SECONDS",
         "TRAIN_REPEAT_BATCH",
         "TRAIN_GENERATE_PROMPT",
         "TRAIN_GENERATE_TOKENS",

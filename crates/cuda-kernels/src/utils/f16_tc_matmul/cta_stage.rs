@@ -44,7 +44,7 @@ pub(super) fn stage_tiles(
 }
 
 #[inline(always)]
-pub(super) fn load_a_fragments(a_tile: &SharedArray<u16, CTA_A_ELEMS>, tile: CtaTile) -> [u32; 4] {
+pub(crate) fn load_a_fragments(a_tile: &SharedArray<u16, CTA_A_ELEMS>, tile: CtaTile) -> [u32; 4] {
     [
         load_a_fragment(a_tile, tile, 0),
         load_a_fragment(a_tile, tile, 1),
@@ -54,7 +54,7 @@ pub(super) fn load_a_fragments(a_tile: &SharedArray<u16, CTA_A_ELEMS>, tile: Cta
 }
 
 #[inline(always)]
-pub(super) fn load_b_fragments(
+pub(crate) fn load_b_fragments(
     b_tile: &SharedArray<u16, CTA_B_ELEMS>,
     tile: CtaTile,
     warp_n: u32,

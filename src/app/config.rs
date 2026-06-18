@@ -11,6 +11,7 @@ pub struct TrainConfig {
     pub steps: usize,
     pub log_interval: usize,
     pub eval_interval: Option<usize>,
+    pub max_seconds: Option<f64>,
 }
 
 impl TrainConfig {
@@ -19,6 +20,7 @@ impl TrainConfig {
             steps: env_usize("TRAIN_STEPS").unwrap_or(DEFAULT_TRAIN_STEPS),
             log_interval: env_usize("TRAIN_LOG_INTERVAL").unwrap_or(1).max(1),
             eval_interval: env_usize("TRAIN_EVAL_INTERVAL").filter(|interval| *interval > 0),
+            max_seconds: env_f64("TRAIN_MAX_SECONDS").filter(|seconds| *seconds > 0.0),
         }
     }
 }
@@ -77,6 +79,12 @@ fn env_usize(name: &str) -> Option<usize> {
 }
 
 fn env_f32(name: &str) -> Option<f32> {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse().ok())
+}
+
+fn env_f64(name: &str) -> Option<f64> {
     std::env::var(name)
         .ok()
         .and_then(|value| value.parse().ok())

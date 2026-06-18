@@ -1,19 +1,31 @@
 use cuda_core::{CudaStream, DeviceBuffer};
 
-pub struct Nvfp4WeightUpdateArgs<'a> {
+pub struct AuroraMegaUpdateArgs<'a> {
     pub stream: &'a CudaStream,
-    pub bytes: &'a mut DeviceBuffer<u8>,
-    pub scales: &'a mut DeviceBuffer<u8>,
-    pub global_scale: &'a mut DeviceBuffer<f32>,
-    pub z_master: &'a mut DeviceBuffer<f32>,
-    pub x_master: &'a mut DeviceBuffer<f32>,
-    pub aurora_update: &'a DeviceBuffer<f32>,
-    pub amax: &'a mut DeviceBuffer<f32>,
-    pub chunk_amax: &'a mut DeviceBuffer<f32>,
-    pub len: u32,
+    pub grad_ptrs: &'a DeviceBuffer<u64>,
+    pub momentum_ptrs: &'a DeviceBuffer<u64>,
+    pub z_master_ptrs: &'a DeviceBuffer<u64>,
+    pub x_master_ptrs: &'a DeviceBuffer<u64>,
+    pub byte_ptrs: &'a DeviceBuffer<u64>,
+    pub scale_ptrs: &'a DeviceBuffer<u64>,
+    pub global_scale_ptrs: &'a DeviceBuffer<u64>,
+    pub rows: &'a DeviceBuffer<u32>,
+    pub cols: &'a DeviceBuffer<u32>,
+    pub oriented: &'a mut DeviceBuffer<f32>,
+    pub polar_next: &'a mut DeviceBuffer<f32>,
+    pub polar_x: &'a mut DeviceBuffer<f32>,
+    pub polar_gram: &'a mut DeviceBuffer<f32>,
+    pub polar_ax: &'a mut DeviceBuffer<f32>,
+    pub polar_chunks: &'a mut DeviceBuffer<f32>,
+    pub slot_count: u32,
+    pub max_len: u32,
+    pub max_ax_len: u32,
+    pub max_dim: u32,
+    pub mu: f32,
     pub learning_rate: f32,
     pub weight_decay: f32,
     pub average_coefficient: f32,
+    pub iterations: u32,
 }
 
 pub struct AdamWUpdateArgs<'a> {

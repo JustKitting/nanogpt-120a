@@ -1,6 +1,6 @@
 mod args;
 mod config;
-mod kernels;
+pub(crate) mod kernels;
 mod launcher;
 
 pub use args::{

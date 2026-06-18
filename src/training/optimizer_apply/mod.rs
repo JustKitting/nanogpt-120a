@@ -1,9 +1,9 @@
 mod adam;
 mod apply;
+mod aurora;
 mod block;
 mod embedding;
 mod layer_norm;
-mod matrix;
 mod mlp;
 mod qkv;
 mod result;

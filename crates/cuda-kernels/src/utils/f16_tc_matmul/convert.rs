@@ -12,7 +12,7 @@ pub(super) fn fp32_to_f16_body(src: &[f32], mut dst: DisjointSlice<u16>, element
 }
 
 #[inline(always)]
-pub(super) fn cvt_rn_f16_f32(value: f32) -> u16 {
+pub(crate) fn cvt_rn_f16_f32(value: f32) -> u16 {
     let half: u16;
     unsafe {
         ptx_asm!(
