@@ -39,6 +39,7 @@ fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error
     let input_global_scales_dev = DeviceBuffer::from_host(&stream, &input_global_scales)?;
     let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
     let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
+    let weight_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut logits_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * VOCAB_SIZE)?;
 
     module.logits(LmHeadArgs {
@@ -51,7 +52,7 @@ fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error
         weight: Nvfp4FourSixMmaWeightTensor {
             bytes: &weight_bytes_dev,
             scales: &weight_scales_dev,
-            global_scale: 1.0,
+            global_scale: &weight_global_scale_dev,
         },
         logits: &mut logits_dev,
         token_count: TOKEN_COUNT as u32,

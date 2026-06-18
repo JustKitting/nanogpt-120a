@@ -33,6 +33,7 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let inv_std_dev = DeviceBuffer::from_host(&stream, &inv_std)?;
     let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
     let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
+    let weight_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut dx_dev = DeviceBuffer::<f32>::zeroed(&stream, ROWS * COLS)?;
 
     module.backward_input(LayerNormBackwardInputArgs {
@@ -44,7 +45,7 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
         weight: Nvfp4DeviceTensor {
             bytes: &weight_bytes_dev,
             scales: &weight_scales_dev,
-            global_scale: 1.0,
+            global_scale: &weight_global_scale_dev,
         },
         d_residual: &mut dx_dev,
         row_count: ROWS as u32,

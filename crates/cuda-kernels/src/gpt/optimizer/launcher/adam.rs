@@ -1,6 +1,6 @@
 use cuda_core::{DriverError, LaunchConfig};
 
-use super::super::args::{AdamWUpdateArgs, Nvfp4WeightUpdateArgs};
+use super::super::args::AdamWUpdateArgs;
 use super::super::kernels::APPLY_THREADS_PER_BLOCK;
 use super::OptimizerModule;
 
@@ -27,7 +27,7 @@ impl OptimizerModule {
             args.second_moment,
             &*args.residual,
             args.fp32_workspace,
-            args.global_scale,
+            &*args.global_scale,
             args.learning_rate,
             args.weight_decay,
             args.beta1,
@@ -38,27 +38,18 @@ impl OptimizerModule {
             args.len,
         )?;
 
-        self.requantize(Nvfp4WeightUpdateArgs {
-            stream: args.stream,
-            bytes: args.bytes,
-            scales: args.scales,
-            global_scale: args.global_scale,
-            requantize_global_scale: args.requantize_global_scale,
-            aurora_update: args.grad,
-            fp32_workspace: args.fp32_workspace,
-            amax: args.amax,
-            chunk_amax: args.chunk_amax,
-            next_global_scale: args.next_global_scale,
-            len: args.len,
-            learning_rate: args.learning_rate,
-            weight_decay: args.weight_decay,
-        })?;
+        self.requantize(
+            args.stream,
+            args.bytes,
+            args.scales,
+            args.global_scale,
+            &*args.fp32_workspace,
+            args.amax,
+            args.chunk_amax,
+            args.len,
+            args.requantize_global_scale,
+        )?;
 
-        let next_global_scale = if args.requantize_global_scale > 0.0 {
-            args.requantize_global_scale
-        } else {
-            args.next_global_scale.to_host_vec(args.stream)?[0]
-        };
         self.apply.adam.nvfp4_adamw_residual_update_kernel(
             args.stream,
             LaunchConfig {
@@ -70,7 +61,7 @@ impl OptimizerModule {
             &*args.scales,
             args.residual,
             &*args.fp32_workspace,
-            next_global_scale,
+            &*args.global_scale,
             args.len,
         )
     }

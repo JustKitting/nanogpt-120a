@@ -77,16 +77,20 @@ impl UploadedLayerNorm {
 pub struct UploadedNvfp4 {
     pub(crate) bytes: DeviceBuffer<u8>,
     pub(crate) scales: DeviceBuffer<u8>,
-    pub(crate) global_scale: f32,
+    pub(crate) global_scale: DeviceBuffer<f32>,
     pub(crate) len: usize,
 }
 
 impl UploadedNvfp4 {
+    pub(crate) fn global_scale_to_host(&self, stream: &CudaStream) -> AppResult<f32> {
+        Ok(self.global_scale.to_host_vec(stream)?[0])
+    }
+
     pub fn device(&self) -> Nvfp4DeviceTensor<'_> {
         Nvfp4DeviceTensor {
             bytes: &self.bytes,
             scales: &self.scales,
-            global_scale: self.global_scale,
+            global_scale: &self.global_scale,
         }
     }
 
@@ -94,7 +98,7 @@ impl UploadedNvfp4 {
         Nvfp4FourSixMmaWeightTensor {
             bytes: &self.bytes,
             scales: &self.scales,
-            global_scale: self.global_scale,
+            global_scale: &self.global_scale,
         }
     }
 }
@@ -116,7 +120,7 @@ fn upload_nvfp4<S: Nvfp4Shape>(
     Ok(UploadedNvfp4 {
         bytes: DeviceBuffer::from_host(stream, tensor.bytes.as_ref())?,
         scales: DeviceBuffer::from_host(stream, tensor.scales.as_ref())?,
-        global_scale: tensor.global_scale,
+        global_scale: DeviceBuffer::from_host(stream, &[tensor.global_scale])?,
         len: tensor.len(),
     })
 }

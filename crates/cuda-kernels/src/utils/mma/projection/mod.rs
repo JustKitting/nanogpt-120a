@@ -3,7 +3,7 @@ mod args;
 mod body;
 mod body_fused;
 mod load;
-mod load_bytes;
+pub(crate) mod load_bytes;
 mod store;
 
 pub use accumulate::nvfp4_projection_accumulate_tile;

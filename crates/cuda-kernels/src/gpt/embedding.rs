@@ -15,7 +15,6 @@ const EMBEDDING_THREADS_PER_BLOCK: u32 = 256;
 pub struct EmbeddingParams {
     pub hidden_len: u32,
     pub embedding_dim: u32,
-    pub token_embedding_global_scale: f32,
 }
 
 unsafe impl DeviceCopy for EmbeddingParams {}
@@ -51,11 +50,11 @@ impl EmbeddingModule {
             args.tokens,
             args.token_embedding.bytes,
             args.token_embedding.scales,
+            args.token_embedding.global_scale,
             args.residual,
             EmbeddingParams {
                 hidden_len: args.hidden_len,
                 embedding_dim: args.embedding_dim,
-                token_embedding_global_scale: args.token_embedding.global_scale,
             },
         )
     }
@@ -71,6 +70,7 @@ pub mod kernels {
         tokens: &[u32],
         token_embedding_bytes: &[u8],
         token_embedding_scales: &[u8],
+        token_embedding_global_scale: &[f32],
         mut residual: DisjointSlice<f32>,
         params: EmbeddingParams,
     ) {
@@ -86,7 +86,7 @@ pub mod kernels {
             let values = layer_norm_map3!(cols, |col| nvfp4_column(
                 token_embedding_bytes,
                 token_embedding_scales,
-                params.token_embedding_global_scale,
+                token_embedding_global_scale[0],
                 token_base,
                 col,
                 params.embedding_dim,

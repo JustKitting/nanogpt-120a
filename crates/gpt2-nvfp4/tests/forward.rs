@@ -138,7 +138,7 @@ fn token_ids() -> Vec<u32> {
 struct UploadedNvfp4 {
     bytes: DeviceBuffer<u8>,
     scales: DeviceBuffer<u8>,
-    global_scale: f32,
+    global_scale: DeviceBuffer<f32>,
 }
 
 impl UploadedNvfp4 {
@@ -146,7 +146,7 @@ impl UploadedNvfp4 {
         Nvfp4DeviceTensor {
             bytes: &self.bytes,
             scales: &self.scales,
-            global_scale: self.global_scale,
+            global_scale: &self.global_scale,
         }
     }
 
@@ -154,7 +154,7 @@ impl UploadedNvfp4 {
         Nvfp4FourSixMmaWeightTensor {
             bytes: &self.bytes,
             scales: &self.scales,
-            global_scale: self.global_scale,
+            global_scale: &self.global_scale,
         }
     }
 }
@@ -225,7 +225,7 @@ fn upload_nvfp4<S: Nvfp4Shape>(
     Ok(UploadedNvfp4 {
         bytes: DeviceBuffer::from_host(stream, tensor.bytes.as_ref())?,
         scales: DeviceBuffer::from_host(stream, tensor.scales.as_ref())?,
-        global_scale: tensor.global_scale,
+        global_scale: DeviceBuffer::from_host(stream, &[tensor.global_scale])?,
     })
 }
 

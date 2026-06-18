@@ -21,9 +21,16 @@ mod module {
         weight_scales: &[u8],
         bias_bytes: &[u8],
         bias_scales: &[u8],
+        weight_global_scale: &[f32],
+        bias_global_scale: &[f32],
         mut out: DisjointSlice<f32>,
         params: Nvfp4ProjectionParams,
     ) {
+        let params = Nvfp4ProjectionParams {
+            weight_global_scale: weight_global_scale[0],
+            bias_global_scale: bias_global_scale[0],
+            ..params
+        };
         nvfp4_projection_kernel_body(
             input_bytes,
             input_scales,
@@ -47,10 +54,17 @@ mod module {
         weight_scales: &[u8],
         bias_bytes: &[u8],
         bias_scales: &[u8],
+        weight_global_scale: &[f32],
+        bias_global_scale: &[f32],
         mut pre_activation: DisjointSlice<f32>,
         mut out: DisjointSlice<f32>,
         params: Nvfp4ProjectionParams,
     ) {
+        let params = Nvfp4ProjectionParams {
+            weight_global_scale: weight_global_scale[0],
+            bias_global_scale: bias_global_scale[0],
+            ..params
+        };
         nvfp4_projection_relu2_kernel_body(
             input_bytes,
             input_scales,

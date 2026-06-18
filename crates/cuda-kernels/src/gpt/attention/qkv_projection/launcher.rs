@@ -16,6 +16,8 @@ impl AttentionModule {
             args.weight.scales,
             args.bias.bytes,
             args.bias.scales,
+            args.weight.global_scale,
+            args.bias.global_scale,
             args.out,
             qkv_params(&args),
         )
@@ -32,13 +34,10 @@ impl AttentionModule {
             args.weight.scales,
             args.bias.bytes,
             args.bias.scales,
+            args.weight.global_scale,
+            args.bias.global_scale,
             args.residual,
-            c_proj_params(
-                args.token_count,
-                args.embedding_dim,
-                args.weight.global_scale,
-                args.bias.global_scale,
-            ),
+            c_proj_params(args.token_count, args.embedding_dim),
         )
     }
 
@@ -54,14 +53,11 @@ impl AttentionModule {
                 args.weight.scales,
                 args.bias.bytes,
                 args.bias.scales,
+                args.weight.global_scale,
+                args.bias.global_scale,
                 args.residual,
                 args.projection_out,
-                c_proj_params(
-                    args.token_count,
-                    args.embedding_dim,
-                    args.weight.global_scale,
-                    args.bias.global_scale,
-                ),
+                c_proj_params(args.token_count, args.embedding_dim),
             )
     }
 }

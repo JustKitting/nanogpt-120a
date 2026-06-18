@@ -95,6 +95,8 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
     let bias_bytes_dev = DeviceBuffer::from_host(&stream, &bias_bytes)?;
     let bias_scales_dev = DeviceBuffer::from_host(&stream, &bias_scales)?;
+    let weight_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
+    let bias_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut out_dev = DeviceBuffer::<f32>::zeroed(&stream, x.len())?;
     let mut amax_dev = DeviceBuffer::<f32>::zeroed(&stream, row_count)?;
     let mut mean_dev = DeviceBuffer::<f32>::zeroed(&stream, row_count)?;
@@ -106,12 +108,12 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
         weight: Nvfp4DeviceTensor {
             bytes: &weight_bytes_dev,
             scales: &weight_scales_dev,
-            global_scale: 1.0,
+            global_scale: &weight_global_scale_dev,
         },
         bias: Nvfp4DeviceTensor {
             bytes: &bias_bytes_dev,
             scales: &bias_scales_dev,
-            global_scale: 1.0,
+            global_scale: &bias_global_scale_dev,
         },
         normalized: &mut out_dev,
         normalized_amax: &mut amax_dev,

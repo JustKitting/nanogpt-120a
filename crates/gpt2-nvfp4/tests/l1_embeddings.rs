@@ -29,6 +29,7 @@ fn embedding_forward_decodes_token_embeddings_to_residual_only() -> Result<(), B
     let tokens_dev = DeviceBuffer::from_host(&stream, &tokens)?;
     let token_embedding_bytes_dev = DeviceBuffer::from_host(&stream, &token_embedding_bytes)?;
     let token_embedding_scales_dev = DeviceBuffer::from_host(&stream, &token_embedding_scales)?;
+    let token_embedding_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
 
     let mut residual_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let normalized_sentinel = vec![123.0_f32; HiddenState::LEN];
@@ -42,7 +43,7 @@ fn embedding_forward_decodes_token_embeddings_to_residual_only() -> Result<(), B
         token_embedding: Nvfp4DeviceTensor {
             bytes: &token_embedding_bytes_dev,
             scales: &token_embedding_scales_dev,
-            global_scale: 1.0,
+            global_scale: &token_embedding_global_scale_dev,
         },
         residual: &mut residual_dev,
         hidden_len: HiddenState::LEN as u32,

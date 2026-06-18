@@ -37,6 +37,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
     let one_scales = DeviceBuffer::from_host(&stream, &data::one_scales())?;
     let d_qkv = DeviceBuffer::from_host(&stream, &data::d_qkv_values())?;
     let dummy_f32 = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let global_scale = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
 
     let saved = data::saved_block(
         &qkv_input_bytes,
@@ -48,15 +49,15 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
         qkv_weight: Nvfp4FourSixMmaWeightTensor {
             bytes: &qkv_weight_bytes,
             scales: &qkv_weight_scales,
-            global_scale: 1.0,
+            global_scale: &global_scale,
         },
-        qkv_bias: nvfp4_device(&zero_bytes, &one_scales),
+        qkv_bias: nvfp4_device(&zero_bytes, &one_scales, &global_scale),
         c_proj_weight: Nvfp4FourSixMmaWeightTensor {
             bytes: &zero_bytes,
             scales: &one_scales,
-            global_scale: 1.0,
+            global_scale: &global_scale,
         },
-        c_proj_bias: nvfp4_device(&zero_bytes, &one_scales),
+        c_proj_bias: nvfp4_device(&zero_bytes, &one_scales, &global_scale),
     };
     let mut scratch = scratch::QkvBackwardScratch::new(&stream)?;
     let mut d_ln_1_normalized = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
@@ -90,11 +91,12 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
 fn nvfp4_device<'a>(
     bytes: &'a DeviceBuffer<u8>,
     scales: &'a DeviceBuffer<u8>,
+    global_scale: &'a DeviceBuffer<f32>,
 ) -> Nvfp4DeviceTensor<'a> {
     Nvfp4DeviceTensor {
         bytes,
         scales,
-        global_scale: 1.0,
+        global_scale,
     }
 }
 

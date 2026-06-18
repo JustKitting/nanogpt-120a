@@ -11,7 +11,7 @@ mod module {
     pub fn nvfp4_decode_transpose_f32_kernel(
         bytes: &[u8],
         scales: &[u8],
-        global_scale: f32,
+        global_scale: &[f32],
         mut output: DisjointSlice<f32>,
         rows: u32,
         cols: u32,
@@ -21,7 +21,7 @@ mod module {
         if index < len {
             let row = index / cols;
             let col = index - row * cols;
-            let value = nvfp4_value(bytes, scales, global_scale, index as usize);
+            let value = nvfp4_value(bytes, scales, global_scale[0], index as usize);
             let out_index = col * rows + row;
 
             unsafe {

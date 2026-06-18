@@ -51,6 +51,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let bias_scales = vec![E4M3_ONE; QkvVectorShape::SCALE_LEN];
     let bias_bytes_dev = DeviceBuffer::from_host(&stream, &bias_bytes)?;
     let bias_scales_dev = DeviceBuffer::from_host(&stream, &bias_scales)?;
+    let global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
 
     let c_proj_weight_bytes = c_proj_identity_weight_bytes();
     let c_proj_weight_scales = vec![E4M3_ONE; ResidualWeightShape::SCALE_LEN];
@@ -74,22 +75,22 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
             qkv_weight: Nvfp4FourSixMmaWeightTensor {
                 bytes: &weight_bytes_dev,
                 scales: &weight_scales_dev,
-                global_scale: 1.0,
+                global_scale: &global_scale_dev,
             },
             qkv_bias: Nvfp4DeviceTensor {
                 bytes: &bias_bytes_dev,
                 scales: &bias_scales_dev,
-                global_scale: 1.0,
+                global_scale: &global_scale_dev,
             },
             c_proj_weight: Nvfp4FourSixMmaWeightTensor {
                 bytes: &c_proj_weight_bytes_dev,
                 scales: &c_proj_weight_scales_dev,
-                global_scale: 1.0,
+                global_scale: &global_scale_dev,
             },
             c_proj_bias: Nvfp4DeviceTensor {
                 bytes: &c_proj_bias_bytes_dev,
                 scales: &c_proj_bias_scales_dev,
-                global_scale: 1.0,
+                global_scale: &global_scale_dev,
             },
         },
         &mut qkv_dev,

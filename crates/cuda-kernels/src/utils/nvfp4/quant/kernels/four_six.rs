@@ -45,6 +45,8 @@ pub(crate) mod module {
             let tensor_amax = amax[row];
             let global_scale = if fixed_global_scale > 0.0 {
                 fixed_global_scale
+            } else if fixed_global_scale < 0.0 {
+                unsafe { *out_global_scale.as_mut_ptr().add(row) }
             } else if tensor_amax == 0.0 {
                 1.0
             } else {

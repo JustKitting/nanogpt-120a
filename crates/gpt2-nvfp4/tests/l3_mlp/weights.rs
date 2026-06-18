@@ -19,6 +19,7 @@ pub struct WeightBuffers {
     down_weight_scales: DeviceBuffer<u8>,
     down_bias_bytes: DeviceBuffer<u8>,
     down_bias_scales: DeviceBuffer<u8>,
+    global_scale: DeviceBuffer<f32>,
 }
 
 impl WeightBuffers {
@@ -35,6 +36,7 @@ impl WeightBuffers {
                 &vec![0_u8; HiddenVectorShape::BYTE_LEN],
             )?,
             down_bias_scales: one_scales(stream, HiddenVectorShape::SCALE_LEN)?,
+            global_scale: DeviceBuffer::from_host(stream, &[1.0_f32])?,
         })
     }
 
@@ -43,12 +45,12 @@ impl WeightBuffers {
             weight: Nvfp4FourSixMmaWeightTensor {
                 bytes: &self.up_weight_bytes,
                 scales: &self.up_weight_scales,
-                global_scale: 1.0,
+                global_scale: &self.global_scale,
             },
             bias: Nvfp4DeviceTensor {
                 bytes: &self.up_bias_bytes,
                 scales: &self.up_bias_scales,
-                global_scale: 1.0,
+                global_scale: &self.global_scale,
             },
         }
     }
@@ -58,12 +60,12 @@ impl WeightBuffers {
             weight: Nvfp4FourSixMmaWeightTensor {
                 bytes: &self.down_weight_bytes,
                 scales: &self.down_weight_scales,
-                global_scale: 1.0,
+                global_scale: &self.global_scale,
             },
             bias: Nvfp4DeviceTensor {
                 bytes: &self.down_bias_bytes,
                 scales: &self.down_bias_scales,
-                global_scale: 1.0,
+                global_scale: &self.global_scale,
             },
         }
     }

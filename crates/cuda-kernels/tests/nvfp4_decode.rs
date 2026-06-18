@@ -23,6 +23,7 @@ fn nvfp4_decode_transpose_writes_fp32_transpose() -> Result<(), Box<dyn Error>> 
 
     let bytes = DeviceBuffer::from_host(&stream, &[E2M1_ONE_PAIR; ROWS * COLS / 2])?;
     let scales = DeviceBuffer::from_host(&stream, &[E4M3_ONE; ROWS * COLS / 16])?;
+    let scalar_global_scale = DeviceBuffer::from_host(&stream, &[3.0_f32])?;
     let mut scalar_out = DeviceBuffer::<f32>::zeroed(&stream, ROWS * COLS)?;
     let globals = DeviceBuffer::from_host(&stream, &[1.0_f32, 2.0])?;
     let mut rowwise_out = DeviceBuffer::<f32>::zeroed(&stream, ROWS * COLS)?;
@@ -32,7 +33,7 @@ fn nvfp4_decode_transpose_writes_fp32_transpose() -> Result<(), Box<dyn Error>> 
         input: Nvfp4DeviceTensor {
             bytes: &bytes,
             scales: &scales,
-            global_scale: 3.0,
+            global_scale: &scalar_global_scale,
         },
         output: &mut scalar_out,
         rows: ROWS as u32,

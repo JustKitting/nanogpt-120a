@@ -59,11 +59,13 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
     let e_h_global_scales_dev = DeviceBuffer::from_host(&stream, &e_h_global_scales)?;
     let weight_t_h_bytes_dev = DeviceBuffer::from_host(&stream, &weight_t_h_bytes)?;
     let weight_t_h_scales_dev = DeviceBuffer::from_host(&stream, &weight_t_h_scales)?;
+    let weight_t_h_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let e_t_h_bytes_dev = DeviceBuffer::from_host(&stream, &e_t_h_bytes)?;
     let e_t_h_scales_dev = DeviceBuffer::from_host(&stream, &e_t_h_scales)?;
     let e_t_h_global_scales_dev = DeviceBuffer::from_host(&stream, &e_t_h_global_scales)?;
     let input_t_h_bytes_dev = DeviceBuffer::from_host(&stream, &input_t_h_bytes)?;
     let input_t_h_scales_dev = DeviceBuffer::from_host(&stream, &input_t_h_scales)?;
+    let input_t_h_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut dinput_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * INPUT_DIM)?;
     let mut dweight_dev = DeviceBuffer::<f32>::zeroed(&stream, OUTPUT_DIM * INPUT_DIM)?;
 
@@ -77,7 +79,7 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
         weight_t_h: Nvfp4FourSixMmaWeightTensor {
             bytes: &weight_t_h_bytes_dev,
             scales: &weight_t_h_scales_dev,
-            global_scale: 1.0,
+            global_scale: &weight_t_h_global_scale_dev,
         },
         e_t_h: Nvfp4RowwiseDeviceTensor {
             bytes: &e_t_h_bytes_dev,
@@ -87,7 +89,7 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
         input_t_h: Nvfp4FourSixMmaWeightTensor {
             bytes: &input_t_h_bytes_dev,
             scales: &input_t_h_scales_dev,
-            global_scale: 1.0,
+            global_scale: &input_t_h_global_scale_dev,
         },
         dinput: &mut dinput_dev,
         dweight: &mut dweight_dev,

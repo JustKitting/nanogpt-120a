@@ -1,6 +1,7 @@
 pub mod f16;
 pub mod mxf4nvf4;
 pub mod projection;
+pub mod projection_cta;
 pub mod tensors;
 
 pub use f16::mma_m16n8k16_f16_f16_f32;
@@ -11,5 +12,10 @@ pub use projection::{
     Nvfp4ProjectionTile, nvfp4_projection_accumulate_tile, nvfp4_projection_kernel_body,
     nvfp4_projection_nobias_kernel_body, nvfp4_projection_relu2_kernel_body,
     nvfp4_projection_residual_kernel_body, projection_grid_dim,
+};
+pub use projection_cta::{
+    NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
+    NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS,
+    nvfp4_projection_cta_nobias_kernel_body, projection_cta_grid_dim,
 };
 pub use tensors::{Nvfp4DeviceScaleMmaWeightTensor, Nvfp4FourSixMmaWeightTensor};

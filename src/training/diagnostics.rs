@@ -73,6 +73,7 @@ impl PendingTrainingDiagnostics {
         let (d_embedding_rms, d_embedding_max) =
             f32_buffer_stats(stream, &grads.d_embedding_residual)?;
         let updates = collect_update_snapshots(stream, uploaded, grads, state, step)?;
+        let token_embedding_global = uploaded.token_embedding.global_scale_to_host(stream)?;
 
         Ok(Self {
             diagnostics: TrainingDiagnostics {
@@ -86,8 +87,8 @@ impl PendingTrainingDiagnostics {
                 d_lm_head_max,
                 d_embedding_rms,
                 d_embedding_max,
-                token_embedding_global_before: uploaded.token_embedding.global_scale,
-                token_embedding_global_after: uploaded.token_embedding.global_scale,
+                token_embedding_global_before: token_embedding_global,
+                token_embedding_global_after: token_embedding_global,
                 token_embedding_changed_bytes: 0,
                 token_embedding_hash_before: hash_bytes(&token_embedding_bytes_before),
                 token_embedding_hash_after: 0,
@@ -104,7 +105,8 @@ impl PendingTrainingDiagnostics {
         uploaded: &UploadedModel,
     ) -> AppResult<TrainingDiagnostics> {
         let after = uploaded.token_embedding.bytes.to_host_vec(stream)?;
-        self.diagnostics.token_embedding_global_after = uploaded.token_embedding.global_scale;
+        self.diagnostics.token_embedding_global_after =
+            uploaded.token_embedding.global_scale_to_host(stream)?;
         self.diagnostics.token_embedding_changed_bytes =
             changed_bytes(&self.token_embedding_bytes_before, &after);
         self.diagnostics.token_embedding_hash_after = hash_bytes(&after);
@@ -388,7 +390,7 @@ fn push_snapshot(
         len: tensor.len,
         before_bytes: tensor.bytes.to_host_vec(stream)?,
         before_scales: tensor.scales.to_host_vec(stream)?,
-        before_global: tensor.global_scale,
+        before_global: tensor.global_scale_to_host(stream)?,
         grad: grad.to_host_vec(stream)?,
         adam,
     });
@@ -485,11 +487,12 @@ fn finish_update(
 ) -> AppResult {
     let after_bytes = tensor.bytes.to_host_vec(stream)?;
     let after_scales = tensor.scales.to_host_vec(stream)?;
+    let after_global = tensor.global_scale_to_host(stream)?;
     updates.push(tensor_update_stats(
         pending,
         after_bytes,
         after_scales,
-        tensor.global_scale,
+        after_global,
     ));
     Ok(())
 }

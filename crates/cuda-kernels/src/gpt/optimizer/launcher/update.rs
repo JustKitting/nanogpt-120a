@@ -24,12 +24,22 @@ impl OptimizerModule {
             &*args.scales,
             args.aurora_update,
             args.fp32_workspace,
-            args.global_scale,
+            &*args.global_scale,
             args.learning_rate,
             args.weight_decay,
             args.len,
         )?;
 
-        self.requantize(args)
+        self.requantize(
+            args.stream,
+            args.bytes,
+            args.scales,
+            args.global_scale,
+            &*args.fp32_workspace,
+            args.amax,
+            args.chunk_amax,
+            args.len,
+            args.requantize_global_scale,
+        )
     }
 }

@@ -55,12 +55,13 @@ impl LmHeadModule {
             args.input.global_scales,
             args.weight.bytes,
             args.weight.scales,
+            args.weight.global_scale,
             args.logits,
             LmHeadParams {
                 token_count: args.token_count,
                 input_dim: args.input_dim,
                 vocab_size: args.vocab_size,
-                weight_global_scale: args.weight.global_scale,
+                weight_global_scale: 1.0,
             },
         )
     }
@@ -77,9 +78,14 @@ mod kernels {
         input_global_scales: &[f32],
         weight_bytes: &[u8],
         weight_scales: &[u8],
+        weight_global_scale: &[f32],
         mut logits: DisjointSlice<f32>,
         params: LmHeadParams,
     ) {
+        let params = LmHeadParams {
+            weight_global_scale: weight_global_scale[0],
+            ..params
+        };
         let lane = thread::threadIdx_x();
         if lane >= NVFP4_PROJECTION_THREADS_PER_BLOCK {
             return;

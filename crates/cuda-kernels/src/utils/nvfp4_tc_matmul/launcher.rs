@@ -73,7 +73,6 @@ impl Nvfp4TcMatmulModule {
         )?;
 
         let a = scratch.a.rowwise();
-        let b_t = scratch.b_t.mma_weight();
         self.module.nvfp4_tc_matmul_kernel(
             args.stream,
             LaunchConfig {
@@ -84,14 +83,14 @@ impl Nvfp4TcMatmulModule {
             a.bytes,
             a.scales,
             a.global_scales,
-            b_t.bytes,
-            b_t.scales,
+            &*scratch.b_t.bytes,
+            &*scratch.b_t.scales,
             args.out,
             Nvfp4ProjectionParams {
                 token_count: args.m,
                 input_dim: padded_k,
                 output_dim: args.n,
-                weight_global_scale: b_t.global_scale,
+                weight_global_scale: scratch.b_t.global_scale,
                 bias_global_scale: 0.0,
                 residual_add: 0,
                 activation: NVFP4_PROJECTION_ACTIVATION_NONE,

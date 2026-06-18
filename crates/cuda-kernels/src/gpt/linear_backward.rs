@@ -5,9 +5,11 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 
 use crate::layer_norm_reduce::{layer_norm_block_reduce, layer_norm_store_row};
 use crate::mma::{
-    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_THREADS_PER_BLOCK,
-    Nvfp4DeviceScaleMmaWeightTensor, Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionParams,
-    nvfp4_projection_nobias_kernel_body, projection_grid_dim,
+    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES,
+    NVFP4_PROJECTION_CTA_B_PACKS, NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS,
+    NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4DeviceScaleMmaWeightTensor,
+    Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionParams, nvfp4_projection_cta_nobias_kernel_body,
+    nvfp4_projection_nobias_kernel_body, projection_cta_grid_dim, projection_grid_dim,
 };
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
 use crate::nvfp4_quant::{
@@ -117,7 +119,7 @@ impl LinearBackwardModule {
         let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
 
-        self.module.linear_backward_projection_kernel(
+        self.module.linear_backward_projection_device_scale_kernel(
             args.stream,
             LaunchConfig {
                 grid_dim: projection_grid_dim(args.token_count, args.input_dim),
@@ -129,19 +131,20 @@ impl LinearBackwardModule {
             args.e_h.global_scales,
             args.weight_t_h.bytes,
             args.weight_t_h.scales,
+            args.weight_t_h.global_scale,
             args.dinput,
             Nvfp4ProjectionParams {
                 token_count: args.token_count,
                 input_dim: dinput_k,
                 output_dim: args.input_dim,
-                weight_global_scale: args.weight_t_h.global_scale,
+                weight_global_scale: 1.0,
                 bias_global_scale: 0.0,
                 residual_add: 0,
                 activation: NVFP4_PROJECTION_ACTIVATION_NONE,
             },
         )?;
 
-        self.module.linear_backward_projection_kernel(
+        self.module.linear_backward_projection_device_scale_kernel(
             args.stream,
             LaunchConfig {
                 grid_dim: projection_grid_dim(args.output_dim, args.input_dim),
@@ -153,12 +156,13 @@ impl LinearBackwardModule {
             args.e_t_h.global_scales,
             args.input_t_h.bytes,
             args.input_t_h.scales,
+            args.input_t_h.global_scale,
             args.dweight,
             Nvfp4ProjectionParams {
                 token_count: args.output_dim,
                 input_dim: dweight_k,
                 output_dim: args.input_dim,
-                weight_global_scale: args.input_t_h.global_scale,
+                weight_global_scale: 1.0,
                 bias_global_scale: 0.0,
                 residual_add: 0,
                 activation: NVFP4_PROJECTION_ACTIVATION_NONE,
@@ -222,6 +226,66 @@ impl LinearBackwardModule {
                 activation: NVFP4_PROJECTION_ACTIVATION_NONE,
             },
         )
+    }
+
+    pub fn backward_device_scale_cta(
+        &self,
+        args: LinearBackwardDeviceScaleArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
+        let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
+
+        self.module
+            .linear_backward_projection_cta_device_scale_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: projection_cta_grid_dim(args.token_count, args.input_dim),
+                    block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                args.e_h.bytes,
+                args.e_h.scales,
+                args.e_h.global_scales,
+                args.weight_t_h.bytes,
+                args.weight_t_h.scales,
+                args.weight_t_h.global_scale,
+                args.dinput,
+                Nvfp4ProjectionParams {
+                    token_count: args.token_count,
+                    input_dim: dinput_k,
+                    output_dim: args.input_dim,
+                    weight_global_scale: 1.0,
+                    bias_global_scale: 0.0,
+                    residual_add: 0,
+                    activation: NVFP4_PROJECTION_ACTIVATION_NONE,
+                },
+            )?;
+
+        self.module
+            .linear_backward_projection_cta_device_scale_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: projection_cta_grid_dim(args.output_dim, args.input_dim),
+                    block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                args.e_t_h.bytes,
+                args.e_t_h.scales,
+                args.e_t_h.global_scales,
+                args.input_t_h.bytes,
+                args.input_t_h.scales,
+                args.input_t_h.global_scale,
+                args.dweight,
+                Nvfp4ProjectionParams {
+                    token_count: args.output_dim,
+                    input_dim: dweight_k,
+                    output_dim: args.input_dim,
+                    weight_global_scale: 1.0,
+                    bias_global_scale: 0.0,
+                    residual_add: 0,
+                    activation: NVFP4_PROJECTION_ACTIVATION_NONE,
+                },
+            )
     }
 
     pub fn backward_ms_eden(
@@ -317,7 +381,7 @@ impl LinearBackwardModule {
             },
         )?;
 
-        self.backward_device_scale(LinearBackwardDeviceScaleArgs {
+        self.backward_device_scale_cta(LinearBackwardDeviceScaleArgs {
             stream: args.stream,
             e_h: scratch.e_h.rowwise(),
             weight_t_h: scratch.weight_t_h.device_scale_mma_weight(),
@@ -437,6 +501,38 @@ mod kernels {
             weight_scales,
             &mut out,
             params,
+        );
+    }
+
+    #[kernel]
+    pub fn linear_backward_projection_cta_device_scale_kernel(
+        input_bytes: &[u8],
+        input_scales: &[u8],
+        input_global_scales: &[f32],
+        weight_bytes: &[u8],
+        weight_scales: &[u8],
+        weight_global_scale: &[f32],
+        mut out: DisjointSlice<f32>,
+        mut params: Nvfp4ProjectionParams,
+    ) {
+        static mut A_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
+        static mut B_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS> = SharedArray::UNINIT;
+        static mut A_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
+        static mut B_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES> = SharedArray::UNINIT;
+
+        params.weight_global_scale = weight_global_scale[0];
+        nvfp4_projection_cta_nobias_kernel_body(
+            input_bytes,
+            input_scales,
+            input_global_scales,
+            weight_bytes,
+            weight_scales,
+            &mut out,
+            params,
+            unsafe { &mut A_PACKS },
+            unsafe { &mut B_PACKS },
+            unsafe { &mut A_SCALES },
+            unsafe { &mut B_SCALES },
         );
     }
 

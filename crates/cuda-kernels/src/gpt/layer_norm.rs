@@ -64,14 +64,14 @@ mod kernels {
         weight_scales: &[u8],
         bias_bytes: &[u8],
         bias_scales: &[u8],
+        weight_global_scale: &[f32],
+        bias_global_scale: &[f32],
         mut normalized: DisjointSlice<f32>,
         mut normalized_amax: DisjointSlice<f32>,
         mut mean_out: DisjointSlice<f32>,
         mut inv_std_out: DisjointSlice<f32>,
         row_count: u32,
         embedding_dim: u32,
-        weight_global_scale: f32,
-        bias_global_scale: f32,
         epsilon: f32,
     ) {
         static mut WARP_SUMS: SharedArray<f32, { GPT_LAYER_NORM_WARPS_PER_BLOCK as usize }> =
@@ -127,8 +127,8 @@ mod kernels {
                     embedding_dim,
                     centered[index],
                     inv_std,
-                    weight_global_scale,
-                    bias_global_scale,
+                    weight_global_scale[0],
+                    bias_global_scale[0],
                 ));
 
             layer_norm_store3!(
@@ -223,14 +223,14 @@ impl LayerNormModule {
             args.weight.scales,
             args.bias.bytes,
             args.bias.scales,
+            args.weight.global_scale,
+            args.bias.global_scale,
             args.normalized,
             args.normalized_amax,
             args.mean,
             args.inv_std,
             args.row_count,
             args.embedding_dim,
-            args.weight.global_scale,
-            args.bias.global_scale,
             args.epsilon,
         )
     }

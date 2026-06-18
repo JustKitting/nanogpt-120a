@@ -60,10 +60,10 @@ impl LayerNormBackwardModule {
             args.inv_std,
             args.weight.bytes,
             args.weight.scales,
+            args.weight.global_scale,
             args.d_residual,
             args.row_count,
             args.embedding_dim,
-            args.weight.global_scale,
         )
     }
 

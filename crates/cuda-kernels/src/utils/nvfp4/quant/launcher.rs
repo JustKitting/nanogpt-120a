@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig, memory};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 
 use super::args::{
     MsEdenDeviceScaleQuantArgs, MsEdenQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs,
@@ -179,26 +179,6 @@ impl Nvfp4QuantModule {
         )
     }
 
-    pub fn fp32_to_nvfp4_quartet_backward_ms_eden(
-        &self,
-        args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
-    ) -> Result<f32, DriverError> {
-        let args = args;
-        self.row_amax_f32(RowAmaxArgs {
-            stream: args.stream,
-            x: args.x,
-            out: &mut *args.out_chunk_amax,
-            row_count: 1,
-            row_len: args.row_count * args.src_row_len,
-        })?;
-
-        let global_scale = quartet_backward_ms_eden_global_scale(copy_first_f32(
-            args.stream,
-            args.out_chunk_amax,
-        )?);
-        self.fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(args, global_scale)
-    }
-
     pub fn fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
         &self,
         args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
@@ -314,18 +294,4 @@ impl Nvfp4QuantModule {
             fixed_global_scale,
         )
     }
-}
-
-fn copy_first_f32(stream: &CudaStream, buffer: &DeviceBuffer<f32>) -> Result<f32, DriverError> {
-    let mut value = 0.0f32;
-    unsafe {
-        memory::memcpy_dtoh_async(
-            &mut value as *mut f32,
-            buffer.cu_deviceptr(),
-            std::mem::size_of::<f32>(),
-            stream.cu_stream(),
-        )?;
-    }
-    stream.synchronize()?;
-    Ok(value)
 }

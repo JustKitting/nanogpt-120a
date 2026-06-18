@@ -6,7 +6,7 @@ mod update;
 
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 
 use super::kernels::{self, MATRIX_THREADS_PER_BLOCK};
 use crate::nvfp4_quant::{Nvfp4QuantArgs, Nvfp4QuantModule, TensorAmaxArgs};
@@ -24,28 +24,40 @@ impl OptimizerModule {
         })
     }
 
-    fn requantize(&self, args: super::args::Nvfp4WeightUpdateArgs<'_>) -> Result<(), DriverError> {
-        if args.requantize_global_scale == 0.0 {
+    #[allow(clippy::too_many_arguments)]
+    fn requantize(
+        &self,
+        stream: &CudaStream,
+        bytes: &mut DeviceBuffer<u8>,
+        scales: &mut DeviceBuffer<u8>,
+        global_scale: &mut DeviceBuffer<f32>,
+        fp32_workspace: &DeviceBuffer<f32>,
+        amax: &mut DeviceBuffer<f32>,
+        chunk_amax: &mut DeviceBuffer<f32>,
+        len: u32,
+        fixed_global_scale: f32,
+    ) -> Result<(), DriverError> {
+        if fixed_global_scale == 0.0 {
             self.quant.tensor_amax_f32(TensorAmaxArgs {
-                stream: args.stream,
-                x: &*args.fp32_workspace,
-                chunk_amax: args.chunk_amax,
-                out: args.amax,
-                element_count: args.len,
+                stream,
+                x: fp32_workspace,
+                chunk_amax,
+                out: amax,
+                element_count: len,
             })?;
         }
 
         self.quant.fp32_to_nvfp4_four_six_fixed_global(
             Nvfp4QuantArgs {
-                stream: args.stream,
-                x: &*args.fp32_workspace,
-                amax: &*args.amax,
-                out_fp4: args.bytes,
-                out_scales: args.scales,
-                out_global_scale: args.next_global_scale,
-                group_count: args.len / 16,
+                stream,
+                x: fp32_workspace,
+                amax: &*amax,
+                out_fp4: bytes,
+                out_scales: scales,
+                out_global_scale: global_scale,
+                group_count: len / 16,
             },
-            args.requantize_global_scale,
+            fixed_global_scale,
         )
     }
 }

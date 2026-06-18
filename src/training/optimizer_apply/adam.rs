@@ -48,12 +48,12 @@ pub(super) fn update_adam_tensor(
     state: &mut AdamState,
     step: u32,
 ) -> Result<(), DriverError> {
-    let requantize_global_scale = requantize_global_scale(tensor.global_scale, step);
+    let requantize_global_scale = requantize_global_scale(step);
     optimizer.apply_adamw_update(AdamWUpdateArgs {
         stream,
         bytes: &mut tensor.bytes,
         scales: &mut tensor.scales,
-        global_scale: tensor.global_scale,
+        global_scale: &mut tensor.global_scale,
         requantize_global_scale,
         grad,
         first_moment: &mut state.first,
@@ -62,7 +62,6 @@ pub(super) fn update_adam_tensor(
         fp32_workspace: &mut scratch.fp32_workspace,
         amax: &mut scratch.amax,
         chunk_amax: &mut scratch.chunk_amax,
-        next_global_scale: &mut scratch.next_global_scale,
         len: tensor.len as u32,
         learning_rate: adam_learning_rate(step),
         weight_decay: ADAM_WEIGHT_DECAY,
@@ -73,14 +72,9 @@ pub(super) fn update_adam_tensor(
         eps: ADAM_EPS,
     })?;
 
-    tensor.global_scale = if requantize_global_scale > 0.0 {
-        requantize_global_scale
-    } else {
-        scratch.next_global_scale.to_host_vec(stream)?[0]
-    };
     Ok(())
 }
 
-fn requantize_global_scale(global_scale: f32, step: u32) -> f32 {
-    if step == 1 { 0.0 } else { global_scale }
+fn requantize_global_scale(step: u32) -> f32 {
+    if step == 1 { 0.0 } else { -1.0 }
 }

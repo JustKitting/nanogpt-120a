@@ -6,7 +6,7 @@ use crate::nvfp4_cast::{e2m1_value, e4m3_value};
 pub struct Nvfp4DeviceTensor<'a> {
     pub bytes: &'a DeviceBuffer<u8>,
     pub scales: &'a DeviceBuffer<u8>,
-    pub global_scale: f32,
+    pub global_scale: &'a DeviceBuffer<f32>,
 }
 
 #[derive(Clone, Copy)]

@@ -19,26 +19,14 @@ pub(super) fn qkv_params(args: &QkvProjectionArgs<'_, '_>) -> Nvfp4ProjectionPar
         args.token_count,
         args.input_dim,
         args.output_dim,
-        args.weight.global_scale,
-        args.bias.global_scale,
+        1.0,
+        1.0,
         0,
     )
 }
 
-pub(super) fn c_proj_params(
-    token_count: u32,
-    embedding_dim: u32,
-    weight_global_scale: f32,
-    bias_global_scale: f32,
-) -> Nvfp4ProjectionParams {
-    projection_params(
-        token_count,
-        embedding_dim,
-        embedding_dim,
-        weight_global_scale,
-        bias_global_scale,
-        1,
-    )
+pub(super) fn c_proj_params(token_count: u32, embedding_dim: u32) -> Nvfp4ProjectionParams {
+    projection_params(token_count, embedding_dim, embedding_dim, 1.0, 1.0, 1)
 }
 
 fn projection_params(

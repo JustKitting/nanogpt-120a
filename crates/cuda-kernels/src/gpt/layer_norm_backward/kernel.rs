@@ -25,10 +25,10 @@ pub(super) mod kernels {
         inv_std: &[f32],
         weight_bytes: &[u8],
         weight_scales: &[u8],
+        weight_global_scale: &[f32],
         mut d_residual: DisjointSlice<f32>,
         row_count: u32,
         embedding_dim: u32,
-        weight_global_scale: f32,
     ) {
         static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
 
@@ -50,7 +50,7 @@ pub(super) mod kernels {
                 let weight = nvfp4_column(
                     weight_bytes,
                     weight_scales,
-                    weight_global_scale,
+                    weight_global_scale[0],
                     0,
                     col,
                     embedding_dim,

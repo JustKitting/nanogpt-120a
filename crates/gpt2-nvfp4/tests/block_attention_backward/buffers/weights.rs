@@ -21,6 +21,7 @@ pub struct WeightBuffers {
     ln_weight_scales: DeviceBuffer<u8>,
     ln_bias_bytes: DeviceBuffer<u8>,
     ln_bias_scales: DeviceBuffer<u8>,
+    global_scale: DeviceBuffer<f32>,
 }
 
 impl WeightBuffers {
@@ -38,22 +39,47 @@ impl WeightBuffers {
             ln_weight_scales: filled_u8(stream, HiddenVectorShape::SCALE_LEN, E4M3_ONE)?,
             ln_bias_bytes: filled_u8(stream, HiddenVectorShape::BYTE_LEN, 0)?,
             ln_bias_scales: filled_u8(stream, HiddenVectorShape::SCALE_LEN, E4M3_ONE)?,
+            global_scale: DeviceBuffer::from_host(stream, &[1.0_f32])?,
         })
     }
 
     pub fn ln_1(&self) -> LayerNormTensors<'_> {
         LayerNormTensors {
-            weight: nvfp4_device(&self.ln_weight_bytes, &self.ln_weight_scales),
-            bias: nvfp4_device(&self.ln_bias_bytes, &self.ln_bias_scales),
+            weight: nvfp4_device(
+                &self.ln_weight_bytes,
+                &self.ln_weight_scales,
+                &self.global_scale,
+            ),
+            bias: nvfp4_device(
+                &self.ln_bias_bytes,
+                &self.ln_bias_scales,
+                &self.global_scale,
+            ),
         }
     }
 
     pub fn projections(&self) -> AttentionProjectionTensors<'_> {
         AttentionProjectionTensors {
-            qkv_weight: mma_weight(&self.qkv_weight_bytes, &self.qkv_weight_scales),
-            qkv_bias: nvfp4_device(&self.qkv_bias_bytes, &self.qkv_bias_scales),
-            c_proj_weight: mma_weight(&self.c_proj_weight_bytes, &self.c_proj_weight_scales),
-            c_proj_bias: nvfp4_device(&self.c_proj_bias_bytes, &self.c_proj_bias_scales),
+            qkv_weight: mma_weight(
+                &self.qkv_weight_bytes,
+                &self.qkv_weight_scales,
+                &self.global_scale,
+            ),
+            qkv_bias: nvfp4_device(
+                &self.qkv_bias_bytes,
+                &self.qkv_bias_scales,
+                &self.global_scale,
+            ),
+            c_proj_weight: mma_weight(
+                &self.c_proj_weight_bytes,
+                &self.c_proj_weight_scales,
+                &self.global_scale,
+            ),
+            c_proj_bias: nvfp4_device(
+                &self.c_proj_bias_bytes,
+                &self.c_proj_bias_scales,
+                &self.global_scale,
+            ),
         }
     }
 }
@@ -65,21 +91,23 @@ fn filled_u8(stream: &CudaStream, len: usize, value: u8) -> Result<DeviceBuffer<
 fn mma_weight<'a>(
     bytes: &'a DeviceBuffer<u8>,
     scales: &'a DeviceBuffer<u8>,
+    global_scale: &'a DeviceBuffer<f32>,
 ) -> Nvfp4FourSixMmaWeightTensor<'a> {
     Nvfp4FourSixMmaWeightTensor {
         bytes,
         scales,
-        global_scale: 1.0,
+        global_scale,
     }
 }
 
 fn nvfp4_device<'a>(
     bytes: &'a DeviceBuffer<u8>,
     scales: &'a DeviceBuffer<u8>,
+    global_scale: &'a DeviceBuffer<f32>,
 ) -> Nvfp4DeviceTensor<'a> {
     Nvfp4DeviceTensor {
         bytes,
         scales,
-        global_scale: 1.0,
+        global_scale,
     }
 }

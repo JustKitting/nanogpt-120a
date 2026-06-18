@@ -1,6 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer};
 
-use crate::mma::Nvfp4FourSixMmaWeightTensor;
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 pub use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
@@ -71,14 +70,6 @@ impl<'a> Nvfp4TcMatmulOperand<'a> {
             bytes: &*self.bytes,
             scales: &*self.scales,
             global_scales: &*self.global_scales,
-        }
-    }
-
-    pub(super) fn mma_weight(&self) -> Nvfp4FourSixMmaWeightTensor<'_> {
-        Nvfp4FourSixMmaWeightTensor {
-            bytes: &*self.bytes,
-            scales: &*self.scales,
-            global_scale: self.global_scale,
         }
     }
 }
