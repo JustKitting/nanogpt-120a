@@ -1,5 +1,6 @@
-use crate::loss_graph::LossCurve;
 use crate::training::TrainStats;
+
+use super::super::loss_graph::LossCurve;
 
 pub struct TrainingLogger {
     previous_loss: Option<f32>,

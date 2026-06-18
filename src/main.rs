@@ -1,6 +1,5 @@
 mod app;
 mod checkpoint;
-mod loss_graph;
 mod training;
 mod upload;
 

@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::loss_graph::LossCurve;
 use crate::{AppResult, app::config};
 
+use super::loss_graph::LossCurve;
 use super::run_output::{self, RunOutput};
 
 pub fn write_loss_graph(run_output: &RunOutput, loss_curve: &LossCurve) -> AppResult<PathBuf> {
