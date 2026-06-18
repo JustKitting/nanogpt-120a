@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DriverError};
 use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD};
 
-use crate::runtime::Runtime;
+use crate::app::runtime::Runtime;
 use crate::upload::UploadedBlock;
 
 use super::super::OptimizerTrace;

@@ -2,7 +2,7 @@ use cuda_core::CudaStream;
 use std::time::Instant;
 
 use crate::AppResult;
-use crate::runtime::Runtime;
+use crate::app::runtime::Runtime;
 use crate::upload::UploadedModel;
 
 use super::super::grads::BackwardBuffers;

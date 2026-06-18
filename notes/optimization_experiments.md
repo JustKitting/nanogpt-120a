@@ -89,13 +89,18 @@ Shakespeare test.
 - Shakespeare smoke and 2k experiments.
 - Default dataset switched from FineWeb to PleIAs/SYNTH.
 - Run artifacts now go to datetime-labelled run folders.
+- Aurora rectangular power-balancing reduced from two passes to one pass:
+  - 20-step Shakespeare smoke kept loss behavior comparable.
+  - Aurora polar TC helper launch counts dropped from 20160 to 11520 over 20
+    steps.
 
 ## Current Bottlenecks
 
 From recent logs and profiling:
 
-- Optimizer is too expensive, roughly 290 ms/step in late AMUSE runs.
-- Aurora dominates optimizer time, roughly 280 ms/step.
+- Optimizer is still expensive, roughly 140 ms/step after one-pass Aurora
+  rectangular power balancing.
+- Aurora is roughly 115 ms/step after one-pass rectangular power balancing.
 - Backward enqueue is roughly 240 ms/step.
 - Loss sync is roughly 184 ms on logged steps, but this can be amortized by
   larger `TRAIN_LOG_INTERVAL`.
@@ -121,7 +126,7 @@ Likely root causes:
 - ncu SOL and instruction mix on the current top kernels.
 - Fusion of schedule-free materialization with quantization/writeback where
   possible.
-- Fusion or removal of Aurora helper kernels.
+- Further fusion or removal of Aurora helper kernels.
 - Replacing Aurora polar helper path with fewer, larger TC kernels.
 - Larger CTA-tiled rewrites for remaining backward matmul-heavy paths.
 - Capturing CUDA graph or equivalent launch-overhead reduction.
@@ -153,15 +158,106 @@ Likely root causes:
 ```text
 date:
 commit:
-dataset:
-command:
-tokens_per_step:
-steps:
-log_interval:
-eval_interval:
-final_train_loss:
-final_val_loss:
-tokens_per_second:
-top_kernels:
+experiment:
+status: success | failure | inconclusive
+decision:
+baseline:
+result:
+quality:
+performance:
+evidence:
+verification:
 notes:
+```
+
+## Experiment Log
+
+```text
+date: 2026-06-18
+commit: uncommitted
+experiment: Pre-convert the left operand of Aurora B @ X to FP16 before the
+  in-place TC matmul.
+status: failure
+decision: reverted
+baseline:
+  PP_ITERATIONS=2 profile had optimizer_ms around 293ms at step 19.
+  f16_cta_tc_matmul_add_f32_in_place_kernel took 2.870s over 20160 launches.
+  fp32_to_f16_kernel took 384ms over 22560 launches.
+result:
+  optimizer_ms increased to around 306ms at step 19.
+  replacement f16_cta_tc_matmul_add_f16_a_f32_in_place_kernel still took 2.870s
+  over 20160 launches.
+  fp32_to_f16_kernel increased to 416ms over 42720 launches.
+quality:
+  No quality benefit measured; this was a kernel performance experiment only.
+performance:
+  Failed. The extra conversion launches/cost outweighed any staging benefit.
+evidence:
+  target/nsys/prepared_a_direct_route_20.nsys-rep
+verification:
+  CUDA ignored kernel tests passed before profiling.
+notes:
+  This route should stay rejected unless the conversion can be fused into an
+  existing producer or reused across multiple matmuls without extra launches.
+```
+
+```text
+date: 2026-06-18
+commit: uncommitted
+experiment: Reduce rectangular Aurora power balancing from two passes to one
+  pass with PP_ITERATIONS 2 -> 1.
+status: success, preliminary
+decision: keep for now; needs 2k-step quality check before committing as safe
+baseline:
+  PP_ITERATIONS=2 profile had optimizer_ms around 293ms at step 19.
+  Aurora was around 282ms at step 19.
+  Each Aurora polar TC helper launched 20160 times over 20 steps.
+result:
+  PP_ITERATIONS=1 profile had optimizer_ms around 140ms at step 19.
+  Aurora was around 115ms at step 19.
+  Aurora polar TC helper launches dropped to 11520 over 20 steps.
+quality:
+  20-step Shakespeare loss stayed comparable: final_train_loss 9.131195 direct,
+  9.127897 under nsys.
+performance:
+  20-step direct wall throughput was 12917 tokens/s including startup and two
+  loss syncs.
+  Top profiled kernels shifted to causal attention, MS-EDEN quantization,
+  Aurora in-place TC matmul, and linear backward projection.
+evidence:
+  target/nsys/aurora_pp1_20.nsys-rep
+  target/runs/aurora_pp1_20/loss.png
+verification:
+  cargo check --workspace --tests: pass
+  cargo build --release: pass
+  20-step direct GPU training run: pass
+  20-step nsys GPU training run: pass
+notes:
+  Baseline PP_ITERATIONS=2 profile had optimizer_ms around 293ms at step 19
+  and 20160 launches for each Aurora polar TC helper over 20 steps. PP1 profile
+  had optimizer_ms around 140ms at step 19 and 11520 launches for those helpers.
+```
+
+```text
+date: 2026-06-18
+commit: uncommitted
+experiment: 100-step quality smoke for PP_ITERATIONS=1.
+status: success, short-run only
+decision: keep as preliminary evidence; still requires 2k-step Shakespeare run
+baseline:
+  Prior 100-step grouped-Aurora experiment reached final loss around 6.440577.
+result:
+  100-step Shakespeare final_train_loss was 6.438200.
+quality:
+  Loss dropped from 10.808949 at step 0 to 6.438200 at step 99.
+performance:
+  Wall throughput was 13203 tokens/s including startup and two loss syncs.
+evidence:
+  target/runs/aurora_pp1_100/loss.png
+verification:
+  cargo test --workspace: pass
+  100-step direct GPU training run: pass
+notes:
+  Short learning check stayed healthy; this does not replace a 2k-step quality
+  check.
 ```

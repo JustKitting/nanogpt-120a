@@ -23,7 +23,7 @@ use balance::aurora_oriented;
 use finalize::finalize_update;
 use orient::orient_update;
 
-pub(super) const PP_ITERATIONS: usize = 2;
+pub(super) const PP_ITERATIONS: usize = 1;
 pub(super) const EPS: f32 = 1.0e-7;
 
 const MU: f32 = 0.95;

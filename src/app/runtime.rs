@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use cuda_core::{CudaContext, CudaStream};
@@ -114,8 +113,5 @@ fn gpu_device_index() -> usize {
 }
 
 fn ptx_path() -> String {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("rust_kernels_cuda.ptx")
-        .to_string_lossy()
-        .into_owned()
+    format!("{}/rust_kernels_cuda.ptx", env!("CARGO_MANIFEST_DIR"))
 }

@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DriverError};
 
-use crate::runtime::Runtime;
+use crate::app::runtime::Runtime;
 use crate::upload::UploadedBlock;
 
 use super::super::OptimizerTrace;

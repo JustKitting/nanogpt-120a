@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
-use crate::runtime::Runtime;
+use crate::app::runtime::Runtime;
 use crate::upload::UploadedNvfp4;
 
 use super::super::optimizer::OptimizerScratch;

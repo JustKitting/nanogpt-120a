@@ -8,7 +8,7 @@ use crate::AppResult;
 const TRAIN_RUN_DIR_ENV: &str = "TRAIN_RUN_DIR";
 const RUNS_DIR: &str = "target/runs";
 
-pub struct RunOutput {
+pub(crate) struct RunOutput {
     dir: PathBuf,
 }
 
@@ -37,7 +37,7 @@ impl RunOutput {
     }
 }
 
-pub fn ensure_parent(path: &Path) -> AppResult {
+pub(crate) fn ensure_parent(path: &Path) -> AppResult {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }

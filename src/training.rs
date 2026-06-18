@@ -32,7 +32,7 @@ pub use generate::SamplingConfig;
 use gpt2_nvfp4::{Gpt2, Gpt2Rng};
 
 use crate::AppResult;
-use crate::runtime::Runtime;
+use crate::app::runtime::Runtime;
 use crate::upload::UploadedModel;
 
 pub struct Trainer {
