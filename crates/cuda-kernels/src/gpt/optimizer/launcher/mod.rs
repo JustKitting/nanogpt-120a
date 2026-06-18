@@ -31,34 +31,28 @@ impl OptimizerModule {
         bytes: &mut DeviceBuffer<u8>,
         scales: &mut DeviceBuffer<u8>,
         global_scale: &mut DeviceBuffer<f32>,
-        fp32_workspace: &DeviceBuffer<f32>,
+        master: &DeviceBuffer<f32>,
         amax: &mut DeviceBuffer<f32>,
         chunk_amax: &mut DeviceBuffer<f32>,
         len: u32,
-        fixed_global_scale: f32,
     ) -> Result<(), DriverError> {
-        if fixed_global_scale == 0.0 {
-            self.quant.tensor_amax_f32(TensorAmaxArgs {
-                stream,
-                x: fp32_workspace,
-                chunk_amax,
-                out: amax,
-                element_count: len,
-            })?;
-        }
+        self.quant.tensor_amax_f32(TensorAmaxArgs {
+            stream,
+            x: master,
+            chunk_amax,
+            out: amax,
+            element_count: len,
+        })?;
 
-        self.quant.fp32_to_nvfp4_four_six_fixed_global(
-            Nvfp4QuantArgs {
-                stream,
-                x: fp32_workspace,
-                amax: &*amax,
-                out_fp4: bytes,
-                out_scales: scales,
-                out_global_scale: global_scale,
-                group_count: len / 16,
-            },
-            fixed_global_scale,
-        )
+        self.quant.fp32_to_nvfp4_four_six(Nvfp4QuantArgs {
+            stream,
+            x: master,
+            amax: &*amax,
+            out_fp4: bytes,
+            out_scales: scales,
+            out_global_scale: global_scale,
+            group_count: len / 16,
+        })
     }
 }
 

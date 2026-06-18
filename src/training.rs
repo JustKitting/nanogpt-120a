@@ -6,6 +6,7 @@ mod data;
 mod diagnostics;
 mod eval;
 mod forward;
+mod generate;
 mod grad_block;
 mod grad_clear;
 mod grads;
@@ -17,6 +18,7 @@ mod optimizer_apply;
 mod optimizer_aurora;
 mod optimizer_state;
 mod optimizer_tc_scratch;
+mod save;
 mod scratch;
 mod tape;
 mod tape_block;
@@ -73,9 +75,12 @@ impl Trainer {
         model.init(seed);
         let weights = model.weights().expect("Gpt2::init must create weights");
 
+        let uploaded = UploadedModel::new(stream, weights)?;
+        let buffers = buffers::TrainBuffers::new(stream, &runtime, &uploaded)?;
+
         Ok(Self {
-            uploaded: UploadedModel::new(stream, weights)?,
-            buffers: buffers::TrainBuffers::new(stream)?,
+            uploaded,
+            buffers,
             runtime,
             model,
             rng: Gpt2Rng::new(seed ^ 0xa047_0a91),

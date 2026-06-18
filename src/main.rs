@@ -1,8 +1,11 @@
+mod checkpoint;
+mod loss_graph;
 mod runtime;
 mod training;
 mod upload;
 
 use std::error::Error;
+use std::path::PathBuf;
 
 use training::{TokenDataLoader, Trainer};
 
@@ -19,6 +22,7 @@ fn main() -> AppResult {
     let steps = train_steps();
     let log_interval = train_log_interval();
     let eval_interval = train_eval_interval();
+    let mut loss_curve = loss_graph::LossCurve::new();
     let validation_tokens = data.validation_tokens()?;
     let validation_batch = trainer.batch_from_default_windows(&validation_tokens)?;
 
@@ -39,6 +43,7 @@ fn main() -> AppResult {
                 .map(|loss| format!("{:+.6}", stats.loss - loss))
                 .unwrap_or_else(|| "n/a".to_string());
             let ema = update_loss_ema(&mut loss_ema, stats.loss);
+            loss_curve.push(step, stats.loss, ema);
             println!(
                 "step={step} source={source} offset={offset} batch_size={window_batch_size} seq_len={window_seq_len} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} aurora_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_sync_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
                 stats.tokens,
@@ -116,6 +121,23 @@ fn main() -> AppResult {
         }
     }
 
+    if let Some(path) = train_save_model_path() {
+        trainer.save_model(&path)?;
+        println!("saved_model={}", path.display());
+    }
+
+    if let Some(path) = train_loss_graph_path() {
+        loss_curve.write_svg(&path)?;
+        println!("loss_graph={}", path.display());
+    }
+
+    if let Some(prompt) = train_generate_prompt() {
+        let text = trainer.generate_greedy(&prompt, train_generate_tokens())?;
+        println!("generated_text_begin");
+        println!("{text}");
+        println!("generated_text_end");
+    }
+
     Ok(())
 }
 
@@ -139,6 +161,33 @@ fn train_eval_interval() -> Option<usize> {
         .ok()
         .and_then(|value| value.parse().ok())
         .filter(|interval| *interval > 0)
+}
+
+fn train_save_model_path() -> Option<PathBuf> {
+    std::env::var("TRAIN_SAVE_MODEL")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn train_loss_graph_path() -> Option<PathBuf> {
+    std::env::var("TRAIN_LOSS_GRAPH")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn train_generate_prompt() -> Option<String> {
+    std::env::var("TRAIN_GENERATE_PROMPT")
+        .ok()
+        .filter(|value| !value.is_empty())
+}
+
+fn train_generate_tokens() -> usize {
+    std::env::var("TRAIN_GENERATE_TOKENS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(128)
 }
 
 fn should_log_step(step: usize, steps: usize, log_interval: usize) -> bool {

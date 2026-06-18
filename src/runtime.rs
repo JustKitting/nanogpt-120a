@@ -13,6 +13,7 @@ use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::layer_norm_backward::LayerNormBackwardModule;
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
 use rust_kernels_cuda::lm_head::LmHeadModule;
+use rust_kernels_cuda::logits::LogitsModule;
 use rust_kernels_cuda::loss::LossModule;
 use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
@@ -32,9 +33,10 @@ pub struct Runtime {
     pub layer_norm: LayerNormModule,
     pub mlp: MlpModule,
     pub lm_head: LmHeadModule,
+    pub logits: LogitsModule,
     pub loss: LossModule,
     pub transpose: TransposeModule,
-    decode: Nvfp4DecodeModule,
+    pub decode: Nvfp4DecodeModule,
     linear: LinearBackwardModule,
     layer_norm_backward: LayerNormBackwardModule,
     residual: ResidualBackwardModule,
@@ -55,6 +57,7 @@ impl Runtime {
             layer_norm: LayerNormModule::from_module(ptx.clone())?,
             mlp: MlpModule::from_module(ptx.clone())?,
             lm_head: LmHeadModule::from_module(ptx.clone())?,
+            logits: LogitsModule::from_module(ptx.clone())?,
             loss: LossModule::from_module(ptx.clone())?,
             transpose: TransposeModule::from_module(ptx.clone())?,
             decode: Nvfp4DecodeModule::from_module(ptx.clone())?,

@@ -180,9 +180,9 @@ struct PendingTensorUpdateDiagnostics {
 }
 
 struct AdamSnapshot {
+    master: Vec<f32>,
     first: Vec<f32>,
     second: Vec<f32>,
-    residual: Vec<f32>,
     learning_rate: f32,
     weight_decay: f32,
     beta1: f32,
@@ -353,9 +353,9 @@ fn push_update(
 ) -> AppResult {
     let config = adam_debug_config(step);
     let adam = AdamSnapshot {
+        master: state.master.to_host_vec(stream)?,
         first: state.first.to_host_vec(stream)?,
         second: state.second.to_host_vec(stream)?,
-        residual: state.residual.to_host_vec(stream)?,
         learning_rate: config.learning_rate,
         weight_decay: config.weight_decay,
         beta1: config.beta1,
@@ -524,12 +524,11 @@ fn tensor_update_stats(
             pending.before_global,
             i,
         );
-        let residual = pending
+        let before = pending
             .adam
             .as_ref()
-            .map(|adam| adam.residual[i])
-            .unwrap_or(0.0);
-        let before = decoded_before + residual;
+            .map(|adam| adam.master[i])
+            .unwrap_or(decoded_before);
         let after = nvfp4_host_value(&after_bytes, &after_scales, after_global, i);
         let delta = after - before;
         let (predicted_delta, quant_error) = match pending.adam.as_ref() {

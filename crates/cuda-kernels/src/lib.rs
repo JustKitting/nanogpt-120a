@@ -20,6 +20,8 @@ pub mod layer_norm_utils;
 pub mod linear_backward;
 #[path = "gpt/lm_head.rs"]
 pub mod lm_head;
+#[path = "gpt/logits/mod.rs"]
+pub mod logits;
 #[path = "gpt/loss.rs"]
 pub mod loss;
 #[path = "gpt/mlp/mod.rs"]
@@ -49,8 +51,8 @@ pub mod warp_reduce;
 
 pub mod gpt {
     pub use crate::{
-        attention, embedding, layer_norm, layer_norm_backward, linear_backward, lm_head, loss, mlp,
-        optimizer, residual,
+        attention, embedding, layer_norm, layer_norm_backward, linear_backward, lm_head, logits,
+        loss, mlp, optimizer, residual,
     };
 }
 

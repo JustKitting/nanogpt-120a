@@ -38,7 +38,6 @@ impl Nvfp4QuantModule {
             args.out_global_scale,
             args.group_count,
             0,
-            0.0,
         )
     }
 
@@ -55,25 +54,6 @@ impl Nvfp4QuantModule {
             args.out_global_scale,
             args.group_count,
             args.row_len,
-            0.0,
-        )
-    }
-
-    pub fn fp32_to_nvfp4_four_six_fixed_global(
-        &self,
-        args: Nvfp4QuantArgs<'_, '_>,
-        global_scale: f32,
-    ) -> Result<(), DriverError> {
-        self.launch_fp32_to_nvfp4_four_six(
-            args.stream,
-            args.x,
-            args.amax,
-            args.out_fp4,
-            args.out_scales,
-            args.out_global_scale,
-            args.group_count,
-            0,
-            global_scale,
         )
     }
 
@@ -273,7 +253,6 @@ impl Nvfp4QuantModule {
         out_global_scale: &mut DeviceBuffer<f32>,
         group_count: u32,
         row_len: u32,
-        fixed_global_scale: f32,
     ) -> Result<(), DriverError> {
         let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
 
@@ -291,7 +270,6 @@ impl Nvfp4QuantModule {
             out_global_scale,
             row_len,
             SCALE_OVERRIDE,
-            fixed_global_scale,
         )
     }
 }

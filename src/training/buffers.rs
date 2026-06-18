@@ -9,6 +9,8 @@ use super::optimizer_state::OptimizerStateBuffers;
 use super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::scratch::BackwardScratchBuffers;
 use super::tape::ForwardTapeBuffers;
+use crate::runtime::Runtime;
+use crate::upload::UploadedModel;
 
 pub struct TrainBuffers {
     pub residual: DeviceBuffer<f32>,
@@ -36,7 +38,11 @@ pub struct TrainBuffers {
 }
 
 impl TrainBuffers {
-    pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
+    pub fn new(
+        stream: &CudaStream,
+        runtime: &Runtime,
+        uploaded: &UploadedModel,
+    ) -> Result<Self, DriverError> {
         Ok(Self {
             residual: zero(stream, HiddenState::LEN)?,
             normalized: zero(stream, HiddenState::LEN)?,
@@ -58,7 +64,7 @@ impl TrainBuffers {
             backward: BackwardBuffers::new(stream)?,
             scratch: BackwardScratchBuffers::new(stream)?,
             optimizer: OptimizerScratch::new(stream)?,
-            optimizer_state: OptimizerStateBuffers::new(stream)?,
+            optimizer_state: OptimizerStateBuffers::new(stream, &runtime.decode, uploaded)?,
             aurora: AuroraScratchBuffers::new(stream)?,
         })
     }
