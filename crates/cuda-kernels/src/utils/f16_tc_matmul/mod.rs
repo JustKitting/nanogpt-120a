@@ -6,10 +6,13 @@ mod launcher;
 mod load;
 mod matmul;
 mod pad;
+mod prepare;
 mod store;
+mod symmetric;
 mod tile;
 
 pub use args::{
-    F16TcMatmulArgs, F16TcMatmulScratch, f16_tc_matmul_elements, f16_tc_matmul_padded_k,
+    F16TcMatmulAddArgs, F16TcMatmulArgs, F16TcMatmulScratch, F16TcSymmetricMatmulArgs,
+    f16_tc_matmul_elements, f16_tc_matmul_padded_k,
 };
 pub use launcher::F16TcMatmulModule;

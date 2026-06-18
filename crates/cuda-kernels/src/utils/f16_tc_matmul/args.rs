@@ -21,6 +21,30 @@ pub struct F16TcMatmulArgs<'a, 'scratch, 'out> {
     pub k: u32,
 }
 
+pub struct F16TcMatmulAddArgs<'a, 'scratch, 'out> {
+    pub stream: &'a CudaStream,
+    pub a: &'a DeviceBuffer<f32>,
+    pub b_t: &'a DeviceBuffer<f32>,
+    pub base: &'a DeviceBuffer<f32>,
+    pub out: &'out mut DeviceBuffer<f32>,
+    pub scratch: F16TcMatmulScratch<'scratch>,
+    pub batch_count: u32,
+    pub m: u32,
+    pub n: u32,
+    pub k: u32,
+    pub base_scale: f32,
+    pub matmul_scale: f32,
+}
+
+pub struct F16TcSymmetricMatmulArgs<'a, 'scratch, 'out> {
+    pub stream: &'a CudaStream,
+    pub x: &'a DeviceBuffer<f32>,
+    pub out: &'out mut DeviceBuffer<f32>,
+    pub scratch: F16TcMatmulScratch<'scratch>,
+    pub rows: u32,
+    pub cols: u32,
+}
+
 impl<'a> F16TcMatmulScratch<'a> {
     pub fn reborrow(&mut self) -> F16TcMatmulScratch<'_> {
         F16TcMatmulScratch {

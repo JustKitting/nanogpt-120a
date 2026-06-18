@@ -1,8 +1,9 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::convert::fp32_to_f16_body;
-use super::matmul::matmul_body;
+use super::matmul::{matmul_add_body, matmul_body};
 use super::pad::pad_rows_body;
+use super::symmetric::symmetric_matmul_body;
 
 pub const F16_THREADS_PER_BLOCK: u32 = 256;
 
@@ -37,6 +38,43 @@ pub(super) mod module {
         k: u32,
     ) {
         matmul_body(a, b_t, out, batch_count, m, n, k);
+    }
+
+    #[kernel]
+    pub fn f16_batched_tc_matmul_add_kernel(
+        a: &[u16],
+        b_t: &[u16],
+        base: &[f32],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
+        base_scale: f32,
+        matmul_scale: f32,
+    ) {
+        matmul_add_body(
+            a,
+            b_t,
+            base,
+            out,
+            batch_count,
+            m,
+            n,
+            k,
+            base_scale,
+            matmul_scale,
+        );
+    }
+
+    #[kernel]
+    pub fn f16_symmetric_tc_matmul_kernel(
+        x: &[u16],
+        out: DisjointSlice<f32>,
+        rows: u32,
+        cols: u32,
+    ) {
+        symmetric_matmul_body(x, out, rows, cols);
     }
 }
 

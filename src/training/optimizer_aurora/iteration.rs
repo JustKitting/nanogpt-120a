@@ -3,7 +3,7 @@ use rust_kernels_cuda::transpose::TransposeF32Args;
 
 use super::AuroraMatrixArgs;
 use super::polar::POLAR_ITERATIONS;
-use super::tc::tc_matmul;
+use super::tc::{tc_matmul_add, tc_self_matmul_symmetric};
 
 pub(super) fn polar_iteration(
     args: &mut AuroraMatrixArgs<'_, '_>,
@@ -34,50 +34,35 @@ fn build_a(
     cols: u32,
     iter: usize,
 ) -> Result<(), DriverError> {
-    tc_matmul(
+    tc_self_matmul_symmetric(
         args.stream,
         args.modules,
         &mut args.scratch.tc,
         &args.scratch.polar_x,
-        &args.scratch.polar_x,
         &mut args.scratch.a,
-        rows,
         rows,
         cols,
         args.seed,
         0x1000 + iter as u32,
-    )?;
-    args.modules.transpose.transpose_f32(TransposeF32Args {
-        stream: args.stream,
-        input: &args.scratch.a,
-        output: &mut args.scratch.a_t,
-        rows,
-        cols: rows,
-    })
+    )
 }
 
 fn build_b(args: &mut AuroraMatrixArgs<'_, '_>, rows: u32, iter: usize) -> Result<(), DriverError> {
-    tc_matmul(
+    tc_matmul_add(
         args.stream,
         args.modules,
         &mut args.scratch.tc,
         &args.scratch.a,
-        &args.scratch.a_t,
-        &mut args.scratch.aa,
-        rows,
-        rows,
-        rows,
-        args.seed,
-        0x2000 + iter as u32,
-    )?;
-    args.modules.optimizer.matrix_combine(
-        args.stream,
         &args.scratch.a,
-        &args.scratch.aa,
+        &args.scratch.a,
         &mut args.scratch.b,
+        rows,
+        rows,
+        rows,
         -1.5,
         0.5,
-        rows * rows,
+        args.seed,
+        0x2000 + iter as u32,
     )
 }
 
@@ -94,26 +79,20 @@ fn apply_b(
         rows,
         cols,
     })?;
-    tc_matmul(
+    tc_matmul_add(
         args.stream,
         args.modules,
         &mut args.scratch.tc,
         &args.scratch.b,
         &args.scratch.polar_xt,
-        &mut args.scratch.bx,
+        &args.scratch.polar_x,
+        &mut args.scratch.polar_next,
         rows,
         cols,
         rows,
-        args.seed,
-        0x3000 + iter as u32,
-    )?;
-    args.modules.optimizer.matrix_combine(
-        args.stream,
-        &args.scratch.polar_x,
-        &args.scratch.bx,
-        &mut args.scratch.polar_next,
         2.0,
         1.0,
-        rows * cols,
+        args.seed,
+        0x3000 + iter as u32,
     )
 }
