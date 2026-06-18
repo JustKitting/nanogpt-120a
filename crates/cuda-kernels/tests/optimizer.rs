@@ -8,8 +8,31 @@ use rust_kernels_cuda::optimizer::{
 mod common;
 
 const LEN: usize = 32;
+const POLAR_LEN: usize = 1024;
 const E2M1_ONE_PAIR: u8 = 0x22;
 const E4M3_ONE: u8 = 0x38;
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn aurora_polar_normalize_broadcasts_block_sum_to_all_threads() -> Result<(), Box<dyn Error>> {
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let module =
+        OptimizerModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+
+    let x = DeviceBuffer::from_host(&stream, &[1.0_f32; POLAR_LEN])?;
+    let mut out = DeviceBuffer::<f32>::zeroed(&stream, POLAR_LEN)?;
+
+    module.polar_normalize(&stream, &x, &mut out, POLAR_LEN as u32)?;
+
+    let actual = out.to_host_vec(&stream)?;
+    let expected = 1.0 / ((POLAR_LEN as f32).sqrt() * 1.01 + 1.0e-7);
+    assert!(actual.iter().all(|value| {
+        let error = (*value - expected).abs();
+        value.is_finite() && error <= 1.0e-7
+    }));
+    Ok(())
+}
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]

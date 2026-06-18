@@ -14,6 +14,13 @@ macro_rules! block_sum {
             0.0
         };
         let block_total = crate::warp_reduce::warp_sum_f32(partial);
+        if $warp == 0 && $lane == 0 {
+            unsafe {
+                $storage[0] = block_total;
+            }
+        }
+        thread::sync_threads();
+        let block_total = unsafe { $storage[0] };
         thread::sync_threads();
         block_total
     }};

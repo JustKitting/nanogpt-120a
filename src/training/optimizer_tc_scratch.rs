@@ -10,7 +10,6 @@ pub struct AuroraScratchBuffers {
     pub(super) polar_x: DeviceBuffer<f32>,
     pub(super) a: DeviceBuffer<f32>,
     pub(super) b: DeviceBuffer<f32>,
-    pub(super) norm: DeviceBuffer<f32>,
     pub(super) row_scale: DeviceBuffer<f32>,
     pub(super) tc: TcMatmulScratch,
 }
@@ -32,7 +31,6 @@ impl AuroraScratchBuffers {
             polar_x: DeviceBuffer::zeroed(stream, max_matrix())?,
             a: DeviceBuffer::zeroed(stream, small_square())?,
             b: DeviceBuffer::zeroed(stream, small_square())?,
-            norm: DeviceBuffer::zeroed(stream, 1)?,
             row_scale: DeviceBuffer::zeroed(stream, GPT2_MLP)?,
             tc: TcMatmulScratch::new(stream)?,
         })

@@ -17,7 +17,7 @@ pub(super) fn orient_update(
         return Ok((args.cols, args.rows, true));
     }
 
-    args.modules.optimizer.matrix_combine(
+    args.modules.optimizer.elementwise_linear_combination(
         args.stream,
         &args.scratch.update,
         &args.scratch.update,

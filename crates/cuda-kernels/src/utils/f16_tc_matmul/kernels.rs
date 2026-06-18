@@ -3,7 +3,7 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel};
 use super::convert::fp32_to_f16_body;
 use super::cta::cta_matmul_body;
 use super::cta_add_f32::cta_matmul_add_f32_body;
-use super::cta_add_f32_in_place::cta_matmul_add_f32_in_place_body;
+use super::cta_add_f32_rhs_transposed::cta_matmul_add_f32_rhs_transposed_body;
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
 use super::pad::pad_rows_body;
 use super::symmetric::symmetric_matmul_body;
@@ -73,8 +73,9 @@ pub(super) mod module {
     }
 
     #[kernel]
-    pub fn f16_cta_tc_matmul_add_f32_in_place_kernel(
+    pub fn f16_cta_tc_matmul_add_f32_rhs_transposed_kernel(
         a: &[f32],
+        rhs_base: &[f32],
         out: DisjointSlice<f32>,
         batch_count: u32,
         m: u32,
@@ -84,8 +85,8 @@ pub(super) mod module {
         matmul_scale: f32,
     ) {
         call_with_tiles!(
-            cta_matmul_add_f32_in_place_body,
-            [a, out],
+            cta_matmul_add_f32_rhs_transposed_body,
+            [a, rhs_base, out],
             [batch_count, m, n, k, base_scale, matmul_scale]
         );
     }

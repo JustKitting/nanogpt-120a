@@ -36,10 +36,11 @@ pub struct F16TcMatmulAddArgs<'a, 'scratch, 'out> {
     pub matmul_scale: f32,
 }
 
-pub struct F16TcMatmulAddRhsTransposeInPlaceArgs<'a, 'scratch, 'out> {
+pub struct F16TcMatmulAddRhsTransposeArgs<'a, 'scratch, 'out> {
     pub stream: &'a CudaStream,
     pub a: &'a DeviceBuffer<f32>,
-    pub rhs_base_out: &'out mut DeviceBuffer<f32>,
+    pub rhs_base: &'a DeviceBuffer<f32>,
+    pub out: &'out mut DeviceBuffer<f32>,
     pub scratch: F16TcMatmulScratch<'scratch>,
     pub batch_count: u32,
     pub m: u32,

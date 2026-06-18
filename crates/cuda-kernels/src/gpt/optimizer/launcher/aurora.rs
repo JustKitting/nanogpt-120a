@@ -24,14 +24,14 @@ impl OptimizerModule {
         )
     }
 
-    pub fn matrix_frobenius_norm(
+    pub fn polar_normalize(
         &self,
         stream: &CudaStream,
         x: &DeviceBuffer<f32>,
         out: &mut DeviceBuffer<f32>,
         len: u32,
     ) -> Result<(), DriverError> {
-        self.apply.aurora.matrix.matrix_frobenius_norm_kernel(
+        self.apply.aurora.polar.polar_normalize_kernel(
             stream,
             LaunchConfig {
                 grid_dim: (1, 1, 1),
@@ -44,23 +44,25 @@ impl OptimizerModule {
         )
     }
 
-    pub fn matrix_scale_in_place(
+    pub fn polar_normalize_in_place(
         &self,
         stream: &CudaStream,
         x: &mut DeviceBuffer<f32>,
-        norm: &DeviceBuffer<f32>,
         len: u32,
     ) -> Result<(), DriverError> {
-        self.apply.aurora.matrix.matrix_scale_in_place_kernel(
+        self.apply.aurora.polar.polar_normalize_in_place_kernel(
             stream,
-            matrix_config(len),
+            LaunchConfig {
+                grid_dim: (1, 1, 1),
+                block_dim: (MATRIX_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
             x,
-            norm,
             len,
         )
     }
 
-    pub fn matrix_combine(
+    pub fn elementwise_linear_combination(
         &self,
         stream: &CudaStream,
         a: &DeviceBuffer<f32>,
@@ -70,16 +72,19 @@ impl OptimizerModule {
         b_scale: f32,
         len: u32,
     ) -> Result<(), DriverError> {
-        self.apply.aurora.matrix.matrix_combine_kernel(
-            stream,
-            matrix_config(len),
-            a,
-            b,
-            out,
-            a_scale,
-            b_scale,
-            len,
-        )
+        self.apply
+            .aurora
+            .elementwise
+            .elementwise_linear_combination_kernel(
+                stream,
+                matrix_config(len),
+                a,
+                b,
+                out,
+                a_scale,
+                b_scale,
+                len,
+            )
     }
 
     pub fn row_inv_norm(
@@ -91,7 +96,7 @@ impl OptimizerModule {
         cols: u32,
         eps: f32,
     ) -> Result<(), DriverError> {
-        self.apply.aurora.row.row_inv_norm_kernel(
+        self.apply.aurora.row_balance.row_inv_norm_kernel(
             stream,
             LaunchConfig {
                 grid_dim: (rows, 1, 1),

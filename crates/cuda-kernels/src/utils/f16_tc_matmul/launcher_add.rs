@@ -1,6 +1,6 @@
 use cuda_core::DriverError;
 
-use super::args::{F16TcMatmulAddArgs, F16TcMatmulAddRhsTransposeInPlaceArgs};
+use super::args::{F16TcMatmulAddArgs, F16TcMatmulAddRhsTransposeArgs};
 use super::launcher::{F16TcMatmulModule, cta_config};
 
 impl F16TcMatmulModule {
@@ -29,18 +29,19 @@ impl F16TcMatmulModule {
         )
     }
 
-    pub fn batched_matmul_add_rhs_transposed_in_place(
+    pub fn batched_matmul_add_rhs_transposed(
         &self,
-        args: F16TcMatmulAddRhsTransposeInPlaceArgs<'_, '_, '_>,
+        args: F16TcMatmulAddRhsTransposeArgs<'_, '_, '_>,
     ) -> Result<(), DriverError> {
-        assert!(args.rhs_base_out.len() >= elements(args.batch_count, args.k, args.n));
-        assert!(args.rhs_base_out.len() >= elements(args.batch_count, args.m, args.n));
+        assert!(args.rhs_base.len() >= elements(args.batch_count, args.k, args.n));
+        assert!(args.out.len() >= elements(args.batch_count, args.m, args.n));
 
-        self.module.f16_cta_tc_matmul_add_f32_in_place_kernel(
+        self.module.f16_cta_tc_matmul_add_f32_rhs_transposed_kernel(
             args.stream,
             cta_config(args.m, args.n, args.batch_count),
             args.a,
-            args.rhs_base_out,
+            args.rhs_base,
+            args.out,
             args.batch_count,
             args.m,
             args.n,

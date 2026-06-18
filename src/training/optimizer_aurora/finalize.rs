@@ -22,7 +22,7 @@ pub(super) fn finalize_update(
     };
     let ratio = args.rows as f32 / args.cols as f32;
     let scale = if ratio > 1.0 { ratio.sqrt() } else { 1.0 };
-    args.modules.optimizer.matrix_combine(
+    args.modules.optimizer.elementwise_linear_combination(
         args.stream,
         source,
         source,

@@ -2,10 +2,10 @@ use cuda_core::DriverError;
 use rust_kernels_cuda::transpose::TransposeF32Args;
 
 use super::AuroraMatrixArgs;
-use super::iteration::polar_iteration;
-use super::polar_source::{copy_source_to_polar_x, transpose_source_to_polar_x};
+use super::polar_express::polar_express_iteration;
+use super::polar_source::{normalize_source_to_polar_x, transpose_source_to_polar_x};
 
-pub(super) const POLAR_ITERATIONS: usize = 12;
+pub(super) const POLAR_ITERATIONS: usize = 5;
 
 #[derive(Clone, Copy)]
 pub(super) enum PolarSource {
@@ -21,6 +21,7 @@ pub(super) fn polar(
 ) -> Result<(), DriverError> {
     if rows > cols {
         transpose_source_to_polar_x(args, source, rows, cols)?;
+        normalize_polar_x(args, rows * cols)?;
         polar_wide(args, cols, rows)?;
         return args.modules.transpose.transpose_f32(TransposeF32Args {
             stream: args.stream,
@@ -31,9 +32,9 @@ pub(super) fn polar(
         });
     }
 
-    copy_source_to_polar_x(args, source, rows * cols)?;
+    normalize_source_to_polar_x(args, source, rows * cols)?;
     polar_wide(args, rows, cols)?;
-    args.modules.optimizer.matrix_combine(
+    args.modules.optimizer.elementwise_linear_combination(
         args.stream,
         &args.scratch.polar_x,
         &args.scratch.polar_x,
@@ -49,24 +50,14 @@ fn polar_wide(
     rows: u32,
     cols: u32,
 ) -> Result<(), DriverError> {
-    normalize(args, rows * cols)?;
     for iter in 0..POLAR_ITERATIONS {
-        polar_iteration(args, rows, cols, iter)?;
+        polar_express_iteration(args, rows, cols, iter)?;
     }
     Ok(())
 }
 
-fn normalize(args: &mut AuroraMatrixArgs<'_, '_>, len: u32) -> Result<(), DriverError> {
-    args.modules.optimizer.matrix_frobenius_norm(
-        args.stream,
-        &args.scratch.polar_x,
-        &mut args.scratch.norm,
-        len,
-    )?;
-    args.modules.optimizer.matrix_scale_in_place(
-        args.stream,
-        &mut args.scratch.polar_x,
-        &args.scratch.norm,
-        len,
-    )
+fn normalize_polar_x(args: &mut AuroraMatrixArgs<'_, '_>, len: u32) -> Result<(), DriverError> {
+    args.modules
+        .optimizer
+        .polar_normalize_in_place(args.stream, &mut args.scratch.polar_x, len)
 }

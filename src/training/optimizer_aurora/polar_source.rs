@@ -28,28 +28,22 @@ pub(super) fn transpose_source_to_polar_x(
     }
 }
 
-pub(super) fn copy_source_to_polar_x(
+pub(super) fn normalize_source_to_polar_x(
     args: &mut AuroraMatrixArgs<'_, '_>,
     source: PolarSource,
     len: u32,
 ) -> Result<(), DriverError> {
     match source {
-        PolarSource::Oriented => args.modules.optimizer.matrix_combine(
+        PolarSource::Oriented => args.modules.optimizer.polar_normalize(
             args.stream,
             &args.scratch.oriented,
-            &args.scratch.oriented,
             &mut args.scratch.polar_x,
-            1.0,
-            0.0,
             len,
         ),
-        PolarSource::Scaled => args.modules.optimizer.matrix_combine(
+        PolarSource::Scaled => args.modules.optimizer.polar_normalize(
             args.stream,
             &args.scratch.scaled,
-            &args.scratch.scaled,
             &mut args.scratch.polar_x,
-            1.0,
-            0.0,
             len,
         ),
     }

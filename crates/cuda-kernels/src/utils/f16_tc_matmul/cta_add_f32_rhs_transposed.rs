@@ -2,13 +2,14 @@ use cuda_device::{DisjointSlice, SharedArray, thread};
 
 use super::cta_stage::{load_a_fragments, load_b_fragments};
 use super::cta_stage_f32::stage_tiles_f32_rhs_transposed;
-use super::cta_store_add_in_place::store_add_in_place;
+use super::cta_store_add::store_add;
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
 use crate::mma::mma_m16n8k16_f16_f16_f32;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn cta_matmul_add_f32_in_place_body(
+pub(super) fn cta_matmul_add_f32_rhs_transposed_body(
     a: &[f32],
+    rhs_base: &[f32],
     mut out: DisjointSlice<f32>,
     a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
     b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
@@ -31,7 +32,7 @@ pub(super) fn cta_matmul_add_f32_in_place_body(
     let mut acc3 = [0.0_f32; 4];
     let mut k_base = 0;
     while k_base < k {
-        stage_tiles_f32_rhs_transposed(a, &mut out, a_tile, b_tile, tile, m, n, k, k_base);
+        stage_tiles_f32_rhs_transposed(a, rhs_base, a_tile, b_tile, tile, m, n, k, k_base);
         thread::sync_threads();
         let a_fragments = load_a_fragments(a_tile, tile);
         mma_m16n8k16_f16_f16_f32(
@@ -57,40 +58,44 @@ pub(super) fn cta_matmul_add_f32_in_place_body(
         thread::sync_threads();
         k_base += CTA_K;
     }
-    store_add_in_place(
+    store_add(
         acc0,
         tile,
         tile.warp_n0,
+        rhs_base,
         &mut out,
         m,
         n,
         base_scale,
         matmul_scale,
     );
-    store_add_in_place(
+    store_add(
         acc1,
         tile,
         tile.warp_n0 + 1,
+        rhs_base,
         &mut out,
         m,
         n,
         base_scale,
         matmul_scale,
     );
-    store_add_in_place(
+    store_add(
         acc2,
         tile,
         tile.warp_n0 + 2,
+        rhs_base,
         &mut out,
         m,
         n,
         base_scale,
         matmul_scale,
     );
-    store_add_in_place(
+    store_add(
         acc3,
         tile,
         tile.warp_n0 + 3,
+        rhs_base,
         &mut out,
         m,
         n,

@@ -1,9 +1,13 @@
+//! Host-side Aurora update flow:
+//! momentum -> orient -> row balance -> Polar Express -> finalize -> FP32 master update.
+
 mod apply;
 mod balance;
 mod finalize;
-mod iteration;
 mod orient;
 mod polar;
+mod polar_express;
+mod polar_express_coefficients;
 mod polar_source;
 mod tc;
 

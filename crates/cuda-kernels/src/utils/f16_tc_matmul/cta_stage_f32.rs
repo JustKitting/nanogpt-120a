@@ -1,4 +1,4 @@
-use cuda_device::{DisjointSlice, SharedArray, thread};
+use cuda_device::{SharedArray, thread};
 
 use super::convert::cvt_rn_f16_f32;
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
@@ -20,7 +20,7 @@ pub(super) fn stage_tiles_f32_b_t(
 
 pub(super) fn stage_tiles_f32_rhs_transposed(
     a: &[f32],
-    rhs: &mut DisjointSlice<f32>,
+    rhs: &[f32],
     a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
     b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
     tile: CtaTile,
@@ -80,7 +80,7 @@ fn stage_b_t(
 }
 
 fn stage_rhs_transposed(
-    rhs: &mut DisjointSlice<f32>,
+    rhs: &[f32],
     b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
     tile: CtaTile,
     n: u32,
@@ -95,7 +95,7 @@ fn stage_rhs_transposed(
         let global_col = k_base + col;
         b_tile[offset as usize] = if global_row < n && global_col < k {
             let index = ((tile.batch * k + global_col) * n + global_row) as usize;
-            unsafe { cvt_rn_f16_f32(*rhs.as_mut_ptr().add(index)) }
+            cvt_rn_f16_f32(rhs[index])
         } else {
             0
         };
