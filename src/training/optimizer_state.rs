@@ -8,6 +8,7 @@ use crate::upload::{
 
 pub struct OptimizerStateBuffers {
     step: u32,
+    schedule_free_weight_sum: f32,
     pub(super) token_embedding: AdamState,
     pub(super) ln_f: LayerNormState,
     pub(super) blocks: [BlockState; GPT2_N_LAYER],
@@ -33,13 +34,15 @@ pub(super) struct LinearState {
 }
 
 pub(super) struct AdamState {
-    pub(super) master: DeviceBuffer<f32>,
+    pub(super) z_master: DeviceBuffer<f32>,
+    pub(super) x_master: DeviceBuffer<f32>,
     pub(super) first: DeviceBuffer<f32>,
     pub(super) second: DeviceBuffer<f32>,
 }
 
 pub(super) struct AuroraState {
-    pub(super) master: DeviceBuffer<f32>,
+    pub(super) z_master: DeviceBuffer<f32>,
+    pub(super) x_master: DeviceBuffer<f32>,
     pub(super) momentum: DeviceBuffer<f32>,
 }
 
@@ -51,6 +54,7 @@ impl OptimizerStateBuffers {
     ) -> Result<Self, DriverError> {
         Ok(Self {
             step: 0,
+            schedule_free_weight_sum: 0.0,
             token_embedding: AdamState::new(stream, decode, &uploaded.token_embedding)?,
             ln_f: LayerNormState::new(stream, decode, &uploaded.ln_f)?,
             blocks: block_array(|i| BlockState::new(stream, decode, &uploaded.blocks[i]))?,
@@ -60,6 +64,17 @@ impl OptimizerStateBuffers {
     pub(super) fn advance(&mut self) -> u32 {
         self.step += 1;
         self.step
+    }
+
+    pub(super) fn schedule_free_average_coefficient(&mut self, step: u32) -> f32 {
+        super::learning_rate::schedule_free_average_coefficient(
+            step,
+            &mut self.schedule_free_weight_sum,
+        )
+    }
+
+    pub(super) fn next_step(&self) -> u32 {
+        self.step + 1
     }
 }
 
@@ -112,8 +127,10 @@ impl AdamState {
         decode: &Nvfp4DecodeModule,
         tensor: &UploadedNvfp4,
     ) -> Result<Self, DriverError> {
+        let master = decode_master(stream, decode, tensor)?;
         Ok(Self {
-            master: decode_master(stream, decode, tensor)?,
+            z_master: clone_device(stream, &master)?,
+            x_master: master,
             first: DeviceBuffer::zeroed(stream, tensor.len)?,
             second: DeviceBuffer::zeroed(stream, tensor.len)?,
         })
@@ -126,8 +143,10 @@ impl AuroraState {
         decode: &Nvfp4DecodeModule,
         tensor: &UploadedNvfp4,
     ) -> Result<Self, DriverError> {
+        let master = decode_master(stream, decode, tensor)?;
         Ok(Self {
-            master: decode_master(stream, decode, tensor)?,
+            z_master: clone_device(stream, &master)?,
+            x_master: master,
             momentum: DeviceBuffer::zeroed(stream, tensor.len)?,
         })
     }
@@ -151,6 +170,13 @@ fn decode_master(
         cols: tensor.len as u32,
     })?;
     Ok(master)
+}
+
+fn clone_device(
+    stream: &CudaStream,
+    buffer: &DeviceBuffer<f32>,
+) -> Result<DeviceBuffer<f32>, DriverError> {
+    DeviceBuffer::from_host(stream, &buffer.to_host_vec(stream)?)
 }
 
 fn block_array<F, T>(mut f: F) -> Result<[T; GPT2_N_LAYER], DriverError>

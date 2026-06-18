@@ -16,6 +16,7 @@ pub(super) fn update_layer_norm(
     scratch: &mut OptimizerScratch,
     state: &mut LayerNormState,
     step: u32,
+    average_coefficient: f32,
 ) -> Result<(), DriverError> {
     update_adam_tensor(
         stream,
@@ -25,6 +26,7 @@ pub(super) fn update_layer_norm(
         scratch,
         &mut state.weight,
         step,
+        average_coefficient,
     )?;
     update_adam_tensor(
         stream,
@@ -34,5 +36,6 @@ pub(super) fn update_layer_norm(
         scratch,
         &mut state.bias,
         step,
+        average_coefficient,
     )
 }

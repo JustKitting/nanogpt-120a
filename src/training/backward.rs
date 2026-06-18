@@ -9,6 +9,14 @@ use crate::AppResult;
 
 impl Trainer {
     pub fn train_step(&mut self, batch: &TokenBatch, sync_loss: bool) -> AppResult<TrainStats> {
+        super::schedule_free::materialize_training_weights(
+            self.runtime.stream.as_ref(),
+            &self.runtime,
+            &mut self.uploaded,
+            &mut self.buffers.optimizer,
+            &self.buffers.optimizer_state,
+        )?;
+
         let forward_start = Instant::now();
         let mut stats = self.forward_step(batch)?;
         stats.forward_ms = forward_start.elapsed().as_secs_f64() * 1000.0;

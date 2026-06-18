@@ -49,6 +49,7 @@ pub(super) struct AuroraMatrixArgs<'a, 'scratch> {
     pub(super) cols: u32,
     pub(super) seed: u32,
     pub(super) step: u32,
+    pub(super) average_coefficient: f32,
 }
 
 pub(super) fn aurora_learning_rate(step: u32) -> f32 {

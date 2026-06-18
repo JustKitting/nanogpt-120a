@@ -23,6 +23,7 @@ pub(super) fn update_block(
     state: &mut BlockState,
     aurora: &mut AuroraScratchBuffers,
     step: u32,
+    average_coefficient: f32,
     trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
     let optimizer = &runtime.optimizer;
@@ -35,11 +36,21 @@ pub(super) fn update_block(
         scratch,
         &mut state.ln_1,
         step,
+        average_coefficient,
     )?;
     trace.adam_ms += elapsed_ms(start);
 
     update_qkv(
-        stream, runtime, block, grad, scratch, state, aurora, step, trace,
+        stream,
+        runtime,
+        block,
+        grad,
+        scratch,
+        state,
+        aurora,
+        step,
+        average_coefficient,
+        trace,
     )?;
 
     let start = Instant::now();
@@ -51,10 +62,20 @@ pub(super) fn update_block(
         scratch,
         &mut state.ln_2,
         step,
+        average_coefficient,
     )?;
     trace.adam_ms += elapsed_ms(start);
 
     update_mlp(
-        stream, runtime, block, grad, scratch, state, aurora, step, trace,
+        stream,
+        runtime,
+        block,
+        grad,
+        scratch,
+        state,
+        aurora,
+        step,
+        average_coefficient,
+        trace,
     )
 }

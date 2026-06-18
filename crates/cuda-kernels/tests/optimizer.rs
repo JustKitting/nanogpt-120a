@@ -21,7 +21,8 @@ fn nvfp4_weight_update_applies_decay_update_and_requantizes() -> Result<(), Box<
 
     let mut bytes = DeviceBuffer::from_host(&stream, &[E2M1_ONE_PAIR; LEN / 2])?;
     let mut scales = DeviceBuffer::from_host(&stream, &[E4M3_ONE; LEN / 16])?;
-    let mut master = DeviceBuffer::from_host(&stream, &[1.0_f32; LEN])?;
+    let mut z_master = DeviceBuffer::from_host(&stream, &[1.0_f32; LEN])?;
+    let mut x_master = DeviceBuffer::from_host(&stream, &[1.0_f32; LEN])?;
     let update = DeviceBuffer::from_host(&stream, &[0.5_f32; LEN])?;
     let mut amax = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
     let mut chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
@@ -32,21 +33,25 @@ fn nvfp4_weight_update_applies_decay_update_and_requantizes() -> Result<(), Box<
         bytes: &mut bytes,
         scales: &mut scales,
         global_scale: &mut global_scale,
-        master: &mut master,
+        z_master: &mut z_master,
+        x_master: &mut x_master,
         aurora_update: &update,
         amax: &mut amax,
         chunk_amax: &mut chunk_amax,
         len: LEN as u32,
         learning_rate: 0.25,
         weight_decay: 0.1,
+        average_coefficient: 1.0,
     })?;
 
-    let master = master.to_host_vec(&stream)?;
+    let z_master = z_master.to_host_vec(&stream)?;
+    let x_master = x_master.to_host_vec(&stream)?;
     let bytes = bytes.to_host_vec(&stream)?;
     let scales = scales.to_host_vec(&stream)?;
     let global_scale = global_scale.to_host_vec(&stream)?;
 
-    assert!(master.iter().all(|value| (*value - 0.85).abs() <= 1.0e-6));
+    assert!(z_master.iter().all(|value| (*value - 0.85).abs() <= 1.0e-6));
+    assert!(x_master.iter().all(|value| (*value - 0.85).abs() <= 1.0e-6));
     assert!(bytes.iter().any(|byte| *byte != 0));
     assert!(scales.iter().any(|scale| *scale != 0));
     assert!((global_scale[0] - 0.85 / (256.0 * 6.0)).abs() <= 1.0e-8);
@@ -63,7 +68,8 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
 
     let mut bytes = DeviceBuffer::from_host(&stream, &[E2M1_ONE_PAIR; LEN / 2])?;
     let mut scales = DeviceBuffer::from_host(&stream, &[E4M3_ONE; LEN / 16])?;
-    let mut master = DeviceBuffer::from_host(&stream, &[1.0_f32; LEN])?;
+    let mut z_master = DeviceBuffer::from_host(&stream, &[1.0_f32; LEN])?;
+    let mut x_master = DeviceBuffer::from_host(&stream, &[1.0_f32; LEN])?;
     let grad = DeviceBuffer::from_host(&stream, &[0.5_f32; LEN])?;
     let mut first = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
     let mut second = DeviceBuffer::<f32>::zeroed(&stream, LEN)?;
@@ -76,7 +82,8 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
         bytes: &mut bytes,
         scales: &mut scales,
         global_scale: &mut global_scale,
-        master: &mut master,
+        z_master: &mut z_master,
+        x_master: &mut x_master,
         grad: &grad,
         first_moment: &mut first,
         second_moment: &mut second,
@@ -90,12 +97,23 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
         beta1_correction: 0.1,
         beta2_correction: 0.05,
         eps: 1.0e-10,
+        average_coefficient: 1.0,
     })?;
 
-    let master = master.to_host_vec(&stream)?;
+    let z_master = z_master.to_host_vec(&stream)?;
+    let x_master = x_master.to_host_vec(&stream)?;
     let first = first.to_host_vec(&stream)?;
     let second = second.to_host_vec(&stream)?;
-    assert!(master.iter().all(|value| (*value - 0.725).abs() <= 1.0e-6));
+    assert!(
+        z_master
+            .iter()
+            .all(|value| (*value - 0.725).abs() <= 1.0e-6)
+    );
+    assert!(
+        x_master
+            .iter()
+            .all(|value| (*value - 0.725).abs() <= 1.0e-6)
+    );
     assert!(first.iter().all(|value| (*value - 0.05).abs() <= 1.0e-6));
     assert!(second.iter().all(|value| (*value - 0.0125).abs() <= 1.0e-6));
     Ok(())

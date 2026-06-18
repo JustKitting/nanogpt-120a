@@ -19,6 +19,7 @@ mod optimizer_aurora;
 mod optimizer_state;
 mod optimizer_tc_scratch;
 mod save;
+mod schedule_free;
 mod scratch;
 mod tape;
 mod tape_block;

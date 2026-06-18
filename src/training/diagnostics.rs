@@ -66,13 +66,15 @@ impl PendingTrainingDiagnostics {
         grads: &BackwardBuffers,
         state: &OptimizerStateBuffers,
         step: u32,
+        average_coefficient: f32,
     ) -> AppResult<Self> {
         let token_embedding_bytes_before = uploaded.token_embedding.bytes.to_host_vec(stream)?;
         let (dlogits_rms, dlogits_max) = f32_buffer_stats(stream, &grads.dlogits)?;
         let (d_lm_head_rms, d_lm_head_max) = f32_buffer_stats(stream, &grads.d_lm_head_weight)?;
         let (d_embedding_rms, d_embedding_max) =
             f32_buffer_stats(stream, &grads.d_embedding_residual)?;
-        let updates = collect_update_snapshots(stream, uploaded, grads, state, step)?;
+        let updates =
+            collect_update_snapshots(stream, uploaded, grads, state, step, average_coefficient)?;
         let token_embedding_global = uploaded.token_embedding.global_scale_to_host(stream)?;
 
         Ok(Self {
@@ -180,7 +182,8 @@ struct PendingTensorUpdateDiagnostics {
 }
 
 struct AdamSnapshot {
-    master: Vec<f32>,
+    z_master: Vec<f32>,
+    x_master: Vec<f32>,
     first: Vec<f32>,
     second: Vec<f32>,
     learning_rate: f32,
@@ -190,6 +193,7 @@ struct AdamSnapshot {
     beta1_correction: f32,
     beta2_correction: f32,
     eps: f32,
+    average_coefficient: f32,
 }
 
 fn collect_update_snapshots(
@@ -198,6 +202,7 @@ fn collect_update_snapshots(
     grads: &BackwardBuffers,
     state: &OptimizerStateBuffers,
     step: u32,
+    average_coefficient: f32,
 ) -> AppResult<Vec<PendingTensorUpdateDiagnostics>> {
     let mut updates = Vec::new();
     push_update(
@@ -208,6 +213,7 @@ fn collect_update_snapshots(
         &grads.d_lm_head_weight,
         &state.token_embedding,
         step,
+        average_coefficient,
     )?;
     push_layer_norm(
         &mut updates,
@@ -217,6 +223,7 @@ fn collect_update_snapshots(
         &grads.final_norm,
         &state.ln_f,
         step,
+        average_coefficient,
     )?;
 
     for (index, ((block, grad), state)) in uploaded
@@ -234,6 +241,7 @@ fn collect_update_snapshots(
             &grad.ln_1,
             &state.ln_1,
             step,
+            average_coefficient,
         )?;
         push_observed_update(
             &mut updates,
@@ -250,6 +258,7 @@ fn collect_update_snapshots(
             &grad.d_attn_qkv_bias,
             &state.attn_qkv.bias,
             step,
+            average_coefficient,
         )?;
         push_observed_update(
             &mut updates,
@@ -266,6 +275,7 @@ fn collect_update_snapshots(
             &grad.d_attn_c_proj_bias,
             &state.attn_c_proj.bias,
             step,
+            average_coefficient,
         )?;
         push_layer_norm(
             &mut updates,
@@ -275,6 +285,7 @@ fn collect_update_snapshots(
             &grad.ln_2,
             &state.ln_2,
             step,
+            average_coefficient,
         )?;
         push_observed_update(
             &mut updates,
@@ -291,6 +302,7 @@ fn collect_update_snapshots(
             &grad.d_mlp_c_fc_bias,
             &state.mlp_up.bias,
             step,
+            average_coefficient,
         )?;
         push_observed_update(
             &mut updates,
@@ -307,6 +319,7 @@ fn collect_update_snapshots(
             &grad.d_mlp_c_proj_bias,
             &state.mlp_down.bias,
             step,
+            average_coefficient,
         )?;
     }
 
@@ -321,6 +334,7 @@ fn push_layer_norm(
     grads: &super::grad_block::LayerNormGradBuffers,
     state: &super::optimizer_state::LayerNormState,
     step: u32,
+    average_coefficient: f32,
 ) -> AppResult {
     push_update(
         updates,
@@ -330,6 +344,7 @@ fn push_layer_norm(
         &grads.d_weight,
         &state.weight,
         step,
+        average_coefficient,
     )?;
     push_update(
         updates,
@@ -339,6 +354,7 @@ fn push_layer_norm(
         &grads.d_bias,
         &state.bias,
         step,
+        average_coefficient,
     )
 }
 
@@ -350,10 +366,12 @@ fn push_update(
     grad: &DeviceBuffer<f32>,
     state: &AdamState,
     step: u32,
+    average_coefficient: f32,
 ) -> AppResult {
     let config = adam_debug_config(step);
     let adam = AdamSnapshot {
-        master: state.master.to_host_vec(stream)?,
+        z_master: state.z_master.to_host_vec(stream)?,
+        x_master: state.x_master.to_host_vec(stream)?,
         first: state.first.to_host_vec(stream)?,
         second: state.second.to_host_vec(stream)?,
         learning_rate: config.learning_rate,
@@ -363,6 +381,7 @@ fn push_update(
         beta1_correction: config.beta1_correction,
         beta2_correction: config.beta2_correction,
         eps: config.eps,
+        average_coefficient,
     };
     push_snapshot(updates, stream, name, tensor, grad, Some(adam))
 }
@@ -527,15 +546,21 @@ fn tensor_update_stats(
         let before = pending
             .adam
             .as_ref()
-            .map(|adam| adam.master[i])
+            .map(|adam| adam.x_master[i])
             .unwrap_or(decoded_before);
         let after = nvfp4_host_value(&after_bytes, &after_scales, after_global, i);
         let delta = after - before;
         let (predicted_delta, quant_error) = match pending.adam.as_ref() {
             Some(adam) => {
-                let predicted_next =
-                    adam_predicted_next(before, grad, adam.first[i], adam.second[i], adam);
-                (predicted_next - before, after - predicted_next)
+                let predicted_z = adam_predicted_next(
+                    adam.z_master[i],
+                    grad,
+                    adam.first[i],
+                    adam.second[i],
+                    adam,
+                );
+                let predicted_x = before + adam.average_coefficient * (predicted_z - before);
+                (predicted_x - before, after - predicted_x)
             }
             None => (0.0, 0.0),
         };

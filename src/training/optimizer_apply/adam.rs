@@ -47,13 +47,15 @@ pub(super) fn update_adam_tensor(
     scratch: &mut OptimizerScratch,
     state: &mut AdamState,
     step: u32,
+    average_coefficient: f32,
 ) -> Result<(), DriverError> {
     optimizer.apply_adamw_update(AdamWUpdateArgs {
         stream,
         bytes: &mut tensor.bytes,
         scales: &mut tensor.scales,
         global_scale: &mut tensor.global_scale,
-        master: &mut state.master,
+        z_master: &mut state.z_master,
+        x_master: &mut state.x_master,
         grad,
         first_moment: &mut state.first,
         second_moment: &mut state.second,
@@ -67,6 +69,7 @@ pub(super) fn update_adam_tensor(
         beta1_correction: 1.0 - ADAM_BETA1.powi(step as i32),
         beta2_correction: 1.0 - ADAM_BETA2.powi(step as i32),
         eps: ADAM_EPS,
+        average_coefficient,
     })?;
 
     Ok(())

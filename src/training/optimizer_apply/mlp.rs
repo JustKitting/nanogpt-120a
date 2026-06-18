@@ -24,6 +24,7 @@ pub(super) fn update_mlp(
     state: &mut BlockState,
     aurora: &mut AuroraScratchBuffers,
     step: u32,
+    average_coefficient: f32,
     trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
     let optimizer = &runtime.optimizer;
@@ -40,6 +41,7 @@ pub(super) fn update_mlp(
         GPT2_MLP as u32,
         seed(step, 0x37),
         step,
+        average_coefficient,
     )?;
     trace.aurora_ms += elapsed_ms(start);
 
@@ -52,6 +54,7 @@ pub(super) fn update_mlp(
         scratch,
         &mut state.mlp_up.bias,
         step,
+        average_coefficient,
     )?;
     trace.adam_ms += elapsed_ms(start);
 
@@ -68,6 +71,7 @@ pub(super) fn update_mlp(
         GPT2_N_EMBD as u32,
         seed(step, 0x41),
         step,
+        average_coefficient,
     )?;
     trace.aurora_ms += elapsed_ms(start);
 
@@ -80,6 +84,7 @@ pub(super) fn update_mlp(
         scratch,
         &mut state.mlp_down.bias,
         step,
+        average_coefficient,
     )?;
     trace.adam_ms += elapsed_ms(start);
     Ok(())

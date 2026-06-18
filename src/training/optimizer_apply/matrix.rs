@@ -20,6 +20,7 @@ pub(super) fn update_matrix_tensor(
     cols: u32,
     seed: u32,
     step: u32,
+    average_coefficient: f32,
 ) -> Result<(), DriverError> {
     apply_aurora_matrix(AuroraMatrixArgs {
         stream,
@@ -37,5 +38,6 @@ pub(super) fn update_matrix_tensor(
         cols,
         seed,
         step,
+        average_coefficient,
     })
 }
