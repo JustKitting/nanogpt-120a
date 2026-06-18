@@ -127,7 +127,7 @@ fn main() -> AppResult {
     }
 
     if let Some(path) = train_loss_graph_path() {
-        loss_curve.write_svg(&path)?;
+        let path = loss_curve.write_png(&path)?;
         println!("loss_graph={}", path.display());
     }
 

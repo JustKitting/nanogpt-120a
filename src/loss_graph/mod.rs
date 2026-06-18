@@ -1,7 +1,6 @@
-mod svg;
+mod png;
 
-use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::AppResult;
 
@@ -24,16 +23,18 @@ impl LossCurve {
         self.points.push(LossPoint { step, loss, ema });
     }
 
-    pub fn write_svg(&self, path: &Path) -> AppResult {
+    pub fn write_png(&self, path: &Path) -> AppResult<PathBuf> {
+        let path = png_path(path);
         if self.points.is_empty() {
-            return Ok(());
+            return Ok(path);
         }
-        if let Some(parent) = path.parent()
-            && !parent.as_os_str().is_empty()
-        {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(path, svg::render(&self.points))?;
-        Ok(())
+        png::render(&path, &self.points)?;
+        Ok(path)
     }
+}
+
+fn png_path(path: &Path) -> PathBuf {
+    let mut path = path.to_path_buf();
+    path.set_extension("png");
+    path
 }
