@@ -1046,17 +1046,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 
 [[package]]
-name = "fineweb-prep"
-version = "0.1.0"
-dependencies = [
- "arrow-array",
- "bytemuck",
- "gpt2-bpe",
- "hf-hub",
- "parquet",
-]
-
-[[package]]
 name = "flatbuffers"
 version = "25.12.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2656,12 +2645,13 @@ name = "rust-kernels"
 version = "0.1.0"
 dependencies = [
  "cuda-core",
- "fineweb-prep",
  "gpt2-bpe",
  "gpt2-nvfp4",
  "plotters",
  "reqwest",
  "rust-kernels-cuda",
+ "synth-prep",
+ "time",
 ]
 
 [[package]]
@@ -3096,6 +3086,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "synth-prep"
+version = "0.1.0"
+dependencies = [
+ "arrow-array",
+ "bytemuck",
+ "gpt2-bpe",
+ "hf-hub",
+ "parquet",
 ]
 
 [[package]]

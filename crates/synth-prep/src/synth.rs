@@ -1,0 +1,10 @@
+pub const DATASET_OWNER: &str = "PleIAs";
+pub const DATASET_NAME: &str = "SYNTH";
+pub const DATASET_REPO: &str = "PleIAs/SYNTH";
+pub const DATASET_SPLIT: &str = "train";
+pub const DATA_DIR: &str = "data/synth";
+pub const PARQUET_DIR: &str = "parquet";
+pub const SHARDS_DIR: &str = "shards";
+pub const SHARD_SIZE: usize = 100_000_000;
+pub const SHARD_FILE_PREFIX: &str = "synth";
+pub const PARQUET_FILE_PATTERN: &str = "synth_*.parquet";

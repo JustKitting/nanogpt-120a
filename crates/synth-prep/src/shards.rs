@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bytemuck::cast_slice;
 
 use crate::AppResult;
-use crate::fineweb::{DATA_DIR, SHARD_FILE_PREFIX, SHARD_SIZE, SHARDS_DIR};
+use crate::synth::{DATA_DIR, SHARD_FILE_PREFIX, SHARD_SIZE, SHARDS_DIR};
 
 pub struct ShardWriter {
     output_dir: PathBuf,

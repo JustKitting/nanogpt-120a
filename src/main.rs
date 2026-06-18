@@ -1,5 +1,6 @@
 mod checkpoint;
 mod loss_graph;
+mod run_output;
 mod runtime;
 mod training;
 mod upload;
@@ -16,6 +17,13 @@ const DEFAULT_TRAIN_STEPS: usize = 10;
 
 fn main() -> AppResult {
     let mut trainer = Trainer::new(SEED)?;
+    let dataset = TokenDataLoader::training_dataset_name();
+    let steps = train_steps();
+    let log_interval = train_log_interval();
+    let eval_interval = train_eval_interval();
+    let run_output = run_output::RunOutput::new(&dataset, steps)?;
+    println!("run_dir={}", run_output.dir().display());
+
     if let Some(path) = train_load_model_path() {
         trainer.load_model(&path)?;
         println!("loaded_model={}", path.display());
@@ -24,13 +32,11 @@ fn main() -> AppResult {
     let mut data = TokenDataLoader::from_training_dataset()?;
     let mut previous_loss = None;
     let mut loss_ema = None;
-    let steps = train_steps();
-    let log_interval = train_log_interval();
-    let eval_interval = train_eval_interval();
     let mut loss_curve = loss_graph::LossCurve::new();
     let validation_tokens = data.validation_tokens()?;
     let validation_batch = trainer.batch_from_default_windows(&validation_tokens)?;
 
+    run_output.write_info(&run_info(&dataset, steps, log_interval, eval_interval))?;
     println!("training_tokens={} steps={steps}", data.token_count());
 
     for step in 0..steps {
@@ -126,12 +132,14 @@ fn main() -> AppResult {
         }
     }
 
-    if let Some(path) = train_save_model_path() {
+    if let Some(path) = train_save_model_path(&run_output) {
+        run_output::ensure_parent(&path)?;
         trainer.save_model(&path)?;
         println!("saved_model={}", path.display());
     }
 
-    if let Some(path) = train_loss_graph_path() {
+    if let Some(path) = train_loss_graph_path(&run_output) {
+        run_output::ensure_parent(&path)?;
         let path = loss_curve.write_png(&path)?;
         println!("loss_graph={}", path.display());
     }
@@ -139,6 +147,10 @@ fn main() -> AppResult {
     if let Some(prompt) = train_generate_prompt() {
         let text =
             trainer.generate_sampled(&prompt, train_generate_tokens(), train_sampling_config())?;
+        let generated_path = run_output.path("generated.txt");
+        run_output::ensure_parent(&generated_path)?;
+        std::fs::write(&generated_path, &text)?;
+        println!("generated_text={}", generated_path.display());
         println!("generated_text_begin");
         println!("{text}");
         println!("generated_text_end");
@@ -169,11 +181,16 @@ fn train_eval_interval() -> Option<usize> {
         .filter(|interval| *interval > 0)
 }
 
-fn train_save_model_path() -> Option<PathBuf> {
-    std::env::var("TRAIN_SAVE_MODEL")
+fn train_save_model_path(run_output: &run_output::RunOutput) -> Option<PathBuf> {
+    let value = std::env::var("TRAIN_SAVE_MODEL")
         .ok()
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
+        .filter(|value| !value.is_empty())?;
+
+    if value == "1" || value.eq_ignore_ascii_case("true") {
+        Some(run_output.path("model.ckpt"))
+    } else {
+        Some(PathBuf::from(value))
+    }
 }
 
 fn train_load_model_path() -> Option<PathBuf> {
@@ -183,11 +200,55 @@ fn train_load_model_path() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-fn train_loss_graph_path() -> Option<PathBuf> {
-    std::env::var("TRAIN_LOSS_GRAPH")
-        .ok()
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
+fn train_loss_graph_path(run_output: &run_output::RunOutput) -> Option<PathBuf> {
+    Some(
+        std::env::var("TRAIN_LOSS_GRAPH")
+            .ok()
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| run_output.path("loss.png")),
+    )
+}
+
+fn run_info(
+    dataset: &str,
+    steps: usize,
+    log_interval: usize,
+    eval_interval: Option<usize>,
+) -> String {
+    let mut info = String::new();
+    push_info(&mut info, "dataset", dataset);
+    push_info(&mut info, "steps", steps);
+    push_info(&mut info, "log_interval", log_interval);
+    push_info(
+        &mut info,
+        "eval_interval",
+        eval_interval
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "none".to_string()),
+    );
+    push_info(&mut info, "seed", format!("{SEED:#x}"));
+    push_env(&mut info, "CUDA_DEVICE_INDEX");
+    push_env(&mut info, "TRAIN_LOAD_MODEL");
+    push_env(&mut info, "TRAIN_SAVE_MODEL");
+    push_env(&mut info, "TRAIN_REPEAT_BATCH");
+    push_env(&mut info, "TRAIN_GENERATE_PROMPT");
+    push_env(&mut info, "TRAIN_GENERATE_TOKENS");
+    push_env(&mut info, "TRAIN_GENERATE_TEMPERATURE");
+    push_env(&mut info, "TRAIN_GENERATE_TOP_K");
+    push_env(&mut info, "TRAIN_GENERATE_TOP_P");
+    info
+}
+
+fn push_env(info: &mut String, name: &str) {
+    if let Ok(value) = std::env::var(name) {
+        push_info(info, name, value);
+    }
+}
+
+fn push_info(info: &mut String, name: &str, value: impl std::fmt::Display) {
+    use std::fmt::Write;
+    let _ = writeln!(info, "{name}={value}");
 }
 
 fn train_generate_prompt() -> Option<String> {

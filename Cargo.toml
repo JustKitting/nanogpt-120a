@@ -8,18 +8,19 @@ members = [
     "crates/gpt2-bpe",
     "crates/gpt2-nvfp4",
     "crates/cuda-kernels",
-    "crates/fineweb-prep",
+    "crates/synth-prep",
 ]
 resolver = "3"
 
 [dependencies]
 cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }
-fineweb-prep = { path = "crates/fineweb-prep" }
+synth-prep = { path = "crates/synth-prep" }
 gpt2-bpe = { path = "crates/gpt2-bpe" }
 gpt2-nvfp4 = { path = "crates/gpt2-nvfp4" }
 plotters = { version = "0.3.7", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "line_series", "ttf"] }
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "rustls"] }
 rust-kernels-cuda = { path = "crates/cuda-kernels" }
+time = "0.3"
 
 [package.metadata.cuda-oxide]
 device-crates = [

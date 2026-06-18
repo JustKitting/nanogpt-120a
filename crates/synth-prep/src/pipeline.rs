@@ -2,7 +2,7 @@ use std::fs;
 
 use gpt2_bpe::Gpt2Bpe;
 
-use crate::fineweb::{DATA_DIR, PARQUET_DIR, SHARDS_DIR};
+use crate::synth::{DATA_DIR, PARQUET_DIR, SHARDS_DIR};
 use crate::{AppResult, huggingface, parquet_text, shards};
 
 pub fn parse_data() -> AppResult<()> {

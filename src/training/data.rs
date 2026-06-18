@@ -2,16 +2,16 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use fineweb_prep::fineweb::SHARDS_DIR;
-use fineweb_prep::{DATA_DIR, SHARD_FILE_PREFIX};
 use gpt2_bpe::Gpt2Bpe;
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
+use synth_prep::synth::SHARDS_DIR;
+use synth_prep::{DATA_DIR, SHARD_FILE_PREFIX};
 
 use crate::AppResult;
 
 const TRAIN_DATASET_ENV: &str = "TRAIN_DATASET";
 const TRAIN_REPEAT_BATCH_ENV: &str = "TRAIN_REPEAT_BATCH";
-const DATASET_FINEWEB: &str = "fineweb";
+const DATASET_SYNTH: &str = "synth";
 const DATASET_SHAKESPEARE: &str = "shakespeare";
 const SHAKESPEARE_URL: &str =
     "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt";
@@ -37,19 +37,23 @@ pub struct TokenWindowBatch {
 }
 
 impl TokenDataLoader {
+    pub fn training_dataset_name() -> String {
+        training_dataset()
+    }
+
     pub fn from_training_dataset() -> AppResult<Self> {
-        match training_dataset()?.as_str() {
-            DATASET_FINEWEB => Self::from_fineweb(),
+        match training_dataset().as_str() {
+            DATASET_SYNTH => Self::from_synth(),
             DATASET_SHAKESPEARE => Self::from_shakespeare(),
             dataset => Err(format!(
-                "unknown TRAIN_DATASET={dataset}; expected fineweb or shakespeare"
+                "unknown TRAIN_DATASET={dataset}; expected synth or shakespeare"
             )
             .into()),
         }
     }
 
-    pub fn from_fineweb() -> AppResult<Self> {
-        ensure_fineweb_shard()?;
+    pub fn from_synth() -> AppResult<Self> {
+        ensure_synth_shard()?;
         Self::from_path(first_train_shard()?)
     }
 
@@ -132,8 +136,8 @@ fn train_end(token_count: usize) -> usize {
         .max(GPT2_SEQ_LEN + 1)
 }
 
-fn training_dataset() -> AppResult<String> {
-    Ok(std::env::var(TRAIN_DATASET_ENV).unwrap_or_else(|_| DATASET_FINEWEB.to_string()))
+fn training_dataset() -> String {
+    std::env::var(TRAIN_DATASET_ENV).unwrap_or_else(|_| DATASET_SYNTH.to_string())
 }
 
 fn repeat_first_window() -> bool {
@@ -147,7 +151,7 @@ fn first_train_shard() -> AppResult<PathBuf> {
     let mut shards = Vec::new();
 
     if !dir.exists() {
-        return Err(format!("{} does not exist after FineWeb prep", dir.display()).into());
+        return Err(format!("{} does not exist after SYNTH prep", dir.display()).into());
     }
 
     for entry in fs::read_dir(&dir)? {
@@ -167,12 +171,12 @@ fn first_train_shard() -> AppResult<PathBuf> {
         .ok_or_else(|| format!("no train shards found in {}", dir.display()).into())
 }
 
-fn ensure_fineweb_shard() -> AppResult<()> {
+fn ensure_synth_shard() -> AppResult<()> {
     if first_train_shard().is_ok() {
         return Ok(());
     }
 
-    fineweb_prep::parse_data()?;
+    synth_prep::parse_data()?;
     first_train_shard().map(|_| ())
 }
 
