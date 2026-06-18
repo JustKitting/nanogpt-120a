@@ -26,6 +26,7 @@ mod tape_leaf;
 
 pub use batch::TokenBatch;
 pub use data::TokenDataLoader;
+pub use generate::SamplingConfig;
 
 use gpt2_nvfp4::{Gpt2, Gpt2Rng};
 

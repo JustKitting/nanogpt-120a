@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
-use super::args::{ARGMAX_THREADS_PER_BLOCK, LogitsArgmaxArgs, LogitsArgmaxParams};
+use super::args::{
+    ARGMAX_THREADS_PER_BLOCK, LOGITS_TOP_K, LogitsArgmaxArgs, LogitsArgmaxParams, LogitsTopKArgs,
+    LogitsTopKParams, TOPK_THREADS_PER_BLOCK,
+};
 use super::kernels::kernels;
 
 pub struct LogitsModule {
@@ -29,6 +32,26 @@ impl LogitsModule {
             LogitsArgmaxParams {
                 row: args.row,
                 vocab_size: args.vocab_size,
+            },
+        )
+    }
+
+    pub fn top_k(&self, args: LogitsTopKArgs<'_, '_>) -> Result<(), DriverError> {
+        let k = args.k.clamp(1, LOGITS_TOP_K as u32);
+        self.module.logits_top_k_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (1, 1, 1),
+                block_dim: (TOPK_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.logits,
+            args.out_tokens,
+            args.out_values,
+            LogitsTopKParams {
+                row: args.row,
+                vocab_size: args.vocab_size,
+                k,
             },
         )
     }

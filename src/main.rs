@@ -7,7 +7,7 @@ mod upload;
 use std::error::Error;
 use std::path::PathBuf;
 
-use training::{TokenDataLoader, Trainer};
+use training::{SamplingConfig, TokenDataLoader, Trainer};
 
 type AppResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -132,7 +132,8 @@ fn main() -> AppResult {
     }
 
     if let Some(prompt) = train_generate_prompt() {
-        let text = trainer.generate_greedy(&prompt, train_generate_tokens())?;
+        let text =
+            trainer.generate_sampled(&prompt, train_generate_tokens(), train_sampling_config())?;
         println!("generated_text_begin");
         println!("{text}");
         println!("generated_text_end");
@@ -188,6 +189,23 @@ fn train_generate_tokens() -> usize {
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(128)
+}
+
+fn train_sampling_config() -> SamplingConfig {
+    SamplingConfig {
+        temperature: std::env::var("TRAIN_GENERATE_TEMPERATURE")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(0.7),
+        top_k: std::env::var("TRAIN_GENERATE_TOP_K")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(32),
+        top_p: std::env::var("TRAIN_GENERATE_TOP_P")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(0.9),
+    }
 }
 
 fn should_log_step(step: usize, steps: usize, log_interval: usize) -> bool {
