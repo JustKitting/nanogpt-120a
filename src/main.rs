@@ -16,6 +16,11 @@ const DEFAULT_TRAIN_STEPS: usize = 10;
 
 fn main() -> AppResult {
     let mut trainer = Trainer::new(SEED)?;
+    if let Some(path) = train_load_model_path() {
+        trainer.load_model(&path)?;
+        println!("loaded_model={}", path.display());
+    }
+
     let mut data = TokenDataLoader::from_training_dataset()?;
     let mut previous_loss = None;
     let mut loss_ema = None;
@@ -166,6 +171,13 @@ fn train_eval_interval() -> Option<usize> {
 
 fn train_save_model_path() -> Option<PathBuf> {
     std::env::var("TRAIN_SAVE_MODEL")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn train_load_model_path() -> Option<PathBuf> {
+    std::env::var("TRAIN_LOAD_MODEL")
         .ok()
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
