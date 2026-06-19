@@ -1,7 +1,6 @@
 use cuda_device::{DisjointSlice, thread};
 
 use super::types::CausalAttentionBackwardTcParams;
-use crate::float_ptx::{exp_f32, fma_f32, sincos_f32};
 
 pub(super) const TC_BACKWARD_THREADS_PER_BLOCK: u32 = 256;
 
@@ -32,9 +31,9 @@ pub(super) fn gather_body(
     }
 
     unsafe {
-        *q.get_unchecked_mut(index as usize) = rope_value(qkv, batch, token, head, dim, 0, &params);
+        *q.get_unchecked_mut(index as usize) = qkv[qkv_index(batch, token, head, dim, 0, &params)];
         *k.get_unchecked_mut(index as usize) =
-            rope_value(qkv, batch, token, head, dim, params.embedding_dim, &params);
+            qkv[qkv_index(batch, token, head, dim, params.embedding_dim, &params)];
         *v.get_unchecked_mut(index as usize) =
             qkv[qkv_index(batch, token, head, dim, params.embedding_dim * 2, &params)];
         *d_out.get_unchecked_mut(index as usize) =
@@ -68,29 +67,4 @@ fn hidden_index(
     (batch as usize * params.seq_len as usize + token as usize) * params.embedding_dim as usize
         + head as usize * params.head_dim as usize
         + dim as usize
-}
-
-#[inline(always)]
-fn rope_value(
-    qkv: &[f32],
-    batch: u32,
-    token: u32,
-    head: u32,
-    dim: u32,
-    section_offset: u32,
-    params: &CausalAttentionBackwardTcParams,
-) -> f32 {
-    let value = qkv[qkv_index(batch, token, head, dim, section_offset, params)];
-    let paired = qkv[qkv_index(batch, token, head, dim ^ 1, section_offset, params)];
-    let (sin, cos) = sincos_f32(token as f32 * rope_inv_freq(dim, params.head_dim));
-    if dim & 1 == 0 {
-        fma_f32(-paired, sin, value * cos)
-    } else {
-        fma_f32(paired, sin, value * cos)
-    }
-}
-
-#[inline(always)]
-fn rope_inv_freq(dim: u32, head_dim: u32) -> f32 {
-    exp_f32(-9.210_340_5 * (dim & !1) as f32 / head_dim as f32)
 }

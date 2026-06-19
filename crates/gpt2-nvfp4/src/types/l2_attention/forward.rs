@@ -1,5 +1,7 @@
 use cuda_core::DriverError;
-use rust_kernels_cuda::attention::{CProjArgs, CausalAttentionArgs, QkvProjectionArgs};
+use rust_kernels_cuda::attention::{
+    ApplyRopeArgs, CProjArgs, CausalAttentionArgs, QkvProjectionArgs,
+};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantRowwiseArgs;
 
@@ -54,6 +56,18 @@ pub(super) fn forward<'a, 'scratch>(
         token_count: row_count,
         input_dim: crate::GPT2_N_EMBD as u32,
         output_dim: crate::GPT2_QKV as u32,
+    })?;
+
+    args.module.apply_rope(ApplyRopeArgs {
+        stream,
+        qkv: args.qkv,
+        row_count,
+        seq_len,
+        batch_size,
+        embedding_dim: crate::GPT2_N_EMBD as u32,
+        qkv_dim: crate::GPT2_QKV as u32,
+        head_count: crate::GPT2_N_HEAD as u32,
+        head_dim: (crate::GPT2_N_EMBD / crate::GPT2_N_HEAD) as u32,
     })?;
 
     args.module.causal_attention(CausalAttentionArgs {

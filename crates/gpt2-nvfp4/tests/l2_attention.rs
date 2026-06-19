@@ -115,7 +115,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let residual_out = residual_dev.to_host_vec(&stream)?;
     assert_qkv_nonzero(&qkv);
     assert_attention_log_sum_exp(&attention_log_sum_exp);
-    assert_rope_attention_matches(&qkv, &out);
+    assert_attention_matches(&qkv, &out);
     assert_output_amax(&out, &output_amax);
     assert_c_proj_residual_add(&residual, &out, &residual_out);
     Ok(())
@@ -185,10 +185,10 @@ fn assert_attention_log_sum_exp(log_sum_exp: &[f32]) {
     assert!(log_sum_exp.iter().any(|value| value.abs() > 1.0e-7));
 }
 
-fn assert_rope_attention_matches(qkv: &[f32], out: &[f32]) {
+fn assert_attention_matches(qkv: &[f32], out: &[f32]) {
     for row in [0, 1, 2, 17, 128, GPT2_CONTEXT_LEN - 1] {
         for head in [0, GPT2_N_HEAD / 2, GPT2_N_HEAD - 1] {
-            let scores = rope_scores(qkv, row, head);
+            let scores = attention_scores(qkv, row, head);
             let score_max = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
             let denom = scores
                 .iter()
@@ -215,37 +215,17 @@ fn assert_rope_attention_matches(qkv: &[f32], out: &[f32]) {
     }
 }
 
-fn rope_scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
+fn attention_scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
     let mut scores = Vec::with_capacity(query + 1);
     for key in 0..=query {
         let mut dot = 0.0;
         for dim in 0..HEAD_DIM {
-            dot += rope_value(qkv, query, head, dim, 0, query)
-                * rope_value(qkv, key, head, dim, GPT2_N_EMBD, key);
+            dot +=
+                qkv_value(qkv, query, head, dim, 0) * qkv_value(qkv, key, head, dim, GPT2_N_EMBD);
         }
         scores.push(dot / (HEAD_DIM as f32).sqrt());
     }
     scores
-}
-
-fn rope_value(
-    qkv: &[f32],
-    token: usize,
-    head: usize,
-    dim: usize,
-    offset: usize,
-    position: usize,
-) -> f32 {
-    let pair_dim = dim & !1;
-    let theta = position as f32 * 10_000.0_f32.powf(-(pair_dim as f32) / HEAD_DIM as f32);
-    let (sin, cos) = theta.sin_cos();
-    let value = qkv_value(qkv, token, head, dim, offset);
-    let paired = qkv_value(qkv, token, head, dim ^ 1, offset);
-    if dim & 1 == 0 {
-        value * cos - paired * sin
-    } else {
-        paired * sin + value * cos
-    }
 }
 
 fn qkv_value(qkv: &[f32], token: usize, head: usize, dim: usize, offset: usize) -> f32 {

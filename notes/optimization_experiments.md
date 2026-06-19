@@ -31,6 +31,36 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Pre-apply RoPE to Q/K once after QKV projection.
+status: kept
+measured_effect:
+  Before:
+    target/nsys/direct_all_linear_operands_b8_l2d1024_20_20260619T200422Z.nsys-rep
+    causal_attention_kernel: 431.699 ms / 42 launches
+  After:
+    target/nsys/rope_preapply_b8_l2d1024_20_20260619T203528Z.nsys-rep
+    causal_attention_kernel: 397.725 ms / 42 launches
+    apply_rope_kernel: 0.789 ms / 42 launches
+  Net attention-side reduction: about 33.2 ms over 20 training steps.
+stability_effect:
+  100-step SYNTH check stayed finite and nonzero.
+validation_result:
+  target/rope_prequest_100step_synth_20260619T203459Z.log
+  heldout_eval val_loss=7.381578 at 100 steps.
+implementation:
+  Q and K in the saved qkv activation buffer are now post-RoPE; V is unchanged.
+  The forward causal attention kernel reads Q/K directly. The TC backward gather
+  also reads Q/K directly, while scatter still inverse-rotates dQ/dK into the
+  raw QKV projection gradient coordinates.
+next_justified_experiment:
+  Fuse the RoPE store into the QKV projection store path if the extra launch
+  becomes visible at larger batch/model sizes. Larger remaining bottlenecks are
+  still Aurora update, linear backward projection, and LM-head/logits.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Direct MS-EDEN packing for FP32 E^T in linear backward.
 status: implemented and profiled; not promoted by itself
 target:

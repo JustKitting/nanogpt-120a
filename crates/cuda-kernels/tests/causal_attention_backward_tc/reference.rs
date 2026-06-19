@@ -18,8 +18,8 @@ pub fn backward(qkv: &[f32], out: &[f32], d_out: &[f32], log_sum_exp: &[f32]) ->
                     let k_index = hidden_index(key, head, dim);
                     grad[qkv_index(key, head, dim, 2 * EMBEDDING)] +=
                         p * d_out[hidden_index(query, head, dim)];
-                    dq_rot[q_index] += ds * rope_value(qkv, key, head, dim, EMBEDDING) * scale;
-                    dk_rot[k_index] += ds * rope_value(qkv, query, head, dim, 0) * scale;
+                    dq_rot[q_index] += ds * qkv_value(qkv, key, head, dim, EMBEDDING) * scale;
+                    dk_rot[k_index] += ds * qkv_value(qkv, query, head, dim, 0) * scale;
                 }
             }
         }
@@ -34,8 +34,8 @@ fn scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
         .map(|key| {
             let mut dot = 0.0;
             for dim in 0..HEAD_DIM {
-                dot += rope_value(qkv, query, head, dim, 0)
-                    * rope_value(qkv, key, head, dim, EMBEDDING);
+                dot +=
+                    qkv_value(qkv, query, head, dim, 0) * qkv_value(qkv, key, head, dim, EMBEDDING);
             }
             dot * scale
         })
@@ -82,15 +82,8 @@ fn apply_rope_backward(grad: &mut [f32], dq_rot: &[f32], dk_rot: &[f32]) {
     }
 }
 
-fn rope_value(qkv: &[f32], token: usize, head: usize, dim: usize, offset: usize) -> f32 {
-    let value = qkv[qkv_index(token, head, dim, offset)];
-    let paired = qkv[qkv_index(token, head, dim ^ 1, offset)];
-    let (sin, cos) = rope_angle(token, dim).sin_cos();
-    if dim & 1 == 0 {
-        value * cos - paired * sin
-    } else {
-        paired * sin + value * cos
-    }
+fn qkv_value(qkv: &[f32], token: usize, head: usize, dim: usize, offset: usize) -> f32 {
+    qkv[qkv_index(token, head, dim, offset)]
 }
 
 fn rope_raw_grad(token: usize, dim: usize, grad_dim: f32, grad_pair: f32) -> f32 {

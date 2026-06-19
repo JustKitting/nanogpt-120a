@@ -2,7 +2,7 @@ use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig}
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use super::AttentionModule;
-use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32, sincos_f32};
+use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
 pub(crate) const CAUSAL_ATTENTION_MAX_THREADS_PER_BLOCK: u32 = 128;
@@ -105,14 +105,14 @@ pub mod kernels {
         }
 
         let query_value = if thread_index < params.head_dim {
-            rope_q_value(qkv, batch, query, head, thread_index, &params)
+            q_value(qkv, batch, query, head, thread_index, &params)
         } else {
             0.0
         };
         let mut key = 0;
         while key <= query {
             let local_dot = if thread_index < params.head_dim {
-                query_value * rope_k_value(qkv, batch, key, head, thread_index, &params)
+                query_value * k_value(qkv, batch, key, head, thread_index, &params)
             } else {
                 0.0
             };
@@ -268,7 +268,7 @@ pub mod kernels {
     }
 
     #[inline(always)]
-    fn rope_q_value(
+    fn q_value(
         qkv: &[f32],
         batch: u32,
         token: u32,
@@ -276,11 +276,11 @@ pub mod kernels {
         dim: u32,
         params: &CausalAttentionParams,
     ) -> f32 {
-        rope_value(qkv, batch, token, head, dim, 0, params)
+        qkv[qkv_index(batch, token, head, dim, 0, params)]
     }
 
     #[inline(always)]
-    fn rope_k_value(
+    fn k_value(
         qkv: &[f32],
         batch: u32,
         token: u32,
@@ -288,37 +288,7 @@ pub mod kernels {
         dim: u32,
         params: &CausalAttentionParams,
     ) -> f32 {
-        rope_value(qkv, batch, token, head, dim, params.embedding_dim, params)
-    }
-
-    #[inline(always)]
-    fn rope_value(
-        qkv: &[f32],
-        batch: u32,
-        token: u32,
-        head: u32,
-        dim: u32,
-        section_offset: u32,
-        params: &CausalAttentionParams,
-    ) -> f32 {
-        let paired_dim = if dim & 1 == 0 { dim + 1 } else { dim - 1 };
-        let value = qkv[qkv_index(batch, token, head, dim, section_offset, params)];
-        let paired = qkv[qkv_index(batch, token, head, paired_dim, section_offset, params)];
-        let theta = token as f32 * rope_inv_freq(dim, params.head_dim);
-        let (sin, cos) = sincos_f32(theta);
-
-        if dim & 1 == 0 {
-            fma_f32(-paired, sin, value * cos)
-        } else {
-            fma_f32(paired, sin, value * cos)
-        }
-    }
-
-    #[inline(always)]
-    fn rope_inv_freq(dim: u32, head_dim: u32) -> f32 {
-        const ROPE_LN_BASE: f32 = 9.210_340_5;
-        let pair_dim = (dim & !1) as f32;
-        exp_f32(-ROPE_LN_BASE * pair_dim / head_dim as f32)
+        qkv[qkv_index(batch, token, head, dim, params.embedding_dim, params)]
     }
 
     #[inline(always)]
