@@ -15,7 +15,8 @@ fn main() -> AppResult {
     let mut trainer = Trainer::new(app::config::SEED)?;
     let dataset = TokenDataLoader::training_dataset_name();
     let config = TrainConfig::from_env();
-    let run_output = app::run_output::RunOutput::new(&dataset, config.steps)?;
+    let run_label = format!("{}s", config.max_seconds.round() as u64);
+    let run_output = app::run_output::RunOutput::new(&dataset, &run_label)?;
     println!("run_dir={}", run_output.dir().display());
 
     if let Some(path) = app::config::load_model_path() {
@@ -27,18 +28,22 @@ fn main() -> AppResult {
     let mut logger = TrainingLogger::new();
     let wall_clock = app::wall_clock::WallClockBudget::new(config.max_seconds);
     let validation_tokens = data.validation_tokens()?;
-    let validation_batch = trainer.batch_from_default_windows(&validation_tokens)?;
+    let validation_batch = trainer.batch_from_windows(
+        &validation_tokens,
+        TokenDataLoader::validation_window_count(),
+    )?;
 
     run_output.write_info(&app::run_info::build(&dataset, &config))?;
     println!(
-        "training_tokens={} steps={}",
+        "training_tokens={} max_seconds={:.3} step_cap={}",
         data.token_count(),
-        config.steps
+        config.max_seconds,
+        config.step_cap
     );
 
     let mut completed_steps = 0usize;
-    for step in 0..config.steps {
-        let log_step = app::config::should_log_step(step, config.steps, config.log_interval);
+    for step in 0..config.step_cap {
+        let log_step = app::config::should_log_step(step, config.step_cap, config.log_interval);
         let window = data.next_batch()?;
         let source = window.source.display().to_string();
         let batch = trainer.batch_from_default_windows(&window.tokens)?;
@@ -57,7 +62,7 @@ fn main() -> AppResult {
                 &stats,
             );
         }
-        if app::config::should_eval_step(step, config.steps, config.eval_interval) {
+        if app::config::should_eval_step(step, config.step_cap, config.eval_interval) {
             let val_loss = trainer.eval_loss(&validation_batch)?;
             println!("eval step={step} val_loss={val_loss:.6}");
         }
@@ -74,14 +79,12 @@ fn main() -> AppResult {
     }
     let train_elapsed_s = wall_clock.elapsed_seconds();
 
-    if config.max_seconds.is_some() {
-        let eval_start = std::time::Instant::now();
-        let val_loss = trainer.eval_loss(&validation_batch)?;
-        let eval_elapsed_s = eval_start.elapsed().as_secs_f64();
-        println!(
-            "heldout_eval split=val val_loss={val_loss:.6} train_elapsed_s={train_elapsed_s:.3} eval_elapsed_s={eval_elapsed_s:.3} completed_steps={completed_steps}",
-        );
-    }
+    let eval_start = std::time::Instant::now();
+    let val_loss = trainer.eval_loss(&validation_batch)?;
+    let eval_elapsed_s = eval_start.elapsed().as_secs_f64();
+    println!(
+        "heldout_eval split=val val_loss={val_loss:.6} train_elapsed_s={train_elapsed_s:.3} eval_elapsed_s={eval_elapsed_s:.3} completed_steps={completed_steps}",
+    );
 
     if let Some(path) = app::config::save_model_path(&run_output) {
         app::run_output::ensure_parent(&path)?;

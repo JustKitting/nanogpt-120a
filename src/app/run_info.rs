@@ -3,16 +3,11 @@ use crate::app::config::{SEED, TrainConfig};
 pub fn build(dataset: &str, config: &TrainConfig) -> String {
     let mut info = String::new();
     push_info(&mut info, "dataset", dataset);
-    push_info(&mut info, "steps", config.steps);
+    push_info(&mut info, "tokenizer", llama2_tokenizer::TOKENIZER_NAME);
+    push_info(&mut info, "vocab_size", llama2_tokenizer::VOCAB_SIZE);
+    push_info(&mut info, "step_cap", config.step_cap);
     push_info(&mut info, "log_interval", config.log_interval);
-    push_info(
-        &mut info,
-        "max_seconds",
-        config
-            .max_seconds
-            .map(|value| value.to_string())
-            .unwrap_or_else(|| "none".to_string()),
-    );
+    push_info(&mut info, "max_seconds", config.max_seconds);
     push_info(
         &mut info,
         "eval_interval",

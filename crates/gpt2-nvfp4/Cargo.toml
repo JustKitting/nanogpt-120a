@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }
+llama2-tokenizer = { path = "../llama2-tokenizer" }
 rust-kernels-cuda = { path = "../cuda-kernels" }

@@ -1,12 +1,12 @@
-pub const GPT2_VOCAB_SIZE: usize = 50_257;
+pub const GPT2_VOCAB_SIZE: usize = llama2_tokenizer::VOCAB_SIZE;
 pub const GPT2_SEQ_LEN: usize = 1024;
-pub const GPT2_BATCH_SIZE: usize = 8;
+pub const GPT2_BATCH_SIZE: usize = 4;
 pub const GPT2_TOKEN_ROWS: usize = GPT2_BATCH_SIZE * GPT2_SEQ_LEN;
 pub const GPT2_CONTEXT_LEN: usize = GPT2_SEQ_LEN;
 
-pub const GPT2_N_LAYER: usize = 12;
+pub const GPT2_N_LAYER: usize = 8;
 pub const GPT2_N_HEAD: usize = 12;
-pub const GPT2_N_EMBD: usize = 768;
+pub const GPT2_N_EMBD: usize = 1536;
 pub const GPT2_LAYER_NORM_EPSILON: f32 = 1.0e-5;
 
 pub const GPT2_MLP: usize = 4 * GPT2_N_EMBD;

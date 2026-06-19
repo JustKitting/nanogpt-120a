@@ -29,7 +29,7 @@ pub use batch::TokenBatch;
 pub use data::TokenDataLoader;
 pub use generate::SamplingConfig;
 
-use gpt2_nvfp4::{Gpt2, Gpt2Rng};
+use gpt2_nvfp4::{GPT2_SEQ_LEN, Gpt2, Gpt2Rng};
 
 use crate::AppResult;
 use crate::app::runtime::Runtime;
@@ -91,5 +91,14 @@ impl Trainer {
 
     pub fn batch_from_default_windows(&self, tokens: &[u16]) -> AppResult<TokenBatch> {
         TokenBatch::from_default_batch(self.runtime.stream.as_ref(), tokens)
+    }
+
+    pub fn batch_from_windows(&self, tokens: &[u16], batch_size: usize) -> AppResult<TokenBatch> {
+        TokenBatch::from_flat_windows(
+            self.runtime.stream.as_ref(),
+            tokens,
+            batch_size,
+            GPT2_SEQ_LEN,
+        )
     }
 }

@@ -2,8 +2,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use gpt2_bpe::Gpt2Bpe;
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
+use llama2_tokenizer::Llama2Tokenizer;
 use synth_prep::synth::SHARDS_DIR;
 use synth_prep::{DATA_DIR, SHARD_FILE_PREFIX};
 
@@ -17,7 +17,7 @@ const SHAKESPEARE_URL: &str =
     "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt";
 const SHAKESPEARE_DIR: &str = "data/shakespeare";
 const SHAKESPEARE_RAW: &str = "input.txt";
-const SHAKESPEARE_SHARD: &str = "shakespeare_train_000000.bin";
+const SHAKESPEARE_SHARD: &str = "shakespeare_llama2_train_000000.bin";
 const VALIDATION_WINDOWS: usize = 4;
 
 pub struct TokenDataLoader {
@@ -39,6 +39,10 @@ pub struct TokenWindowBatch {
 impl TokenDataLoader {
     pub fn training_dataset_name() -> String {
         training_dataset()
+    }
+
+    pub fn validation_window_count() -> usize {
+        VALIDATION_WINDOWS
     }
 
     pub fn from_training_dataset() -> AppResult<Self> {
@@ -103,13 +107,13 @@ impl TokenDataLoader {
         if self.tokens.len() < len {
             return Err(format!("{} has fewer than {len} tokens", self.path.display()).into());
         }
-        let needed = GPT2_BATCH_SIZE * len;
+        let needed = VALIDATION_WINDOWS * len;
         if self.tokens.len() < needed {
             return Err(format!("{} has fewer than {needed} tokens", self.path.display()).into());
         }
         let start = self.tokens.len() - needed;
         let mut tokens = Vec::with_capacity(needed);
-        for batch in 0..GPT2_BATCH_SIZE {
+        for batch in 0..VALIDATION_WINDOWS {
             let offset = start + batch * len;
             tokens.extend_from_slice(&self.tokens[offset..offset + len]);
         }
@@ -130,7 +134,7 @@ impl TokenDataLoader {
 }
 
 fn train_end(token_count: usize) -> usize {
-    let validation_tokens = VALIDATION_WINDOWS * GPT2_SEQ_LEN;
+    let validation_tokens = VALIDATION_WINDOWS * (GPT2_SEQ_LEN + 1);
     token_count
         .saturating_sub(validation_tokens)
         .max(GPT2_SEQ_LEN + 1)
@@ -199,9 +203,9 @@ fn ensure_shakespeare_shard() -> AppResult<PathBuf> {
     }
 
     let text = fs::read_to_string(raw_path)?;
-    let tokenizer = Gpt2Bpe::from_default_assets()?;
+    let tokenizer = Llama2Tokenizer::from_default_assets()?;
     let mut tokens = Vec::new();
-    tokens.push(u16::try_from(tokenizer.eot_token())?);
+    tokens.push(u16::try_from(tokenizer.bos_token())?);
     for id in tokenizer.encode_ordinary(&text)? {
         tokens.push(u16::try_from(id)?);
     }

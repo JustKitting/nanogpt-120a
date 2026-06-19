@@ -2,7 +2,7 @@ use std::fs::File;
 use std::path::Path;
 
 use arrow_array::{Array, LargeStringArray, RecordBatch, StringArray};
-use gpt2_bpe::Gpt2Bpe;
+use llama2_tokenizer::Llama2Tokenizer;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
 use super::AppResult;
@@ -11,7 +11,7 @@ use super::tokenize::tokenize_doc;
 
 pub fn tokenize_parquet_file(
     path: &Path,
-    tokenizer: &Gpt2Bpe,
+    tokenizer: &Llama2Tokenizer,
     writer: &mut ShardWriter,
 ) -> AppResult<()> {
     let file = File::open(path)?;
@@ -29,7 +29,7 @@ pub fn tokenize_parquet_file(
 
 fn tokenize_synth_batch(
     batch: &RecordBatch,
-    tokenizer: &Gpt2Bpe,
+    tokenizer: &Llama2Tokenizer,
     writer: &mut ShardWriter,
 ) -> AppResult<()> {
     let query = string_column(batch, "query")?;

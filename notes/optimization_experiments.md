@@ -30,6 +30,180 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Fixed 5-minute validation-loss comparison for wide Llama 2 B4 vs B8.
+status: B4 wins this fixed-wall-clock validation run
+decision:
+  Use validation loss at fixed wall-clock as the ranking signal. Token
+  throughput is only diagnostic. For this 300-second Shakespeare check, B4 is
+  the better current candidate despite lower token throughput.
+changes:
+  Training now defaults to TRAIN_MAX_SECONDS=300 with TRAIN_STEPS acting only
+  as a large safety cap when unset.
+  The run directory label uses the time budget instead of a step count.
+  Final held-out validation evaluation always runs and prints heldout_eval.
+  Validation uses a fixed four-window held-out batch independent of training
+  batch size, so B4 and B8 compare against the same validation slice.
+result:
+  B4 300-second run:
+    target/fixed_time_val_wide1536_l8_b4_300s_20260619T025909Z.log
+    completed_steps=372
+    heldout_eval split=val val_loss=5.335806 train_elapsed_s=301.131
+  B8 300-second run:
+    target/fixed_time_val_wide1536_l8_b8_300s_20260619T030431Z.log
+    completed_steps=275
+    heldout_eval split=val val_loss=5.438506 train_elapsed_s=301.753
+comparison:
+  B4 beat B8 by 0.102700 validation loss at the same wall-clock budget.
+  The previous fixed-step comparison was misleading for ranking because it used
+  train loss and did not normalize by wall-clock time.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  B4 300-second direct GPU run: pass.
+  B8 300-second direct GPU run: pass.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Drop wide Llama 2 model batch size from B8 to B4.
+status: valid sustained runs, stable but lower throughput
+decision:
+  Do not call B4 a win yet. It is stable and gets close to the B8 loss at the
+  same wall-clock time, but B8 still has better token throughput and slightly
+  better final fixed-wall-clock loss in this check.
+changes:
+  GPT2_BATCH_SIZE changed from 8 to 4 while keeping d_model=1536, mlp=6144,
+  layers=8, heads=12, and AURORA_COOPERATIVE_BLOCKS=180.
+result:
+  B4 100-step Shakespeare run:
+    target/llama2_wide1536_l8_b4_aurora180_100steps_20260619T025109Z.log
+    step 0 loss=10.448714, step 99 loss=5.905748, elapsed_s=80.111,
+    finite=true and nonzero=true throughout logged steps.
+  B4 equal-wall-clock run against the B8 100-step time:
+    target/llama2_wide1536_l8_b4_aurora180_135steps_equalwall_20260619T025245Z.log
+    step 0 loss=10.448714, step 134 loss=5.742118, elapsed_s=108.950,
+    finite=true and nonzero=true throughout logged steps.
+comparison:
+  B8 wide run with Aurora 180:
+    step 99 loss=5.686881, elapsed_s=108.926, tokens=819,200,
+    throughput=7,521 tokens/s.
+  B4 100-step run:
+    tokens=409,600, throughput=5,113 tokens/s.
+  B4 equal-wall-clock run:
+    tokens=552,960, throughput=5,075 tokens/s.
+  B4 is not unstable, but it does not beat B8 on this fixed wall-clock check.
+  Its lower batch gives more optimizer steps per minute, but it gives up too
+  much token throughput in the current kernels.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  B4 100-step direct GPU training run: pass.
+  B4 135-step equal-wall-clock direct GPU training run: pass.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Widen model to d_model=1536, mlp=6144, layers=8, heads=12.
+status: valid sustained run, better fixed-step loss, still slower wall-clock
+decision:
+  Keep as an active candidate only if equal-wall-clock validation improves.
+  The shape learns faster per step on Shakespeare. The first launch sizing
+  pass narrowed the wall-clock gap, but it is still slower than the d_model=768,
+  layers=12 baseline at fixed step count.
+changes:
+  GPT2_N_EMBD changed from 768 to 1536.
+  GPT2_MLP remains 4 * d_model, so it changed from 3072 to 6144.
+  GPT2_N_LAYER changed from 12 to 8.
+  GPT2_N_HEAD stayed 12, giving head_dim=128. This widens the linear layers
+  without doubling causal-attention square buffers via 24 heads.
+  AURORA_COOPERATIVE_BLOCKS changed from 120 to 180 after profiling the wide
+  model's Aurora cooperative launch.
+result:
+  Initial B8 100-step Shakespeare run:
+    target/llama2_wide1536_l8_b8_100steps_20260619T023718Z.log
+    step 0 loss=10.456142, step 99 loss=5.690090, elapsed_s=129.361,
+    finite=true and nonzero=true throughout logged steps.
+  After Aurora cooperative block sizing to 180:
+    target/llama2_wide1536_l8_b8_aurora180_100steps_20260619T024448Z.log
+    step 0 loss=10.456142, step 99 loss=5.686881, elapsed_s=108.926,
+    finite=true and nonzero=true throughout logged steps.
+profiling:
+  Wide B8 20-step nsys, AURORA_COOPERATIVE_BLOCKS=120:
+    target/nsys_wide1536_l8_b8_20_20260619T024112Z.sqlite
+    aurora_mega_update_cooperative_kernel avg=729.840785ms.
+  Wide B8 20-step nsys, AURORA_COOPERATIVE_BLOCKS=160:
+    target/nsys_wide1536_l8_b8_aurora160_20_20260619T024254Z.sqlite
+    aurora_mega_update_cooperative_kernel avg=542.993246ms.
+  Wide B8 20-step nsys, AURORA_COOPERATIVE_BLOCKS=180:
+    target/nsys_wide1536_l8_b8_aurora180_20_20260619T024339Z.sqlite
+    aurora_mega_update_cooperative_kernel avg=521.137870ms.
+  AURORA_COOPERATIVE_BLOCKS=192 failed at runtime with:
+    DriverError(720, "too many blocks in cooperative launch").
+comparison:
+  d_model=768, layers=12, Llama 2 tokenizer baseline:
+    step 99 loss=6.439928, elapsed_s=50.288.
+  Wider shape with the 180-block Aurora launch improves fixed-step loss by
+  0.753047 at step 99, but still takes 2.17x longer for the same number of
+  steps. This must be judged by held-out loss at fixed wall-clock time, not
+  fixed step count.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  B8 100-step direct GPU training run: pass.
+notes:
+  loss_sync_ms rose to roughly 396ms in the logged wide run. That may be a
+  synchronization/reporting artifact, but it is real wall-clock cost in the
+  current training loop and needs profiling before calling the wider shape a
+  speed win. The first useful optimization target was Aurora launch sizing, not
+  abandoning the wide shape.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Switch active training tokenizer from GPT-2 BPE to Llama 2 32k BPE.
+status: success, sustained runtime check passed
+decision:
+  Keep as the next baseline. This reduces the tied embedding/lm-head/logits
+  path from vocab 50,257 to vocab 32,000 without adding a hidden GPT-2 fallback.
+changes:
+  Added llama2-tokenizer crate with vendored NousResearch Llama 2 tokenizer
+  artifacts.
+  GPT2_VOCAB_SIZE now derives from llama2_tokenizer::VOCAB_SIZE = 32,000.
+  SYNTH prep and Shakespeare prep use Llama2Tokenizer directly.
+  Shard names changed to synth_llama2_* and shakespeare_llama2_* so old GPT-2
+  token shards are not silently reused.
+  Generation now encodes/decodes with Llama 2 and pads generation windows with
+  the Llama 2 EOS token.
+result:
+  Local Shakespeare Llama 2 shard was generated:
+    data/shakespeare/shards/shakespeare_llama2_train_000000.bin
+    tokens=368,634.
+  B8 logits per step dropped from the GPT-2-tokenizer shape's 411,705,344 to
+  262,144,000.
+  B8 100-step Shakespeare run:
+    target/llama2_tokenizer_b8_100steps_20260619T023033Z.log
+    step 0 loss=10.394513, step 99 loss=6.439928, elapsed_s=50.217,
+    finite=true and nonzero=true throughout logged steps.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo test -p llama2-tokenizer: pass
+  cargo oxide build --arch sm_120a: pass
+  B8 100-step direct GPU training run: pass.
+notes:
+  The old GPT-2 BPE crate was removed from the workspace and source tree. The
+  active app, SYNTH prep, generation, and model-vocab path use Llama 2 only.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Rename Aurora mega scratch contract from scaled to polar_next.
 status: success, behavior-preserving fusion-audit cleanup
 decision:

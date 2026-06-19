@@ -5,22 +5,25 @@ use crate::training::SamplingConfig;
 use super::run_output::RunOutput;
 
 pub const SEED: u64 = 0x4750_5432;
-const DEFAULT_TRAIN_STEPS: usize = 10;
+const DEFAULT_TRAIN_MAX_SECONDS: f64 = 300.0;
+const DEFAULT_TRAIN_STEP_CAP: usize = 1_000_000;
 
 pub struct TrainConfig {
-    pub steps: usize,
+    pub step_cap: usize,
     pub log_interval: usize,
     pub eval_interval: Option<usize>,
-    pub max_seconds: Option<f64>,
+    pub max_seconds: f64,
 }
 
 impl TrainConfig {
     pub fn from_env() -> Self {
         Self {
-            steps: env_usize("TRAIN_STEPS").unwrap_or(DEFAULT_TRAIN_STEPS),
+            step_cap: env_usize("TRAIN_STEPS").unwrap_or(DEFAULT_TRAIN_STEP_CAP),
             log_interval: env_usize("TRAIN_LOG_INTERVAL").unwrap_or(1).max(1),
             eval_interval: env_usize("TRAIN_EVAL_INTERVAL").filter(|interval| *interval > 0),
-            max_seconds: env_f64("TRAIN_MAX_SECONDS").filter(|seconds| *seconds > 0.0),
+            max_seconds: env_f64("TRAIN_MAX_SECONDS")
+                .filter(|seconds| *seconds > 0.0)
+                .unwrap_or(DEFAULT_TRAIN_MAX_SECONDS),
         }
     }
 }
@@ -60,12 +63,12 @@ pub fn sampling_config() -> SamplingConfig {
     }
 }
 
-pub fn should_log_step(step: usize, steps: usize, log_interval: usize) -> bool {
-    step == 0 || step + 1 == steps || step % log_interval == 0
+pub fn should_log_step(step: usize, step_cap: usize, log_interval: usize) -> bool {
+    step == 0 || step + 1 == step_cap || step % log_interval == 0
 }
 
-pub fn should_eval_step(step: usize, steps: usize, eval_interval: Option<usize>) -> bool {
-    eval_interval.is_some_and(|interval| step == 0 || step + 1 == steps || step % interval == 0)
+pub fn should_eval_step(step: usize, step_cap: usize, eval_interval: Option<usize>) -> bool {
+    eval_interval.is_some_and(|interval| step == 0 || step + 1 == step_cap || step % interval == 0)
 }
 
 fn env_nonempty(name: &str) -> Option<String> {

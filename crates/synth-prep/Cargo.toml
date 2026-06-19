@@ -6,6 +6,6 @@ edition = "2024"
 [dependencies]
 arrow-array = "59"
 bytemuck = "1"
-gpt2-bpe = { path = "../gpt2-bpe" }
 hf-hub = { version = "1.0.0-rc.1", features = ["blocking", "rustls-tls"] }
+llama2-tokenizer = { path = "../llama2-tokenizer" }
 parquet = "59"

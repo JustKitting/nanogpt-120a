@@ -6,10 +6,10 @@ pub struct WallClockBudget {
 }
 
 impl WallClockBudget {
-    pub fn new(max_seconds: Option<f64>) -> Self {
+    pub fn new(max_seconds: f64) -> Self {
         Self {
             start: Instant::now(),
-            max: max_seconds.map(Duration::from_secs_f64),
+            max: Some(Duration::from_secs_f64(max_seconds)),
         }
     }
 

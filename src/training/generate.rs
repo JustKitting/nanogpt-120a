@@ -1,6 +1,6 @@
 use cuda_core::DeviceBuffer;
-use gpt2_bpe::Gpt2Bpe;
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_VOCAB_SIZE};
+use llama2_tokenizer::Llama2Tokenizer;
 use rust_kernels_cuda::logits::{LOGITS_TOP_K, LogitsTopKArgs};
 
 use super::{TokenBatch, Trainer};
@@ -20,10 +20,10 @@ impl Trainer {
         max_new_tokens: usize,
         config: SamplingConfig,
     ) -> AppResult<String> {
-        let tokenizer = Gpt2Bpe::from_default_assets()?;
+        let tokenizer = Llama2Tokenizer::from_default_assets()?;
         let mut tokens = tokenizer.encode(prompt)?;
         if tokens.is_empty() {
-            tokens.push(tokenizer.eot_token());
+            tokens.push(tokenizer.bos_token());
         }
 
         let stream = self.runtime.stream.clone();
@@ -32,7 +32,7 @@ impl Trainer {
         let mut top_logits_dev = DeviceBuffer::<f32>::zeroed(stream.as_ref(), top_k)?;
 
         for _ in 0..max_new_tokens {
-            let (windows, row) = generation_batch(&tokens, tokenizer.eot_token())?;
+            let (windows, row) = generation_batch(&tokens, tokenizer.eos_token())?;
             let batch = TokenBatch::from_default_batch(stream.as_ref(), &windows)?;
             self.forward_step(&batch)?;
             self.runtime.logits.top_k(LogitsTopKArgs {

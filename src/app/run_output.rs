@@ -13,12 +13,12 @@ pub(crate) struct RunOutput {
 }
 
 impl RunOutput {
-    pub fn new(dataset: &str, steps: usize) -> AppResult<Self> {
+    pub fn new(dataset: &str, label: &str) -> AppResult<Self> {
         let dir = std::env::var(TRAIN_RUN_DIR_ENV)
             .ok()
             .filter(|value| !value.is_empty())
             .map(PathBuf::from)
-            .unwrap_or_else(|| default_run_dir(dataset, steps));
+            .unwrap_or_else(|| default_run_dir(dataset, label));
         fs::create_dir_all(&dir)?;
         Ok(Self { dir })
     }
@@ -44,12 +44,12 @@ pub(crate) fn ensure_parent(path: &Path) -> AppResult {
     Ok(())
 }
 
-fn default_run_dir(dataset: &str, steps: usize) -> PathBuf {
+fn default_run_dir(dataset: &str, label: &str) -> PathBuf {
     PathBuf::from(RUNS_DIR).join(format!(
-        "{}_{}_{}steps",
+        "{}_{}_{}",
         utc_stamp(),
         sanitize_path_part(dataset),
-        steps
+        sanitize_path_part(label)
     ))
 }
 
