@@ -30,6 +30,38 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Same-tokenizer architecture cut from 2 layers to 1 layer.
+status: rejected, faster but worse held-out validation
+decision:
+  Revert to the L2 candidate. L1 completed many more steps in the same
+  wall-clock budget, but validation loss was worse, so capacity is now winning
+  over step count at this boundary.
+changes:
+  Tested GPT2_N_LAYER=1 with AURORA_MATRIX_PHASES=4. Tokenizer, dataset,
+  sequence length, width, MLP size, batch size, and optimizer math stayed the
+  same.
+result:
+  Current L2 B4 reference:
+    target/fixed_time_val_wide1536_l2_b4_phase8_300s_20260619T042826Z.log
+    completed_steps=1013
+    heldout_eval split=val val_loss=4.772994 train_elapsed_s=300.497
+  L1 B4 candidate:
+    target/fixed_time_val_wide1536_l1_b4_phase4_300s_20260619T043429Z.log
+    completed_steps=1798
+    heldout_eval split=val val_loss=4.853128 train_elapsed_s=300.214
+quality:
+  The L1 run was finite=true and nonzero=true at every logged step, but it did
+  not beat held-out validation loss at the fixed wall-clock budget.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  L1 300-second direct GPU run: pass.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Same-tokenizer architecture cut from 4 layers to 2 layers.
 status: success, keep L2 for current five-minute validation target
 decision:
