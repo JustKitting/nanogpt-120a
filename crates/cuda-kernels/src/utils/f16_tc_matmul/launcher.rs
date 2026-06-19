@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
-use super::args::F16TcMatmulArgs;
+use super::args::{F16TcMatmulArgs, F16TcMatmulF32Args};
 use super::cta_tile::{CTA_M, CTA_N, CTA_THREADS};
 use super::kernels;
 use super::prepare::prepare_halves;
@@ -43,6 +43,27 @@ impl F16TcMatmulModule {
             args.m,
             args.n,
             k,
+        )
+    }
+
+    pub fn batched_matmul_f32_input(
+        &self,
+        args: F16TcMatmulF32Args<'_, '_>,
+    ) -> Result<(), DriverError> {
+        assert!(args.a.len() >= args.batch_count as usize * args.m as usize * args.k as usize);
+        assert!(args.b_t.len() >= args.batch_count as usize * args.n as usize * args.k as usize);
+        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
+
+        self.module.f16_cta_tc_matmul_f32_kernel(
+            args.stream,
+            cta_config(args.m, args.n, args.batch_count),
+            args.a,
+            args.b_t,
+            args.out,
+            args.batch_count,
+            args.m,
+            args.n,
+            args.k,
         )
     }
 }

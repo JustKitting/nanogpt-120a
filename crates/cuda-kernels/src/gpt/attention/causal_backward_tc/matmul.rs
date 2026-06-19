@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
-use crate::f16_tc_matmul::{F16TcMatmulArgs, F16TcMatmulModule, F16TcMatmulScratch};
+use crate::f16_tc_matmul::{F16TcMatmulF32Args, F16TcMatmulModule};
 
 pub(super) struct AttentionTcMatmulContext<'a> {
     pub stream: &'a CudaStream,
@@ -14,7 +14,6 @@ pub(super) struct AttentionTcMatmulContext<'a> {
 pub(super) fn run_tc_matmul(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,
-    scratch: &mut F16TcMatmulScratch<'_>,
     a: &DeviceBuffer<f32>,
     b_t: &DeviceBuffer<f32>,
     out: &mut DeviceBuffer<f32>,
@@ -23,12 +22,11 @@ pub(super) fn run_tc_matmul(
     n: u32,
     k: u32,
 ) -> Result<(), DriverError> {
-    tc_module.batched_matmul(F16TcMatmulArgs {
+    tc_module.batched_matmul_f32_input(F16TcMatmulF32Args {
         stream,
         a,
         b_t,
         out,
-        scratch: scratch.reborrow(),
         batch_count,
         m,
         n,

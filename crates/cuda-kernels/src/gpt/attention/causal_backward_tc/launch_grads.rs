@@ -10,7 +10,6 @@ pub(super) fn run_grad_matmuls(
     run_tc_matmul(
         ctx.stream,
         ctx.tc_module,
-        &mut scratch.matmul,
         scratch.ds,
         scratch.k_t,
         scratch.d_q,
@@ -22,7 +21,6 @@ pub(super) fn run_grad_matmuls(
     run_tc_matmul(
         ctx.stream,
         ctx.tc_module,
-        &mut scratch.matmul,
         scratch.ds_t,
         scratch.q_t,
         scratch.d_k,
@@ -34,7 +32,6 @@ pub(super) fn run_grad_matmuls(
     run_tc_matmul(
         ctx.stream,
         ctx.tc_module,
-        &mut scratch.matmul,
         scratch.p_t,
         scratch.d_out_t,
         scratch.d_v,

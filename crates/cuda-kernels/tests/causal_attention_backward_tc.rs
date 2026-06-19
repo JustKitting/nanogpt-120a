@@ -7,8 +7,6 @@ use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 #[path = "causal_attention_backward_tc/case.rs"]
 mod case;
 mod common;
-#[path = "causal_attention_backward_tc/matmul_scratch.rs"]
-mod matmul_scratch;
 #[path = "causal_attention_backward_tc/reference.rs"]
 mod reference;
 #[path = "causal_attention_backward_tc/scratch.rs"]

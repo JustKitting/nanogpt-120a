@@ -1,7 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::CausalAttentionBackwardTcScratch;
 
-use super::matmul_scratch::TcMatmulScratchBuffers;
 use super::shape::{HEAD_DIM, HEADS, TOKEN_COUNT};
 
 pub struct TcScratchBuffers {
@@ -21,7 +20,6 @@ pub struct TcScratchBuffers {
     d_q: DeviceBuffer<f32>,
     d_k: DeviceBuffer<f32>,
     d_v: DeviceBuffer<f32>,
-    matmul: TcMatmulScratchBuffers,
 }
 
 impl TcScratchBuffers {
@@ -45,7 +43,6 @@ impl TcScratchBuffers {
             d_q: zero(stream, compact)?,
             d_k: zero(stream, compact)?,
             d_v: zero(stream, compact)?,
-            matmul: TcMatmulScratchBuffers::new(stream, HEADS * TOKEN_COUNT.max(HEAD_DIM))?,
         })
     }
 
@@ -67,7 +64,6 @@ impl TcScratchBuffers {
             d_q: &mut self.d_q,
             d_k: &mut self.d_k,
             d_v: &mut self.d_v,
-            matmul: self.matmul.args(),
         }
     }
 }

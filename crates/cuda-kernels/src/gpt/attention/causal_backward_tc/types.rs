@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy};
 
-use crate::f16_tc_matmul::{F16TcMatmulModule, F16TcMatmulScratch};
+use crate::f16_tc_matmul::F16TcMatmulModule;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -34,7 +34,6 @@ pub struct CausalAttentionBackwardTcScratch<'a> {
     pub d_q: &'a mut DeviceBuffer<f32>,
     pub d_k: &'a mut DeviceBuffer<f32>,
     pub d_v: &'a mut DeviceBuffer<f32>,
-    pub matmul: F16TcMatmulScratch<'a>,
 }
 
 pub struct CausalAttentionBackwardTcArgs<'a, 'scratch, 'out> {
@@ -75,7 +74,6 @@ impl<'a> CausalAttentionBackwardTcScratch<'a> {
             d_q: self.d_q,
             d_k: self.d_k,
             d_v: self.d_v,
-            matmul: self.matmul.reborrow(),
         }
     }
 }

@@ -21,6 +21,17 @@ pub struct F16TcMatmulArgs<'a, 'scratch, 'out> {
     pub k: u32,
 }
 
+pub struct F16TcMatmulF32Args<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub a: &'a DeviceBuffer<f32>,
+    pub b_t: &'a DeviceBuffer<f32>,
+    pub out: &'out mut DeviceBuffer<f32>,
+    pub batch_count: u32,
+    pub m: u32,
+    pub n: u32,
+    pub k: u32,
+}
+
 pub struct F16TcMatmulAddArgs<'a, 'scratch, 'out> {
     pub stream: &'a CudaStream,
     pub a: &'a DeviceBuffer<f32>,

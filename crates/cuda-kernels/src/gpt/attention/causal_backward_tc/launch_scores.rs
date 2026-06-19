@@ -10,7 +10,6 @@ pub(super) fn run_pair_scores(
     run_tc_matmul(
         ctx.stream,
         ctx.tc_module,
-        &mut scratch.matmul,
         scratch.q,
         scratch.k,
         scratch.scores,
@@ -22,7 +21,6 @@ pub(super) fn run_pair_scores(
     run_tc_matmul(
         ctx.stream,
         ctx.tc_module,
-        &mut scratch.matmul,
         scratch.d_out,
         scratch.v,
         scratch.dot,

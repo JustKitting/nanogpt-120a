@@ -1,7 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{AttentionCoreScratch, GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_SEQ_LEN};
 use rust_kernels_cuda::attention::CausalAttentionBackwardTcScratch;
-use rust_kernels_cuda::f16_tc_matmul::{F16TcMatmulScratch, f16_tc_matmul_elements};
 
 pub struct AttentionCoreScratchBuffers {
     softmax_d: DeviceBuffer<f32>,
@@ -21,17 +20,12 @@ pub struct AttentionCoreScratchBuffers {
     d_q: DeviceBuffer<f32>,
     d_k: DeviceBuffer<f32>,
     d_v: DeviceBuffer<f32>,
-    a_padded: DeviceBuffer<f32>,
-    b_t_padded: DeviceBuffer<f32>,
-    a_halves: DeviceBuffer<u16>,
-    b_t_halves: DeviceBuffer<u16>,
 }
 
 impl AttentionCoreScratchBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         let compact = GPT2_BATCH_SIZE * GPT2_SEQ_LEN * GPT2_N_EMBD;
         let square = GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN * GPT2_SEQ_LEN;
-        let matmul = f16_tc_matmul_elements(matmul_rows() as u32, matmul_k() as u32);
         Ok(Self {
             softmax_d: zero(stream, GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN)?,
             q: zero(stream, compact)?,
@@ -50,10 +44,6 @@ impl AttentionCoreScratchBuffers {
             d_q: zero(stream, compact)?,
             d_k: zero(stream, compact)?,
             d_v: zero(stream, compact)?,
-            a_padded: zero(stream, matmul)?,
-            b_t_padded: zero(stream, matmul)?,
-            a_halves: zero(stream, matmul)?,
-            b_t_halves: zero(stream, matmul)?,
         })
     }
 
@@ -77,12 +67,6 @@ impl AttentionCoreScratchBuffers {
                 d_q: &mut self.d_q,
                 d_k: &mut self.d_k,
                 d_v: &mut self.d_v,
-                matmul: F16TcMatmulScratch {
-                    a_padded: &mut self.a_padded,
-                    b_t_padded: &mut self.b_t_padded,
-                    a_halves: &mut self.a_halves,
-                    b_t_halves: &mut self.b_t_halves,
-                },
             },
         }
     }
@@ -93,12 +77,4 @@ fn zero<T: cuda_core::DeviceCopy>(
     len: usize,
 ) -> Result<DeviceBuffer<T>, DriverError> {
     DeviceBuffer::zeroed(stream, len)
-}
-
-fn matmul_rows() -> usize {
-    GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN.max(GPT2_N_EMBD / GPT2_N_HEAD)
-}
-
-fn matmul_k() -> usize {
-    GPT2_SEQ_LEN.max(GPT2_N_EMBD / GPT2_N_HEAD)
 }

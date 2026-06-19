@@ -30,6 +30,61 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-19
+commit: this commit
+experiment: Stage attention-backward FP32 operands as FP16 inside the TC tile load.
+status: validated and promoted
+target:
+  Remove the separate fp32_to_f16_kernel launches from the attention-backward
+  TC matmul path. The TC matmuls still run as f16.f16 with FP32 accumulators,
+  but operands are converted while staging each CTA tile into shared memory.
+code_change:
+  Added a plain f32-input f16 TC matmul kernel using the existing shared-memory
+  f32 staging helpers. Routed the attention-backward score and gradient
+  matmuls through that entry point and removed attention-only half/padded
+  matmul scratch buffers from the app and tests.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+  causal_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+  block_attention_backward -- --ignored --nocapture: pass.
+sustained_check:
+  target/f16_staged_attention_bwd_cleanup_100step_synth_20260619T221626Z.log
+  heldout_eval val_loss=6.878532 at 100 steps; finite and nonzero.
+profile_effect:
+  Baseline:
+    target/nsys/rope_preapply_b8_l2d1024_20_20260619T203528Z.nsys-rep
+    fp32_to_f16_kernel: 68.082 ms / 400
+    f16_cta_tc_matmul_kernel: 155.812 ms / 200
+  Candidate:
+    target/nsys/f16_staged_attention_bwd_cleanup_b8_l2d1024_20_20260619T221654Z.nsys-rep
+    fp32_to_f16_kernel: 0.000 ms / 0
+    f16_cta_tc_matmul_f32_kernel: 166.486 ms / 200
+  The local attention-backward TC matmul section improved by about 57.4 ms over
+  20 steps, but whole-profile kernel time was flat within noise:
+    baseline total kernel time: 3113.264 ms
+    candidate total kernel time: 3117.344 ms
+validation_result:
+  target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+  stopped_by_wall_clock=true elapsed_s=900.033 completed_steps=5683.
+  heldout_eval split=val val_loss=4.129953 train_elapsed_s=900.191
+  completed_steps=5683.
+comparison:
+  Previous promoted baseline:
+    target/resid_proj_scaled_init_b8_l2d1024_900s_20260619T215342Z.log
+    val_loss=4.143612, completed_steps=5580.
+  F32-staged attention backward improves held-out validation loss by 0.013659
+  and completes 103 more steps under the same 900-second budget.
+decision:
+  Keep and promote. notes/sweep_baseline.env, notes/sweep_seed.tsv, and
+  notes/sweep_seed_current.tsv were updated to this result.
+```
+
+```text
+date: 2026-06-19
 commit: not committed
 experiment: Scale residual projection initialization.
 status: validated and promoted
