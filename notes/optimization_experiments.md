@@ -30,6 +30,44 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Same-tokenizer architecture cut from 4 layers to 2 layers.
+status: success, keep L2 for current five-minute validation target
+decision:
+  Keep GPT2_N_LAYER=2 and AURORA_MATRIX_PHASES=8 for the current Shakespeare
+  five-minute optimization loop. This preserves tokenizer, dataset, sequence
+  length, width, MLP size, batch size, and optimizer math.
+motivation:
+  The L4 profile still had Aurora as the dominant kernel:
+    target/nsys/current_l4_b4_20_20260619T042709Z_kernel_sum.csv
+    aurora_mega_update_cooperative_kernel 7.958s total over 20 steps,
+    397.908ms avg, 71.7% of GPU kernel time.
+  Reducing depth again halves the number of Aurora-updated matrix weights.
+  L2 has 8 Aurora matrix slots, so the phase count must be 8 rather than 16.
+result:
+  Previous L4 B4:
+    target/fixed_time_val_wide1536_l4_b4_300s_20260619T042125Z.log
+    completed_steps=540
+    heldout_eval split=val val_loss=5.098733 train_elapsed_s=300.616
+  Initial L2 run with AURORA_MATRIX_PHASES=16 failed before training:
+    target/fixed_time_val_wide1536_l2_b4_300s_20260619T042759Z.log
+    assertion left=8 right=0 in aurora_mega assert.
+  L2 B4 with AURORA_MATRIX_PHASES=8:
+    target/fixed_time_val_wide1536_l2_b4_phase8_300s_20260619T042826Z.log
+    completed_steps=1013
+    heldout_eval split=val val_loss=4.772994 train_elapsed_s=300.497
+quality:
+  The run was finite=true and nonzero=true at every logged step.
+  This is a held-out validation improvement at the same wall-clock budget.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  L2 300-second direct GPU run: pass.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Same-tokenizer architecture cut from 8 layers to 4 layers.
 status: success, keep L4 for current five-minute validation target
 decision:

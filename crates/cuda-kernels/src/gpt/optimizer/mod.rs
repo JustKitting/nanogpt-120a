@@ -26,4 +26,4 @@ pub use args::{
 pub use launcher::OptimizerModule;
 
 pub const AURORA_COOPERATIVE_BLOCKS: usize = 180;
-pub const AURORA_MATRIX_PHASES: usize = 16;
+pub const AURORA_MATRIX_PHASES: usize = 8;
