@@ -30,6 +30,38 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Same-tokenizer width cut from d1536 to d1024 at L2.
+status: rejected, faster but worse held-out validation
+decision:
+  Revert to the L2 d1536/head12 candidate. The d1024/head16 candidate is
+  faster and Tensor-Core friendly with head_dim=64, but it loses too much
+  capacity for the current fixed five-minute validation target.
+changes:
+  Tested GPT2_N_EMBD=1024, GPT2_N_HEAD=16, GPT2_N_LAYER=2,
+  AURORA_MATRIX_PHASES=8. Tokenizer, dataset, sequence length, MLP ratio,
+  batch size, and optimizer math stayed the same.
+result:
+  Current L2 d1536/head12 reference:
+    target/fixed_time_val_wide1536_l2_b4_phase8_300s_20260619T042826Z.log
+    completed_steps=1013
+    heldout_eval split=val val_loss=4.772994 train_elapsed_s=300.497
+  L2 d1024/head16 candidate:
+    target/fixed_time_val_d1024_l2_h16_b4_300s_20260619T044108Z.log
+    completed_steps=2156
+    heldout_eval split=val val_loss=4.973414 train_elapsed_s=300.248
+quality:
+  The d1024 run was finite=true and nonzero=true at every logged step, but it
+  did not beat held-out validation loss.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  d1024 300-second direct GPU run: pass.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Same-tokenizer architecture cut from 2 layers to 1 layer.
 status: rejected, faster but worse held-out validation
 decision:
