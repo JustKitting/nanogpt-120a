@@ -31,6 +31,60 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: not committed
+experiment: Fuse attention-backward FP32 transpose plus FP16 cast.
+status: rejected; fixed-wall validation loss regressed
+target:
+  Remove the attention-backward path that materialized q_t/k_t/d_out_t/p_t/ds_t
+  as FP32 and then converted those transposed buffers to FP16 inside the TC
+  matmul launcher.
+code_change_tested:
+  Added a generic f16_transpose_rows_kernel and prepared-FP16 TC matmul entry
+  point. Routed the three attention-backward gradient matmuls through
+  transpose-to-FP16 half buffers and removed the old attention FP32 transpose
+  scratch fields.
+correctness_checks:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+  causal_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+  block_attention_backward -- --ignored --nocapture: pass.
+sustained_check:
+  target/attention_bwd_half_transpose_100step_synth_20260619T212834Z.log
+  heldout_eval val_loss=7.383965 at 100 steps; finite and nonzero.
+profile_effect:
+  Baseline:
+    target/nsys/rope_preapply_b8_l2d1024_20_20260619T203528Z.nsys-rep
+    transpose_matrix_kernel: 77.314 ms / 200
+    fp32_to_f16_kernel: 68.082 ms / 400
+  Candidate:
+    target/nsys/attention_bwd_half_transpose_b8_l2d1024_20_20260619T212858Z.nsys-rep
+    f16_transpose_rows_kernel: 81.862 ms / 200
+    fp32_to_f16_kernel: 25.417 ms / 200
+  The local transpose/cast path improved by about 38.1 ms over 20 steps, but
+  total profiled runtime moved only about one percent.
+validation_result:
+  target/attention_bwd_half_transpose_b8_l2d1024_900s_20260619T212948Z.log
+  stopped_by_wall_clock=true elapsed_s=900.089 completed_steps=5641.
+  heldout_eval split=val val_loss=4.231810 train_elapsed_s=900.248
+  completed_steps=5641.
+comparison:
+  Current promoted baseline:
+    target/rope_preapply_b8_l2d1024_900s_20260619T203854Z.log
+    val_loss=4.224687, completed_steps=5577.
+  The candidate completed 64 more steps but validation loss was worse by
+  0.007123.
+decision:
+  Reverted the code change. Do not repeat this as an isolated same-math
+  attention-backward launch cleanup; the fixed-wall validation target did not
+  improve.
+```
+
+```text
+date: 2026-06-19
+commit: not committed
 experiment: Widen NVFP4 projection CTA from 32x32 to 32x64.
 status: rejected; fixed-wall validation loss regressed
 target:
