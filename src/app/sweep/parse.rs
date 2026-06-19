@@ -2,15 +2,21 @@
 pub struct RunResult {
     pub val_loss: Option<f64>,
     pub completed_steps: Option<usize>,
+    pub last_step: Option<usize>,
+    pub last_elapsed_s: Option<f64>,
+    pub last_train_loss: Option<f64>,
     pub saw_nan: bool,
 }
 
 impl RunResult {
     pub fn update(&mut self, line: &str) {
         if line.starts_with("step=") {
-            self.completed_steps = field(line, "step=")
-                .and_then(parse_usize)
-                .map(|step| step + 1);
+            if let Some(step) = field(line, "step=").and_then(parse_usize) {
+                self.last_step = Some(step);
+                self.completed_steps = Some(step + 1);
+            }
+            self.last_elapsed_s = field(line, "elapsed_s=").and_then(parse_f64);
+            self.last_train_loss = field(line, "loss=").and_then(parse_f64);
         }
         if line.contains("loss=NaN") || line.contains("finite=false") {
             self.saw_nan = true;

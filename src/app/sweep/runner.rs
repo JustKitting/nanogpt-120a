@@ -11,7 +11,9 @@ use super::{
     chain,
     config::SweepConfig,
     history::{self, History, Trial},
-    optimizer, run_build, run_train,
+    optimizer,
+    parse::RunResult,
+    run_build, run_train, status,
 };
 
 pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
@@ -48,7 +50,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
         );
         let trial_dir = sweep_dir.join(format!("trial_{index:04}"));
         println!("sweep_trial_begin index={index} key={}", candidate.key());
-        let trial = run_trial(&trial_dir, candidate, &config)?;
+        let trial = run_trial(index, &sweep_dir, &trial_dir, candidate, &config)?;
         println!(
             "sweep_trial_end index={index} status={} val_loss={} completed_steps={} log_path={}",
             trial.status,
@@ -83,32 +85,75 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_trial(
+    index: usize,
+    sweep_dir: &Path,
     trial_dir: &Path,
     candidate: Candidate,
     config: &SweepConfig,
 ) -> Result<Trial, Box<dyn std::error::Error>> {
     fs::create_dir_all(trial_dir)?;
     history::write_candidate(&trial_dir.join("candidate.env"), &candidate)?;
+    let mut run_result = RunResult::default();
+    status::record(
+        sweep_dir,
+        trial_dir,
+        index,
+        &candidate,
+        "trial_started",
+        &run_result,
+    )?;
     if config.dry_run {
+        status::record(
+            sweep_dir,
+            trial_dir,
+            index,
+            &candidate,
+            "dry_run",
+            &run_result,
+        )?;
         return Ok(trial(candidate, "dry_run", None, None, trial_dir));
     }
 
+    status::record(
+        sweep_dir,
+        trial_dir,
+        index,
+        &candidate,
+        "build_started",
+        &run_result,
+    )?;
     let build_status =
         run_build::build_candidate(&candidate, config, &trial_dir.join("build.log"))?;
     if !build_status.success() {
+        status::record(
+            sweep_dir,
+            trial_dir,
+            index,
+            &candidate,
+            "failed_build",
+            &run_result,
+        )?;
         return Ok(trial(candidate, "failed_build", None, None, trial_dir));
     }
 
-    let run_result = run_train::run_candidate(&candidate, config, trial_dir)?;
-    let status = match (run_result.val_loss, run_result.saw_nan) {
+    run_result = run_train::run_candidate(&candidate, config, sweep_dir, trial_dir, index)?;
+    let status_name = match (run_result.val_loss, run_result.saw_nan) {
         (Some(_), false) => "success",
         (Some(_), true) => "nan_with_val",
         (None, true) => "nan",
         (None, false) => "failed_run",
     };
+    status::record(
+        sweep_dir,
+        trial_dir,
+        index,
+        &candidate,
+        status_name,
+        &run_result,
+    )?;
     Ok(trial(
         candidate,
-        status,
+        status_name,
         run_result.val_loss,
         run_result.completed_steps,
         trial_dir,

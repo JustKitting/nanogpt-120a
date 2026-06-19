@@ -5,12 +5,14 @@ use std::{
     process::{Command, Stdio},
 };
 
-use super::{candidate::Candidate, config::SweepConfig, parse::RunResult};
+use super::{candidate::Candidate, config::SweepConfig, parse::RunResult, status};
 
 pub fn run_candidate(
     candidate: &Candidate,
     config: &SweepConfig,
+    sweep_dir: &Path,
     trial_dir: &Path,
+    trial_index: usize,
 ) -> std::io::Result<RunResult> {
     let mut log = File::create(trial_dir.join("train.log"))?;
     let mut command = Command::new("./target/release/rust-kernels");
@@ -29,12 +31,45 @@ pub fn run_candidate(
     let mut child = command.spawn()?;
     let stdout = child.stdout.take().expect("stdout must be piped");
     let mut result = RunResult::default();
+    status::record(
+        sweep_dir,
+        trial_dir,
+        trial_index,
+        candidate,
+        "training_started",
+        &result,
+    )?;
     for line in BufReader::new(stdout).lines() {
         let line = line?;
+        let previous_steps = result.completed_steps;
+        let previous_val_loss = result.val_loss;
         result.update(&line);
+        println!("{line}");
         writeln!(log, "{line}")?;
+        if result.completed_steps != previous_steps
+            || result.val_loss != previous_val_loss
+            || result.saw_nan
+        {
+            status::record(
+                sweep_dir,
+                trial_dir,
+                trial_index,
+                candidate,
+                "training_progress",
+                &result,
+            )?;
+        }
         if result.saw_nan {
             writeln!(log, "sweep_early_stop=nan_detected")?;
+            println!("sweep_early_stop=nan_detected");
+            status::record(
+                sweep_dir,
+                trial_dir,
+                trial_index,
+                candidate,
+                "nan_detected",
+                &result,
+            )?;
             let _ = child.kill();
             break;
         }
@@ -45,5 +80,13 @@ pub fn run_candidate(
         }
     }
     child.wait()?;
+    status::record(
+        sweep_dir,
+        trial_dir,
+        trial_index,
+        candidate,
+        "training_exited",
+        &result,
+    )?;
     Ok(result)
 }

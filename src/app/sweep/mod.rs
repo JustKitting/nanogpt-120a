@@ -9,6 +9,7 @@ mod rng;
 mod run_build;
 mod run_train;
 mod runner;
+mod status;
 mod trial_row;
 
 #[cfg(test)]
