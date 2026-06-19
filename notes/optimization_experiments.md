@@ -30,6 +30,83 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Same-tokenizer architecture cut from 8 layers to 4 layers.
+status: success, keep L4 for current five-minute validation target
+decision:
+  Keep GPT2_N_LAYER=4 for the current Shakespeare five-minute optimization
+  loop. This does not change tokenizer, dataset, sequence length, width, MLP
+  size, batch size, or optimizer. It reduces the number of transformer blocks
+  and therefore the number of Aurora-updated matrix weights.
+motivation:
+  Current B4 L8 nsys showed Aurora dominating GPU kernel time:
+    target/nsys/current_b4_20_20260619T040750Z_kernel_sum.csv
+    aurora_mega_update_cooperative_kernel 10.401s total over 20 steps,
+    520.032ms avg, 65.0% of GPU kernel time.
+  Layer count directly multiplies QKV, c_proj, MLP up, and MLP down matrix
+  updates, so reducing depth is an architecture-level way to improve useful
+  optimizer steps per fixed wall-clock budget while preserving the tokenizer.
+result:
+  Previous L8 B4 default:
+    target/fixed_time_val_wide1536_l8_b4_default_lr1p5_300s_20260619T034639Z.log
+    completed_steps=373
+    heldout_eval split=val val_loss=5.219253 train_elapsed_s=301.241
+  New L4 B4 fixed 300-second run:
+    target/fixed_time_val_wide1536_l4_b4_300s_20260619T042125Z.log
+    completed_steps=540
+    heldout_eval split=val val_loss=5.098733 train_elapsed_s=300.616
+quality:
+  The run was finite=true and nonzero=true at every logged step.
+  This is a real held-out validation improvement at the same wall-clock budget,
+  not a throughput-only result.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  L4 300-second direct GPU run: pass.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Current B4 nsys profile and rejected Aurora geometry tests.
+status: no code change kept
+decision:
+  Do not change Aurora phase geometry from the current 180 blocks and 16
+  phases. The attempted lower-barrier schedules made the dominant optimizer
+  kernel slower.
+current_profile:
+  Current B4 20-step nsys:
+    target/nsys/current_b4_20_20260619T040750Z.nsys-rep
+    target/nsys/current_b4_20_20260619T040750Z_kernel_sum.csv
+    aurora_mega_update_cooperative_kernel 10.401s total, 520.032ms avg,
+    65.0% of GPU kernel time.
+  Next largest kernels in that profile:
+    linear_backward_projection_cta_device_scale_kernel 1.243s total.
+    fp32_to_nvfp4_ms_eden_device_scale_kernel 0.955s total.
+    causal_attention_kernel 0.577s total.
+rejected:
+  AURORA_MATRIX_PHASES=8 with 180 blocks failed launch:
+    target/aurora_phase8_b4_20_20260619T040928Z.log
+    DriverError(720, "too many blocks in cooperative launch")
+  AURORA_MATRIX_PHASES=8 with 90 blocks launched but was slower:
+    target/nsys/aurora_phase8_blocks90_b4_20_20260619T040953Z_kernel_sum.csv
+    aurora_mega_update_cooperative_kernel 12.017s total, 600.849ms avg.
+  AURORA_ACTIVE_MATRICES=3 with 120 blocks required an inactive-barrier path
+  for partial final phases and passed the serial Aurora recurrence tests, but
+  was slower:
+    target/nsys/aurora_active3_blocks120_b4_20_20260619T041708Z_kernel_sum.csv
+    aurora_mega_update_cooperative_kernel 11.859s total, 592.963ms avg.
+  AURORA_ACTIVE_MATRICES=2 with 120 blocks was slower:
+    target/nsys/aurora_active2_blocks120_b4_20_20260619T041757Z_kernel_sum.csv
+    aurora_mega_update_cooperative_kernel 14.636s total, 731.778ms avg.
+notes:
+  The failed active-matrix support code was reverted. The next useful speed
+  work should target algorithmic kernel cost, not more Aurora launch geometry.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Fixed 5-minute LR-scale comparison for wide Llama 2 B4.
 status: TRAIN_LR_SCALE=1.5 wins among tested default, 1.5, and 2.0.
 decision:
