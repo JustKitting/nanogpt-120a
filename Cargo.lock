@@ -2850,6 +2850,7 @@ dependencies = [
 name = "rust-kernels"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "cuda-core",
  "gpt2-nvfp4",
  "llama2-tokenizer",

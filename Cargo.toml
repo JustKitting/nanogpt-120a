@@ -13,6 +13,7 @@ members = [
 resolver = "3"
 
 [dependencies]
+clap = { version = "4.5", features = ["derive"] }
 cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git", branch = "main" }
 synth-prep = { path = "crates/synth-prep" }
 llama2-tokenizer = { path = "crates/llama2-tokenizer" }
