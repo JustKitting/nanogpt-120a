@@ -30,6 +30,94 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-19
+commit: not committed
+experiment: Add fixed-budget cosine LR decay.
+status: rejected at fixed-wall validation
+target:
+  Replace warmup-only LR multipliers with warmup plus cosine decay to
+  min_ratio=0.1. The decay endpoint was read from the promoted baseline's
+  COMPLETED_STEPS instead of TRAIN_STEPS, so changing a run cap would not alter
+  the schedule. Adam and Aurora used the same multiplier, and the
+  schedule-free averaging weight used the decayed multiplier as well.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+sustained_check:
+  target/cosine_decay_schedule_100step_synth_20260619T230340Z.log
+  heldout_eval val_loss=6.882954 at 100 steps; finite and nonzero.
+  The progress log confirmed decay was active:
+    step 99 adam_lr=3.958472e-4 aurora_lr=1.013410e-4.
+validation_result:
+  target/cosine_decay_schedule_b8_l2d1024_900s_20260619T230408Z.log
+  stopped_by_wall_clock=true elapsed_s=900.101 completed_steps=5677.
+  heldout_eval split=val val_loss=4.582866 train_elapsed_s=900.259
+  completed_steps=5677.
+comparison:
+  Current promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The cosine schedule completed 6 fewer steps and validation loss regressed by
+  0.452913. It undertrained the current AMUSE/Aurora setup over the 15-minute
+  SYNTH budget.
+decision:
+  Reverted the code. Do not promote or commit this schedule.
+```
+
+```text
+date: 2026-06-19
+commit: not committed
+experiment: Add aligned no-bounds CTA projection fast path.
+status: rejected at fixed-wall validation
+target:
+  Remove inner row/column/K bounds checks from the shared NVFP4 CTA projection
+  path when token_count, input_dim, and output_dim are exact multiples of the
+  CTA M/N/K tile sizes. Route linear backward and LM head through the aligned
+  entry points for the current B8 L2 d1024 h16 shape.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head --
+  --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+  --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward
+  -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward
+  -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward
+  -- --ignored --nocapture: pass.
+sustained_check:
+  target/projection_cta_aligned_100step_synth_20260619T224449Z.log
+  heldout_eval val_loss=6.882009 at 100 steps; finite and nonzero.
+profile_effect:
+  Baseline:
+    target/nsys/f16_staged_attention_bwd_cleanup_kernel_sum.csv
+    linear_backward_projection_cta_device_scale_kernel: 521.094 ms / 360
+    lm_head_kernel: 138.648 ms / 21
+  Candidate:
+    target/nsys/projection_cta_aligned_b8_l2d1024_20_20260619T224511Z.nsys-rep
+    linear_backward_projection_cta_aligned_device_scale_kernel: 471.774 ms / 360
+    lm_head_aligned_kernel: 131.170 ms / 21
+    total kernel time: 3064.753 ms vs baseline 3117.344 ms
+validation_result:
+  target/projection_cta_aligned_b8_l2d1024_900s_20260619T224543Z.log
+  stopped_by_wall_clock=true elapsed_s=900.153 completed_steps=5781.
+  heldout_eval split=val val_loss=4.149405 train_elapsed_s=900.309
+  completed_steps=5781.
+comparison:
+  Current promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The candidate completed 98 more steps but validation loss regressed by
+  0.019452, so it fails the fixed-wall objective.
+decision:
+  Reverted the code. Do not promote or commit this change.
+```
+
+```text
+date: 2026-06-19
 commit: this commit
 experiment: Stage attention-backward FP32 operands as FP16 inside the TC tile load.
 status: validated and promoted
