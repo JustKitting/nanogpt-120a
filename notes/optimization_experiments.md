@@ -31,6 +31,42 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: not committed
+experiment: Fuse Aurora momentum/orientation with Polar Express norm chunks.
+status: rejected at profile gate; no meaningful Aurora speedup
+target:
+  Avoid one full read/reduction pass over each Aurora matrix by accumulating
+  the Nesterov/oriented Frobenius norm chunks while writing the oriented matrix,
+  then starting Polar Express normalization from those chunks.
+code_change_tested:
+  Replaced momentum_orient with momentum_orient_sum, removed the separate
+  normalize_source_to_x summation entry point, and routed Polar Express through
+  a pre-summed-source entry point.
+correctness_checks:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer --
+  --ignored --nocapture: pass.
+sustained_check:
+  target/aurora_norm_fused_100step_synth_20260619T215021Z.log
+  heldout_eval val_loss=7.386400 at 100 steps; finite and nonzero.
+profile_effect:
+  Baseline:
+    target/nsys/rope_preapply_b8_l2d1024_20_20260619T203528Z.nsys-rep
+    aurora_mega_update_cooperative_kernel: 969.237 ms / 20
+  Candidate:
+    target/nsys/aurora_norm_fused_b8_l2d1024_20_20260619T215048Z.nsys-rep
+    aurora_mega_update_cooperative_kernel: 968.412 ms / 20
+  Aurora improved by only 0.825 ms over 20 steps, and short wall-clock timing
+  was slightly worse.
+decision:
+  Reverted the code change. Do not run a 900-second validation for this isolated
+  change; the profile effect is too small to matter for the fixed-wall
+  validation objective.
+```
+
+```text
+date: 2026-06-19
+commit: not committed
 experiment: Fuse attention-backward FP32 transpose plus FP16 cast.
 status: rejected; fixed-wall validation loss regressed
 target:
