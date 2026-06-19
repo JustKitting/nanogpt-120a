@@ -30,6 +30,54 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-19
+commit: not committed
+experiment: Widen NVFP4 projection CTA from 32x32 to 32x64.
+status: rejected; fixed-wall validation loss regressed
+target:
+  Reduce CTA count and improve A-tile reuse for large projection outputs,
+  especially linear_backward_projection_cta_device_scale_kernel and
+  lm_head_kernel, without changing training math.
+code_change_tested:
+  crates/cuda-kernels/src/utils/mma/projection_cta/tile.rs changed
+  NVFP4_PROJECTION_CTA_N from 32 to 64 and derived a 512-thread, 16-warp
+  mapping from N / 8.
+correctness_checks:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head --
+  --ignored --nocapture: pass.
+profile_effect:
+  Baseline:
+    target/nsys/rope_preapply_b8_l2d1024_20_20260619T203528Z.nsys-rep
+    linear_backward_projection_cta_device_scale_kernel: 496.495 ms / 360
+    lm_head_kernel: 132.395 ms / 21
+  N=64 candidate:
+    target/nsys/projection_cta_n64_b8_l2d1024_20_20260619T210050Z.nsys-rep
+    linear_backward_projection_cta_device_scale_kernel: 431.362 ms / 360
+    lm_head_kernel: 112.262 ms / 21
+  Short-profile runtime improved, and the 100-step safety run stayed finite:
+    target/projection_cta_n64_100step_synth_20260619T210027Z.log
+    heldout_eval val_loss=7.387764 at 100 steps.
+validation_result:
+  target/projection_cta_n64_b8_l2d1024_900s_20260619T210117Z.log
+  stopped_by_wall_clock=true elapsed_s=900.113 completed_steps=5755.
+  heldout_eval split=val val_loss=4.240527 train_elapsed_s=900.269
+  completed_steps=5755.
+comparison:
+  Current promoted baseline:
+    target/rope_preapply_b8_l2d1024_900s_20260619T203854Z.log
+    val_loss=4.224687, completed_steps=5577.
+  N=64 completed 178 more steps but validation loss was worse by 0.015840.
+decision:
+  Revert the tile change. Do not repeat this as a same-math optimization unless
+  paired with a substantive projection-kernel redesign that changes the
+  validation result, not just isolated kernel time.
+```
+
+```text
+date: 2026-06-19
 commit: 002a9e82
 experiment: Pre-apply RoPE to Q/K once after QKV projection.
 status: validated and promoted
