@@ -28,10 +28,7 @@ fn main() -> AppResult {
     let mut logger = TrainingLogger::new();
     let wall_clock = app::wall_clock::WallClockBudget::new(config.max_seconds);
     let validation_tokens = data.validation_tokens()?;
-    let validation_batch = trainer.batch_from_windows(
-        &validation_tokens,
-        TokenDataLoader::validation_window_count(),
-    )?;
+    let validation_window_count = TokenDataLoader::validation_window_count();
 
     run_output.write_info(&app::run_info::build(&dataset, &config))?;
     println!(
@@ -63,7 +60,8 @@ fn main() -> AppResult {
             );
         }
         if app::config::should_eval_step(step, config.step_cap, config.eval_interval) {
-            let val_loss = trainer.eval_loss(&validation_batch)?;
+            let val_loss =
+                trainer.eval_loss_windows(&validation_tokens, validation_window_count)?;
             println!("eval step={step} val_loss={val_loss:.6}");
         }
         app::logging::log_diagnostics(step, &stats);
@@ -80,7 +78,7 @@ fn main() -> AppResult {
     let train_elapsed_s = wall_clock.elapsed_seconds();
 
     let eval_start = std::time::Instant::now();
-    let val_loss = trainer.eval_loss(&validation_batch)?;
+    let val_loss = trainer.eval_loss_windows(&validation_tokens, validation_window_count)?;
     let eval_elapsed_s = eval_start.elapsed().as_secs_f64();
     println!(
         "heldout_eval split=val val_loss={val_loss:.6} train_elapsed_s={train_elapsed_s:.3} eval_elapsed_s={eval_elapsed_s:.3} completed_steps={completed_steps}",

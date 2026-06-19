@@ -30,6 +30,66 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Fixed 5-minute validation-loss comparison for wide Llama 2 B3.
+status: valid run, worse than B4
+decision:
+  Do not keep B3 as the current candidate. B4 remains best among B2, B3, B4,
+  and B8 on the fixed 300-second held-out validation metric.
+changes:
+  GPT2_BATCH_SIZE changed from 2 to 3 for the experiment. Chunked validation
+  remained enabled so the same four held-out windows were evaluated.
+result:
+  B3 300-second run:
+    target/fixed_time_val_wide1536_l8_b3_300s_20260619T032748Z.log
+    completed_steps=407
+    heldout_eval split=val val_loss=5.371977 train_elapsed_s=300.955
+comparison:
+  B4 fixed 300-second val_loss=5.335806.
+  B3 fixed 300-second val_loss=5.371977.
+  B2 fixed 300-second val_loss=5.394615.
+  B8 fixed 300-second val_loss=5.438506.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  B3 300-second direct GPU run: pass.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Fixed 5-minute validation-loss comparison for wide Llama 2 B2.
+status: valid run after chunked validation fix, worse than B4
+decision:
+  Do not keep B2 as the current candidate. It beats B8 on this run but does not
+  beat B4 on held-out validation loss at the same 300-second budget.
+changes:
+  Validation now evaluates the fixed four-window held-out slice in chunks no
+  larger than GPT2_BATCH_SIZE. This avoids overflowing fixed GPU buffers when
+  the training batch size is below the held-out window count.
+  GPT2_BATCH_SIZE changed from 4 to 2 for the experiment.
+result:
+  Initial B2 run trained to the wall-clock stop but failed final validation:
+    target/fixed_time_val_wide1536_l8_b2_300s_20260619T031557Z.log
+    DriverError(700, "an illegal memory access was encountered")
+  B2 rerun after chunked validation:
+    target/fixed_time_val_wide1536_l8_b2_300s_chunkedval_20260619T032212Z.log
+    completed_steps=450
+    heldout_eval split=val val_loss=5.394615 train_elapsed_s=300.692
+comparison:
+  B4 fixed 300-second val_loss=5.335806.
+  B8 fixed 300-second val_loss=5.438506.
+  B2 lands between B4 and B8, so B4 remains best among tested batch sizes.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  B2 300-second direct GPU run with chunked validation: pass.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Fixed 5-minute validation-loss comparison for wide Llama 2 B4 vs B8.
 status: B4 wins this fixed-wall-clock validation run
 decision:
