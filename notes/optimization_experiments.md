@@ -30,9 +30,9 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-19
-commit: uncommitted
+commit: 002a9e82
 experiment: Pre-apply RoPE to Q/K once after QKV projection.
-status: kept
+status: validated and promoted
 measured_effect:
   Before:
     target/nsys/direct_all_linear_operands_b8_l2d1024_20_20260619T200422Z.nsys-rep
@@ -43,10 +43,20 @@ measured_effect:
     apply_rope_kernel: 0.789 ms / 42 launches
   Net attention-side reduction: about 33.2 ms over 20 training steps.
 stability_effect:
-  100-step SYNTH check stayed finite and nonzero.
+  100-step SYNTH check stayed finite and nonzero:
+    target/rope_prequest_100step_synth_20260619T203459Z.log
+    heldout_eval val_loss=7.381578 at 100 steps.
 validation_result:
-  target/rope_prequest_100step_synth_20260619T203459Z.log
-  heldout_eval val_loss=7.381578 at 100 steps.
+  target/rope_preapply_b8_l2d1024_900s_20260619T203854Z.log
+  stopped_by_wall_clock=true elapsed_s=900.085 completed_steps=5577.
+  heldout_eval split=val val_loss=4.224687 train_elapsed_s=900.245
+  completed_steps=5577.
+comparison:
+  Previous promoted baseline was:
+    target/rowwise_direct_input_t_b8_l2d1024_900s_20260619T194141Z.log
+    val_loss=4.238420, completed_steps=5503.
+  RoPE pre-apply improves held-out validation loss by 0.013733 and completes
+  74 more steps under the same 900-second wall-clock budget.
 implementation:
   Q and K in the saved qkv activation buffer are now post-RoPE; V is unchanged.
   The forward causal attention kernel reads Q/K directly. The TC backward gather
