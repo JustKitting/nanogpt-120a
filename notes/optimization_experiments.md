@@ -30,6 +30,43 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Fixed 5-minute LR-scale comparison for wide Llama 2 B4.
+status: TRAIN_LR_SCALE=1.5 wins among tested default, 1.5, and 2.0.
+decision:
+  Set the default shared LR multiplier to 1.5. It improved held-out validation
+  loss at the same 300-second budget without reducing completed steps.
+changes:
+  Tested B4 wide shape with TRAIN_LR_SCALE=1.5 and TRAIN_LR_SCALE=2.0.
+  The code default is now 1.5 while TRAIN_LR_SCALE remains an explicit override.
+result:
+  Default scale 1.0:
+    target/fixed_time_val_wide1536_l8_b4_300s_20260619T025909Z.log
+    completed_steps=372
+    heldout_eval split=val val_loss=5.335806 train_elapsed_s=301.131
+  TRAIN_LR_SCALE=1.5:
+    target/fixed_time_val_wide1536_l8_b4_lr1p5_300s_20260619T033539Z.log
+    completed_steps=373
+    heldout_eval split=val val_loss=5.220257 train_elapsed_s=300.787
+  TRAIN_LR_SCALE=2.0:
+    target/fixed_time_val_wide1536_l8_b4_lr2p0_300s_20260619T034049Z.log
+    completed_steps=372
+    heldout_eval split=val val_loss=5.264327 train_elapsed_s=300.986
+  New default scale 1.5, no TRAIN_LR_SCALE override:
+    target/fixed_time_val_wide1536_l8_b4_default_lr1p5_300s_20260619T034639Z.log
+    completed_steps=373
+    heldout_eval split=val val_loss=5.219253 train_elapsed_s=301.241
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  All fixed-time GPU runs completed with finite=true and nonzero=true in the
+  logged steps. The final run used no TRAIN_LR_SCALE override and reported
+  adam_lr=6e-5 and aurora_lr=3e-5 at step 0, confirming the default path.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Fixed 5-minute validation-loss comparison for wide Llama 2 B3.
 status: valid run, worse than B4
 decision:

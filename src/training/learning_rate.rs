@@ -4,12 +4,13 @@ const TRAIN_LR_WARMUP_STEPS_ENV: &str = "TRAIN_LR_WARMUP_STEPS";
 const TRAIN_LR_START_RATIO_ENV: &str = "TRAIN_LR_START_RATIO";
 const TRAIN_AMUSE_BETA1_ENV: &str = "TRAIN_AMUSE_BETA1";
 const TRAIN_AMUSE_RHO_ENV: &str = "TRAIN_AMUSE_RHO";
+const DEFAULT_LR_SCALE: f32 = 1.5;
 const DEFAULT_LR_WARMUP_STEPS: u32 = 5;
 const AMUSE_AVERAGE_R: f32 = 0.0;
 const AMUSE_WEIGHT_LR_POWER: f32 = 2.0;
 
 pub(super) fn scale() -> f32 {
-    scale_from(TRAIN_LR_SCALE_ENV).unwrap_or(1.0)
+    scale_from(TRAIN_LR_SCALE_ENV).unwrap_or(DEFAULT_LR_SCALE)
 }
 
 pub(super) fn adam_scale() -> f32 {
