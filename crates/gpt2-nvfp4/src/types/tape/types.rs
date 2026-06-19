@@ -7,7 +7,6 @@ pub struct Gpt2ForwardTape<'a> {
     pub blocks: [BlockForwardTape<'a>; GPT2_N_LAYER],
     pub final_norm: LayerNormTape<'a>,
     pub lm_head_input_nvfp4: RowwiseNvfp4Tape<'a>,
-    pub logits: &'a mut DeviceBuffer<f32>,
 }
 
 pub struct BlockForwardTape<'a> {

@@ -78,10 +78,6 @@ pub(super) fn finish_forward<'a>(
         vocab_size: crate::GPT2_VOCAB_SIZE as u32,
     })?;
 
-    if let Some(tape) = tape.as_mut() {
-        tape.save_logits(stream, args.logits)?;
-    }
-
     Ok(HiddenStateDevice {
         stream,
         batch_size,

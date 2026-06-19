@@ -8,6 +8,7 @@ impl<'a> Gpt2ForwardTape<'a> {
     pub fn saved<'t>(
         &'t self,
         tokens: &'t DeviceBuffer<u32>,
+        logits: &'t DeviceBuffer<f32>,
         batch_size: u32,
         seq_len: u32,
         row_count: u32,
@@ -23,7 +24,7 @@ impl<'a> Gpt2ForwardTape<'a> {
             }),
             final_norm: self.final_norm.saved(row_count),
             lm_head_input_nvfp4: self.lm_head_input_nvfp4.saved(),
-            logits: &*self.logits,
+            logits,
         }
     }
 
@@ -37,13 +38,5 @@ impl<'a> Gpt2ForwardTape<'a> {
         residual: &DeviceBuffer<f32>,
     ) -> Result<(), DriverError> {
         copy_device(stream, residual, self.embedding_residual)
-    }
-
-    pub(crate) fn save_logits(
-        &mut self,
-        stream: &CudaStream,
-        logits: &DeviceBuffer<f32>,
-    ) -> Result<(), DriverError> {
-        copy_device(stream, logits, self.logits)
     }
 }

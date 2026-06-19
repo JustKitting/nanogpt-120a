@@ -2,8 +2,9 @@ use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use rust_kernels_cuda::linear_backward::{
-    LinearBackwardArgs, LinearBackwardModule, LinearBackwardMsEdenArgs,
-    LinearBackwardMsEdenScratch, MsEdenOperandScratch,
+    LinearBackwardArgs, LinearBackwardInputTranspose, LinearBackwardModule,
+    LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratch, LinearBackwardWeightTranspose,
+    MsEdenOperandScratch,
 };
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
@@ -125,12 +126,10 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
 
     let e = patterned_matrix(TOKEN_COUNT, OUTPUT_DIM, 0.015625);
     let weight_t = patterned_matrix(INPUT_DIM, OUTPUT_DIM, 0.03125);
-    let e_t = patterned_matrix(OUTPUT_DIM, TOKEN_COUNT, 0.015625);
     let input_t = patterned_matrix(INPUT_DIM, TOKEN_COUNT, 0.03125);
 
     let e_dev = DeviceBuffer::from_host(&stream, &e)?;
     let weight_t_dev = DeviceBuffer::from_host(&stream, &weight_t)?;
-    let e_t_dev = DeviceBuffer::from_host(&stream, &e_t)?;
     let input_t_dev = DeviceBuffer::from_host(&stream, &input_t)?;
 
     let mut e_bytes = DeviceBuffer::<u8>::zeroed(&stream, TOKEN_COUNT * OUTPUT_DIM / 2)?;
@@ -167,9 +166,8 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
         stream: &stream,
         quant_module: &quant_module,
         e: &e_dev,
-        weight_t: &weight_t_dev,
-        e_t: &e_t_dev,
-        input_t: &input_t_dev,
+        weight_t: LinearBackwardWeightTranspose::Fp32(&weight_t_dev),
+        input_t: LinearBackwardInputTranspose::Fp32(&input_t_dev),
         scratch: LinearBackwardMsEdenScratch {
             e_h: MsEdenOperandScratch {
                 bytes: &mut e_bytes,

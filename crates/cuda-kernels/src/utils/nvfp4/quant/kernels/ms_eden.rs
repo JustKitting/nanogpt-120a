@@ -1,6 +1,8 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
+use crate::amax::{amax4_f32, max4_f32};
 use crate::float_ptx::{abs_f32, max_f32};
+use crate::nvfp4::{nvfp4_rowwise_value, nvfp4_value};
 use crate::nvfp4_cast::{e2m1_value, e4m3_value};
 use crate::quartet::{
     QUARTET_MS_EDEN_FP4_MAX, QUARTET_MS_EDEN_FP8_MAX, QUARTET_MS_EDEN_SCALE_OVERRIDE,
@@ -8,6 +10,7 @@ use crate::quartet::{
 use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32, warp_max_f32};
 
 use super::convert::{cvt_rn_satfinite_e2m1x2_f32, cvt_rn_satfinite_e4m3x2_f32};
+use super::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK;
 
 #[allow(static_mut_refs)]
 #[cuda_module]
@@ -47,6 +50,8 @@ pub(crate) mod module {
             &mut out_chunk_amax,
             src_row_len,
             dst_row_len,
+            src_row_len,
+            0,
             global_scale,
             scale_override,
             sign_seed,
@@ -77,9 +82,254 @@ pub(crate) mod module {
             &mut out_chunk_amax,
             src_row_len,
             dst_row_len,
+            src_row_len,
+            0,
             global_scale[0],
             scale_override,
             sign_seed,
+            scale_seed,
+        );
+    }
+
+    #[kernel]
+    #[allow(clippy::too_many_arguments)]
+    pub fn fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel(
+        x: &[f32],
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        mut out_chunk_amax: DisjointSlice<f32>,
+        global_scale: &[f32],
+        source_rows: u32,
+        source_cols: u32,
+        dst_row_len: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        fp32_to_nvfp4_ms_eden_body(
+            x,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            &mut out_chunk_amax,
+            source_rows,
+            dst_row_len,
+            source_cols,
+            1,
+            global_scale[0],
+            scale_override,
+            sign_seed,
+            scale_seed,
+        );
+    }
+
+    #[kernel]
+    pub fn rowwise_nvfp4_chunk_amax_kernel(
+        bytes: &[u8],
+        scales: &[u8],
+        global_scales: &[f32],
+        mut out: DisjointSlice<f32>,
+        rows: u32,
+        cols: u32,
+    ) {
+        let chunk = thread::blockIdx_x();
+        let thread = thread::threadIdx_x();
+        let lane = warp::lane_id();
+        let warp_in_block = thread / 32;
+        let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
+        let element_count = rows * cols;
+        let stride = thread::blockDim_x();
+        let i0 = base + thread;
+        let i1 = i0 + stride;
+        let i2 = i1 + stride;
+        let i3 = i2 + stride;
+
+        let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
+            amax4_f32(
+                rowwise_value_at(bytes, scales, global_scales, cols, i0),
+                rowwise_value_at(bytes, scales, global_scales, cols, i1),
+                rowwise_value_at(bytes, scales, global_scales, cols, i2),
+                rowwise_value_at(bytes, scales, global_scales, cols, i3),
+            )
+        } else {
+            max4_f32(
+                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i0, element_count),
+                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i1, element_count),
+                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i2, element_count),
+                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i3, element_count),
+            )
+        };
+
+        let warp_amax = warp_max_f32(local_amax);
+        if lane == 0 {
+            unsafe {
+                AMAX_REDUCE[warp_in_block as usize] = warp_amax;
+            }
+        }
+
+        thread::sync_threads();
+
+        if warp_in_block == 0 {
+            let partial = if lane < AMAX_WARPS_PER_BLOCK {
+                unsafe { AMAX_REDUCE[lane as usize] }
+            } else {
+                0.0
+            };
+            let block_amax = warp_max_f32(partial);
+            if lane == 0 {
+                unsafe {
+                    *out.get_unchecked_mut(chunk as usize) = block_amax;
+                }
+            }
+        }
+    }
+
+    #[kernel]
+    pub fn nvfp4_chunk_amax_kernel(
+        bytes: &[u8],
+        scales: &[u8],
+        global_scale: &[f32],
+        mut out: DisjointSlice<f32>,
+        element_count: u32,
+    ) {
+        let chunk = thread::blockIdx_x();
+        let thread = thread::threadIdx_x();
+        let lane = warp::lane_id();
+        let warp_in_block = thread / 32;
+        let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
+        let stride = thread::blockDim_x();
+        let i0 = base + thread;
+        let i1 = i0 + stride;
+        let i2 = i1 + stride;
+        let i3 = i2 + stride;
+
+        let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
+            amax4_f32(
+                nvfp4_value_at(bytes, scales, global_scale, i0),
+                nvfp4_value_at(bytes, scales, global_scale, i1),
+                nvfp4_value_at(bytes, scales, global_scale, i2),
+                nvfp4_value_at(bytes, scales, global_scale, i3),
+            )
+        } else {
+            max4_f32(
+                checked_nvfp4_abs_value(bytes, scales, global_scale, i0, element_count),
+                checked_nvfp4_abs_value(bytes, scales, global_scale, i1, element_count),
+                checked_nvfp4_abs_value(bytes, scales, global_scale, i2, element_count),
+                checked_nvfp4_abs_value(bytes, scales, global_scale, i3, element_count),
+            )
+        };
+
+        let warp_amax = warp_max_f32(local_amax);
+        if lane == 0 {
+            unsafe {
+                AMAX_REDUCE[warp_in_block as usize] = warp_amax;
+            }
+        }
+
+        thread::sync_threads();
+
+        if warp_in_block == 0 {
+            let partial = if lane < AMAX_WARPS_PER_BLOCK {
+                unsafe { AMAX_REDUCE[lane as usize] }
+            } else {
+                0.0
+            };
+            let block_amax = warp_max_f32(partial);
+            if lane == 0 {
+                unsafe {
+                    *out.get_unchecked_mut(chunk as usize) = block_amax;
+                }
+            }
+        }
+    }
+
+    #[kernel]
+    #[allow(clippy::too_many_arguments)]
+    pub fn nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
+        bytes: &[u8],
+        scales: &[u8],
+        source_global_scale: &[f32],
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        mut out_chunk_amax: DisjointSlice<f32>,
+        global_scale: &[f32],
+        source_rows: u32,
+        source_cols: u32,
+        dst_row_len: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        let lane = warp::lane_id();
+        let chunk = thread::blockIdx_x();
+        let chunk_base = chunk * HADAMARD_DIM;
+        let input = nvfp4_transposed_hadamard_input(
+            bytes,
+            scales,
+            source_global_scale,
+            chunk_base,
+            lane,
+            source_rows,
+            source_cols,
+            dst_row_len,
+            sign_seed,
+        );
+        ms_eden_pack_chunk(
+            input,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            &mut out_chunk_amax,
+            dst_row_len,
+            global_scale[0],
+            scale_override,
+            scale_seed,
+        );
+    }
+
+    #[kernel]
+    #[allow(clippy::too_many_arguments)]
+    pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
+        bytes: &[u8],
+        scales: &[u8],
+        source_global_scales: &[f32],
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        mut out_chunk_amax: DisjointSlice<f32>,
+        global_scale: &[f32],
+        source_rows: u32,
+        source_cols: u32,
+        dst_row_len: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        let lane = warp::lane_id();
+        let chunk = thread::blockIdx_x();
+        let chunk_base = chunk * HADAMARD_DIM;
+        let input = rowwise_transposed_hadamard_input(
+            bytes,
+            scales,
+            source_global_scales,
+            chunk_base,
+            lane,
+            source_rows,
+            source_cols,
+            dst_row_len,
+            sign_seed,
+        );
+        ms_eden_pack_chunk(
+            input,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            &mut out_chunk_amax,
+            dst_row_len,
+            global_scale[0],
+            scale_override,
             scale_seed,
         );
     }
@@ -141,9 +391,51 @@ pub(crate) mod module {
         out_chunk_amax: &mut DisjointSlice<'_, f32>,
         src_row_len: u32,
         dst_row_len: u32,
+        source_cols: u32,
+        transpose_source: u32,
         global_scale: f32,
         scale_override: f32,
         sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        let lane = warp::lane_id();
+        let chunk = thread::blockIdx_x();
+        let chunk_base = chunk * HADAMARD_DIM;
+
+        let input = hadamard_input(
+            x,
+            chunk_base,
+            lane,
+            src_row_len,
+            dst_row_len,
+            source_cols,
+            transpose_source,
+            sign_seed,
+        );
+        ms_eden_pack_chunk(
+            input,
+            out_fp4,
+            out_scales,
+            out_global_scales,
+            out_chunk_amax,
+            dst_row_len,
+            global_scale,
+            scale_override,
+            scale_seed,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn ms_eden_pack_chunk(
+        input: f32,
+        out_fp4: &mut DisjointSlice<'_, u8>,
+        out_scales: &mut DisjointSlice<'_, u8>,
+        out_global_scales: &mut DisjointSlice<'_, f32>,
+        out_chunk_amax: &mut DisjointSlice<'_, f32>,
+        dst_row_len: u32,
+        global_scale: f32,
+        scale_override: f32,
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
@@ -153,11 +445,11 @@ pub(crate) mod module {
         let row = element / dst_row_len;
         let row_offset = element - row * dst_row_len;
 
-        let value = hadamard_value(x, chunk_base, lane, src_row_len, dst_row_len, sign_seed);
         unsafe {
-            ROTATED[lane as usize] = value;
+            ROTATED[lane as usize] = input;
         }
         thread::sync_threads();
+        let value = hadamard_transform_lane(lane);
 
         if row_offset == 0 {
             unsafe {
@@ -221,46 +513,167 @@ pub(crate) mod module {
     }
 
     #[inline(always)]
-    fn hadamard_value(
-        x: &[f32],
+    fn nvfp4_value_at(bytes: &[u8], scales: &[u8], global_scale: &[f32], index: u32) -> f32 {
+        nvfp4_value(bytes, scales, global_scale[0], index as usize)
+    }
+
+    #[inline(always)]
+    fn checked_nvfp4_abs_value(
+        bytes: &[u8],
+        scales: &[u8],
+        global_scale: &[f32],
+        index: u32,
+        element_count: u32,
+    ) -> f32 {
+        if index < element_count {
+            abs_f32(nvfp4_value_at(bytes, scales, global_scale, index))
+        } else {
+            0.0
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn nvfp4_transposed_hadamard_input(
+        bytes: &[u8],
+        scales: &[u8],
+        global_scale: &[f32],
         chunk_base: u32,
         lane: u32,
-        src_row_len: u32,
+        source_rows: u32,
+        source_cols: u32,
         dst_row_len: u32,
         seed: u32,
     ) -> f32 {
         let row = chunk_base / dst_row_len;
         let row_base = row * dst_row_len;
         let chunk_in_row = chunk_base - row_base;
-        let mut sum = 0.0_f32;
-        let mut col = 0;
-        while col < HADAMARD_DIM {
-            let input_col = chunk_in_row + col;
-            let input = if input_col < src_row_len {
-                x[(row * src_row_len + input_col) as usize]
-            } else {
-                0.0
-            };
-            let sign = hadamard_sign(col, lane) * random_sign(seed, chunk_in_row + col);
-            sum += input * sign;
-            col += 1;
+        let input_col = chunk_in_row + lane;
+        let input = if input_col < source_rows {
+            let source_index = input_col * source_cols + row;
+            nvfp4_value_at(bytes, scales, global_scale, source_index)
+        } else {
+            0.0
+        };
+        input * random_sign(seed, input_col)
+    }
+
+    #[inline(always)]
+    fn rowwise_value_at(
+        bytes: &[u8],
+        scales: &[u8],
+        global_scales: &[f32],
+        cols: u32,
+        index: u32,
+    ) -> f32 {
+        let row = index / cols;
+        let col = index - row * cols;
+        nvfp4_rowwise_value(
+            bytes,
+            scales,
+            global_scales,
+            cols as usize,
+            row as usize,
+            col as usize,
+        )
+    }
+
+    #[inline(always)]
+    fn checked_rowwise_abs_value(
+        bytes: &[u8],
+        scales: &[u8],
+        global_scales: &[f32],
+        cols: u32,
+        index: u32,
+        element_count: u32,
+    ) -> f32 {
+        if index < element_count {
+            abs_f32(rowwise_value_at(bytes, scales, global_scales, cols, index))
+        } else {
+            0.0
         }
-        sum * INV_SQRT_32
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn rowwise_transposed_hadamard_input(
+        bytes: &[u8],
+        scales: &[u8],
+        global_scales: &[f32],
+        chunk_base: u32,
+        lane: u32,
+        source_rows: u32,
+        source_cols: u32,
+        dst_row_len: u32,
+        seed: u32,
+    ) -> f32 {
+        let row = chunk_base / dst_row_len;
+        let row_base = row * dst_row_len;
+        let chunk_in_row = chunk_base - row_base;
+        let input_col = chunk_in_row + lane;
+        let input = if input_col < source_rows {
+            nvfp4_rowwise_value(
+                bytes,
+                scales,
+                global_scales,
+                source_cols as usize,
+                input_col as usize,
+                row as usize,
+            )
+        } else {
+            0.0
+        };
+        input * random_sign(seed, input_col)
     }
 
     #[inline(always)]
-    fn hadamard_sign(row: u32, col: u32) -> f32 {
-        if parity(row & col) == 0 { 1.0 } else { -1.0 }
+    fn hadamard_input(
+        x: &[f32],
+        chunk_base: u32,
+        lane: u32,
+        src_row_len: u32,
+        dst_row_len: u32,
+        source_cols: u32,
+        transpose_source: u32,
+        seed: u32,
+    ) -> f32 {
+        let row = chunk_base / dst_row_len;
+        let row_base = row * dst_row_len;
+        let chunk_in_row = chunk_base - row_base;
+        let input_col = chunk_in_row + lane;
+        let input = if input_col < src_row_len {
+            let index = if transpose_source == 0 {
+                row * src_row_len + input_col
+            } else {
+                input_col * source_cols + row
+            };
+            x[index as usize]
+        } else {
+            0.0
+        };
+        input * random_sign(seed, input_col)
     }
 
     #[inline(always)]
-    fn parity(mut value: u32) -> u32 {
-        value ^= value >> 16;
-        value ^= value >> 8;
-        value ^= value >> 4;
-        value ^= value >> 2;
-        value ^= value >> 1;
-        value & 1
+    fn hadamard_transform_lane(lane: u32) -> f32 {
+        let mut stride = 1;
+        while stride < HADAMARD_DIM {
+            let a = unsafe { ROTATED[lane as usize] };
+            let b = unsafe { ROTATED[(lane ^ stride) as usize] };
+            let next = if lane & stride == 0 { a + b } else { b - a };
+            unsafe {
+                ROTATED[lane as usize] = next;
+            }
+            thread::sync_threads();
+            stride <<= 1;
+        }
+
+        let value = unsafe { ROTATED[lane as usize] } * INV_SQRT_32;
+        unsafe {
+            ROTATED[lane as usize] = value;
+        }
+        thread::sync_threads();
+        value
     }
 
     #[inline(always)]

@@ -1,9 +1,10 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::linear_backward::LinearBackwardMsEdenArgs;
+use rust_kernels_cuda::linear_backward::{
+    LinearBackwardInputTranspose, LinearBackwardMsEdenArgs, LinearBackwardWeightTranspose,
+};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
+use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 
-use super::transforms::{decode_rowwise_t, decode_weight_t, transpose_f32};
 use super::types::{AttentionBackwardModules, AttentionLinearScratch};
 
 pub(super) struct AttentionLinearPass<'a, 'scratch, 'out> {
@@ -27,38 +28,16 @@ pub(super) fn run_attention_linear_pass(
     pass: AttentionLinearPass<'_, '_, '_>,
 ) -> Result<(), DriverError> {
     let row_count = pass.row_count;
-    decode_weight_t(
-        modules.decode,
-        stream,
-        pass.weight,
-        pass.scratch.weight_t,
-        pass.output_dim as usize,
-        pass.input_dim as usize,
-    )?;
-    transpose_f32(
-        modules.transpose,
-        stream,
-        pass.e,
-        pass.scratch.error_t,
-        row_count as usize,
-        pass.output_dim as usize,
-    )?;
-    decode_rowwise_t(
-        modules.decode,
-        stream,
-        pass.saved_input,
-        pass.scratch.input_t,
-        row_count as usize,
-        pass.input_dim as usize,
-    )?;
-
     modules.linear.backward_ms_eden(LinearBackwardMsEdenArgs {
         stream,
         quant_module: modules.quant,
         e: pass.e,
-        weight_t: pass.scratch.weight_t,
-        e_t: pass.scratch.error_t,
-        input_t: pass.scratch.input_t,
+        weight_t: LinearBackwardWeightTranspose::Nvfp4(Nvfp4DeviceTensor {
+            bytes: pass.weight.bytes,
+            scales: pass.weight.scales,
+            global_scale: pass.weight.global_scale,
+        }),
+        input_t: LinearBackwardInputTranspose::RowwiseNvfp4(pass.saved_input),
         scratch: pass.scratch.linear,
         dinput: pass.dinput,
         dweight: pass.dweight,

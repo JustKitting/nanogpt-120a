@@ -1,14 +1,14 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::linear_backward::{
-    LinearBackwardModule, LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratch,
+    LinearBackwardInputTranspose, LinearBackwardModule, LinearBackwardMsEdenArgs,
+    LinearBackwardMsEdenScratch, LinearBackwardWeightTranspose,
 };
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 pub(super) struct MlpLinearBackwardCall<'a, 'scratch, 'out> {
     pub e: &'a DeviceBuffer<f32>,
-    pub weight_t: &'scratch DeviceBuffer<f32>,
-    pub e_t: &'scratch DeviceBuffer<f32>,
-    pub input_t: &'scratch DeviceBuffer<f32>,
+    pub weight_t: LinearBackwardWeightTranspose<'a>,
+    pub input_t: LinearBackwardInputTranspose<'a>,
     pub scratch: LinearBackwardMsEdenScratch<'scratch>,
     pub dinput: &'out mut DeviceBuffer<f32>,
     pub dweight: &'out mut DeviceBuffer<f32>,
@@ -31,7 +31,6 @@ pub(super) fn run_linear_backward(
         quant_module: quant,
         e: call.e,
         weight_t: call.weight_t,
-        e_t: call.e_t,
         input_t: call.input_t,
         scratch: call.scratch,
         dinput: call.dinput,

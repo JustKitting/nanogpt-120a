@@ -12,9 +12,9 @@ use training::{TokenDataLoader, Trainer};
 type AppResult<T = ()> = Result<T, Box<dyn Error>>;
 
 fn main() -> AppResult {
-    let mut trainer = Trainer::new(app::config::SEED)?;
     let dataset = TokenDataLoader::training_dataset_name();
     let config = TrainConfig::from_env();
+    let mut trainer = Trainer::new(config.seed)?;
     let run_label = format!("{}s", config.max_seconds.round() as u64);
     let run_output = app::run_output::RunOutput::new(&dataset, &run_label)?;
     println!("run_dir={}", run_output.dir().display());

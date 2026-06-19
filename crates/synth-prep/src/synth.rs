@@ -6,5 +6,6 @@ pub const DATA_DIR: &str = "data/synth";
 pub const PARQUET_DIR: &str = "parquet";
 pub const SHARDS_DIR: &str = "shards";
 pub const SHARD_SIZE: usize = 100_000_000;
+pub const DEFAULT_TRAIN_SHARD_COUNT: usize = 4;
 pub const SHARD_FILE_PREFIX: &str = "synth_llama2";
 pub const PARQUET_FILE_PATTERN: &str = "synth_*.parquet";

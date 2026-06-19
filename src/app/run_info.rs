@@ -1,4 +1,4 @@
-use crate::app::config::{SEED, TrainConfig};
+use crate::app::config::TrainConfig;
 use gpt2_nvfp4::{
     GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_N_LAYER, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
 };
@@ -32,7 +32,7 @@ pub fn build(dataset: &str, config: &TrainConfig) -> String {
             .map(|value| value.to_string())
             .unwrap_or_else(|| "none".to_string()),
     );
-    push_info(&mut info, "seed", format!("{SEED:#x}"));
+    push_info(&mut info, "seed", format!("{:#x}", config.seed));
     push_run_env(&mut info);
     info
 }
@@ -44,6 +44,7 @@ fn push_run_env(info: &mut String) {
         "TRAIN_SAVE_MODEL",
         "TRAIN_MAX_SECONDS",
         "TRAIN_REPEAT_BATCH",
+        "TRAIN_SEED",
         "TRAIN_LR_SCALE",
         "TRAIN_ADAM_LR_SCALE",
         "TRAIN_LR_WARMUP_STEPS",

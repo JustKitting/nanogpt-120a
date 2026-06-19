@@ -17,7 +17,8 @@ External reference target:
 
 Primary optimization target:
 
-- Lowest held-out validation loss after a fixed wall-clock training budget.
+- Lowest held-out validation loss after a fixed 15-minute wall-clock training
+  budget.
 - Training loss, fixed-step loss, tokens/s, and isolated kernel timings are
   diagnostics only. They do not prove an optimization unless the held-out
   validation loss at the same wall-clock budget improves or is preserved.
@@ -25,6 +26,586 @@ Primary optimization target:
 
 ```text
 heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Direct MS-EDEN packing for FP32 E^T in linear backward.
+status: implemented and profiled; not promoted by itself
+target:
+  Remove the materialized FP32 transpose of the linear-backward error matrix
+  before MS-EDEN quantization. This preserves the Quartet II backward operand
+  contract: E is still quantized with derived device scale, and E^T uses the
+  same device scale as E.
+code_change:
+  Added fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel and routed
+  LinearBackwardModule::backward_ms_eden to pack E^T directly from row-major E.
+  Removed the MLP, attention, and final-head transpose_f32(e -> e_t) calls.
+verification:
+  cargo oxide build --arch sm_120a: pass
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass, 2 tests
+  cargo check --all-targets: pass
+sustained_check:
+  target/ms_eden_transpose_100step_synth.log
+  CUDA_DEVICE_INDEX=0, SYNTH, 100 steps.
+  completed_steps=100, heldout_eval val_loss=7.383308,
+  finite=true and nonzero=true through final logged step.
+profile:
+  target/nsys/ms_eden_transpose_direct_b8_l2d1024_20_20260619T191437Z.nsys-rep
+  target/nsys/ms_eden_transpose_direct_b8_l2d1024_20_20260619T191437Z_kernels_cuda_gpu_kern_sum.csv
+measured_effect:
+  Previous current-code profile
+  target/nsys/lm_head_cta_b8_l2d1024_20_20260619T153905Z_stats.txt had:
+    fp32_to_nvfp4_ms_eden_device_scale_kernel: 720 launches, 289.640ms
+    transpose_f32_kernel: 180 launches, 55.902ms
+  New profile has:
+    fp32_to_nvfp4_ms_eden_device_scale_kernel: 540 launches, 170.992ms
+    fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel: 180 launches, 118.797ms
+    transpose_f32_kernel: absent from the kernel summary
+  Total MS-EDEN E/E^T packing time is effectively unchanged, and the
+  materialized transpose cost is removed. The measured operand-prep improvement
+  is about the removed 55.9ms over the 20-step profile.
+validation_loss_result:
+  target/ms_eden_transpose_b8_l2d1024_900s_20260619T191732Z.log
+  heldout_eval val_loss=4.244381, completed_steps=5476.
+  Previous promoted baseline was val_loss=4.243804, completed_steps=5376.
+  The change improved completed steps but did not improve held-out validation
+  loss by itself, so it was not promoted as the objective baseline.
+next_justified_experiment:
+  Continue the same operand-prep rewrite for saved rowwise NVFP4 activations:
+  pack X^T for linear backward directly into MS-EDEN instead of materializing a
+  FP32 decoded transpose.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Direct MS-EDEN packing for saved rowwise NVFP4 X^T in linear backward.
+status: implemented, profiled, and promoted as current validation baseline
+target:
+  Remove decode_rowwise_t(saved activation -> FP32 X^T) before MS-EDEN
+  quantization in MLP, attention, and final head backward linear paths. The
+  new path derives the Quartet/MS-EDEN device global scale from decoded rowwise
+  source values on GPU, then packs the transposed source directly into the
+  existing LinearBackwardMsEdenScratch input_t_h operand.
+code_change:
+  Added rowwise_nvfp4_chunk_amax_kernel and
+  rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel under the
+  MS-EDEN quantization module. LinearBackwardModule::backward_ms_eden now
+  accepts LinearBackwardInputTranspose::RowwiseNvfp4 for saved activation
+  sources and routes MLP, attention, and final-head input_t operands through
+  the direct rowwise source path.
+verification:
+  cargo fmt && cargo check --all-targets: pass
+  cargo oxide build --arch sm_120a: pass
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass, 2 tests
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass, 2 tests
+sustained_check:
+  target/rowwise_direct_input_t_100step_synth.log
+  CUDA_DEVICE_INDEX=0, SYNTH, 100 steps.
+  completed_steps=100, heldout_eval val_loss=7.386125,
+  finite=true and nonzero=true through final logged step.
+profile:
+  target/nsys/rowwise_direct_input_t_b8_l2d1024_20_20260619T194122Z.nsys-rep
+  target/nsys/rowwise_direct_input_t_b8_l2d1024_20_20260619T194122Z_kernels.csv
+measured_effect:
+  The old nvfp4_decode_rowwise_transpose_f32_kernel is absent from the 20-step
+  kernel summary. New rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel
+  costs 37.243ms over 180 launches. The 100-step training check improved
+  train_elapsed_s from the previous direct-E^T check's 16.114s to 15.962s.
+validation_loss_result:
+  target/rowwise_direct_input_t_b8_l2d1024_900s_20260619T194141Z.log
+  heldout_eval val_loss=4.238420, completed_steps=5503.
+  Previous promoted baseline was val_loss=4.243804, completed_steps=5376.
+  This is a measured improvement in the fixed 900-second held-out validation
+  objective, so notes/sweep_baseline.env was updated to this result.
+next_justified_experiment:
+  Direct W^T packing is implemented as a candidate below. Because it increases
+  completed steps but had a worse first seeded validation result, evaluate it
+  across repeated deterministic seeds before deciding whether to promote or
+  remove it.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Direct MS-EDEN packing for stored NVFP4 W^T in linear backward.
+status: implemented and profiled; mixed first validation seed, candidate retained
+target:
+  Remove decode_weight_t(stored NVFP4 weight -> FP32 W^T) before MS-EDEN
+  quantization in MLP, attention, and final-head backward linear paths. The new
+  route decodes source values inside the MS-EDEN packing kernel, derives the
+  Quartet/MS-EDEN device global scale on GPU, and emits the same packed operand
+  consumed by linear_backward_projection_cta_device_scale_kernel.
+code_change:
+  Added nvfp4_chunk_amax_kernel and
+  nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel. LinearBackwardModule
+  accepts LinearBackwardWeightTranspose::Nvfp4 and routes stored NVFP4 weights
+  through the direct W^T packer. The materialized FP32 path remains available
+  for tests through LinearBackwardWeightTranspose::Fp32.
+verification:
+  cargo fmt && cargo check --all-targets: pass
+  cargo oxide build --arch sm_120a: pass
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass, 3 tests
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass, 2 tests
+sustained_check:
+  target/direct_all_linear_operands_100step_synth.log
+  completed_steps=100, heldout_eval val_loss=7.379606,
+  finite=true and nonzero=true through final logged step.
+  target/direct_all_linear_operands_seed_override_rebuilt_100step_synth.log
+  with TRAIN_SEED=0x47505433 completed_steps=100, heldout_eval val_loss=7.401977,
+  finite=true and nonzero=true through final logged step.
+seed_control:
+  TRAIN_SEED is now a runtime override for the model/init/backward RNG seed and
+  is recorded in run_info.txt. Verified in
+  target/runs/20260619_202503Z_synth_900s/run_info.txt:
+    seed=0x47505433
+    TRAIN_SEED=0x47505433
+profile:
+  target/nsys/direct_all_linear_operands_b8_l2d1024_20_20260619T200422Z.nsys-rep
+  target/nsys/direct_all_linear_operands_b8_l2d1024_20_20260619T200422Z_kernels.csv
+measured_effect:
+  nvfp4_decode_transpose_f32_kernel fell to 27 tiny calls in the 20-step
+  profile. The new nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel cost
+  17.058ms over 180 launches. The 100-step run completed in 15.916s versus
+  15.962s for the direct-X^T path.
+validation_loss_result:
+  target/direct_all_linear_operands_b8_l2d1024_900s_20260619T200449Z.log
+  heldout_eval val_loss=4.259685, completed_steps=5515.
+  Current promoted baseline is val_loss=4.238420, completed_steps=5503.
+interpretation:
+  Do not promote from this single seed. Also do not treat it as a hard
+  rejection yet: it improves completed steps, and with a fixed random seed a
+  single validation sample can be noisy. The correct decision surface is the
+  mean held-out validation loss over repeated deterministic seeds at the same
+  900-second budget, biased slightly toward faster variants when validation is
+  statistically close.
+next_justified_experiment:
+  Add a repeated-seed validation harness for architecture/kernel variants so
+  direct W^T can be compared against the promoted direct-X^T baseline by
+  validation mean/variance and completed steps, not one lucky or unlucky seed.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Switch LM head from one-warp projection to CTA NVFP4 projection.
+status: kept as a kernel speedup; not a validation-objective win under the existing schedule
+target:
+  Reuse the existing 32x32 CTA NVFP4 projection body for the tied LM head,
+  replacing the older 16x8 one-warp projection path. The math and output layout
+  stay the same: row-major FP32 logits from NVFP4 activations and tied NVFP4
+  token embedding weights.
+code_change:
+  crates/cuda-kernels/src/gpt/lm_head.rs now launches with
+  projection_cta_grid_dim and NVFP4_PROJECTION_CTA_THREADS, and calls
+  nvfp4_projection_cta_nobias_kernel_body with shared packed/scales staging.
+short_check:
+  target/lm_head_cta_b8_l2d1024_100steps_20260619T153841Z.log
+  Shape B8 L2 d1024 h16, Aurora phases=2 blocks=90, current best schedule.
+  completed_steps=100, train_elapsed_s=15.545, heldout_eval val_loss=7.285653,
+  finite and nonzero.
+profile_result:
+  target/nsys/lm_head_cta_b8_l2d1024_20_20260619T153905Z.nsys-rep
+  lm_head_kernel fell from 322.568587ms over 21 calls in the previous
+  no-logits-copy profile to 141.260135ms over 21 calls. The 20-step train loop
+  moved from 3.367s to 3.181s.
+validation_objective:
+  target/lm_head_cta_b8_l2d1024_900s_20260619T153928Z.log
+  stopped_by_wall_clock=true elapsed_s=900.113 completed_steps=5655.
+  heldout_eval split=val val_loss=4.747964 train_elapsed_s=900.271
+  completed_steps=5655.
+comparison:
+  The previous best remains
+  target/mseden_fwht_b8_l2d1024_900s_20260619T145904Z.log with val_loss=4.623164
+  and completed_steps=5429. The CTA LM-head path completed 226 more steps in
+  the same 900-second budget, but the unchanged step-based optimizer schedule
+  ended at worse held-out validation loss.
+decision:
+  Keep the kernel speedup as an efficiency improvement, but do not count it as
+  progress on the validation-loss objective until a coupled schedule/optimizer
+  sweep beats 4.623164 under the same 900-second validation gate. Future
+  candidates should account for the faster step rate rather than reusing this
+  exact schedule blindly.
+history:
+  notes/sweep_seed.tsv includes the 4.747964 result so future Bayesian/Pareto
+  sweeps treat this as measured evidence, not an untested win.
+  The default sweep seed was moved to notes/sweep_seed_current.tsv after this
+  kernel change because notes/sweep_seed.tsv also contains pre-LM-head-CTA
+  measurements, including the same hyperparameter key with a different loss.
+  Keeping the default on the current-code seed avoids feeding stale objective
+  values into the proposer.
+verification:
+  cargo fmt --check: pass.
+  cargo check -p rust-kernels-cuda --tests: pass.
+  cargo check -p gpt2-nvfp4 --tests: pass.
+  cargo check --bin rust-kernels: pass.
+  GPT2_BATCH_SIZE=8 GPT2_N_LAYER=2 GPT2_N_EMBD=1024 GPT2_N_HEAD=16
+  AURORA_MATRIX_PHASES=2 AURORA_COOPERATIVE_BLOCKS=90 cargo oxide build
+  --arch sm_120a: pass.
+  Matching cargo build --release: pass.
+  100-step SYNTH check: pass, finite through heldout_eval.
+  900-second SYNTH validation run: pass, finite through heldout_eval.
+next_experiment:
+  Run a coupled sweep around the faster LM-head path. Do not manually lower
+  only one LR knob; vary LR scale, Adam LR scale, warmup/start, AMUSE
+  parameters, and possibly Aurora layout together against the 900-second
+  held-out validation objective.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Fuse final-head cross-entropy with dlogits transpose.
+status: rejected and reverted
+target:
+  Remove the final-head dlogits transpose launch by having cross-entropy write
+  both row-major dlogits and transposed dlogits_t for the LM-head backward
+  GEMMs.
+code_change_tested:
+  Added a cross_entropy_with_transposed_grad kernel that wrote the existing
+  row-major dlogits plus dlogits_t[col, row] in the same pass. Final-head
+  backward then skipped transpose_dlogits.
+correctness_check:
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored
+  --nocapture: pass while the experiment was applied.
+sustained_check:
+  target/fused_ce_dlogits_t_b8_l2d1024_100steps_20260619T153440Z.log
+  Shape B8 L2 d1024 h16, Aurora phases=2 blocks=90, current best schedule.
+  completed_steps=100, train_elapsed_s=16.516, heldout_eval val_loss=7.286378,
+  finite and nonzero.
+profile_result:
+  target/nsys/fused_ce_dlogits_t_b8_l2d1024_20_20260619T153505Z.nsys-rep
+  cross_entropy_with_transposed_grad_kernel took 118.193215ms over 20 calls.
+  The previous no-logits-copy profile had cross_entropy_kernel at 55.803301ms
+  over 21 calls and transpose_f32_kernel at 56.081499ms over 180 calls. After
+  fusion, transpose_f32_kernel dropped to 20.626525ms over 160 calls, meaning
+  the removed final-head transpose accounted for about 35.45ms over 20 steps.
+measured_effect:
+  The fused CE kernel added about 62ms of CE time while removing only about
+  35ms of final-head transpose time over 20 steps. 20-step train time also
+  moved from 3.367s in the previous no-logits-copy profile to 3.384s in the
+  fused profile.
+decision:
+  Reverted. Writing dlogits_t from CE creates scattered stores and is slower
+  than keeping the dedicated transpose kernel. Do not retry this exact fusion
+  unless the write layout changes.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Remove the duplicate final-logits tape copy.
+status: cleanup kept; not a meaningful objective improvement
+target:
+  Reduce obvious logits-path memory traffic without changing model math,
+  optimizer state, data order, sampling, or schedule parameters.
+code_change:
+  The forward pass already writes final logits into src/training/buffers.rs
+  TrainBuffers::logits. Backward now saves a reference to that buffer instead
+  of copying the full logits tensor into a second tape-owned logits allocation.
+measured_effect:
+  nsys 20-step profile after the change:
+  target/nsys/no_logits_tape_copy_b8_l2d1024_20_20260619T152748Z.nsys-rep.
+  CUDA memcpy Device-to-Device time was 32.047033ms over 1431 operations.
+  The prior FWHT profile showed about 61.89ms of D2D memcpy over 20 steps, so
+  this removed roughly 30ms of D2D work per 20-step profile.
+runtime_effect:
+  No material wall-clock improvement. The comparable 100-step run with current
+  best schedule finished in 16.498s:
+  target/no_logits_tape_copy_best_b8_l2d1024_100steps_20260619T152720Z.log.
+  The earlier corrected d1024 100-step check was 16.555s and the FWHT-only
+  100-step check was 16.180s, so this is within run-to-run noise.
+validation_result:
+  100-step held-out val_loss=7.288118, finite, nonzero updates. This matches
+  the current 100-step band but is not a new 900-second validation result.
+verification:
+  cargo fmt --check: pass.
+  cargo check -p gpt2-nvfp4 --tests: pass.
+  cargo check --bin rust-kernels: pass.
+  cargo test --bin sweep: pass.
+  GPT2_BATCH_SIZE=8 GPT2_N_LAYER=2 GPT2_N_EMBD=1024 GPT2_N_HEAD=16
+  AURORA_MATRIX_PHASES=2 AURORA_COOPERATIVE_BLOCKS=90 cargo oxide build
+  --arch sm_120a: pass.
+  Matching cargo build --release: pass.
+next_experiment:
+  Do not spend more time on logits tape copies unless a later profile changes
+  the cost picture. Current top kernels remain Aurora mega update, linear
+  backward projection CTA, causal attention, LM head, and MS-EDEN quantization.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Add multi-variable Bayesian/Pareto sweep harness.
+status: implementation complete; dry-run verified
+decision:
+  Use this harness for future hyperparameter/shape tuning instead of manual
+  single-variable experiments. The sweep treats batch size, LR, Adam LR,
+  warmup/start, AMUSE schedule parameters, model depth/width/head count, Aurora
+  phase count, and cooperative block count as coupled candidate variables.
+measured_effect:
+  No training result changed by this implementation. It adds build-time shape
+  env generation, run metadata, seeded history, a TPE-style candidate proposer,
+  and early trial termination when a training log reports NaN or finite=false.
+  NaN trials are recorded as failures and scored as bad regions by the proposer;
+  dry-run rows are excluded from proposer scoring. Completed real trials append
+  to the sweep-local trials.tsv and automatically sync into the shared measured
+  history file, so future candidates see prior results without manual copying.
+seeded_history:
+  notes/sweep_seed.tsv records the known 900-second L4/B8/LR1.0 success and
+  the known L4/B8/LR1.5 and L4/B4/LR1.5 NaN failures so the sweep does not
+  rediscover those exact points.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo test --bin sweep: pass
+  dry-run sweep wrote coupled candidates and trials.tsv without launching
+  training:
+    cargo run --bin sweep -- --trials 3 --random-trials 0 --candidate-samples 8 --dry-run --sweep-dir target/sweeps/dry_run_nan_penalty_check
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: First seeded coupled 15-minute SYNTH sweep trial.
+status: stable, rejected as a quality regression
+decision:
+  Keep the result as negative evidence for the proposer. Do not treat this
+  lower-LR/lower-Aurora-block candidate as an improvement because held-out
+  validation loss was worse than the current stable baseline.
+candidate:
+  GPT2_BATCH_SIZE=8, GPT2_N_LAYER=4, GPT2_N_EMBD=1536, GPT2_N_HEAD=12.
+  AURORA_MATRIX_PHASES=8, AURORA_COOPERATIVE_BLOCKS=120.
+  TRAIN_LR_SCALE=0.535733, TRAIN_ADAM_LR_SCALE=0.753612,
+  TRAIN_LR_WARMUP_STEPS=5, TRAIN_LR_START_RATIO=0.100000,
+  TRAIN_AMUSE_BETA1=0.400000, TRAIN_AMUSE_RHO=0.800000.
+result:
+  target/sweeps/synth_900_20260619T073445Z/trial_0000/train.log
+  stopped_by_wall_clock=true elapsed_s=900.017 completed_steps=1322
+  heldout_eval split=val val_loss=5.646966 train_elapsed_s=900.698
+  completed_steps=1322.
+measured_effect:
+  The run stayed finite and nonzero, but validation loss regressed versus the
+  stable seeded baseline of 5.496781. It processed 10,829,824 tokens in
+  900.698 seconds, about 12,024 tokens/s.
+verification:
+  cargo oxide build --arch sm_120a: pass inside the sweep runner.
+  900-second sweep trial: pass, finite through held-out validation.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Seeded coupled SYNTH sweep trial with L2/high-Aurora-LR candidate.
+status: rejected, early NaN
+decision:
+  Keep this result as bad-region evidence for the proposer. Do not rerun this
+  candidate without a new coupled hypothesis.
+candidate:
+  GPT2_BATCH_SIZE=8, GPT2_N_LAYER=2, GPT2_N_EMBD=1536, GPT2_N_HEAD=12.
+  AURORA_MATRIX_PHASES=8, AURORA_COOPERATIVE_BLOCKS=180.
+  TRAIN_LR_SCALE=2.196803, TRAIN_ADAM_LR_SCALE=0.538864,
+  TRAIN_LR_WARMUP_STEPS=50, TRAIN_LR_START_RATIO=0.200000,
+  TRAIN_AMUSE_BETA1=0.200000, TRAIN_AMUSE_RHO=0.500000.
+result:
+  target/sweeps/synth_900_20260619T075109Z/trial_0000/train.log
+  step=300 elapsed_s=117.216 loss=NaN finite=false nonzero=false.
+  sweep_early_stop=nan_detected.
+measured_effect:
+  This coupled candidate learned faster early by train-loss snapshots but
+  failed numerically before held-out validation. The sweep runner killed the
+  child process immediately after detecting NaN and recorded status=nan with
+  completed_steps=301.
+verification:
+  cargo oxide build --arch sm_120a: pass inside the sweep runner.
+  Early-NaN sweep trial: pass as failure detection, not as model quality.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Three-trial coupled SYNTH sweep after shared-history sync.
+status: best validation loss improved to 4.805441
+decision:
+  Keep the L4/B8/d1024/h16, Aurora-120, LR-scale-1.844459 candidate as the
+  current best 15-minute SYNTH point. Treat the Aurora-160 candidate as stable
+  but worse quality despite higher completed steps.
+trial_0000:
+  status=success, val_loss=5.346710, completed_steps=2755.
+  GPT2_BATCH_SIZE=8, GPT2_N_LAYER=4, GPT2_N_EMBD=1024, GPT2_N_HEAD=16.
+  AURORA_MATRIX_PHASES=8, AURORA_COOPERATIVE_BLOCKS=120.
+  TRAIN_LR_SCALE=1.040728, TRAIN_ADAM_LR_SCALE=0.671306,
+  TRAIN_LR_WARMUP_STEPS=5, TRAIN_LR_START_RATIO=0.200000,
+  TRAIN_AMUSE_BETA1=0.200000, TRAIN_AMUSE_RHO=0.800000.
+trial_0001:
+  status=success, val_loss=4.805441, completed_steps=2750.
+  GPT2_BATCH_SIZE=8, GPT2_N_LAYER=4, GPT2_N_EMBD=1024, GPT2_N_HEAD=16.
+  AURORA_MATRIX_PHASES=8, AURORA_COOPERATIVE_BLOCKS=120.
+  TRAIN_LR_SCALE=1.844459, TRAIN_ADAM_LR_SCALE=0.925681,
+  TRAIN_LR_WARMUP_STEPS=5, TRAIN_LR_START_RATIO=0.000000,
+  TRAIN_AMUSE_BETA1=0.400000, TRAIN_AMUSE_RHO=0.500000.
+trial_0002:
+  status=success, val_loss=4.895197, completed_steps=2881.
+  GPT2_BATCH_SIZE=8, GPT2_N_LAYER=4, GPT2_N_EMBD=1024, GPT2_N_HEAD=16.
+  AURORA_MATRIX_PHASES=8, AURORA_COOPERATIVE_BLOCKS=160.
+  TRAIN_LR_SCALE=2.116410, TRAIN_ADAM_LR_SCALE=0.503505,
+  TRAIN_LR_WARMUP_STEPS=5, TRAIN_LR_START_RATIO=0.000000,
+  TRAIN_AMUSE_BETA1=0.400000, TRAIN_AMUSE_RHO=0.500000.
+measured_effect:
+  The sweep improved held-out validation loss from the previous stable
+  5.496781 baseline to 4.805441. Increasing Aurora cooperative blocks from 120
+  to 160 in trial_0002 increased completed steps from 2750 to 2881 but worsened
+  validation loss from 4.805441 to 4.895197, so throughput alone was not the
+  objective win.
+evidence:
+  target/sweeps/synth_900_multi_20260619T080010Z/trials.tsv
+  target/sweeps/synth_900_multi_20260619T080010Z/trial_0000/train.log
+  target/sweeps/synth_900_multi_20260619T080010Z/trial_0001/train.log
+  target/sweeps/synth_900_multi_20260619T080010Z/trial_0002/train.log
+verification:
+  All three trials reached heldout_eval with finite validation loss.
+  The shared measured-history file notes/sweep_seed.tsv contains all three
+  result rows for future proposer runs.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Follow-up coupled SYNTH sweep with d2048 and L2 candidates.
+status: no improvement; best validation loss remains 4.805441
+decision:
+  Keep the previous L4/B8/d1024/h16, Aurora-120, LR-scale-1.844459 candidate
+  as the current best. Treat the d2048 high-LR candidate as a bad region, the
+  high-Adam-LR L4/d1024 candidate as a validation regression, and the L2
+  candidate as throughput-faster but quality-worse.
+trial_0000:
+  status=nan, completed_steps=451.
+  GPT2_BATCH_SIZE=8, GPT2_N_LAYER=4, GPT2_N_EMBD=2048, GPT2_N_HEAD=16.
+  AURORA_MATRIX_PHASES=8, AURORA_COOPERATIVE_BLOCKS=120.
+  TRAIN_LR_SCALE=2.409066, TRAIN_ADAM_LR_SCALE=0.682491,
+  TRAIN_LR_WARMUP_STEPS=20, TRAIN_LR_START_RATIO=0.000000,
+  TRAIN_AMUSE_BETA1=0.400000, TRAIN_AMUSE_RHO=0.800000.
+  Failed at step=450 with loss=NaN and sweep_early_stop=nan_detected.
+trial_0001:
+  status=success, val_loss=5.512575, completed_steps=2764.
+  GPT2_BATCH_SIZE=8, GPT2_N_LAYER=4, GPT2_N_EMBD=1024, GPT2_N_HEAD=16.
+  AURORA_MATRIX_PHASES=8, AURORA_COOPERATIVE_BLOCKS=120.
+  TRAIN_LR_SCALE=0.927102, TRAIN_ADAM_LR_SCALE=2.246357,
+  TRAIN_LR_WARMUP_STEPS=5, TRAIN_LR_START_RATIO=0.000000,
+  TRAIN_AMUSE_BETA1=0.400000, TRAIN_AMUSE_RHO=0.800000.
+trial_0002:
+  status=success, val_loss=5.132470, completed_steps=4687.
+  GPT2_BATCH_SIZE=8, GPT2_N_LAYER=2, GPT2_N_EMBD=1024, GPT2_N_HEAD=16.
+  AURORA_MATRIX_PHASES=4, AURORA_COOPERATIVE_BLOCKS=120.
+  TRAIN_LR_SCALE=1.359202, TRAIN_ADAM_LR_SCALE=0.511092,
+  TRAIN_LR_WARMUP_STEPS=5, TRAIN_LR_START_RATIO=0.000000,
+  TRAIN_AMUSE_BETA1=0.600000, TRAIN_AMUSE_RHO=0.800000.
+measured_effect:
+  None of these candidates improved held-out validation loss over the current
+  best 4.805441. The L2 candidate completed far more steps in the same 900s
+  budget, but validation loss was worse, so throughput did not translate to
+  the objective. The d2048 candidate was both much slower and numerically
+  unstable at this coupled setting.
+evidence:
+  target/sweeps/synth_900_multi_20260619T132443Z/trials.tsv
+  target/sweeps/synth_900_multi_20260619T132443Z/trial_0000/train.log
+  target/sweeps/synth_900_multi_20260619T132443Z/trial_0001/train.log
+  target/sweeps/synth_900_multi_20260619T132443Z/trial_0002/train.log
+verification:
+  Trial_0000 triggered the NaN early-stop path.
+  Trial_0001 and trial_0002 reached heldout_eval with finite validation loss.
+  notes/sweep_seed.tsv contains all three result rows for future proposer runs.
+```
+
+Measured batch-size effects so far:
+
+- Increasing batch size by itself has worsened fixed-wall-clock validation loss
+  in the measured runs. On the 300-second wide-Llama2 comparison, B4 beat B8
+  by validation loss 5.335806 vs 5.438506. B3 and B2 were also worse than B4.
+- Increasing batch size improved throughput in some short runs and improved
+  stability in the L4 900-second SYNTH runs. L4 B4 LR1.5 and L4 B8 LR1.5 both
+  reached NaN at logged step 1250, but B8 reached that step later in wall-clock
+  time because it processed larger batches. L4 B8 LR1.0 completed the full
+  900-second run finite.
+- Therefore, "increase batch size" is not a valid standalone optimization
+  experiment. Batch size is a stability/throughput lever that must be swept
+  together with LR, schedule, shape, and optimizer parameters to measure the
+  Pareto surface against held-out validation loss.
+
+Sweep rule:
+
+- Do not tune one hyperparameter at a time by hand. Use a recorded
+  multi-variable Bayesian/Pareto sweep over coupled candidates.
+- Notes must state measured effects directly. Do not turn a measured loss
+  regression into vague language like "may help" or "undetermined."
+- Every trial must record build-time shape, runtime optimizer parameters,
+  validation loss, stability/finiteness, completed steps, and log path.
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: L4 B8 fresh-SYNTH 15-minute run with LR scale 1.0.
+status: stable, but validation loss still high
+decision:
+  Keep this as the current stable L4/B8 candidate, not as a quality win. The
+  measured effect of LR scale 1.0 at B8 was improved stability versus LR scale
+  1.5, with worse early training speed. It completed the 900-second validation
+  gate finite but still had high validation loss.
+changes:
+  GPT2_N_LAYER=4, GPT2_BATCH_SIZE=8, GPT2_N_EMBD=1536, GPT2_N_HEAD=12.
+  TRAIN_MAX_SECONDS=900. Default LR scale changed from 1.5 to 1.0. Warmup
+  remained 5. SYNTH training streamed from the 400M-token fresh train shard set.
+result:
+  target/synth_l4_b8_lr1_900s_20260619T062251Z.log
+  step 1250 loss=5.174037 finite=true nonzero=true elapsed_s=723.342
+  stopped_by_wall_clock=true elapsed_s=900.541 completed_steps=1557
+  heldout_eval split=val val_loss=5.496781 train_elapsed_s=901.119
+comparison:
+  L4 B8 default LR reached NaN at logged step 1250.
+  L4 B4 default LR reached NaN at logged step 1250.
+  LR scale 1.0 reduced update magnitude enough to avoid the known step-1250 NaN
+  in this B8 run, but validation loss is still far above the useful-training
+  target.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  1-second launch check: pass
+  900-second direct GPU run: pass, finite through held-out validation.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: L4 B8 fresh-SYNTH 15-minute run with default LR scale.
+status: rejected, NaN before held-out validation
+decision:
+  Reject as a 900-second candidate. The measured effect of increasing batch
+  from B4 to B8 at LR scale 1.5 was better wall-clock stability but not better
+  update-count stability: both runs reached NaN at logged step 1250.
+changes:
+  GPT2_N_LAYER=4, GPT2_BATCH_SIZE=8, GPT2_N_EMBD=1536, GPT2_N_HEAD=12.
+  TRAIN_MAX_SECONDS=900. Default LR scale remained 1.5 and warmup remained 5.
+  SYNTH training streamed from the 400M-token fresh train shard set.
+result:
+  target/synth_l4_b8_900s_20260619T060638Z.log
+  step 1200 loss=5.246863 finite=true nonzero=true elapsed_s=693.723
+  step 1250 loss=NaN finite=false nonzero=false elapsed_s=722.662
+  heldout_eval split=val val_loss=NaN train_elapsed_s=901.121
+comparison:
+  L4 B4 default LR also reached NaN at logged step 1250, at elapsed_s=526.
+  B8 processed twice as many tokens per optimizer step and reached the same
+  failing update later in wall-clock time, but it did not prevent the same
+  update-count failure.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+  1-second launch check: pass
+  900-second direct GPU run: failed numerically with NaN.
 ```
 
 ```text
@@ -1405,9 +1986,13 @@ Likely root causes:
 
 ## Not Yet Tried
 
-- Full batch-size sweep after AMUSE:
-  - batch 8, 16, 32, and higher if memory allows
-  - track tokens/s, memory use, loss behavior, and GPU power
+- Multi-variable Bayesian/Pareto sweep after AMUSE:
+  - jointly vary batch size, LR scale, Adam LR scale, warmup/start, AMUSE
+    schedule parameters, model depth, width, head count, Aurora phase count,
+    and cooperative block count
+  - target held-out validation loss over the fixed wall-clock budget
+  - record stability/finiteness, completed steps, tokens/s, memory use, and GPU
+    power as diagnostics
 - nsys profile on current AMUSE + SYNTH path.
 - ncu SOL and instruction mix on the current top kernels.
 - Fusion of schedule-free materialization with quantization/writeback where
@@ -1425,10 +2010,11 @@ Likely root causes:
 1. Verify SYNTH shard creation on a limited slice or first parquet file.
 2. Run a short SYNTH smoke and confirm loss is finite.
 3. Profile the current AMUSE SYNTH training step with nsys.
-4. Batch-size sweep for throughput and memory:
-   - start at current batch 8
-   - test 16 and 32
+4. Run the multi-variable Bayesian/Pareto sweep:
+   - include batch size only as a coupled variable, never as a standalone
+     increase
    - keep log interval large enough that loss sync does not dominate
+   - rank candidates only by 15-minute held-out validation loss
 5. Use nsys top kernels to pick one bottleneck at a time.
 6. Attack optimizer/materialization overhead first unless profiling says
    backward matmul has overtaken it.
@@ -2005,4 +2591,450 @@ notes:
   The aborted TRAIN_STEPS=100000 fixed-wall attempt exposed a scheduler bug:
   TRAIN_STEPS changed the default LR warmup. That coupling was removed; default
   warmup is now fixed unless TRAIN_LR_WARMUP_STEPS is explicitly set.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Three-trial coupled SYNTH sweep after seeded history update.
+status: completed, new recorded best
+target:
+  Held-out validation loss after a fixed 900 second wall-clock budget.
+sweep:
+  target/sweeps/synth_900_multi_20260619T140614Z
+result:
+  trial_0000:
+    success, val_loss=4.732287, completed_steps=4691.
+    shape B8 L2 d1024 h16, Aurora phases=4 blocks=120.
+    lr_scale=1.575554, adam_lr_scale=1.271614, warmup=20,
+    start_ratio=0.2, amuse_beta1=0.2, amuse_rho=1.0.
+  trial_0001:
+    failed with NaN at step 400 and stopped early.
+    shape B8 L2 d2048 h16, Aurora phases=4 blocks=180.
+    lr_scale=1.434873, adam_lr_scale=2.331448, warmup=100,
+    start_ratio=0.05, amuse_beta1=0.2, amuse_rho=1.0.
+  trial_0002:
+    success, val_loss=5.498525, completed_steps=1311.
+    shape B8 L2 d2048 h16, Aurora phases=4 blocks=160.
+    lr_scale=0.638015, adam_lr_scale=0.526526, warmup=5,
+    start_ratio=0.0, amuse_beta1=0.4, amuse_rho=0.5.
+validation_objective:
+  Best result in this sweep is trial_0000 at val_loss=4.732287.
+  Previous best was trial_0001 from
+  target/sweeps/synth_900_multi_20260619T080010Z at val_loss=4.805441,
+  so this sweep sets a new recorded best by 0.073154 validation loss.
+measured_effect:
+  L2 d1024 with higher LR and start_ratio=0.2 improved validation loss versus
+  the previous L2 d1024 result of 5.132470 and beat the prior L4 d1024 best.
+  The result moves the current Pareto front toward faster L2 d1024 candidates.
+stability_effect:
+  d2048 remains unstable or uncompetitive in this run. The higher Adam LR
+  d2048 trial went NaN quickly; the lower LR d2048 trial stayed finite but
+  trained far fewer steps and ended with worse validation loss.
+runtime_effect:
+  The stable d1024 L2 trial completed 4691 steps in 900 seconds.
+  The stable d2048 L2 trial completed only 1311 steps in 900 seconds, so the
+  larger width is currently too slow for the fixed-wall objective unless kernel
+  efficiency improves substantially.
+history:
+  notes/sweep_seed.tsv contains all three trial rows from this sweep.
+next_experiment:
+  Continue coupled sweeps around the current Pareto front instead of testing
+  d2048 alone: compare L2/L4 d1024 with lr_scale around 1.5-2.1,
+  adam_lr_scale around 0.8-1.4, warmup 5-20, start_ratio 0.0-0.2, and
+  amuse_beta1/rho around the two successful regions.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Add profiled Aurora phase=2/block=90 layout to sweep space.
+status: code change verified; sustained launch check passed
+target:
+  Reduce optimizer scheduling overhead without changing optimizer math. This is
+  a runtime candidate-space fix, not a completed 900-second validation win.
+code_change:
+  src/app/sweep/candidate.rs now samples Aurora cooperative blocks
+  [80, 90, 120, 160, 180] and phases [2, 4, 8, 16], filtered by the existing
+  cooperative-block bound. For L2 there are 8 Aurora matrix slots, so
+  phases=2 and blocks=90 gives 90 * (8 / 2) = 360 cooperative CTAs and is
+  valid. For L4 there are 16 slots, so the same phase=2/block=90 layout would
+  require 720 CTAs and remains filtered out.
+profile_baseline:
+  target/nsys/best_b8_l2d1024_20_20260619T144732Z.nsys-rep
+  Shape B8 L2 d1024 h16, Aurora phases=4 blocks=120.
+  aurora_mega_update_cooperative_kernel total=1.069122657s over 20 calls,
+  avg=53.456ms. Train loop reported about 3.781s for 20 steps.
+profile_candidate:
+  target/nsys/phase2_blocks90_b8_l2d1024_20_20260619T144852Z.nsys-rep
+  Shape B8 L2 d1024 h16, Aurora phases=2 blocks=90.
+  aurora_mega_update_cooperative_kernel total=0.782565486s over 20 calls,
+  avg=39.128ms. Train loop reported about 3.522s for 20 steps.
+measured_effect:
+  The profiled candidate reduced the Aurora mega-kernel average by about 26.8%
+  and reduced the 20-step train-loop time by about 6.8%. The remaining top
+  kernels were fp32_to_nvfp4_ms_eden_device_scale_kernel,
+  linear_backward_projection_cta_device_scale_kernel, causal_attention_kernel,
+  and lm_head_kernel.
+sustained_check:
+  target/phase2_blocks90_b8_l2d1024_100steps_20260619T145205Z.log
+  CUDA_DEVICE_INDEX=0, SYNTH, 100 steps, same hyperparameters as current best
+  L2/d1024 trial: lr_scale=1.575554, adam_lr_scale=1.271614, warmup=20,
+  start_ratio=0.2, amuse_beta1=0.2, amuse_rho=1.0.
+  completed_steps=100, train_elapsed_s=17.571, heldout_eval val_loss=7.288392.
+stability_effect:
+  The 100-step run stayed finite=true and nonzero=true through the final step.
+  This only verifies that the faster launch layout does not immediately break
+  the training path; it is not a substitute for the 900-second validation
+  objective.
+verification:
+  cargo fmt --check: pass
+  cargo test --bin sweep: pass
+  GPT2_BATCH_SIZE=8 GPT2_N_LAYER=2 GPT2_N_EMBD=1024 GPT2_N_HEAD=16
+  AURORA_MATRIX_PHASES=2 AURORA_COOPERATIVE_BLOCKS=90 cargo build --release:
+  pass
+  100-step SYNTH run: pass, finite through heldout_eval.
+next_experiment:
+  Do not keep launching 3-trial sweeps. Either run a longer coupled 900-second
+  sweep with this expanded search space, or continue code profiling on the next
+  top kernels: MS-EDEN quantization, linear backward projection, causal
+  attention, and lm_head.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Replace MS-EDEN dense Hadamard loop with shared-memory FWHT.
+status: completed, new recorded best 900-second validation loss
+target:
+  Reduce the fp32_to_nvfp4_ms_eden_device_scale_kernel cost that remained after
+  the Aurora phase=2/block=90 scheduler change, then verify against the real
+  900-second held-out validation objective.
+code_change:
+  crates/cuda-kernels/src/utils/nvfp4/quant/kernels/ms_eden.rs now loads one
+  signed input per lane and applies a 32-point Walsh-Hadamard transform through
+  five shared-memory butterfly stages. The previous path computed each lane's
+  rotated value with a dense 32-term loop and 32 input loads. The tested
+  out_chunk_amax contract is preserved.
+rejected_subchange:
+  Removing the per-chunk amax write from the MS-EDEN kernel failed the ignored
+  GPU tests because out_chunk_amax is part of the quantizer contract:
+  fp32_to_nvfp4_ms_eden_writes_rotated_quantized_outputs and
+  linear_backward_ms_eden_quantizes_before_gemms both require finite positive
+  chunk amax values. That removal was not kept.
+profile_before:
+  target/nsys/phase2_blocks90_b8_l2d1024_20_20260619T144852Z.nsys-rep
+  fp32_to_nvfp4_ms_eden_device_scale_kernel total=547.410954ms over 720 calls.
+  20-step train-loop time was about 3.522s.
+profile_after:
+  target/nsys/mseden_fwht_b8_l2d1024_20_20260619T145840Z.nsys-rep
+  fp32_to_nvfp4_ms_eden_device_scale_kernel total=288.723091ms over 720 calls.
+  20-step train-loop time was about 3.245s.
+measured_effect:
+  The FWHT rewrite reduced the MS-EDEN device-scale kernel time by about 47.3%
+  in the 20-step profile and reduced 20-step train-loop time by about 7.9%.
+  In the 100-step sustained check, train_elapsed_s improved from 17.571 to
+  16.180 on the same B8 L2 d1024 h16 phase=2/block=90 candidate.
+stability_effect:
+  Focused ignored GPU tests passed after preserving out_chunk_amax:
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test nvfp4_quant --
+  --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward --
+  --ignored --nocapture: pass.
+  The 100-step SYNTH check stayed finite=true and nonzero=true through
+  heldout_eval.
+validation_objective:
+  target/mseden_fwht_b8_l2d1024_900s_20260619T145904Z.log
+  Shape B8 L2 d1024 h16, Aurora phases=2 blocks=90.
+  lr_scale=1.575554, adam_lr_scale=1.271614, warmup=20,
+  start_ratio=0.2, amuse_beta1=0.2, amuse_rho=1.0.
+  stopped_by_wall_clock=true elapsed_s=900.116 completed_steps=5429.
+  heldout_eval split=val val_loss=4.623164 train_elapsed_s=900.282
+  completed_steps=5429.
+comparison:
+  Previous best recorded 900-second validation point was
+  target/sweeps/synth_900_multi_20260619T140614Z/trial_0000/train.log with
+  val_loss=4.732287 and completed_steps=4691. This run improves held-out
+  validation loss by 0.109123 and increases completed steps by 738 under the
+  same 900-second budget.
+history:
+  notes/sweep_seed.tsv includes this direct validation run so future coupled
+  sweeps can score candidates against the current best measured point.
+verification:
+  cargo fmt --check: pass.
+  cargo check -p rust-kernels-cuda --tests: pass.
+  cargo test --bin sweep: pass.
+  GPT2_BATCH_SIZE=8 GPT2_N_LAYER=2 GPT2_N_EMBD=1024 GPT2_N_HEAD=16
+  AURORA_MATRIX_PHASES=2 AURORA_COOPERATIVE_BLOCKS=90 cargo oxide build
+  --arch sm_120a: pass.
+  900-second SYNTH validation run: pass, finite through heldout_eval.
+next_experiment:
+  Continue profiling from the new top kernels after FWHT: Aurora mega,
+  linear_backward_projection_cta_device_scale_kernel, causal_attention_kernel,
+  and lm_head_kernel. Longer coupled sweeps should include the phase=2/block=90
+  point as measured history, not as an untested hypothesis.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Fix causal attention launch for head_dim=128 candidates.
+status: correctness fix verified; no new 900-second best in this pass
+target:
+  Keep the optimization loop honest by making wider model candidates compute
+  all attention head dimensions. The previous causal attention launch used a
+  fixed 64-thread block, so head_dim=128 candidates only wrote dimensions
+  0..63 for each head.
+code_change:
+  crates/cuda-kernels/src/gpt/attention/causal.rs now selects the causal
+  attention block size from head_dim, rounded to a warp multiple and capped at
+  128 threads. Score max/denom reductions use thread::blockDim_x() and the
+  runtime warp count instead of the old fixed 64-thread constants.
+invalidated_history:
+  Prior 900-second and sweep rows with n_embd/n_head=128 were generated by the
+  truncated attention path and are not valid quality evidence. The affected
+  rows were removed from notes/sweep_seed.tsv so future Bayesian/Pareto sweeps
+  do not score or suppress corrected wider candidates using stale data.
+rejected_runtime_experiment:
+  A one-phase Aurora layout was tested for the current L2 d1024 shape:
+  AURORA_MATRIX_PHASES=1, AURORA_COOPERATIVE_BLOCKS=45.
+  target/nsys/phase1_blocks45_b8_l2d1024_20_20260619T151629Z.nsys-rep
+  It was worse than the current phase=2/block=90 layout:
+  aurora_mega_update_cooperative_kernel increased from 782.292149ms to
+  959.618964ms over 20 calls, and 20-step train time increased from about
+  3.245s to 3.398s. This layout was not added to the sweep search space.
+corrected_wider_check:
+  target/attention_dynamic_b8_l2d1536_100steps_20260619T152027Z.log
+  Shape B8 L2 d1536 h12, Aurora phases=2 blocks=90, head_dim=128.
+  Same optimizer settings as the current d1024 best:
+  lr_scale=1.575554, adam_lr_scale=1.271614, warmup=20,
+  start_ratio=0.2, amuse_beta1=0.2, amuse_rho=1.0.
+  completed_steps=100, train_elapsed_s=34.907, heldout_eval val_loss=7.440040.
+comparison:
+  The corrected d1024 check after the same attention fix finished 100 steps in
+  16.555s with heldout_eval val_loss=7.288638:
+  target/attention_dynamic_b8_l2d1024_100steps_20260619T151952Z.log.
+  The corrected d1536 shape was finite, but was about 2.1x slower and worse at
+  the 100-step held-out check, so it was not promoted to a 900-second direct
+  validation run in this pass.
+verification:
+  cargo fmt --check: pass.
+  cargo check -p rust-kernels-cuda --tests: pass.
+  cargo test --bin sweep: pass.
+  cargo oxide build --arch sm_120a with default d1536/h12 head_dim=128: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  causal_attention_log_sum_exp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l2_attention --
+  --ignored --nocapture: pass.
+  GPT2_BATCH_SIZE=8 GPT2_N_LAYER=2 GPT2_N_EMBD=1024 GPT2_N_HEAD=16
+  AURORA_MATRIX_PHASES=2 AURORA_COOPERATIVE_BLOCKS=90 cargo oxide build
+  --arch sm_120a: pass.
+  100-step d1024 and corrected d1536 SYNTH checks: pass, finite through
+  heldout_eval.
+next_experiment:
+  Future 900-second sweeps may include d1536/d2048 again, but only as corrected
+  candidates. The current best measured 900-second point remains B8 L2 d1024
+  h16 phase=2/block=90 with val_loss=4.623164.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: nanoGPT practices to test under fixed-wall validation.
+status: research note only; no code changes made from this list yet
+sources:
+  https://github.com/karpathy/nanoGPT/blob/master/train.py
+  https://github.com/karpathy/nanoGPT/blob/master/model.py
+  https://github.com/karpathy/nanoGPT/blob/master/config/train_shakespeare_char.py
+  https://github.com/karpathy/llm.c/discussions/481
+observed_nanogpt_practices:
+  - Pretraining defaults use bias=false, dropout=0.0, AdamW lr=6e-4,
+    beta1=0.9, beta2=0.95, weight_decay=0.1, grad_clip=1.0, warmup,
+    cosine decay, and min_lr=lr/10.
+  - Small Shakespeare character training uses dropout=0.2, batch=64,
+    block_size=256, 6 layers, 6 heads, n_embd=384, lr=1e-3, beta2=0.99,
+    warmup=100, and validation averaging every 250 steps.
+  - Validation loss is estimated over many batches, not a single held-out
+    batch, before checkpoint/best-loss decisions.
+  - Parameters are split by dimensionality for decay: 2D matmul/embedding
+    tensors get weight decay; bias and layer-norm vectors do not.
+  - Residual projection weights named c_proj are initialized with
+    std=0.02/sqrt(2*n_layer), while other linear/embedding weights use
+    std=0.02.
+  - Token embedding and LM-head weights are tied.
+  - Vocab is padded to 50304 for GPT-2 training efficiency.
+  - Training asynchronously prefetches the next batch before backward.
+  - Inference only evaluates the LM head at the final token position.
+related_llm_c_practices:
+  - GPT-2 reproduction targets about 0.5M tokens per optimizer update, using
+    gradient accumulation when a single GPU cannot fit the desired microbatch.
+  - The run uses gradient clipping at norm 1.0 and logs gradient norm because
+    norm spikes are treated as direct evidence of instability.
+  - Activation recomputation is used as a memory-throughput tradeoff: recompute
+    GeLU activations to fit a larger batch, then disable recompute only if
+    memory allows it without losing throughput.
+  - Validation is logged periodically and generation is mostly deferred to the
+    end; intermediate samples are not used as the optimization target.
+to_test_under_900s_heldout_validation:
+  1. Add gradient global-norm clipping as a sweep dimension.
+     Coupled search variables: lr_scale, adam_lr_scale, batch_size,
+     beta1/beta2 or AMUSE analogs, and grad_clip.
+     Measurement: held-out val loss after 900s, NaN/finiteness, completed steps.
+  2. Add residual-projection scaled initialization for attention c_proj and MLP
+     c_proj weights, using the nanoGPT std=0.02/sqrt(2*n_layer) rule adapted to
+     the NVFP4 master-weight initialization path.
+     Measurement: 100-step stability gate, then 900s held-out val.
+  3. Add parameter-group weight decay semantics.
+     2D matrix/embedding weights decay; layer norm vectors and biases do not.
+     Measurement: compare against current optimizer update on the same
+     Bayesian/coupled sweep budget.
+  4. Add dropout as an actual architecture/training sweep variable only if the
+     kernels can support it without a CPU path or hidden fallback.
+     Measurement: fixed-wall validation on SYNTH, not Shakespeare train loss.
+  5. Change held-out validation from the current fixed small slice to a
+     multi-window average, preserving deterministic sample selection.
+     Measurement: variance of reported val_loss across repeated eval-only runs.
+  6. Check whether vocab padding/tokenizer choice can reduce LM-head edge cost.
+     Constraint: do not change dataset semantics merely to improve speed; this
+     must be evaluated by held-out validation over equal wall-clock.
+  7. Implement inference-only final-token LM-head evaluation for generation.
+     This is generation speed only and must not affect training loss.
+  8. Add async/pipelined batch staging only if it removes observable host-side
+     stalls in nsys. This is a throughput test, not a model-quality change.
+  9. Test activation recomputation for MLP/relu2 saved activations if it permits
+     larger actual batch size without adding more wall-clock than the batch
+     increase saves. Measurement must include held-out validation, completed
+     steps, and nsys kernel mix.
+  10. Add gradient norm reporting and clipping to the sweep contract. The sweep
+      should treat NaN/finite=false as failure immediately and should report
+      norm spikes as instability evidence, not just final validation loss.
+rejected_as_direct_copy:
+  nanoGPT's small Shakespeare config is character-level and intentionally
+  overfits a tiny dataset. Its dropout=0.2, context=256, and beta2=0.99 are
+  useful sweep candidates, but not direct settings for SYNTH tokenizer training.
+objective_rule:
+  Promote an item only if it improves held-out validation loss at the same
+  wall-clock budget or improves throughput without worsening validation in the
+  paired fixed-wall test.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Next quantized-throughput target after LM-head CTA.
+status: research note only while current sweep is running
+current_best_completed:
+  Current-code sweep trial_0002 reached heldout_eval val_loss=4.243804 after
+  900s and 5376 completed steps:
+  target/sweeps/lm_head_cta_current_900_20260619T155927Z/trial_0002/train.log.
+profile_basis:
+  target/nsys/lm_head_cta_b8_l2d1024_20_20260619T153905Z_stats.txt
+  Top GPU kernels after LM-head CTA:
+    aurora_mega_update_cooperative_kernel: 795.324697ms, 25.3%
+    linear_backward_projection_cta_device_scale_kernel: 527.892098ms, 16.8%
+    causal_attention_kernel: 462.040622ms, 14.7%
+    fp32_to_nvfp4_ms_eden_device_scale_kernel: 289.639586ms, 9.2%
+    lm_head_kernel: 141.260135ms, 4.5%
+quantization_position:
+  The backward linear path already uses NVFP4 TC projection through
+  linear_backward_projection_cta_device_scale_kernel. The remaining overhead is
+  not that those GEMMs are FP32; it is operand preparation around them:
+  decode_weight_t, transpose_f32, decode_rowwise_t, then MS-EDEN quantization
+  of E, W^T, E^T, and X^T before the TC projection.
+candidate_experiment:
+  Add a fused transpose/decode-to-MS-EDEN operand packer for transposed backward
+  operands:
+    - FP32 E -> packed rowwise MS-EDEN E^T without materializing FP32 E^T.
+    - saved rowwise NVFP4 X -> packed rowwise MS-EDEN X^T without materializing
+      FP32 X^T.
+    - stored NVFP4 W -> packed MS-EDEN W^T or reuse decoded W^T only if the
+      direct packed path is not practical.
+  The output contract should remain the existing Nvfp4RowwiseDeviceTensor /
+  Nvfp4DeviceScaleMmaWeightTensor consumed by the CTA projection kernel.
+implementation_shape:
+  Put the fused packers under crates/cuda-kernels/src/utils/nvfp4/quant rather
+  than attention/MLP. They are layout-aware Quartet/MS-EDEN operand builders,
+  not layer-specific math.
+  The existing MS-EDEN body is already row-major over
+  (row_count, src_row_len, dst_row_len). The fused variant should share the
+  Hadamard/scale/correction logic but replace hadamard_input with source
+  loaders:
+    - FP32 transpose source: value(row, col) = x[col * row_count + row].
+      This replaces transpose_f32_kernel followed by MS-EDEN.
+    - rowwise NVFP4 transpose source:
+      value(row, col) = nvfp4_rowwise_value(bytes, scales, global_scales,
+      src_original_cols, col, row). This replaces
+      nvfp4_decode_rowwise_transpose_f32_kernel followed by MS-EDEN.
+    - scalar/global NVFP4 transpose source:
+      value(row, col) = nvfp4_value(bytes, scales, global_scale[0],
+      col * original_cols + row). This can replace
+      nvfp4_decode_transpose_f32_kernel followed by MS-EDEN for W^T if the
+      source layout matches the weight tensor.
+  Add launcher args next to MsEdenDeviceScaleQuantArgs, returning the same
+  out_fp4/out_scales/out_global_scales/out_chunk_amax/out_global_scale buffers
+  used by LinearBackwardMsEdenScratch today. Then route
+  LinearBackwardModule::backward_ms_eden through the fused packers for E^T and
+  X^T first, since those remove the obvious FP32 transpose/decode materialized
+  buffers without changing the CTA projection call.
+expected_effect:
+  Reduce transpose_f32_kernel, transpose_matrix_kernel,
+  nvfp4_decode_rowwise_transpose_f32_kernel, nvfp4_decode_transpose_f32_kernel,
+  and part of fp32_to_nvfp4_ms_eden_device_scale_kernel launch/memory cost.
+  This preserves the Quartet II backward quantization contract and increases
+  useful NVFP4 TC work per fixed wall-clock.
+non_goal:
+  Do not replace this with a pure FP16/FP32 backward shortcut. Gradient clipping
+  can still be a coupled stability sweep variable, but it is not the main
+  quantization-throughput optimization.
+verification_plan:
+  1. Add focused GPU correctness tests comparing packed fused operands against
+     the existing materialize-then-MS-EDEN path for deterministic seeds.
+  2. Run the linear backward ignored GPU tests.
+  3. Run a 100-step SYNTH or Shakespeare sustained check for finite/nonzero
+     behavior.
+  4. Profile 20 steps and require reduced operand-prep kernel time.
+  5. Promote only after a 900-second held-out validation run is not worse, or
+     after the coupled sweep finds a better validation point.
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
+experiment: Make hill-climb baseline promotion automatic.
+status: implemented and unit-tested
+measured_baseline:
+  Source trial:
+    target/sweeps/lm_head_cta_current_900_20260619T155927Z/trial_0002/train.log
+  Held-out validation loss: 4.243804
+  Completed steps in 900s: 5376
+  Config:
+    GPT2_BATCH_SIZE=8
+    GPT2_N_LAYER=2
+    GPT2_N_EMBD=1024
+    GPT2_N_HEAD=16
+    AURORA_MATRIX_PHASES=2
+    AURORA_COOPERATIVE_BLOCKS=80
+    TRAIN_LR_SCALE=1.014040
+    TRAIN_ADAM_LR_SCALE=1.980467
+    TRAIN_LR_WARMUP_STEPS=5
+    TRAIN_LR_START_RATIO=0.050000
+    TRAIN_AMUSE_BETA1=0.200000
+    TRAIN_AMUSE_RHO=0.500000
+implementation:
+  Added notes/sweep_baseline.env as the mutable hill-climb baseline.
+  Build scripts read that file when explicit GPT2_* / AURORA_* env vars are
+  absent and rerun when the file changes.
+  Runtime learning-rate defaults read the same file when TRAIN_* env vars are
+  absent.
+  The sweep runner loads the baseline, starts a fresh sweep from it when no
+  trial history exists, and rewrites the baseline file whenever a successful
+  trial beats the current baseline validation loss.
+verification:
+  cargo test -p rust-kernels --bin sweep -- --nocapture
+    result: 6 passed
+  dry-run sweep started from:
+    b8_l2_d1024_h16_p2_c80_lr1.0140_alr1.9805_w5_s0.05_b0.20_r0.50
+  Generated debug build constants:
+    GPT2_BATCH_SIZE=8, GPT2_N_LAYER=2, GPT2_N_HEAD=16, GPT2_N_EMBD=1024
+    AURORA_COOPERATIVE_BLOCKS=80, AURORA_MATRIX_PHASES=2
 ```

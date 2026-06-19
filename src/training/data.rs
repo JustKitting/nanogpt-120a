@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
 use llama2_tokenizer::Llama2Tokenizer;
 use synth_prep::synth::SHARDS_DIR;
-use synth_prep::{DATA_DIR, SHARD_FILE_PREFIX};
+use synth_prep::{DATA_DIR, DEFAULT_TRAIN_SHARD_COUNT, SHARD_FILE_PREFIX, SHARD_SIZE};
 
 use crate::AppResult;
 
@@ -22,12 +22,16 @@ const VALIDATION_WINDOWS: usize = 4;
 
 pub struct TokenDataLoader {
     path: PathBuf,
+    train_paths: Vec<PathBuf>,
+    train_path_index: usize,
     tokens: Vec<u16>,
     validation_tokens: Option<Vec<u16>>,
     validation_path: Option<PathBuf>,
     offset: usize,
     train_end: usize,
+    total_train_tokens: usize,
     repeat_first_window: bool,
+    wrap_train: bool,
 }
 
 pub struct TokenWindowBatch {
@@ -60,23 +64,30 @@ impl TokenDataLoader {
 
     pub fn from_synth() -> AppResult<Self> {
         ensure_synth_shards()?;
+        let train_paths = train_shards()?;
         let validation_path = first_val_shard()?;
         let validation_tokens = read_u16_tokens(&validation_path)?;
-        Self::from_path(
-            first_train_shard()?,
+        Self::from_train_paths(
+            train_paths,
             Some((validation_path, validation_tokens)),
+            false,
+            false,
         )
     }
 
     pub fn from_shakespeare() -> AppResult<Self> {
         let path = ensure_shakespeare_shard()?;
-        Self::from_path(path, None)
+        Self::from_train_paths(vec![path], None, true, true)
     }
 
     pub fn next_batch(&mut self) -> AppResult<TokenWindowBatch> {
         let len = GPT2_SEQ_LEN + 1;
+        let batch_span = GPT2_BATCH_SIZE * GPT2_SEQ_LEN + 1;
         if self.train_end < len {
             return Err(format!("{} has fewer than {len} tokens", self.path.display()).into());
+        }
+        if !self.repeat_first_window && self.offset + batch_span > self.train_end {
+            self.advance_train_shard()?;
         }
 
         let mut offsets = Vec::with_capacity(GPT2_BATCH_SIZE);
@@ -84,9 +95,6 @@ impl TokenDataLoader {
             offsets.resize(GPT2_BATCH_SIZE, 0);
         } else {
             for _ in 0..GPT2_BATCH_SIZE {
-                if self.offset + len > self.train_end {
-                    self.offset = 0;
-                }
                 offsets.push(self.offset);
                 self.offset += GPT2_SEQ_LEN;
             }
@@ -106,7 +114,7 @@ impl TokenDataLoader {
     }
 
     pub fn token_count(&self) -> usize {
-        self.tokens.len()
+        self.total_train_tokens
     }
 
     pub fn validation_tokens(&self) -> AppResult<Vec<u16>> {
@@ -120,25 +128,67 @@ impl TokenDataLoader {
         validation_windows(&self.path, &self.tokens, start)
     }
 
-    fn from_path(path: PathBuf, validation: Option<(PathBuf, Vec<u16>)>) -> AppResult<Self> {
+    fn from_train_paths(
+        train_paths: Vec<PathBuf>,
+        validation: Option<(PathBuf, Vec<u16>)>,
+        wrap_train: bool,
+        reserve_validation_tail: bool,
+    ) -> AppResult<Self> {
+        let path = train_paths
+            .first()
+            .cloned()
+            .ok_or("training dataset has no train shards")?;
         let tokens = read_u16_tokens(&path)?;
         let train_end = if validation.is_some() {
             tokens.len()
-        } else {
+        } else if reserve_validation_tail {
             train_end(tokens.len())
+        } else {
+            tokens.len()
         };
+        let total_train_tokens = token_count_paths(&train_paths)?;
         let (validation_path, validation_tokens) = validation
             .map(|(path, tokens)| (Some(path), Some(tokens)))
             .unwrap_or((None, None));
         Ok(Self {
             path,
+            train_paths,
+            train_path_index: 0,
             tokens,
             validation_tokens,
             validation_path,
             offset: 0,
             train_end,
+            total_train_tokens,
             repeat_first_window: repeat_first_window(),
+            wrap_train,
         })
+    }
+
+    fn advance_train_shard(&mut self) -> AppResult<()> {
+        let next_index = self.train_path_index + 1;
+        if next_index >= self.train_paths.len() {
+            if !self.wrap_train {
+                return Err(format!(
+                    "ran out of fresh train shards after {}; prepare more SYNTH train shards",
+                    self.path.display()
+                )
+                .into());
+            }
+            self.train_path_index = 0;
+        } else {
+            self.train_path_index = next_index;
+        }
+
+        self.path = self.train_paths[self.train_path_index].clone();
+        self.tokens = read_u16_tokens(&self.path)?;
+        self.train_end = if self.validation_tokens.is_some() {
+            self.tokens.len()
+        } else {
+            train_end(self.tokens.len())
+        };
+        self.offset = 0;
+        Ok(())
     }
 }
 
@@ -173,6 +223,18 @@ fn train_end(token_count: usize) -> usize {
         .max(GPT2_SEQ_LEN + 1)
 }
 
+fn token_count_paths(paths: &[PathBuf]) -> AppResult<usize> {
+    let mut total = 0usize;
+    for path in paths {
+        let bytes = path.metadata()?.len();
+        if bytes % 2 != 0 {
+            return Err(format!("{} has odd byte length", path.display()).into());
+        }
+        total += (bytes / 2) as usize;
+    }
+    Ok(total)
+}
+
 fn training_dataset() -> String {
     std::env::var(TRAIN_DATASET_ENV).unwrap_or_else(|_| DATASET_SYNTH.to_string())
 }
@@ -182,16 +244,26 @@ fn repeat_first_window() -> bool {
         .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
 }
 
-fn first_train_shard() -> AppResult<PathBuf> {
-    first_shard("train")
+fn train_shards() -> AppResult<Vec<PathBuf>> {
+    let shards = shards_for_split("train")?
+        .into_iter()
+        .filter(|path| is_full_synth_shard(path))
+        .collect::<Vec<_>>();
+    if shards.is_empty() {
+        return Err("no full SYNTH train shards found".into());
+    }
+    Ok(shards)
 }
 
 fn first_val_shard() -> AppResult<PathBuf> {
-    first_shard("val")
+    shards_for_split("val")?
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("no val shards found in {}", synth_shard_dir().display()).into())
 }
 
-fn first_shard(split: &str) -> AppResult<PathBuf> {
-    let dir = Path::new(DATA_DIR).join(SHARDS_DIR);
+fn shards_for_split(split: &str) -> AppResult<Vec<PathBuf>> {
+    let dir = synth_shard_dir();
     let prefix = format!("{SHARD_FILE_PREFIX}_{split}_");
     let mut shards = Vec::new();
 
@@ -210,19 +282,33 @@ fn first_shard(split: &str) -> AppResult<PathBuf> {
     }
 
     shards.sort();
-    shards
-        .into_iter()
-        .next()
-        .ok_or_else(|| format!("no {split} shards found in {}", dir.display()).into())
+    Ok(shards)
+}
+
+fn synth_shard_dir() -> PathBuf {
+    Path::new(DATA_DIR).join(SHARDS_DIR)
+}
+
+fn is_full_synth_shard(path: &Path) -> bool {
+    path.metadata()
+        .is_ok_and(|metadata| metadata.len() == (SHARD_SIZE * 2) as u64)
 }
 
 fn ensure_synth_shards() -> AppResult<()> {
-    if first_train_shard().is_ok() && first_val_shard().is_ok() {
+    if train_shards().is_ok_and(|shards| shards.len() >= DEFAULT_TRAIN_SHARD_COUNT)
+        && first_val_shard().is_ok()
+    {
         return Ok(());
     }
 
-    synth_prep::parse_data()?;
-    first_train_shard()?;
+    synth_prep::parse_data_for_train_shards(DEFAULT_TRAIN_SHARD_COUNT)?;
+    let train_shard_count = train_shards()?.len();
+    if train_shard_count < DEFAULT_TRAIN_SHARD_COUNT {
+        return Err(format!(
+            "expected {DEFAULT_TRAIN_SHARD_COUNT} full SYNTH train shards, found {train_shard_count}"
+        )
+        .into());
+    }
     first_val_shard().map(|_| ())
 }
 

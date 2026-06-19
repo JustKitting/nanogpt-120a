@@ -29,6 +29,7 @@ impl Trainer {
                 batch.batch_size as u32,
                 batch.seq_len as u32,
                 batch.token_count as u32,
+                &self.buffers.logits,
             );
             let weights = backward_weights(&self.uploaded);
             let mut backward = self.buffers.backward.parts();

@@ -1,19 +1,17 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::linear_backward::LinearBackwardMsEdenScratch;
+use rust_kernels_cuda::linear_backward::{
+    LinearBackwardInputTranspose, LinearBackwardMsEdenScratch, LinearBackwardWeightTranspose,
+};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
+use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 
 use super::args::MlpBackwardModules;
 use super::linear::{MlpLinearBackwardCall, run_linear_backward};
-use super::transforms::{decode_rowwise_t, decode_weight_t, transpose_f32};
 
 pub(super) struct LinearPass<'a, 'scratch, 'out> {
     pub e: &'a DeviceBuffer<f32>,
     pub saved_input: Nvfp4RowwiseDeviceTensor<'a>,
     pub weight: Nvfp4FourSixMmaWeightTensor<'a>,
-    pub error_t: &'scratch mut DeviceBuffer<f32>,
-    pub weight_t: &'scratch mut DeviceBuffer<f32>,
-    pub input_t: &'scratch mut DeviceBuffer<f32>,
     pub linear_scratch: LinearBackwardMsEdenScratch<'scratch>,
     pub dinput: &'out mut DeviceBuffer<f32>,
     pub dweight: &'out mut DeviceBuffer<f32>,
@@ -31,39 +29,18 @@ pub(super) fn run_linear_pass(
     pass: LinearPass<'_, '_, '_>,
 ) -> Result<(), DriverError> {
     let row_count = pass.row_count;
-    decode_weight_t(
-        modules.decode,
-        stream,
-        pass.weight,
-        pass.weight_t,
-        pass.output_dim as usize,
-        pass.input_dim as usize,
-    )?;
-    transpose_f32(
-        modules.transpose,
-        stream,
-        pass.e,
-        pass.error_t,
-        row_count as usize,
-        pass.output_dim as usize,
-    )?;
-    decode_rowwise_t(
-        modules.decode,
-        stream,
-        pass.saved_input,
-        pass.input_t,
-        row_count as usize,
-        pass.input_dim as usize,
-    )?;
     run_linear_backward(
         modules.linear,
         modules.quant,
         stream,
         MlpLinearBackwardCall {
             e: pass.e,
-            weight_t: pass.weight_t,
-            e_t: pass.error_t,
-            input_t: pass.input_t,
+            weight_t: LinearBackwardWeightTranspose::Nvfp4(Nvfp4DeviceTensor {
+                bytes: pass.weight.bytes,
+                scales: pass.weight.scales,
+                global_scale: pass.weight.global_scale,
+            }),
+            input_t: LinearBackwardInputTranspose::RowwiseNvfp4(pass.saved_input),
             scratch: pass.linear_scratch,
             dinput: pass.dinput,
             dweight: pass.dweight,

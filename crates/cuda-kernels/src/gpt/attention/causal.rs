@@ -5,8 +5,8 @@ use super::AttentionModule;
 use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32, sincos_f32};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
-pub(crate) const CAUSAL_ATTENTION_THREADS_PER_BLOCK: u32 = 64;
-pub(crate) const CAUSAL_WARPS_PER_BLOCK: u32 = CAUSAL_ATTENTION_THREADS_PER_BLOCK / 32;
+pub(crate) const CAUSAL_ATTENTION_MAX_THREADS_PER_BLOCK: u32 = 128;
+pub(crate) const CAUSAL_MAX_WARPS_PER_BLOCK: u32 = CAUSAL_ATTENTION_MAX_THREADS_PER_BLOCK / 32;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -43,7 +43,7 @@ impl AttentionModule {
             args.stream,
             LaunchConfig {
                 grid_dim: (args.seq_len, args.head_count, args.batch_size),
-                block_dim: (CAUSAL_ATTENTION_THREADS_PER_BLOCK, 1, 1),
+                block_dim: (causal_attention_threads(args.head_dim), 1, 1),
                 shared_mem_bytes: 0,
             },
             args.qkv,
@@ -63,6 +63,12 @@ impl AttentionModule {
     }
 }
 
+fn causal_attention_threads(head_dim: u32) -> u32 {
+    let threads = head_dim.div_ceil(32) * 32;
+    assert!(threads <= CAUSAL_ATTENTION_MAX_THREADS_PER_BLOCK);
+    threads.max(32)
+}
+
 #[allow(static_mut_refs)]
 #[cuda_module]
 pub mod kernels {
@@ -72,7 +78,8 @@ pub mod kernels {
     const NEG_INFINITY: f32 = -3.4028235e38_f32;
 
     static mut SCORES: SharedArray<f32, MAX_CAUSAL_TOKENS> = SharedArray::UNINIT;
-    static mut REDUCE: SharedArray<f32, { CAUSAL_WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
+    static mut REDUCE: SharedArray<f32, { CAUSAL_MAX_WARPS_PER_BLOCK as usize }> =
+        SharedArray::UNINIT;
 
     #[kernel]
     pub fn causal_attention_kernel(
@@ -84,9 +91,9 @@ pub mod kernels {
         let query = thread::blockIdx_x();
         let head = thread::blockIdx_y();
         let batch = thread::blockIdx_z();
-        let thread = thread::threadIdx_x();
+        let thread_index = thread::threadIdx_x();
         let lane = warp::lane_id();
-        let warp_in_block = thread / 32;
+        let warp_in_block = thread_index / 32;
 
         let row = batch * params.seq_len + query;
         if query >= params.seq_len
@@ -97,15 +104,15 @@ pub mod kernels {
             return;
         }
 
-        let query_value = if thread < params.head_dim {
-            rope_q_value(qkv, batch, query, head, thread, &params)
+        let query_value = if thread_index < params.head_dim {
+            rope_q_value(qkv, batch, query, head, thread_index, &params)
         } else {
             0.0
         };
         let mut key = 0;
         while key <= query {
-            let local_dot = if thread < params.head_dim {
-                query_value * rope_k_value(qkv, batch, key, head, thread, &params)
+            let local_dot = if thread_index < params.head_dim {
+                query_value * rope_k_value(qkv, batch, key, head, thread_index, &params)
             } else {
                 0.0
             };
@@ -119,10 +126,10 @@ pub mod kernels {
 
             thread::sync_threads();
 
-            if thread == 0 {
+            if thread_index == 0 {
                 let mut dot = 0.0;
                 let mut warp_index = 0;
-                while warp_index < CAUSAL_WARPS_PER_BLOCK {
+                while warp_index < thread::blockDim_x() / 32 {
                     unsafe {
                         dot += REDUCE[warp_index as usize];
                     }
@@ -138,9 +145,9 @@ pub mod kernels {
             key += 1;
         }
 
-        let score_max = score_max(query, thread);
-        let denom = score_denom(query, thread, score_max);
-        if thread == 0 {
+        let score_max = score_max(query, thread_index);
+        let denom = score_denom(query, thread_index, score_max);
+        if thread_index == 0 {
             let log_sum_exp_index = (batch as usize * params.head_count as usize + head as usize)
                 * params.seq_len as usize
                 + query as usize;
@@ -149,7 +156,7 @@ pub mod kernels {
             }
         }
 
-        if thread < params.head_dim {
+        if thread_index < params.head_dim {
             let mut value = 0.0;
             key = 0;
             while key <= query {
@@ -157,7 +164,7 @@ pub mod kernels {
                 let weight = exp_f32(score - score_max) / denom;
                 value = fma_f32(
                     weight,
-                    v_value(qkv, batch, key, head, thread, &params),
+                    v_value(qkv, batch, key, head, thread_index, &params),
                     value,
                 );
                 key += 1;
@@ -165,7 +172,7 @@ pub mod kernels {
 
             let out_index = row as usize * params.embedding_dim as usize
                 + head as usize * params.head_dim as usize
-                + thread as usize;
+                + thread_index as usize;
             unsafe {
                 *out.get_unchecked_mut(out_index) = value;
             }
@@ -176,6 +183,8 @@ pub mod kernels {
     fn score_max(query: u32, thread_index: u32) -> f32 {
         let lane = warp::lane_id();
         let warp_in_block = thread_index / 32;
+        let block_threads = thread::blockDim_x();
+        let warp_count = block_threads / 32;
         let mut local_max = NEG_INFINITY;
         let mut key = thread_index;
 
@@ -183,7 +192,7 @@ pub mod kernels {
             unsafe {
                 local_max = max_f32(local_max, SCORES[key as usize]);
             }
-            key += CAUSAL_ATTENTION_THREADS_PER_BLOCK;
+            key += block_threads;
         }
         let warp_max = warp_max_f32(local_max);
 
@@ -198,7 +207,7 @@ pub mod kernels {
         if thread_index == 0 {
             let mut block_max = NEG_INFINITY;
             let mut warp_index = 0;
-            while warp_index < CAUSAL_WARPS_PER_BLOCK {
+            while warp_index < warp_count {
                 unsafe {
                     block_max = max_f32(block_max, REDUCE[warp_index as usize]);
                 }
@@ -218,6 +227,8 @@ pub mod kernels {
     fn score_denom(query: u32, thread_index: u32, score_max: f32) -> f32 {
         let lane = warp::lane_id();
         let warp_in_block = thread_index / 32;
+        let block_threads = thread::blockDim_x();
+        let warp_count = block_threads / 32;
         let mut local_sum = 0.0;
         let mut key = thread_index;
 
@@ -225,7 +236,7 @@ pub mod kernels {
             unsafe {
                 local_sum += exp_f32(SCORES[key as usize] - score_max);
             }
-            key += CAUSAL_ATTENTION_THREADS_PER_BLOCK;
+            key += block_threads;
         }
         let warp_total = warp_sum_f32(local_sum);
 
@@ -240,7 +251,7 @@ pub mod kernels {
         if thread_index == 0 {
             let mut denom = 0.0;
             let mut warp_index = 0;
-            while warp_index < CAUSAL_WARPS_PER_BLOCK {
+            while warp_index < warp_count {
                 unsafe {
                     denom += REDUCE[warp_index as usize];
                 }

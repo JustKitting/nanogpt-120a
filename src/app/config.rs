@@ -4,11 +4,12 @@ use crate::training::SamplingConfig;
 
 use super::run_output::RunOutput;
 
-pub const SEED: u64 = 0x4750_5432;
-const DEFAULT_TRAIN_MAX_SECONDS: f64 = 300.0;
+pub const DEFAULT_SEED: u64 = 0x4750_5432;
+const DEFAULT_TRAIN_MAX_SECONDS: f64 = 900.0;
 const DEFAULT_TRAIN_STEP_CAP: usize = 1_000_000;
 
 pub struct TrainConfig {
+    pub seed: u64,
     pub step_cap: usize,
     pub log_interval: usize,
     pub eval_interval: Option<usize>,
@@ -18,6 +19,7 @@ pub struct TrainConfig {
 impl TrainConfig {
     pub fn from_env() -> Self {
         Self {
+            seed: env_u64("TRAIN_SEED").unwrap_or(DEFAULT_SEED),
             step_cap: env_usize("TRAIN_STEPS").unwrap_or(DEFAULT_TRAIN_STEP_CAP),
             log_interval: env_usize("TRAIN_LOG_INTERVAL").unwrap_or(1).max(1),
             eval_interval: env_usize("TRAIN_EVAL_INTERVAL").filter(|interval| *interval > 0),
@@ -79,6 +81,15 @@ fn env_usize(name: &str) -> Option<usize> {
     std::env::var(name)
         .ok()
         .and_then(|value| value.parse().ok())
+}
+
+fn env_u64(name: &str) -> Option<u64> {
+    let value = std::env::var(name).ok()?;
+    value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+        .map(|hex| u64::from_str_radix(hex, 16).ok())
+        .unwrap_or_else(|| value.parse().ok())
 }
 
 fn env_f32(name: &str) -> Option<f32> {

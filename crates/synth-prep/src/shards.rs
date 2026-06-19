@@ -8,14 +8,16 @@ use crate::synth::{DATA_DIR, SHARD_FILE_PREFIX, SHARD_SIZE, SHARDS_DIR};
 pub struct ShardWriter {
     output_dir: PathBuf,
     shard_index: usize,
+    target_train_shards: usize,
     tokens: Vec<u16>,
 }
 
 impl ShardWriter {
-    pub fn new() -> Self {
+    pub fn new(target_train_shards: usize) -> Self {
         Self {
             output_dir: PathBuf::from(DATA_DIR).join(SHARDS_DIR),
             shard_index: 0,
+            target_train_shards,
             tokens: Vec::with_capacity(SHARD_SIZE),
         }
     }
@@ -28,12 +30,12 @@ impl ShardWriter {
         Ok(())
     }
 
-    pub fn has_default_train_and_val_shards(&self) -> bool {
-        self.shard_index >= 2
+    pub fn has_required_train_and_val_shards(&self) -> bool {
+        self.shard_index > self.target_train_shards
     }
 
     pub fn finish(mut self) -> AppResult<()> {
-        if !self.tokens.is_empty() {
+        if !self.has_required_train_and_val_shards() && !self.tokens.is_empty() {
             self.flush_current()?;
         }
         Ok(())

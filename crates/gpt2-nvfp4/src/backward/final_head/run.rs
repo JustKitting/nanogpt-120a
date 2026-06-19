@@ -1,9 +1,11 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::linear_backward::{LinearBackwardModule, LinearBackwardMsEdenArgs};
+use rust_kernels_cuda::linear_backward::{
+    LinearBackwardInputTranspose, LinearBackwardModule, LinearBackwardMsEdenArgs,
+    LinearBackwardWeightTranspose,
+};
 use rust_kernels_cuda::loss::{CrossEntropyArgs, LossModule};
 
 use super::args::{FinalHeadBackwardArgs, FinalHeadBackwardScratch};
-use super::transpose::{decode_final_normalized, decode_lm_head_weight, transpose_dlogits};
 use crate::{GPT2_N_EMBD, GPT2_VOCAB_SIZE};
 
 pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
@@ -32,32 +34,14 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         dlogits,
         row_count,
     )?;
-    transpose_dlogits(
-        modules.transpose,
-        stream,
-        &*dlogits,
-        &mut *scratch.dlogits_t,
-        row_count,
-    )?;
-    decode_lm_head_weight(
-        modules.decode,
-        stream,
-        lm_head_weight,
-        &mut *scratch.lm_head_weight_t,
-    )?;
-    decode_final_normalized(
-        modules.decode,
-        stream,
-        final_normalized,
-        &mut *scratch.final_normalized_t,
-        row_count,
-    )?;
     run_linear_backward(
         modules.linear,
         stream,
         modules.quant,
         LinearBackwardInputs {
             dlogits,
+            final_normalized,
+            lm_head_weight,
             d_final_normalized,
             d_lm_head_weight,
             scratch,
@@ -90,6 +74,8 @@ fn run_loss(
 
 struct LinearBackwardInputs<'scratch, 'out> {
     dlogits: &'out mut DeviceBuffer<f32>,
+    final_normalized: rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor<'scratch>,
+    lm_head_weight: rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor<'scratch>,
     d_final_normalized: &'out mut DeviceBuffer<f32>,
     d_lm_head_weight: &'out mut DeviceBuffer<f32>,
     scratch: FinalHeadBackwardScratch<'scratch>,
@@ -108,9 +94,8 @@ fn run_linear_backward(
         stream,
         quant_module,
         e: &*inputs.dlogits,
-        weight_t: inputs.scratch.lm_head_weight_t,
-        e_t: inputs.scratch.dlogits_t,
-        input_t: inputs.scratch.final_normalized_t,
+        weight_t: LinearBackwardWeightTranspose::Nvfp4(inputs.lm_head_weight),
+        input_t: LinearBackwardInputTranspose::RowwiseNvfp4(inputs.final_normalized),
         scratch: inputs.scratch.linear,
         dinput: inputs.d_final_normalized,
         dweight: inputs.d_lm_head_weight,
