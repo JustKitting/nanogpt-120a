@@ -20,4 +20,15 @@ impl<W: Nvfp4Shape, B: Nvfp4Shape> LinearWeights<W, B> {
             bias: B::zero_tensor(),
         }
     }
+
+    pub(crate) fn init_with_weight_scale(rng: &mut InitRng, weight_scale: f32) -> Self
+    where
+        W: Nvfp4ShapeInit,
+        B: Nvfp4ShapeInit,
+    {
+        Self {
+            weight: W::smooth_tensor_with_global_scale(rng, weight_scale),
+            bias: B::zero_tensor(),
+        }
+    }
 }

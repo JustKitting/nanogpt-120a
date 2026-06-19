@@ -31,6 +31,42 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: not committed
+experiment: Scale residual projection initialization.
+status: validated and promoted
+target:
+  Apply nanoGPT-style residual projection initialization to the block residual
+  projections while keeping the current Llama-2 tokenizer, B8 L2 d1024 h16
+  shape, optimizer settings, and kernels unchanged.
+code_change:
+  Added a scaled NVFP4 smooth initializer and used
+  0.02 / sqrt(2 * GPT2_N_LAYER) for attention c_proj and MLP c_proj weights.
+  QKV, MLP up, token embeddings, layer norms, and biases keep their previous
+  initialization.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+sustained_check:
+  target/resid_proj_scaled_init_100step_synth_20260619T215309Z.log
+  heldout_eval val_loss=6.876441 at 100 steps; finite and nonzero.
+validation_result:
+  target/resid_proj_scaled_init_b8_l2d1024_900s_20260619T215342Z.log
+  stopped_by_wall_clock=true elapsed_s=900.050 completed_steps=5580.
+  heldout_eval split=val val_loss=4.143612 train_elapsed_s=900.211
+  completed_steps=5580.
+comparison:
+  Previous promoted baseline:
+    target/rope_preapply_b8_l2d1024_900s_20260619T203854Z.log
+    val_loss=4.224687, completed_steps=5577.
+  Residual projection scaling improves held-out validation loss by 0.081075
+  and completes 3 more steps under the same 900-second budget.
+decision:
+  Keep and promote. notes/sweep_baseline.env, notes/sweep_seed.tsv, and
+  notes/sweep_seed_current.tsv were updated to this result.
+```
+
+```text
+date: 2026-06-19
+commit: not committed
 experiment: Fuse Aurora momentum/orientation with Polar Express norm chunks.
 status: rejected at profile gate; no meaningful Aurora speedup
 target:

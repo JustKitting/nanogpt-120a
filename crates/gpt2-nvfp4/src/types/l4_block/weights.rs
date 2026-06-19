@@ -10,12 +10,12 @@ pub struct Gpt2BlockWeights {
 }
 
 impl Gpt2BlockWeights {
-    pub(crate) fn init(rng: &mut InitRng) -> Self {
+    pub(crate) fn init(rng: &mut InitRng, residual_projection_scale: f32) -> Self {
         Self {
             ln_1: LayerNormWeights::init(),
-            attn: AttentionWeights::init(rng),
+            attn: AttentionWeights::init(rng, residual_projection_scale),
             ln_2: LayerNormWeights::init(),
-            mlp: MlpWeights::init(rng),
+            mlp: MlpWeights::init(rng, residual_projection_scale),
         }
     }
 }

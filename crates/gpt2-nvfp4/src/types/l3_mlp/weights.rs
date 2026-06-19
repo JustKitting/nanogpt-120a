@@ -13,10 +13,10 @@ pub struct MlpWeights {
 }
 
 impl MlpWeights {
-    pub(crate) fn init(rng: &mut InitRng) -> Self {
+    pub(crate) fn init(rng: &mut InitRng, residual_projection_scale: f32) -> Self {
         Self {
             c_fc: MlpUpLinear::init(rng),
-            c_proj: MlpDownLinear::init(rng),
+            c_proj: MlpDownLinear::init_with_weight_scale(rng, residual_projection_scale),
         }
     }
 

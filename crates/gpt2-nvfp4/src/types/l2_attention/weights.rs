@@ -13,10 +13,10 @@ pub struct AttentionWeights {
 }
 
 impl AttentionWeights {
-    pub(crate) fn init(rng: &mut InitRng) -> Self {
+    pub(crate) fn init(rng: &mut InitRng, residual_projection_scale: f32) -> Self {
         Self {
             c_attn: QkvLinear::init(rng),
-            c_proj: ResidualLinear::init(rng),
+            c_proj: ResidualLinear::init_with_weight_scale(rng, residual_projection_scale),
         }
     }
 
