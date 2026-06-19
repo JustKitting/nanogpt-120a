@@ -1,3 +1,4 @@
+mod baseline;
 mod candidate;
 mod chain;
 mod config;

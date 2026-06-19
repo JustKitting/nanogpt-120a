@@ -6,6 +6,7 @@ use std::{
 use time::OffsetDateTime;
 
 use super::{
+    baseline::Baseline,
     candidate::Candidate,
     chain,
     config::SweepConfig,
@@ -19,6 +20,19 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
     let mut history = History::load(sweep_dir.join("trials.tsv"))?;
     let mut shared_history = History::load(config.seed_history.clone())?;
     chain::sync_shared_history(&mut shared_history, &history.trials, config.dry_run)?;
+    let mut baseline = Baseline::load(config.baseline.clone())?;
+    let initial_trials = chain::all_trials(&shared_history.trials, &history.trials);
+    if baseline.promote_best(&initial_trials, config.dry_run)? {
+        println!(
+            "sweep_baseline_promoted val_loss={:.6} key={} path={}",
+            baseline.val_loss().unwrap_or(f64::NAN),
+            baseline
+                .candidate()
+                .map(|candidate| candidate.key())
+                .unwrap_or_default(),
+            config.baseline.display()
+        );
+    }
     let mut rng = chain::sweep_rng(config.seed, history.trials.len());
 
     for index in history.trials.len()..config.trials {
@@ -30,12 +44,39 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             &mut rng,
             config.random_trials,
             config.candidate_samples,
+            baseline.candidate(),
         );
         let trial_dir = sweep_dir.join(format!("trial_{index:04}"));
+        println!("sweep_trial_begin index={index} key={}", candidate.key());
         let trial = run_trial(&trial_dir, candidate, &config)?;
+        println!(
+            "sweep_trial_end index={index} status={} val_loss={} completed_steps={} log_path={}",
+            trial.status,
+            trial
+                .val_loss
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_else(|| "NaN".to_string()),
+            trial
+                .completed_steps
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            trial.log_path.display()
+        );
         history.append_unique(trial.clone())?;
+        let promoted = baseline.promote_trial(&trial, config.dry_run)?;
         if !config.dry_run {
             shared_history.append_unique(trial)?;
+        }
+        if promoted {
+            println!(
+                "sweep_baseline_promoted val_loss={:.6} key={} path={}",
+                baseline.val_loss().unwrap_or(f64::NAN),
+                baseline
+                    .candidate()
+                    .map(|candidate| candidate.key())
+                    .unwrap_or_default(),
+                config.baseline.display()
+            );
         }
     }
     Ok(())

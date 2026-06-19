@@ -1,0 +1,138 @@
+use std::{
+    fs,
+    io::{self, Write},
+    path::PathBuf,
+};
+
+use super::{candidate::Candidate, history::Trial};
+
+const DEFAULT_SEQ_LEN: usize = 1024;
+
+pub struct Baseline {
+    path: PathBuf,
+    record: Option<Record>,
+}
+
+#[derive(Clone)]
+struct Record {
+    val_loss: f64,
+    completed_steps: Option<usize>,
+    log_path: PathBuf,
+    candidate: Candidate,
+}
+
+impl Baseline {
+    pub fn load(path: PathBuf) -> io::Result<Self> {
+        let record = fs::read_to_string(&path).ok().and_then(|text| parse(&text));
+        Ok(Self { path, record })
+    }
+
+    pub fn candidate(&self) -> Option<&Candidate> {
+        self.record.as_ref().map(|record| &record.candidate)
+    }
+
+    pub fn val_loss(&self) -> Option<f64> {
+        self.record.as_ref().map(|record| record.val_loss)
+    }
+
+    pub fn promote_best(&mut self, trials: &[Trial], dry_run: bool) -> io::Result<bool> {
+        let mut promoted = false;
+        for trial in trials {
+            promoted |= self.promote_trial(trial, dry_run)?;
+        }
+        Ok(promoted)
+    }
+
+    pub fn promote_trial(&mut self, trial: &Trial, dry_run: bool) -> io::Result<bool> {
+        if dry_run {
+            return Ok(false);
+        }
+
+        let Some(record) = trial_record(trial) else {
+            return Ok(false);
+        };
+
+        if !self.is_improvement(record.val_loss) {
+            return Ok(false);
+        }
+
+        self.record = Some(record);
+        self.write()?;
+        Ok(true)
+    }
+
+    fn is_improvement(&self, val_loss: f64) -> bool {
+        self.record
+            .as_ref()
+            .map(|record| val_loss < record.val_loss)
+            .unwrap_or(true)
+    }
+
+    fn write(&self) -> io::Result<()> {
+        let Some(record) = &self.record else {
+            return Ok(());
+        };
+
+        if let Some(parent) = self.path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let mut file = fs::File::create(&self.path)?;
+        writeln!(file, "VAL_LOSS={:.6}", record.val_loss)?;
+        if let Some(steps) = record.completed_steps {
+            writeln!(file, "COMPLETED_STEPS={steps}")?;
+        }
+        writeln!(file, "LOG_PATH={}", record.log_path.display())?;
+        writeln!(file, "GPT2_SEQ_LEN={DEFAULT_SEQ_LEN}")?;
+        write_env(&mut file, record.candidate.build_env())?;
+        write_env(&mut file, record.candidate.run_env())
+    }
+}
+
+fn write_env(file: &mut fs::File, values: Vec<(&'static str, String)>) -> io::Result<()> {
+    for (name, value) in values {
+        writeln!(file, "{name}={value}")?;
+    }
+    Ok(())
+}
+
+fn trial_record(trial: &Trial) -> Option<Record> {
+    if trial.status != "success" {
+        return None;
+    }
+    Some(Record {
+        val_loss: trial.val_loss.filter(|loss| loss.is_finite())?,
+        completed_steps: trial.completed_steps,
+        log_path: trial.log_path.clone(),
+        candidate: trial.candidate.clone(),
+    })
+}
+
+fn parse(text: &str) -> Option<Record> {
+    Some(Record {
+        val_loss: value(text, "VAL_LOSS")?.parse().ok()?,
+        completed_steps: value(text, "COMPLETED_STEPS").and_then(|value| value.parse().ok()),
+        log_path: PathBuf::from(value(text, "LOG_PATH").unwrap_or("")),
+        candidate: Candidate {
+            batch_size: value(text, "GPT2_BATCH_SIZE")?.parse().ok()?,
+            n_layer: value(text, "GPT2_N_LAYER")?.parse().ok()?,
+            n_embd: value(text, "GPT2_N_EMBD")?.parse().ok()?,
+            n_head: value(text, "GPT2_N_HEAD")?.parse().ok()?,
+            aurora_phases: value(text, "AURORA_MATRIX_PHASES")?.parse().ok()?,
+            aurora_blocks: value(text, "AURORA_COOPERATIVE_BLOCKS")?.parse().ok()?,
+            lr_scale: value(text, "TRAIN_LR_SCALE")?.parse().ok()?,
+            adam_lr_scale: value(text, "TRAIN_ADAM_LR_SCALE")?.parse().ok()?,
+            warmup_steps: value(text, "TRAIN_LR_WARMUP_STEPS")?.parse().ok()?,
+            start_ratio: value(text, "TRAIN_LR_START_RATIO")?.parse().ok()?,
+            amuse_beta1: value(text, "TRAIN_AMUSE_BETA1")?.parse().ok()?,
+            amuse_rho: value(text, "TRAIN_AMUSE_RHO")?.parse().ok()?,
+        },
+    })
+}
+
+fn value<'a>(text: &'a str, name: &str) -> Option<&'a str> {
+    text.lines().find_map(|line| {
+        let (key, value) = line.split_once('=')?;
+        (key.trim() == name).then_some(value.trim())
+    })
+}

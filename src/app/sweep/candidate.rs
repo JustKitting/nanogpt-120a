@@ -1,5 +1,8 @@
 use super::rng::SweepRng;
 
+const AURORA_BLOCK_CHOICES: [usize; 5] = [80, 90, 120, 160, 180];
+const AURORA_PHASE_CHOICES: [usize; 4] = [2, 4, 8, 16];
+
 #[derive(Clone, Debug)]
 pub struct Candidate {
     pub batch_size: usize,
@@ -21,13 +24,8 @@ impl Candidate {
         let (n_embd, n_head) = rng.choose(&[(1024, 16), (1536, 12), (2048, 16)]);
         let n_layer = rng.choose(&[2, 4, 8]);
         let slots = n_layer * 4;
-        let aurora_blocks = rng.choose(&[120, 160, 180]);
-        let phases = [4, 8, 16]
-            .into_iter()
-            .filter(|phase| {
-                slots % phase == 0 && cooperative_blocks(slots, *phase, aurora_blocks) <= 360
-            })
-            .collect::<Vec<_>>();
+        let aurora_blocks = rng.choose(&AURORA_BLOCK_CHOICES);
+        let phases = valid_aurora_phases(slots, aurora_blocks);
         Self {
             batch_size: rng.choose(&[4, 8, 16]),
             n_layer,
@@ -83,6 +81,13 @@ impl Candidate {
             ("TRAIN_AMUSE_RHO", format!("{:.6}", self.amuse_rho)),
         ]
     }
+}
+
+pub(super) fn valid_aurora_phases(slots: usize, blocks: usize) -> Vec<usize> {
+    AURORA_PHASE_CHOICES
+        .into_iter()
+        .filter(|phase| slots % phase == 0 && cooperative_blocks(slots, *phase, blocks) <= 360)
+        .collect()
 }
 
 fn cooperative_blocks(slots: usize, phases: usize, blocks: usize) -> usize {

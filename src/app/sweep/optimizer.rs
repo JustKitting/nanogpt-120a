@@ -10,7 +10,16 @@ pub fn propose(
     rng: &mut SweepRng,
     random_trials: usize,
     samples: usize,
+    baseline: Option<&Candidate>,
 ) -> Candidate {
+    if trials.is_empty() {
+        if let Some(candidate) = baseline {
+            if !seen.contains(&candidate.key()) {
+                return candidate.clone();
+            }
+        }
+    }
+
     let completed = trials
         .iter()
         .filter(|trial| score_loss(trial).is_some())

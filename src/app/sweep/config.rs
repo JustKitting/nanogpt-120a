@@ -23,8 +23,10 @@ pub struct SweepConfig {
     pub cuda_device: Option<String>,
     #[arg(long)]
     pub sweep_dir: Option<PathBuf>,
-    #[arg(long, default_value = "notes/sweep_seed.tsv")]
+    #[arg(long, default_value = "notes/sweep_seed_current.tsv")]
     pub seed_history: PathBuf,
+    #[arg(long, default_value = "notes/sweep_baseline.env")]
+    pub baseline: PathBuf,
     #[arg(long, default_value_t = 0x4750_5432)]
     pub seed: u64,
     #[arg(long)]
