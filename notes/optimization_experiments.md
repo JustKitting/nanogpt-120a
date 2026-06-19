@@ -30,6 +30,28 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Make the SYNTH target runnable without full snapshot prep.
+status: implementation cleanup
+decision:
+  Keep the same PleIAs/SYNTH dataset, sorted parquet order, tokenizer, and shard
+  naming, but do not snapshot-download/tokenize the whole dataset before
+  training can start. The prep path now lists parquet files, downloads one at a
+  time, and stops inside the parquet row loop once the default validation shard
+  and first train shard have been written.
+reason:
+  The current trainer reads the first synth_llama2_train shard and the
+  synth_llama2_val shard. Preparing every parquet file first was wasted work and
+  blocked fixed-time validation experiments on SYNTH.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo test -p synth-prep: pass
+  cargo oxide build --arch sm_120a: pass
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Move the default training target to PleIAs/SYNTH.
 status: implementation cleanup
 decision:

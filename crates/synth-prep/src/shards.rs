@@ -28,6 +28,10 @@ impl ShardWriter {
         Ok(())
     }
 
+    pub fn has_default_train_and_val_shards(&self) -> bool {
+        self.shard_index >= 2
+    }
+
     pub fn finish(mut self) -> AppResult<()> {
         if !self.tokens.is_empty() {
             self.flush_current()?;

@@ -20,6 +20,9 @@ pub fn tokenize_parquet_file(
         .build()?;
 
     for batch in reader {
+        if writer.has_default_train_and_val_shards() {
+            break;
+        }
         let batch = batch?;
         tokenize_synth_batch(&batch, tokenizer, writer)?;
     }
@@ -44,6 +47,9 @@ fn tokenize_synth_batch(
 
         if !text.is_empty() {
             tokenize_doc(&text, tokenizer, writer)?;
+            if writer.has_default_train_and_val_shards() {
+                break;
+            }
         }
     }
     Ok(())
