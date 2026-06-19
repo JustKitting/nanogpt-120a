@@ -30,6 +30,25 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-19
 commit: uncommitted
+experiment: Move the default training target to PleIAs/SYNTH.
+status: implementation cleanup
+decision:
+  Keep SYNTH as the default training dataset and use the shard split produced
+  by synth-prep directly. Training reads the first synth_llama2_train shard.
+  Held-out validation reads synth_llama2_val_000000 instead of reserving the
+  tail of the train shard.
+source:
+  Hugging Face dataset PleIAs/SYNTH is parquet text data with train split and
+  query, synthetic_reasoning, and synthetic_answer columns.
+verification:
+  cargo fmt --check: pass
+  cargo check --workspace --tests: pass
+  cargo oxide build --arch sm_120a: pass
+```
+
+```text
+date: 2026-06-19
+commit: uncommitted
 experiment: Same-tokenizer width increase from d1536 to d2048 at L2.
 status: rejected, slower and worse held-out validation
 decision:

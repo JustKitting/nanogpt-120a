@@ -23,6 +23,8 @@ const VALIDATION_WINDOWS: usize = 4;
 pub struct TokenDataLoader {
     path: PathBuf,
     tokens: Vec<u16>,
+    validation_tokens: Option<Vec<u16>>,
+    validation_path: Option<PathBuf>,
     offset: usize,
     train_end: usize,
     repeat_first_window: bool,
@@ -57,13 +59,18 @@ impl TokenDataLoader {
     }
 
     pub fn from_synth() -> AppResult<Self> {
-        ensure_synth_shard()?;
-        Self::from_path(first_train_shard()?)
+        ensure_synth_shards()?;
+        let validation_path = first_val_shard()?;
+        let validation_tokens = read_u16_tokens(&validation_path)?;
+        Self::from_path(
+            first_train_shard()?,
+            Some((validation_path, validation_tokens)),
+        )
     }
 
     pub fn from_shakespeare() -> AppResult<Self> {
         let path = ensure_shakespeare_shard()?;
-        Self::from_path(path)
+        Self::from_path(path, None)
     }
 
     pub fn next_batch(&mut self) -> AppResult<TokenWindowBatch> {
@@ -103,34 +110,60 @@ impl TokenDataLoader {
     }
 
     pub fn validation_tokens(&self) -> AppResult<Vec<u16>> {
-        let len = GPT2_SEQ_LEN + 1;
-        if self.tokens.len() < len {
-            return Err(format!("{} has fewer than {len} tokens", self.path.display()).into());
+        if let Some(tokens) = &self.validation_tokens {
+            let path = self.validation_path.as_deref().unwrap_or(&self.path);
+            return validation_windows(path, tokens, 0);
         }
-        let needed = VALIDATION_WINDOWS * len;
-        if self.tokens.len() < needed {
-            return Err(format!("{} has fewer than {needed} tokens", self.path.display()).into());
-        }
-        let start = self.tokens.len() - needed;
-        let mut tokens = Vec::with_capacity(needed);
-        for batch in 0..VALIDATION_WINDOWS {
-            let offset = start + batch * len;
-            tokens.extend_from_slice(&self.tokens[offset..offset + len]);
-        }
-        Ok(tokens)
+
+        let needed = VALIDATION_WINDOWS * (GPT2_SEQ_LEN + 1);
+        let start = self.tokens.len().saturating_sub(needed);
+        validation_windows(&self.path, &self.tokens, start)
     }
 
-    fn from_path(path: PathBuf) -> AppResult<Self> {
+    fn from_path(path: PathBuf, validation: Option<(PathBuf, Vec<u16>)>) -> AppResult<Self> {
         let tokens = read_u16_tokens(&path)?;
-        let train_end = train_end(tokens.len());
+        let train_end = if validation.is_some() {
+            tokens.len()
+        } else {
+            train_end(tokens.len())
+        };
+        let (validation_path, validation_tokens) = validation
+            .map(|(path, tokens)| (Some(path), Some(tokens)))
+            .unwrap_or((None, None));
         Ok(Self {
             path,
             tokens,
+            validation_tokens,
+            validation_path,
             offset: 0,
             train_end,
             repeat_first_window: repeat_first_window(),
         })
     }
+}
+
+fn validation_windows(path: &Path, tokens: &[u16], start: usize) -> AppResult<Vec<u16>> {
+    let len = GPT2_SEQ_LEN + 1;
+    if tokens.len() < len {
+        return Err(format!("{} has fewer than {len} tokens", path.display()).into());
+    }
+
+    let needed = VALIDATION_WINDOWS * len;
+    if tokens.len() < start + needed {
+        return Err(format!(
+            "{} has fewer than {} validation tokens",
+            path.display(),
+            start + needed
+        )
+        .into());
+    }
+
+    let mut validation_tokens = Vec::with_capacity(needed);
+    for batch in 0..VALIDATION_WINDOWS {
+        let offset = start + batch * len;
+        validation_tokens.extend_from_slice(&tokens[offset..offset + len]);
+    }
+    Ok(validation_tokens)
 }
 
 fn train_end(token_count: usize) -> usize {
@@ -150,8 +183,16 @@ fn repeat_first_window() -> bool {
 }
 
 fn first_train_shard() -> AppResult<PathBuf> {
+    first_shard("train")
+}
+
+fn first_val_shard() -> AppResult<PathBuf> {
+    first_shard("val")
+}
+
+fn first_shard(split: &str) -> AppResult<PathBuf> {
     let dir = Path::new(DATA_DIR).join(SHARDS_DIR);
-    let prefix = format!("{SHARD_FILE_PREFIX}_train_");
+    let prefix = format!("{SHARD_FILE_PREFIX}_{split}_");
     let mut shards = Vec::new();
 
     if !dir.exists() {
@@ -172,16 +213,17 @@ fn first_train_shard() -> AppResult<PathBuf> {
     shards
         .into_iter()
         .next()
-        .ok_or_else(|| format!("no train shards found in {}", dir.display()).into())
+        .ok_or_else(|| format!("no {split} shards found in {}", dir.display()).into())
 }
 
-fn ensure_synth_shard() -> AppResult<()> {
-    if first_train_shard().is_ok() {
+fn ensure_synth_shards() -> AppResult<()> {
+    if first_train_shard().is_ok() && first_val_shard().is_ok() {
         return Ok(());
     }
 
     synth_prep::parse_data()?;
-    first_train_shard().map(|_| ())
+    first_train_shard()?;
+    first_val_shard().map(|_| ())
 }
 
 fn ensure_shakespeare_shard() -> AppResult<PathBuf> {
