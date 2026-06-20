@@ -4113,3 +4113,40 @@ measured_effect:
 decision:
   Do not promote. Code reverted to the prior baseline.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Source audit for looped-transformer candidates.
+status: research note only
+sources:
+  https://github.com/Leiay/looped_transformer/blob/main/scripts/models.py
+  https://proceedings.iclr.cc/paper_files/paper/2025/file/2676109d49d1eb26d6bc584a8f556305-Paper-Conference.pdf
+  https://arxiv.org/abs/2606.18524
+source_findings:
+  Leiay/looped_transformer implements a separate loop state z initialized from
+  zeros or ones, then repeats z = backbone(x + z) or z = backbone(x * z), and
+  returns predictions from loop outputs. This is not the same as arbitrary
+  repetition of an already-normal GPT residual stack.
+  The ICLR 2025 looped-transformer paper defines language-model looping as a
+  shared transformer block applied repeatedly after embedding, but reports that
+  looped language models are worse on perplexity than iso-flop non-looped
+  baselines while being better on reasoning-style downstream tasks.
+  The same paper proposes a layer-similarity regularizer as the way to inherit
+  looped-model inductive bias without hurting perplexity.
+  The residual-scaling paper for tied residual blocks reports that looped/tied
+  residual updates need explicit loop-aware scaling. Any future looped
+  implementation must include that scaling from the start.
+local_evidence:
+  Two prior local loop candidates already failed the actual objective:
+    target/loop_count2_l4_900s_20260620T071755Z.log:
+      val_loss=4.226233, completed_steps=4102.
+    target/loop2_l4_b8_900_20260620T084124Z.log:
+      val_loss=4.200931, completed_steps=3047.
+decision:
+  Do not run another looped-forward experiment as a direct validation-loss
+  optimization unless the implementation follows the source-backed structure
+  and is treated as a major architecture change. For the current target,
+  the more plausible paper-backed follow-up is the layer-similarity
+  regularizer, not loop repetition.
+```
