@@ -31,6 +31,38 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Compact upper-triangle tile enumeration inside Aurora Polar
+  symmetric Gram stage.
+status: rejected_pre_gate
+change:
+  Replaced full square tile enumeration plus lower-triangle skip with direct
+  upper-triangle tile enumeration inside run_symmetric_tiles. Cooperative launch
+  dimensions and optimizer math were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  100-step SYNTH screen:
+    target/aurora_tri_compact_l4_b8_100_20260620T183208Z.log
+    val_loss=6.546818, train_elapsed_s=19.318, completed_steps=100.
+  20-step nsys screen:
+    target/nsys/aurora_tri_compact_l4_b8_20_20260620T183242Z.run.log
+    train_elapsed_s=3.811, completed_steps=20.
+measured_effect:
+  The intended Aurora kernel got slower. aurora_mega_update_cooperative_kernel
+  increased from about 1.367s to about 1.385s over 20 profiled steps versus
+  target/nsys/ce_dlogits_amax_l4_b8_20_20260620T181000Z.run.log. Total
+  profiled train time regressed from 3.794s to 3.811s. The 100-step screen was
+  effectively flat in runtime and slightly worse in validation loss.
+decision:
+  Reject before the 900-second gate. Code was reverted to the promoted
+  scheduler.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Reuse cross-entropy dlogits row amax for final-head MS-EDEN
   quantization.
 status: accepted
