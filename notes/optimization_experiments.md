@@ -4570,6 +4570,43 @@ decision:
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Direct schedule-free materialization during NVFP4 encode.
+status: failed_900s_gate
+change:
+  Replaced the schedule-free materialization path
+  interpolate(z_master, x_master) -> f32 scratch -> tensor amax -> NVFP4 encode
+  with direct schedule-free amax and encode kernels that recomputed
+  z + beta * (x - z), removing schedule_free_interpolate_kernel from the hot
+  path.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/schedule_free_direct_materialize_l4_b8_100_20260620T131220Z.log
+    val_loss=6.546241, train_elapsed_s=19.328, completed_steps=100.
+  20-step nsys profile:
+    target/nsys/schedule_free_direct_materialize_l4_b8_20_20260620T131308Z_stats.txt
+    cuLaunchKernel dropped from 15048 to 14028 calls versus
+    target/nsys/reusable_batch_l4_b8_20_20260620T122136Z_stats.txt.
+heldout_result:
+  Baseline:
+    target/reusable_batch_l4_b8_900_20260620T122227Z.log
+    val_loss=4.023637, completed_steps=4522.
+  Candidate:
+    target/schedule_free_direct_materialize_l4_b8_900_20260620T131332Z.log
+    val_loss=4.067527, completed_steps=4529.
+measured_effect:
+  The candidate completed 7 more steps in the fixed 900-second run, but
+  worsened held-out validation loss by 0.043890. The launch-count reduction did
+  not improve the actual objective.
+decision:
+  Do not promote. Code was reverted to the promoted baseline.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Four-way unroll of Aurora momentum orientation pass.
 status: rejected_pre_gate
 change:
