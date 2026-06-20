@@ -31,6 +31,54 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: NVFP4 projection CTA 64x64 tile.
+status: measured, rejected after 900-second gate; code reverted
+implementation:
+  Tested widening the shared NVFP4 projection CTA tile from 32x32 to 64x64.
+  Each CTA kept 8 warps but each warp computed four N-subtiles, reusing staged
+  A fragments across more output columns. This touched lm-head, QKV/MLP
+  projection, attention projection, and linear backward projection users of the
+  shared projection CTA body.
+correctness_checks:
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head
+  -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward
+  -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward
+  -- --ignored --nocapture: pass.
+pre_gate_screen:
+  target/projection_cta64_split_l4_b8_100_20260620T111351Z.log
+  train_elapsed_s=18.830, val_loss=6.548421, completed_steps=100.
+diagnostic_profile:
+  target/nsys_projection_cta64_l4_b8_20_20260620T111055Z_stats.txt
+  linear_backward_projection_cta_device_scale_kernel improved from 768.198ms
+  to 662.972ms over 20 profiled steps.
+  lm_head_kernel improved from 141.203ms to 117.436ms over 20 profiled steps.
+baseline:
+  target/grad_clip_l4_b8_900_20260620T101626Z.log
+  val_loss=4.044528, completed_steps=4520.
+measured_result:
+  target/projection_cta64_l4_b8_900_20260620T111425Z.log
+  val_loss=4.047818, completed_steps=4674.
+measured_effect:
+  Completed 154 more steps in the same wall-clock budget, but held-out
+  validation loss worsened by 0.003290.
+runtime_effect:
+  The projection kernels were faster, but the fixed-wall-clock objective did
+  not improve.
+stability:
+  Finite for the full 900-second run.
+decision:
+  Reject and revert. More steps and faster projection kernels do not qualify
+  when held-out validation is worse than the current baseline.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Aurora phase/block geometry p2/c45.
 status: measured, rejected before profile and 900-second gate
 implementation:
