@@ -30,6 +30,119 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-20
+commit: 72afcd59
+experiment: Audit attempted c_proj tape CTA route and retain best repeated 900-second baseline.
+status: baseline updated, optimization claim invalidated
+hypothesis:
+  The regular attention c_proj path used the CTA projection body, but the
+  tape-producing c_proj path still used the old one-warp 16x8 projection body.
+  Moving that active training path to the CTA accumulator should preserve math
+  while improving the fixed-wall validation outcome.
+implementation:
+  Added CTA residual/tape store support and ran validation, then audited call
+  sites before continuing. CProjTapeArgs and c_proj_tape had zero callers in
+  the forward path. The actual backward tape stores the quantized c_proj input
+  through RowwiseNvfp4Tape::save before c_proj runs; the dead c_proj_tape API
+  stored projection output instead. The dead API and residual/tape CTA helpers
+  were removed.
+measured_effect:
+  100-step sanity:
+    target/square_cta_tape_l4_100step_20260620T055627Z.log
+    train_elapsed_s=23.798, val_loss=6.606071.
+stability_effect:
+  Focused ignored GPU tests passed for l2_attention, l3_mlp, forward,
+  lm_head, and linear_backward_projection_cta after regenerating sm_120a PTX.
+  The 100-step and 900-second runs stayed finite/nonzero.
+validation_result:
+  target/square_cta_tape_l4_900s_20260620T055702Z.log
+  stopped_by_wall_clock=true elapsed_s=900.014 completed_steps=3692.
+  heldout_eval split=val val_loss=4.136663 train_elapsed_s=900.257
+  completed_steps=3692.
+comparison:
+  Previous CTA-forward baseline:
+    target/square_cta_forward_l4_900s_20260620T052934Z.log
+    val_loss=4.158232, completed_steps=3693.
+  The attempted c_proj_tape change did not affect the active training path, so
+  the lower validation number is a repeated measurement of the same CTA-forward
+  path, not proof of this attempted optimization.
+decision:
+  Do not promote c_proj_tape as a separate optimization. Retain the lower
+  validation run as the current measured baseline because the optimization
+  target is best held-out validation loss over the fixed wall-clock budget.
+  Future code changes must beat target/square_cta_tape_l4_900s_20260620T055702Z.log.
+```
+
+```text
+date: 2026-06-20
+commit: 72afcd59
+experiment: Use 32x32 CTA NVFP4 projection tiles for forward attention and MLP projections.
+status: promoted at fixed-wall validation
+hypothesis:
+  The forward QKV, attention c_proj, MLP up, and MLP down projections were still
+  using the one-warp 16x8 projection body. Reusing the existing 32x32 CTA
+  projection tile for these square-friendly forward projections should improve
+  wall-clock step count without changing the model math.
+implementation:
+  Added CTA projection bodies for affine and ReLU2 stores and routed regular
+  attention/MLP forward projection launches through the CTA config. The
+  tape-specific attention residual projection path stays on the old warp body.
+measured_effect:
+  100-step sanity:
+    baseline restored L4: target/l4_floor_restored_100step_20260620T052029Z.log
+      train_elapsed_s=25.318, val_loss=6.603828.
+    CTA forward: target/square_cta_forward_l4_100step_20260620T052842Z.log
+      train_elapsed_s=23.786, val_loss=6.606071.
+stability_effect:
+  Focused ignored GPU tests passed for l2_attention, l3_mlp, forward,
+  lm_head, and linear_backward_projection_cta. The 100-step and 900-second
+  runs stayed finite/nonzero.
+validation_result:
+  target/square_cta_forward_l4_900s_20260620T052934Z.log
+  stopped_by_wall_clock=true elapsed_s=900.047 completed_steps=3693.
+  heldout_eval split=val val_loss=4.158232 train_elapsed_s=900.290
+  completed_steps=3693.
+comparison:
+  Previous L4 floor baseline:
+    target/l4_min_length_candidate_900s_20260620T031205Z.log
+    val_loss=4.181291, completed_steps=3467.
+  CTA forward completed 226 more steps and improved validation loss by
+  0.023059 under the same 900-second wall-clock gate.
+decision:
+  Promote this as the current L4 square/uniform baseline. Continue optimizing
+  square-friendly TC paths; do not reintroduce non-uniform layer widths without
+  square grouped projection kernels.
+```
+
+```text
+date: 2026-06-20
+commit: 72afcd59
+experiment: Back off failed non-uniform/active-width work to the L4 floor.
+status: rollback to last stable L4-minimum patch
+measured_effect:
+  The later active-width/non-uniform branch produced NaN during the short L4
+  sanity path, so it is not a candidate for the 900-second validation gate.
+stability_effect:
+  Restore the codebase to the L4-minimum baseline state: GPT2_N_LAYER defaults
+  to 4, build.rs rejects layer counts below 4, and the sweep machinery ignores
+  sub-L4 history/candidates.
+runtime_effect:
+  No new runtime claim. This rollback removes the failed branch rather than
+  promoting a speed change.
+validation_result:
+  Current baseline remains target/l4_min_length_candidate_900s_20260620T031205Z.log
+  with val_loss=4.181291 and completed_steps=3467.
+sustained_check:
+  target/l4_floor_restored_100step_20260620T052029Z.log
+  completed 100 steps, finite=true and nonzero=true at step 99.
+  heldout_eval split=val val_loss=6.603828 train_elapsed_s=25.318
+  completed_steps=100.
+next:
+  Continue optimization from the square/uniform L4 baseline. Do not reintroduce
+  non-uniform layer widths until the square grouped projection kernels exist.
+```
+
+```text
+date: 2026-06-20
 commit: pending
 experiment: Fresh post-AMUSE-beta coupled sweep, trial 2.
 status: promoted at fixed-wall validation

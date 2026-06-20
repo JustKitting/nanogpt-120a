@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use super::{
     baseline::Baseline,
-    candidate::{Candidate, valid_aurora_phases},
+    candidate::{Candidate, MIN_N_LAYER, valid_aurora_phases},
     chain,
     history::History,
     history::Trial,
@@ -23,10 +23,10 @@ fn starts_fresh_sweep_from_best_measured_baseline() {
         super::optimizer::propose(&[], &Default::default(), &mut rng(), 3, 32, Some(&measured));
 
     assert_eq!(baseline.batch_size, 8);
-    assert_eq!(baseline.n_layer, 2);
+    assert_eq!(baseline.n_layer, MIN_N_LAYER);
     assert_eq!(baseline.n_embd, 1024);
     assert_eq!(baseline.n_head, 16);
-    assert_eq!(baseline.aurora_phases, 2);
+    assert_eq!(baseline.aurora_phases, 4);
     assert_eq!(baseline.aurora_blocks, 80);
     assert_eq!(baseline.lr_scale, 1.014_040);
     assert_eq!(baseline.adam_lr_scale, 1.980_467);
@@ -37,33 +37,69 @@ fn starts_fresh_sweep_from_best_measured_baseline() {
 }
 
 #[test]
+fn measured_baseline_is_not_rerun_as_next_candidate() {
+    let seed_history = [trial("success", Some(1.0), candidate(8, 2, 1.0))];
+    let baseline_candidate = candidate(8, 4, 2.0);
+    let baseline_trial = trial("success", Some(4.2), baseline_candidate.clone());
+    let all_trials = chain::all_trials_with_baseline(Some(&baseline_trial), &seed_history, &[]);
+    let seen = chain::seen_keys(&all_trials);
+    let proposal = super::optimizer::propose(
+        &all_trials,
+        &seen,
+        &mut rng(),
+        1,
+        16,
+        Some(&baseline_candidate),
+    );
+
+    assert_ne!(proposal.key(), baseline_candidate.key());
+    assert!(proposal.n_layer >= MIN_N_LAYER);
+}
+
+#[test]
+fn random_candidates_respect_min_layer_count() {
+    let mut rng = rng();
+    for _ in 0..256 {
+        assert!(Candidate::random(&mut rng).n_layer >= MIN_N_LAYER);
+    }
+}
+
+#[test]
+fn optimizer_ignores_sub_min_layer_history() {
+    let trials = [trial("success", Some(1.0), candidate(8, 2, 1.0))];
+    let proposal = super::optimizer::propose(&trials, &Default::default(), &mut rng(), 3, 16, None);
+
+    assert!(proposal.n_layer >= MIN_N_LAYER);
+}
+
+#[test]
 fn promotes_baseline_file_when_validation_improves() {
     let path = temp_path("sweep-baseline.env");
     let mut baseline = Baseline::load(path.clone()).unwrap();
 
     assert!(
         baseline
-            .promote_trial(&trial("success", Some(5.0), candidate(8, 2, 1.0)), false)
-            .unwrap()
-    );
-    assert!(
-        baseline
-            .promote_trial(&trial("success", Some(4.2), measured_candidate()), false)
+            .promote_trial(&trial("success", Some(5.0), candidate(8, 4, 1.0)), false)
             .unwrap()
     );
     assert!(
         !baseline
-            .promote_trial(&trial("success", Some(4.8), candidate(8, 4, 2.0)), false)
+            .promote_trial(&trial("success", Some(4.2), measured_candidate()), false)
+            .unwrap()
+    );
+    assert!(
+        baseline
+            .promote_trial(&trial("success", Some(4.2), candidate(8, 4, 2.0)), false)
             .unwrap()
     );
 
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.contains("VAL_LOSS=4.200000"));
     assert!(text.contains("GPT2_BATCH_SIZE=8"));
-    assert!(text.contains("GPT2_N_LAYER=2"));
-    assert!(text.contains("GPT2_N_EMBD=1024"));
-    assert!(text.contains("AURORA_MATRIX_PHASES=2"));
-    assert!(text.contains("TRAIN_ADAM_LR_SCALE=1.980467"));
+    assert!(text.contains("GPT2_N_LAYER=4"));
+    assert!(text.contains("GPT2_N_EMBD=1536"));
+    assert!(text.contains("AURORA_MATRIX_PHASES=8"));
+    assert!(text.contains("TRAIN_LR_SCALE=2.000000"));
     let _ = std::fs::remove_file(path);
 }
 

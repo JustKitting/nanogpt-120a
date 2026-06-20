@@ -2,14 +2,14 @@ use cuda_core::LaunchConfig;
 
 use super::args::QkvProjectionArgs;
 use crate::mma::{
-    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams,
-    projection_grid_dim,
+    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams,
+    projection_cta_grid_dim,
 };
 
-pub(super) fn config(token_count: u32, output_dim: u32) -> LaunchConfig {
+pub(super) fn cta_config(token_count: u32, output_dim: u32) -> LaunchConfig {
     LaunchConfig {
-        grid_dim: projection_grid_dim(token_count, output_dim),
-        block_dim: (NVFP4_PROJECTION_THREADS_PER_BLOCK, 1, 1),
+        grid_dim: projection_cta_grid_dim(token_count, output_dim),
+        block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
         shared_mem_bytes: 0,
     }
 }

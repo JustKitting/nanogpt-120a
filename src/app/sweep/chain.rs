@@ -23,9 +23,21 @@ pub(super) fn sync_shared_history(
 }
 
 pub(super) fn all_trials(shared_trials: &[Trial], local_trials: &[Trial]) -> Vec<Trial> {
+    all_trials_with_baseline(None, shared_trials, local_trials)
+}
+
+pub(super) fn all_trials_with_baseline(
+    baseline: Option<&Trial>,
+    shared_trials: &[Trial],
+    local_trials: &[Trial],
+) -> Vec<Trial> {
     let mut seen = HashSet::new();
     let mut trials = Vec::new();
-    for trial in shared_trials.iter().chain(local_trials) {
+    for trial in baseline
+        .into_iter()
+        .chain(shared_trials.iter())
+        .chain(local_trials)
+    {
         if seen.insert(trial.candidate.key()) {
             trials.push(trial.clone());
         }

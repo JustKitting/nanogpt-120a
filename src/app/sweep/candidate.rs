@@ -2,6 +2,7 @@ use super::rng::SweepRng;
 
 const AURORA_BLOCK_CHOICES: [usize; 5] = [80, 90, 120, 160, 180];
 const AURORA_PHASE_CHOICES: [usize; 4] = [2, 4, 8, 16];
+pub const MIN_N_LAYER: usize = 4;
 
 #[derive(Clone, Debug)]
 pub struct Candidate {
@@ -22,7 +23,7 @@ pub struct Candidate {
 impl Candidate {
     pub fn random(rng: &mut SweepRng) -> Self {
         let (n_embd, n_head) = rng.choose(&[(1024, 16), (1536, 12), (2048, 16)]);
-        let n_layer = rng.choose(&[2, 4, 8]);
+        let n_layer = rng.choose(&[MIN_N_LAYER, 8]);
         let slots = n_layer * 4;
         let aurora_blocks = rng.choose(&AURORA_BLOCK_CHOICES);
         let phases = valid_aurora_phases(slots, aurora_blocks);
@@ -39,6 +40,26 @@ impl Candidate {
             start_ratio: rng.choose(&[0.0, 0.05, 0.1, 0.2]),
             amuse_beta1: rng.choose(&[0.2, 0.4, 0.6]),
             amuse_rho: rng.choose(&[0.5, 0.8, 1.0]),
+        }
+    }
+
+    pub fn with_min_layers(&self) -> Self {
+        if self.n_layer >= MIN_N_LAYER {
+            return self.clone();
+        }
+
+        let n_layer = MIN_N_LAYER;
+        let phases = valid_aurora_phases(n_layer * 4, self.aurora_blocks);
+        let aurora_phases = phases
+            .iter()
+            .copied()
+            .find(|phase| *phase >= self.aurora_phases)
+            .or_else(|| phases.first().copied())
+            .unwrap_or(self.aurora_phases);
+        Self {
+            n_layer,
+            aurora_phases,
+            ..self.clone()
         }
     }
 

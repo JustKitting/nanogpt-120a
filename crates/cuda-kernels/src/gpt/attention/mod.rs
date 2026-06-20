@@ -9,7 +9,7 @@ use cuda_core::{CudaModule, DriverError};
 
 pub use causal::{CausalAttentionArgs, CausalAttentionParams};
 pub use causal_backward_tc::{CausalAttentionBackwardTcArgs, CausalAttentionBackwardTcScratch};
-pub use qkv_projection::{CProjArgs, CProjTapeArgs, QkvProjectionArgs, QkvProjectionParams};
+pub use qkv_projection::{CProjArgs, QkvProjectionArgs, QkvProjectionParams};
 pub use rope::{ApplyRopeArgs, ApplyRopeParams};
 
 pub struct AttentionModule {

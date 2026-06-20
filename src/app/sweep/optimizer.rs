@@ -1,6 +1,10 @@
 use std::collections::HashSet;
 
-use super::{candidate::Candidate, history::Trial, rng::SweepRng};
+use super::{
+    candidate::{Candidate, MIN_N_LAYER},
+    history::Trial,
+    rng::SweepRng,
+};
 
 const NAN_PENALTY_LOSS: f64 = 1.0e6;
 
@@ -12,11 +16,10 @@ pub fn propose(
     samples: usize,
     baseline: Option<&Candidate>,
 ) -> Candidate {
-    if trials.is_empty() {
-        if let Some(candidate) = baseline {
-            if !seen.contains(&candidate.key()) {
-                return candidate.clone();
-            }
+    if let Some(candidate) = baseline {
+        let candidate = candidate.with_min_layers();
+        if !seen.contains(&candidate.key()) {
+            return candidate;
         }
     }
 
@@ -58,6 +61,9 @@ pub fn propose(
 }
 
 fn score_loss(trial: &Trial) -> Option<f64> {
+    if trial.candidate.n_layer < MIN_N_LAYER {
+        return None;
+    }
     if trial.status == "dry_run" {
         return None;
     }

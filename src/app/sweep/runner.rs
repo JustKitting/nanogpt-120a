@@ -38,7 +38,12 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = chain::sweep_rng(config.seed, history.trials.len());
 
     for index in history.trials.len()..config.trials {
-        let all_trials = chain::all_trials(&shared_history.trials, &history.trials);
+        let baseline_trial = baseline.measured_trial();
+        let all_trials = chain::all_trials_with_baseline(
+            baseline_trial.as_ref(),
+            &shared_history.trials,
+            &history.trials,
+        );
         let seen = chain::seen_keys(&all_trials);
         let candidate = optimizer::propose(
             &all_trials,

@@ -4,7 +4,10 @@ use std::{
     path::PathBuf,
 };
 
-use super::{candidate::Candidate, history::Trial};
+use super::{
+    candidate::{Candidate, MIN_N_LAYER},
+    history::Trial,
+};
 
 const DEFAULT_SEQ_LEN: usize = 1024;
 
@@ -33,6 +36,17 @@ impl Baseline {
 
     pub fn val_loss(&self) -> Option<f64> {
         self.record.as_ref().map(|record| record.val_loss)
+    }
+
+    pub fn measured_trial(&self) -> Option<Trial> {
+        let record = self.record.as_ref()?;
+        Some(Trial {
+            candidate: record.candidate.clone(),
+            status: "success".to_string(),
+            val_loss: Some(record.val_loss),
+            completed_steps: record.completed_steps,
+            log_path: record.log_path.clone(),
+        })
     }
 
     pub fn promote_best(&mut self, trials: &[Trial], dry_run: bool) -> io::Result<bool> {
@@ -98,6 +112,9 @@ fn write_env(file: &mut fs::File, values: Vec<(&'static str, String)>) -> io::Re
 
 fn trial_record(trial: &Trial) -> Option<Record> {
     if trial.status != "success" {
+        return None;
+    }
+    if trial.candidate.n_layer < MIN_N_LAYER {
         return None;
     }
     Some(Record {
