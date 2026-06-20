@@ -56,7 +56,7 @@ impl TrainingLogger {
             stats.optimizer.aurora_lr,
             stats.forward_ms,
             stats.backward_enqueue_ms,
-            stats.loss_sync_ms,
+            stats.loss_host_wait_ms,
             stats.optimizer_ms,
             stats.optimizer.aurora_ms,
             stats.optimizer.adam_ms,

@@ -47,5 +47,6 @@ pub(super) fn run_attention_linear_pass(
         output_dim: pass.output_dim,
         sign_seed: pass.sign_seed,
         scale_seed: pass.scale_seed,
+        precomputed_e_amax_chunks: None,
     })
 }

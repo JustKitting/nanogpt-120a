@@ -51,7 +51,7 @@ pub struct TrainStats {
     pub loss: f32,
     pub forward_ms: f64,
     pub backward_enqueue_ms: f64,
-    pub loss_sync_ms: f64,
+    pub loss_host_wait_ms: f64,
     pub optimizer_ms: f64,
     pub optimizer: OptimizerTrace,
     pub diagnostics: Option<diagnostics::TrainingDiagnostics>,

@@ -31,6 +31,48 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Reuse cross-entropy dlogits row amax for final-head MS-EDEN
+  quantization.
+status: accepted
+change:
+  The cross-entropy kernel now records per-row absolute max while it writes
+  dlogits. The final LM-head linear backward path uses those row maxima to
+  derive the MS-EDEN global scale, avoiding a separate full dlogits amax scan.
+  Progress logs now label the loss copy/sync timer as loss_host_wait_ms,
+  because it measures host wait around queued CUDA work, not standalone GPU
+  kernel time.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture: pass.
+  100-step SYNTH screen:
+    target/ce_dlogits_amax_l4_b8_100_20260620T180927Z.log
+    val_loss=6.543247, train_elapsed_s=19.220, completed_steps=100.
+  Default-log 100-step check:
+    target/ce_dlogits_amax_default_log_l4_b8_100_20260620T181035Z.log
+    val_loss=6.545713, train_elapsed_s=19.323, completed_steps=100.
+  20-step nsys screen:
+    target/nsys/ce_dlogits_amax_l4_b8_20_20260620T181000Z.run.log
+    train_elapsed_s=3.794, completed_steps=20.
+  900-second held-out gate:
+    target/ce_dlogits_amax_defaultlog_l4_b8_900_20260620T181310Z.log
+    val_loss=4.021274, train_elapsed_s=900.162, completed_steps=4558.
+measured_effect:
+  Against the promoted paired-linear-backward 900-second baseline
+  target/paired_linear_backward_l4_b8_900_20260620T170432Z.log, held-out
+  validation improved from 4.054840 to 4.021274 and completed steps increased
+  from 4539 to 4558. The 20-step nsys screen showed tensor_chunk_amax_f32 work
+  dropping from about 19.81ms to about 6.37ms over 20 steps, with no meaningful
+  increase in cross_entropy_kernel time.
+decision:
+  Promote. This is a same-math runtime optimization that passed the 900-second
+  held-out validation gate.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Defer optimizer NVFP4 writeback until eval/save/generate boundaries.
 status: rejected_pre_gate
 change:

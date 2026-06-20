@@ -117,6 +117,7 @@ pub struct LinearBackwardMsEdenArgs<'a, 'scratch, 'out> {
     pub output_dim: u32,
     pub sign_seed: u32,
     pub scale_seed: u32,
+    pub precomputed_e_amax_chunks: Option<u32>,
 }
 
 pub struct LinearBackwardModule {
@@ -338,6 +339,7 @@ impl LinearBackwardModule {
                 dst_row_len: output_k,
                 sign_seed: args.sign_seed,
                 scale_seed: args.scale_seed,
+                precomputed_chunk_count: args.precomputed_e_amax_chunks,
             },
         )?;
         match args.weight_t {
@@ -357,6 +359,7 @@ impl LinearBackwardModule {
                         dst_row_len: output_k,
                         sign_seed: args.sign_seed,
                         scale_seed: args.scale_seed ^ 0x9e37_79b9,
+                        precomputed_chunk_count: None,
                     },
                 )?;
             }
@@ -414,6 +417,7 @@ impl LinearBackwardModule {
                         dst_row_len: token_k,
                         sign_seed: args.sign_seed,
                         scale_seed: args.scale_seed ^ 0xc2b2_ae35,
+                        precomputed_chunk_count: None,
                     },
                 )?;
             }
@@ -466,6 +470,7 @@ struct QuantizeOperandArgs<'a, 'out> {
     dst_row_len: u32,
     sign_seed: u32,
     scale_seed: u32,
+    precomputed_chunk_count: Option<u32>,
 }
 
 struct QuantizeTransposeOperandArgs<'a, 'out> {
@@ -486,6 +491,33 @@ fn quantize_operand(
     module: &Nvfp4QuantModule,
     args: QuantizeOperandArgs<'_, '_>,
 ) -> Result<(), DriverError> {
+    if let Some(chunk_count) = args.precomputed_chunk_count {
+        module.quartet_backward_ms_eden_global_scale_from_chunks(
+            args.stream,
+            &*args.chunk_amax,
+            &mut *args.global_scale,
+            chunk_count,
+        )?;
+
+        return module.fp32_to_nvfp4_ms_eden_device_scale(
+            crate::nvfp4_quant::MsEdenDeviceScaleQuantArgs {
+                stream: args.stream,
+                x: args.x,
+                out_fp4: args.scratch,
+                out_scales: args.scales,
+                out_global_scales: args.global_scales,
+                out_chunk_amax: args.chunk_amax,
+                global_scale: &*args.global_scale,
+                row_count: args.row_count,
+                src_row_len: args.src_row_len,
+                dst_row_len: args.dst_row_len,
+                scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
+                sign_seed: args.sign_seed,
+                scale_seed: args.scale_seed,
+            },
+        );
+    }
+
     module.fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
         QuartetBackwardMsEdenDeviceScaleQuantArgs {
             stream: args.stream,

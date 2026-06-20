@@ -15,6 +15,7 @@ impl Trainer {
             targets: &batch.targets,
             losses: &mut self.buffers.backward.losses,
             dlogits: &mut self.buffers.backward.dlogits,
+            dlogits_row_amax: &mut self.buffers.normalized_amax,
             token_count: batch.token_count as u32,
             vocab_size: GPT2_VOCAB_SIZE as u32,
         })?;

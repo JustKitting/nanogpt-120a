@@ -41,5 +41,6 @@ pub(super) fn run_linear_backward(
         output_dim: call.output_dim,
         sign_seed: call.sign_seed,
         scale_seed: call.scale_seed,
+        precomputed_e_amax_chunks: None,
     })
 }

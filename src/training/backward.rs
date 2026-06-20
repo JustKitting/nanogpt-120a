@@ -56,7 +56,7 @@ impl Trainer {
             stats.loss = active_losses.iter().sum::<f32>() / active_losses.len() as f32;
             stats.finite &= active_losses.iter().all(|value| value.is_finite());
             stats.nonzero |= active_losses.iter().any(|value| value.abs() > 0.0);
-            stats.loss_sync_ms = loss_sync_start.elapsed().as_secs_f64() * 1000.0;
+            stats.loss_host_wait_ms = loss_sync_start.elapsed().as_secs_f64() * 1000.0;
         }
 
         let optimizer_start = Instant::now();

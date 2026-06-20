@@ -32,6 +32,7 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         targets,
         losses,
         dlogits,
+        &mut *scratch.linear.e_h.chunk_amax,
         row_count,
     )?;
     run_linear_backward(
@@ -48,6 +49,7 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
             row_count,
             sign_seed: seeds.sign,
             scale_seed: seeds.scale,
+            precomputed_e_amax_chunks: row_count,
         },
     )
 }
@@ -59,6 +61,7 @@ fn run_loss(
     targets: &DeviceBuffer<u32>,
     losses: &mut DeviceBuffer<f32>,
     dlogits: &mut DeviceBuffer<f32>,
+    dlogits_row_amax: &mut DeviceBuffer<f32>,
     row_count: u32,
 ) -> Result<(), DriverError> {
     module.cross_entropy(CrossEntropyArgs {
@@ -67,6 +70,7 @@ fn run_loss(
         targets,
         losses,
         dlogits,
+        dlogits_row_amax,
         token_count: row_count,
         vocab_size: GPT2_VOCAB_SIZE as u32,
     })
@@ -82,6 +86,7 @@ struct LinearBackwardInputs<'scratch, 'out> {
     row_count: u32,
     sign_seed: u32,
     scale_seed: u32,
+    precomputed_e_amax_chunks: u32,
 }
 
 fn run_linear_backward(
@@ -105,5 +110,6 @@ fn run_linear_backward(
         output_dim: GPT2_VOCAB_SIZE as u32,
         sign_seed: inputs.sign_seed,
         scale_seed: inputs.scale_seed,
+        precomputed_e_amax_chunks: Some(inputs.precomputed_e_amax_chunks),
     })
 }

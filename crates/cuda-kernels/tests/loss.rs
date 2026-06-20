@@ -31,6 +31,7 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
     let targets_dev = DeviceBuffer::from_host(&stream, &targets)?;
     let mut losses_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT)?;
     let mut dlogits_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * VOCAB_SIZE)?;
+    let mut row_amax_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT)?;
 
     module.cross_entropy(CrossEntropyArgs {
         stream: &stream,
@@ -38,12 +39,14 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
         targets: &targets_dev,
         losses: &mut losses_dev,
         dlogits: &mut dlogits_dev,
+        dlogits_row_amax: &mut row_amax_dev,
         token_count: TOKEN_COUNT as u32,
         vocab_size: VOCAB_SIZE as u32,
     })?;
 
     let losses = losses_dev.to_host_vec(&stream)?;
     let dlogits = dlogits_dev.to_host_vec(&stream)?;
+    let row_amax = row_amax_dev.to_host_vec(&stream)?;
     let expected = expected_loss_and_grad(&logits, &targets);
 
     for (actual, expected) in losses.iter().zip(expected.0.iter()) {
@@ -52,6 +55,16 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
 
     for (actual, expected) in dlogits.iter().zip(expected.1.iter()) {
         assert_close(*actual, *expected);
+    }
+
+    for row in 0..TOKEN_COUNT {
+        let base = row * VOCAB_SIZE;
+        let expected_amax = expected.1[base..base + VOCAB_SIZE]
+            .iter()
+            .copied()
+            .map(f32::abs)
+            .fold(0.0, f32::max);
+        assert_close(row_amax[row], expected_amax);
     }
 
     Ok(())
