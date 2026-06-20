@@ -4443,3 +4443,27 @@ decision:
   baseline; the compiler/current instruction mix favors the original scalar
   stores here.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Explicitly unroll f32-input FP16 TC shared-memory staging loops.
+status: rejected_pre_gate
+change:
+  Replaced the four-iteration staging loops in
+  utils/f16_tc_matmul/cta_stage_f32.rs with explicit per-thread staging calls
+  for offsets tid, tid+256, tid+512, and tid+768.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/f16_stage_f32_unroll_l4_b8_100_20260620T121135Z.log
+    val_loss=6.548014, train_elapsed_s=19.669, completed_steps=100.
+measured_effect:
+  The 100-step runtime regressed by about 0.23s versus the current baseline
+  neighborhood, with no quality upside.
+decision:
+  Do not promote and do not spend a profile or 900-second gate. Code was
+  reverted to baseline; the original loop form is better for this kernel.
+```
