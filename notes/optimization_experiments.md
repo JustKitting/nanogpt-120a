@@ -67,6 +67,36 @@ decision:
 
 ```text
 date: 2026-06-20
+commit: note only
+experiment: Retain per-step TokenBatch device buffers until explicit sync.
+status: screened, rejected before 900-second gate
+implementation:
+  Tested holding per-step token/target DeviceBuffers past the training step and
+  clearing them only after explicit sync/log-retainer points. This was intended
+  to remove the hidden cuMemFree synchronization from every step without
+  changing sample order or training math.
+diagnostic_profile:
+  Before: target/nsys_grad_clip_l4_b8_20_20260620T103258Z_stats.txt
+    cuMemFree_v2=3726.943ms over 769 calls.
+  Candidate: target/nsys_retained_batches_l4_b8_20_20260620T103657Z_stats.txt
+    cuMemFree_v2=36.684ms over 769 calls.
+measured_effect:
+  API-level cuMemFree time dropped sharply, but the wait shifted into launch
+  and explicit stream synchronization while GPU work remained the limiter.
+screen:
+  Baseline 100-step screen:
+    target/grad_clip_l4_b8_100_20260620T101549Z.log
+    train_elapsed_s=19.436, val_loss=6.548097.
+  Candidate 100-step screen:
+    target/retained_batches_l4_b8_100_20260620T103735Z.log
+    train_elapsed_s=19.482, val_loss=6.547900.
+decision:
+  Revert the code candidate. It cleaned up API attribution but did not improve
+  objective-facing wall-clock progress enough to justify the 900-second gate.
+```
+
+```text
+date: 2026-06-20
 commit: uncommitted
 experiment: Real two-loop transformer with four physical blocks.
 status: measured, rejected
