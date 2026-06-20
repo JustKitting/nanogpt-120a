@@ -4539,3 +4539,27 @@ decision:
   Do not promote and do not spend a 900-second gate. Code was reverted to the
   promoted baseline.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Reuse Aurora encode half-warp loads through shuffles.
+status: rejected_pre_gate
+change:
+  In aurora/fused/quant/encode.rs, replaced the second pair of global x loads
+  during FP4 pair packing with half-warp shuffle reads from the value each lane
+  already loaded for amax/error calculation.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/aurora_encode_shuffle_l4_b8_100_20260620T124305Z.log
+    emitted step 0, then failed to reach step 99 after more than 90 seconds.
+measured_effect:
+  This is a clear runtime regression versus the promoted baseline 100-step
+  screen at target/reusable_batch_l4_b8_100_20260620T122059Z.log, which
+  completed in 19.350s.
+decision:
+  Do not promote and do not spend a 900-second gate. Code was reverted to the
+  promoted baseline.
+```
