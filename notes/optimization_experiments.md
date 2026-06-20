@@ -31,6 +31,75 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Replace per-step token upload event sync with a 1024-slot batch ring.
+status: rejected_pre_gate
+change:
+  Replaced the single reusable token/target device buffer and pinned host
+  staging buffer with 1024 independent slots. Each slot synchronized only when
+  reused, preserving async pinned-copy safety while removing the per-step event
+  wait from the upload path.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  cargo build --release: pass.
+baseline:
+  Current promoted 100-step reference:
+    target/reusable_batch_l4_b8_100_20260620T122059Z.log
+    val_loss=6.545963, train_elapsed_s=19.350, completed_steps=100.
+pre_gate_screens:
+  target/batch_ring1024_l4_b8_100_20260620T151813Z.log
+    TRAIN_LOG_INTERVAL=25
+    val_loss=6.548292, train_elapsed_s=19.482, completed_steps=100.
+  target/batch_ring1024_l4_b8_100_log250_20260620T151851Z.log
+    TRAIN_LOG_INTERVAL=250
+    val_loss=6.550458, train_elapsed_s=19.573, completed_steps=100.
+measured_effect:
+  Both screens worsened held-out validation loss and runtime. The sparse
+  logging screen was also slower, so the ring did not improve the target path
+  despite reducing the intended per-step upload synchronization.
+decision:
+  Reject and revert. Do not spend a 900-second gate on this form of host batch
+  staging.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Unroll Aurora momentum orientation loop four-wide.
+status: rejected_after_900_second_gate
+change:
+  Replaced the per-thread scalar momentum/orientation stride loop in the fused
+  Aurora mega update with a four-wide unrolled elementwise loop. The optimizer
+  math and state layout were intended to be unchanged.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  cargo build --release: pass.
+pre_gate_screen:
+  target/aurora_momentum_unroll4_l4_b8_100_20260620T150045Z.log
+  val_loss=6.545153, train_elapsed_s=19.348, completed_steps=100.
+baseline:
+  Current promoted 100-step reference:
+    target/reusable_batch_l4_b8_100_20260620T122059Z.log
+    val_loss=6.545963, train_elapsed_s=19.350, completed_steps=100.
+  Current promoted 900-second baseline:
+    target/reusable_batch_l4_b8_900_20260620T122227Z.log
+    val_loss=4.023637, completed_steps=4522.
+measured_result:
+  target/aurora_momentum_unroll4_l4_b8_900_20260620T150122Z.log
+  val_loss=4.070844, train_elapsed_s=900.019, completed_steps=4520.
+measured_effect:
+  The 100-step pre-gate looked slightly better, but the full fixed-wall
+  held-out validation gate regressed by 0.047207 and completed two fewer steps.
+decision:
+  Reject and revert. Do not use the 100-step improvement as promotion evidence.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Increase current L4 Aurora cooperative blocks from 90 to 120.
 status: rejected_pre_gate
 change:
