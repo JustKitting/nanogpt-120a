@@ -4386,3 +4386,28 @@ decision:
   the more plausible paper-backed follow-up is the layer-similarity
   regularizer, not loop repetition.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Direct CTA projection staging instead of one-iteration staging loops.
+status: rejected_pre_gate
+change:
+  Replaced the two stage_tiles while loops in projection_cta/stage.rs with
+  direct per-thread A/B pack stores, relying on the current 256-pack by
+  256-thread CTA contract.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/projection_stage_direct_l4_b8_100_20260620T120355Z.log
+    val_loss=6.546502, train_elapsed_s=19.434, completed_steps=100.
+measured_effect:
+  Runtime was effectively unchanged from the accepted baseline neighborhood.
+  This indicates the compiler was already removing most of the one-iteration
+  loop overhead or the loop was not material to wall-clock.
+decision:
+  Do not promote and do not spend a 900-second gate on this candidate. Code was
+  reverted to baseline; note kept to prevent repeating the same micro-edit.
+```
