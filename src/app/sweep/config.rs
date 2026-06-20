@@ -13,7 +13,7 @@ pub struct SweepConfig {
     pub candidate_samples: usize,
     #[arg(long, default_value_t = 900.0)]
     pub max_seconds: f64,
-    #[arg(long, default_value_t = 500)]
+    #[arg(long, default_value_t = 1)]
     pub log_interval: usize,
     #[arg(long, default_value = "synth")]
     pub dataset: String,

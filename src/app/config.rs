@@ -7,7 +7,6 @@ use super::run_output::RunOutput;
 pub const DEFAULT_SEED: u64 = 0x4750_5432;
 const DEFAULT_TRAIN_MAX_SECONDS: f64 = 900.0;
 const DEFAULT_TRAIN_STEP_CAP: usize = 1_000_000;
-const DEFAULT_TRAIN_LOG_INTERVAL: usize = 500;
 
 pub struct TrainConfig {
     pub seed: u64,
@@ -22,9 +21,7 @@ impl TrainConfig {
         Self {
             seed: env_u64("TRAIN_SEED").unwrap_or(DEFAULT_SEED),
             step_cap: env_usize("TRAIN_STEPS").unwrap_or(DEFAULT_TRAIN_STEP_CAP),
-            log_interval: env_usize("TRAIN_LOG_INTERVAL")
-                .unwrap_or(DEFAULT_TRAIN_LOG_INTERVAL)
-                .max(1),
+            log_interval: env_usize("TRAIN_LOG_INTERVAL").unwrap_or(1).max(1),
             eval_interval: env_usize("TRAIN_EVAL_INTERVAL").filter(|interval| *interval > 0),
             max_seconds: env_f64("TRAIN_MAX_SECONDS")
                 .filter(|seconds| *seconds > 0.0)
