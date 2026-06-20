@@ -4548,6 +4548,28 @@ decision:
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Sparse train-loss logging with existing TRAIN_LOG_INTERVAL.
+status: rejected_pre_gate
+change:
+  Ran the current promoted binary with TRAIN_LOG_INTERVAL=1000000 so the
+  100-step screen only synced train loss at step 0 and the final capped step.
+verification:
+  100-step SYNTH screen:
+    target/sparse_log_l4_b8_100_20260620T130641Z.log
+    val_loss=6.548050, train_elapsed_s=19.369, completed_steps=100.
+measured_effect:
+  This did not improve the promoted baseline screen
+  target/reusable_batch_l4_b8_100_20260620T122059Z.log, which had
+  val_loss=6.545963 and train_elapsed_s=19.350. The loss-sync reduction is too
+  small/noisy at this screen length to justify changing the 900-second gate
+  protocol.
+decision:
+  Keep the existing TRAIN_LOG_INTERVAL=250 convention for the 900-second gate.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Four-way unroll of Aurora momentum orientation pass.
 status: rejected_pre_gate
 change:
