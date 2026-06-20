@@ -30,6 +30,42 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-20
+commit: uncommitted
+experiment: Source-backed loop-state transformer with loop_count=2.
+status: rejected_pre_gate
+change:
+  Implemented the requested looped-transformer shape as a loop state rather
+  than physical block repetition: z0 starts from token embeddings, the second
+  pass enters the same physical block stack as embedding + z1, forward tape was
+  shaped per loop, and backward ran loop 2 normally then loop 1 with shared
+  parameter-gradient accumulation into the same physical weights.
+verification:
+  cargo fmt --all --check: pass.
+  GPT2_LOOP_COUNT=2 cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 GPT2_LOOP_COUNT=2 cargo test -p gpt2-nvfp4 --test
+  block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 GPT2_LOOP_COUNT=2 cargo test -p gpt2-nvfp4 --test
+  l3_mlp -- --ignored --nocapture: pass.
+  One-step SYNTH launch:
+    target/loop_state2_l4_b8_1_20260620T143715Z.log
+    val_loss=10.362991, finite=true, completed_steps=1.
+  100-step SYNTH screen:
+    target/loop_state2_l4_b8_100_20260620T143756Z.log
+    val_loss=8.954576, train_elapsed_s=28.413, completed_steps=100.
+measured_effect:
+  The source-backed loop_count=2 candidate was much worse than the promoted
+  baseline 100-step screen target/reusable_batch_l4_b8_100_20260620T122059Z.log,
+  which had val_loss=6.545963 and train_elapsed_s=19.350. It also slowed the
+  pre-gate by about 9.063s.
+decision:
+  Do not promote and do not spend a 900-second gate. Code was reverted to the
+  promoted baseline. This rejects this local loop-state implementation on the
+  current objective; it is not evidence for arbitrary loop shortcuts.
+```
+
+```text
+date: 2026-06-20
 commit: this commit
 experiment: Fuse row amax and four/six rowwise activation quantization.
 status: rejected_pre_gate
