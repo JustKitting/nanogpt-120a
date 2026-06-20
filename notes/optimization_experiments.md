@@ -5242,3 +5242,37 @@ decision:
   Reject before profiling and before the 900-second gate. Code was reverted to
   the promoted baseline.
 ```
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Aligned CTA path for paired linear-backward projection.
+status: accepted
+change:
+  Added an aligned no-edge variant of the CTA NVFP4 projection body and routed
+  the paired linear-backward projection kernel through it for the current
+  Tensor-Core-aligned training shape. The host wrapper now asserts the CTA
+  alignment contract instead of silently falling back to the edge-checked path.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  100-step SYNTH screen:
+    target/linear_bwd_aligned_l4_b8_100_20260620T183731Z.log
+    val_loss=6.549100, train_elapsed_s=19.081, completed_steps=100.
+  20-step nsys:
+    target/nsys/linear_bwd_aligned_l4_b8_20_20260620T183801Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.766, completed_steps=20.
+  900-second held-out gate:
+    target/linear_bwd_aligned_l4_b8_900_20260620T184019Z.log
+    val_loss=4.031730, train_elapsed_s=900.033, completed_steps=4587.
+measured_effect:
+  The profiled linear_backward_projection_pair_cta_device_scale_kernel time
+  dropped from 740.275ms to 711.227ms over 20 steps, while total profiled
+  train time moved from 3.794s to 3.766s. The 900-second gate completed 29
+  more steps than the prior baseline, while validation loss moved from
+  4.021274 to 4.031730, a +0.26% change.
+decision:
+  Promote under the current acceptance rule: validation loss stayed within the
+  +/-1% no-meaningful-change band and completed step count increased.
+```

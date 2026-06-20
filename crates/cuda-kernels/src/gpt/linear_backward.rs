@@ -6,10 +6,11 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 use crate::layer_norm_reduce::{layer_norm_block_reduce, layer_norm_store_row};
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES,
-    NVFP4_PROJECTION_CTA_B_PACKS, NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS,
+    NVFP4_PROJECTION_CTA_B_PACKS, NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_K,
+    NVFP4_PROJECTION_CTA_M, NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_THREADS,
     NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4DeviceScaleMmaWeightTensor,
     Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
-    nvfp4_projection_cta_nobias_kernel_body, nvfp4_projection_cta_nobias_kernel_body_at,
+    nvfp4_projection_cta_nobias_kernel_body, nvfp4_projection_cta_nobias_kernel_body_at_aligned,
     nvfp4_projection_nobias_kernel_body, projection_cta_grid_dim, projection_cta_tile_count,
     projection_grid_dim,
 };
@@ -250,6 +251,8 @@ impl LinearBackwardModule {
     ) -> Result<(), DriverError> {
         let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
+        assert_projection_cta_aligned(args.token_count, args.input_dim, dinput_k);
+        assert_projection_cta_aligned(args.output_dim, args.input_dim, dweight_k);
         let dinput_grid = projection_cta_grid_dim(args.token_count, args.input_dim);
         let dweight_grid = projection_cta_grid_dim(args.output_dim, args.input_dim);
         let dinput_tiles = projection_cta_tile_count(args.token_count, args.input_dim);
@@ -457,6 +460,12 @@ impl LinearBackwardModule {
     }
 }
 
+fn assert_projection_cta_aligned(rows: u32, cols: u32, k: u32) {
+    assert_eq!(rows % NVFP4_PROJECTION_CTA_M, 0);
+    assert_eq!(cols % NVFP4_PROJECTION_CTA_N, 0);
+    assert_eq!(k % NVFP4_PROJECTION_CTA_K, 0);
+}
+
 struct QuantizeOperandArgs<'a, 'out> {
     stream: &'a CudaStream,
     x: &'a DeviceBuffer<f32>,
@@ -655,7 +664,7 @@ mod kernels {
             let tile = Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row, thread_id);
 
             dinput_params.weight_global_scale = dinput_weight_global_scale[0];
-            nvfp4_projection_cta_nobias_kernel_body_at(
+            nvfp4_projection_cta_nobias_kernel_body_at_aligned(
                 dinput_input_bytes,
                 dinput_input_scales,
                 dinput_input_global_scales,
@@ -677,7 +686,7 @@ mod kernels {
             let tile = Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row, thread_id);
 
             dweight_params.weight_global_scale = dweight_weight_global_scale[0];
-            nvfp4_projection_cta_nobias_kernel_body_at(
+            nvfp4_projection_cta_nobias_kernel_body_at_aligned(
                 dweight_input_bytes,
                 dweight_input_scales,
                 dweight_input_global_scales,
