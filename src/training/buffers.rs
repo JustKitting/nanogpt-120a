@@ -3,6 +3,7 @@ use gpt2_nvfp4::{
     AttentionLogSumExp, GPT2_TOKEN_ROWS, HiddenState, Logits, MlpActivation, QkvActivation,
 };
 
+use super::grad_clip::GradientClipBuffers;
 use super::grads::BackwardBuffers;
 use super::optimizer::OptimizerScratch;
 use super::optimizer_aurora::AuroraPointerTables;
@@ -37,6 +38,7 @@ pub struct TrainBuffers {
     pub optimizer_state: OptimizerStateBuffers,
     pub aurora: AuroraScratchBuffers,
     pub aurora_tables: AuroraPointerTables,
+    pub grad_clip: GradientClipBuffers,
 }
 
 impl TrainBuffers {
@@ -49,6 +51,7 @@ impl TrainBuffers {
         let optimizer_state = OptimizerStateBuffers::new(stream, &runtime.decode, uploaded)?;
         let aurora_tables =
             AuroraPointerTables::new(stream, uploaded, &backward, &optimizer_state)?;
+        let grad_clip = GradientClipBuffers::new(stream, &backward)?;
 
         Ok(Self {
             residual: zero(stream, HiddenState::LEN)?,
@@ -74,6 +77,7 @@ impl TrainBuffers {
             optimizer_state,
             aurora: AuroraScratchBuffers::new(stream)?,
             aurora_tables,
+            grad_clip,
         })
     }
 }

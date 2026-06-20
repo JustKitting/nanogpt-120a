@@ -1,6 +1,7 @@
 mod adam;
 mod aurora_mega;
 mod embedding;
+mod grad_clip;
 mod update;
 
 use std::sync::Arc;

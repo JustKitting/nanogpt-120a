@@ -30,6 +30,43 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-20
+commit: this commit
+experiment: Global GPU gradient clipping before optimizer update.
+status: measured, promoted
+implementation:
+  Added a parameter-gradient pointer table built at buffer initialization.
+  Each optimizer step accumulates global gradient squared norm on GPU, computes
+  clip scale for max norm 1.0 on GPU, and scales all parameter-gradient buffers
+  in place before Adam/Aurora update kernels consume them. This clips LM head,
+  layer norm weights/biases, linear weights, and linear biases together.
+correctness_checks:
+  cargo check --workspace --tests
+  cargo oxide build --arch sm_120a
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer \
+    global_clip_scales_all_gradient_buffers_together -- --ignored --nocapture
+  100-step SYNTH screen: target/grad_clip_l4_b8_100_20260620T101549Z.log
+baseline:
+  target/no_backward_clear_l4_b8_900_20260620T090607Z.log
+  heldout_val_loss=4.069893
+  completed_steps=4535
+measured_result:
+  target/grad_clip_l4_b8_900_20260620T101626Z.log
+  heldout_val_loss=4.044528
+  completed_steps=4520
+  stopped_by_wall_clock=true
+measured_effect:
+  Held-out validation loss improved by 0.025365.
+runtime_effect:
+  Completed 15 fewer optimizer steps in the same 900-second budget.
+stability:
+  Finite for the full 900-second run.
+decision:
+  Promote GPU global gradient clipping because it improves the fixed-wall-clock
+  held-out validation objective despite the small step-count decrease.
+```
+
+```text
+date: 2026-06-20
 commit: uncommitted
 experiment: Real two-loop transformer with four physical blocks.
 status: measured, rejected

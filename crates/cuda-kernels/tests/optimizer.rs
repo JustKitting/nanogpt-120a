@@ -8,5 +8,7 @@ mod assertions;
 mod aurora;
 #[path = "optimizer/embedding.rs"]
 mod embedding;
+#[path = "optimizer/grad_clip.rs"]
+mod grad_clip;
 #[path = "optimizer/polar_reference.rs"]
 mod polar_reference;

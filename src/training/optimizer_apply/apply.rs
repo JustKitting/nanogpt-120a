@@ -1,3 +1,4 @@
+use super::super::grad_clip::GradientClipBuffers;
 use super::super::grads::BackwardBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_aurora::{AuroraPointerTables, aurora_learning_rate};
@@ -26,6 +27,7 @@ pub fn apply_weight_updates(
     state: &mut OptimizerStateBuffers,
     aurora: &mut AuroraScratchBuffers,
     aurora_tables: &AuroraPointerTables,
+    grad_clip: &mut GradientClipBuffers,
 ) -> AppResult<WeightUpdateResult> {
     let optimizer = &runtime.optimizer;
     let mut trace = OptimizerTrace::default();
@@ -36,6 +38,8 @@ pub fn apply_weight_updates(
     let start = Instant::now();
     add_embedding_lookup_grad(stream, optimizer, batch, grads)?;
     trace.embedding_lookup_ms = elapsed_ms(start);
+
+    grad_clip.clip(stream, optimizer)?;
 
     let diagnostics = if super::super::diagnostics::enabled() {
         Some(

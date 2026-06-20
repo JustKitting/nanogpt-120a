@@ -8,6 +8,7 @@ mod eval;
 mod forward;
 mod generate;
 mod grad_block;
+mod grad_clip;
 mod grads;
 mod learning_rate;
 mod linear_scratch;
