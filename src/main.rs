@@ -26,6 +26,7 @@ fn main() -> AppResult {
 
     let mut data = TokenDataLoader::from_training_dataset()?;
     let mut logger = TrainingLogger::new();
+    let mut train_batch = trainer.reusable_default_batch()?;
     let wall_clock = app::wall_clock::WallClockBudget::new(config.max_seconds);
     let validation_tokens = data.validation_tokens()?;
     let validation_window_count = TokenDataLoader::validation_window_count();
@@ -43,7 +44,7 @@ fn main() -> AppResult {
         let log_step = app::config::should_log_step(step, config.step_cap, config.log_interval);
         let window = data.next_batch()?;
         let source = window.source.display().to_string();
-        let batch = trainer.batch_from_default_windows(&window.tokens)?;
+        let batch = trainer.upload_default_batch(&mut train_batch, &window.tokens)?;
         let stats = trainer.train_step(&batch, log_step)?;
 
         if log_step {

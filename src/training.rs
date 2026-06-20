@@ -25,7 +25,7 @@ mod tape;
 mod tape_block;
 mod tape_leaf;
 
-pub use batch::TokenBatch;
+pub use batch::{ReusableTokenBatch, TokenBatch};
 pub use data::TokenDataLoader;
 pub use generate::SamplingConfig;
 
@@ -89,8 +89,16 @@ impl Trainer {
         })
     }
 
-    pub fn batch_from_default_windows(&self, tokens: &[u16]) -> AppResult<TokenBatch> {
-        TokenBatch::from_default_batch(self.runtime.stream.as_ref(), tokens)
+    pub fn reusable_default_batch(&self) -> AppResult<ReusableTokenBatch> {
+        ReusableTokenBatch::default(self.runtime.stream.as_ref())
+    }
+
+    pub fn upload_default_batch<'a>(
+        &self,
+        batch: &'a mut ReusableTokenBatch,
+        tokens: &[u16],
+    ) -> AppResult<&'a TokenBatch> {
+        batch.upload(self.runtime.stream.as_ref(), tokens)
     }
 
     pub fn batch_from_windows(&self, tokens: &[u16], batch_size: usize) -> AppResult<TokenBatch> {

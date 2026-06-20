@@ -4467,3 +4467,50 @@ decision:
   Do not promote and do not spend a profile or 900-second gate. Code was
   reverted to baseline; the original loop form is better for this kernel.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Reuse training token/target batch buffers.
+status: completed, new recorded best 900-second validation loss
+change:
+  Main training now allocates one reusable TokenBatch with persistent device
+  tokens/targets, pinned host staging buffers, and a CUDA event recorded after
+  the stream-ordered HtoD copies. Each step waits only for the prior batch-copy
+  event before refilling the pinned host staging area, then enqueues copies into
+  the same device buffers.
+scope:
+  Training hot path only. Evaluation and generation keep their existing
+  TokenBatch::from_* allocation path. Model math, data order, optimizer state,
+  and validation sample selection are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/reusable_batch_l4_b8_100_20260620T122059Z.log
+    val_loss=6.545963, train_elapsed_s=19.350, completed_steps=100.
+  20-step direct screen:
+    target/reusable_batch_l4_b8_20_direct_20260620T122209Z.log
+    val_loss=8.505538, train_elapsed_s=3.807, completed_steps=20.
+  20-step nsys profile:
+    target/nsys/reusable_batch_l4_b8_20_20260620T122136Z_stats.txt
+profile_effect:
+  cuMemFree_v2 dropped from 3.701772145s/769 calls in
+  target/nsys/current_l4_b8_20_20260620T120735Z_stats.txt to
+  0.036707151s/731 calls in the reusable-batch profile. Top GPU kernel times
+  were effectively unchanged to slightly slower, so the value of this change is
+  host-side allocator removal, not better kernel code.
+heldout_result:
+  Previous accepted baseline:
+    target/grad_clip_l4_b8_900_20260620T101626Z.log
+    val_loss=4.044528, completed_steps=4520.
+  Candidate:
+    target/reusable_batch_l4_b8_900_20260620T122227Z.log
+    val_loss=4.023637, completed_steps=4522.
+measured_effect:
+  Held-out validation loss improved by 0.020891 over the same 900-second SYNTH
+  gate, with two additional completed steps. This clears the promotion rule.
+decision:
+  Promote and make this the recorded baseline.
+```
