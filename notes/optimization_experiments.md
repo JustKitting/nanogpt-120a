@@ -30,6 +30,36 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-20
+commit: uncommitted
+experiment: Remove wide-matrix double transpose inside Aurora momentum orientation.
+status: measured, rejected; code reverted
+target:
+  Test whether QKV and MLP-up Aurora updates can avoid writing Nesterov momentum
+  transposed and then transposing it back during Polar normalization.
+implementation_tested:
+  momentum_orient wrote all matrices in original row-major order, and
+  run_polar_step treated the scratch source as untransposed. Tall matrices still
+  transposed inside Polar normalization through the existing rows > cols path.
+verification_before_screen:
+  cargo check --workspace --tests: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+  aurora_mega_update_matches -- --ignored --nocapture: pass, 3 tests.
+measured_result:
+  target/aurora_no_wide_double_transpose_100_20260620T104824Z.log
+  SYNTH, B8/L4/d1024/h16, current baseline hyperparameters.
+  step 25 loss=NaN finite=false nonzero=false.
+  heldout_eval split=val val_loss=NaN completed_steps=100.
+decision:
+  Revert the code candidate. The focused constant-gradient Aurora tests were too
+  weak to prove training-path equivalence, and the sustained 100-step screen
+  failed quickly. Do not retry this exact orientation rewrite without a stronger
+  non-constant rectangular Aurora recurrence test and a clear derivation of the
+  orientation expected by the update path.
+```
+
+```text
+date: 2026-06-20
 commit: this commit
 experiment: Global GPU gradient clipping before optimizer update.
 status: measured, promoted
