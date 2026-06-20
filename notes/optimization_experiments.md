@@ -4374,17 +4374,18 @@ source_findings:
   residual updates need explicit loop-aware scaling. Any future looped
   implementation must include that scaling from the start.
 local_evidence:
-  Two prior local loop candidates already failed the actual objective:
+  Two prior local loop shortcuts already failed the actual objective:
     target/loop_count2_l4_900s_20260620T071755Z.log:
       val_loss=4.226233, completed_steps=4102.
     target/loop2_l4_b8_900_20260620T084124Z.log:
       val_loss=4.200931, completed_steps=3047.
+  These runs should not be treated as evidence against a real source-faithful
+  looped candidate. They rejected local shortcuts that did not implement the
+  paper's loop-state structure or loop-aware residual scaling.
 decision:
-  Do not run another looped-forward experiment as a direct validation-loss
-  optimization unless the implementation follows the source-backed structure
-  and is treated as a major architecture change. For the current target,
-  the more plausible paper-backed follow-up is the layer-similarity
-  regularizer, not loop repetition.
+  Do not run another arbitrary looped-forward shortcut. If looped transformer
+  is tested again, treat it as a major architecture change and implement the
+  source-backed loop count/loop-state/residual-scaling design from the start.
 ```
 
 ```text
