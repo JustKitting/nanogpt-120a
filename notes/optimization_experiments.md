@@ -4837,6 +4837,38 @@ decision:
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Compile-time lookup-table compact upper-triangle scheduling for the
+  symmetric Polar Gram stage.
+status: rejected_pre_gate; concept still open
+change:
+  Replaced the branch-skip square tile walk in run_symmetric_tiles with compact
+  upper-triangle lookup tables for the current tile dimensions 16, 48, and 64.
+  The mapping avoided runtime triangular-index arithmetic and kept unsupported
+  tile dimensions on the old branch-skip path.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass, 8 tests.
+  100-step SYNTH screen:
+    target/compact_tri_lut_l4_b8_100_20260620T172835Z.log
+    val_loss=6.546121, train_elapsed_s=19.711, completed_steps=100.
+  20-step nsys:
+    target/nsys/compact_tri_lut_l4_b8_20_20260620T172905Z.run.log
+measured_effect:
+  The candidate launched and remained finite, so it fixed the earlier launch
+  failure mode. It still regressed runtime. Against the paired-projection
+  baseline profile target/nsys/paired_linear_backward_l4_b8_20_20260620T170414Z.run.log,
+  aurora_mega_update_cooperative_kernel increased from 68.380 ms/step to
+  72.261 ms/step, and 20-step train_elapsed_s increased from 3.811 to 3.920.
+decision:
+  Reject before the 900-second gate and revert the code. This rejects the LUT
+  implementation, not compact upper-triangle scheduling in general.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Pair the two linear-backward CTA projection launches.
 status: accepted_900s
 change:
