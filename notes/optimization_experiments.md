@@ -5140,3 +5140,31 @@ decision:
   Do not promote and do not spend a 900-second gate. Code was reverted to the
   promoted baseline.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Four-way unroll of cross_entropy_kernel vocab scans and dlogit
+  stores.
+status: rejected_pre_gate
+change:
+  Unrolled the per-row max pass, denominator pass, and dlogits store pass by
+  four columns per participating thread. The mathematical path was unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture: pass.
+  100-step SYNTH screen:
+    target/ce_unroll_l4_b8_100_20260620T173410Z.log
+    val_loss=6.546669, train_elapsed_s=19.323, completed_steps=100.
+measured_effect:
+  Against the paired linear backward baseline screen
+  target/paired_linear_backward_l4_b8_100_20260620T170345Z.log, runtime
+  regressed from 19.285s to 19.323s. Validation loss moved from 6.549596 to
+  6.546669, which is too small to justify the runtime regression or a
+  900-second gate.
+decision:
+  Reject before profiling and before the 900-second gate. Code was reverted to
+  the promoted baseline.
+```
