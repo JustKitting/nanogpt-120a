@@ -30,6 +30,37 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-20
+commit: uncommitted
+experiment: Real two-loop transformer with four physical blocks.
+status: measured, rejected
+implementation:
+  Tested GPT2_LOOP_COUNT=2 as four trainable physical blocks reused for eight
+  logical passes. Forward tape and backward activation gradients were logical
+  pass sized. Parameter gradients from pass i and i + GPT2_N_LAYER were folded
+  into the matching physical block before optimizer update.
+baseline:
+  target/attention_backward_no_transpose_l4_b8_900_20260620T081345Z.log
+  heldout_val_loss=4.077696
+  completed_steps=4483
+measured_result:
+  target/loop2_l4_b8_900_20260620T084124Z.log
+  heldout_val_loss=4.200931
+  completed_steps=3047
+  stopped_by_wall_clock=true
+measured_effect:
+  Held-out validation loss worsened by 0.123235.
+runtime_effect:
+  Completed 1436 fewer optimizer steps in the same 900-second budget.
+stability:
+  Finite for the full 900-second run.
+decision:
+  Do not promote the two-loop four-physical-block architecture in this form.
+  The paper-backed loop count is two, but this repo implementation loses the
+  fixed-wall-clock validation target versus the current L4 baseline.
+```
+
+```text
+date: 2026-06-20
 commit: this commit
 experiment: Remove materialized attention-backward P and dS transposes.
 status: measured, promoted
