@@ -1,5 +1,6 @@
 use cuda_core::DeviceBuffer;
-use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionTcScratch};
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
@@ -11,10 +12,12 @@ use crate::types::{
 
 pub struct BlockForwardArgs<'a, 'scratch> {
     pub attention_module: &'a AttentionModule,
+    pub attention_tc_module: &'a F16TcMatmulModule,
     pub quant_module: &'a Nvfp4QuantModule,
     pub layer_norm_module: &'a LayerNormModule,
     pub mlp_module: &'a MlpModule,
     pub hidden_nvfp4: HiddenStateNvfp4<'scratch>,
+    pub attention_tc_scratch: CausalAttentionTcScratch<'scratch>,
     pub mlp_activation_nvfp4: MlpActivationNvfp4<'scratch>,
     pub projections: AttentionProjectionTensors<'a>,
     pub ln_1: LayerNormTensors<'a>,

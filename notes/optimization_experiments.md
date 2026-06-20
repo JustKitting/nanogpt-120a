@@ -30,6 +30,66 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-20
+commit: this commit
+experiment: Forward causal attention through TC matmul.
+status: measured, promoted
+implementation:
+  Replaced scalar forward causal attention with a compact TC path:
+  gather Q/K/V, compute QK^T through f16 TC matmul, apply causal softmax
+  and log-sum-exp, compute P@V through f16 TC matmul, then scatter back to
+  hidden layout. Also removed three small attention-backward transpose uses by
+  adding a row-major RHS f32 TC matmul variant.
+baseline:
+  target/aurora_stage_unroll_l4_900s_20260620T062251Z.log
+  heldout_val_loss=4.133352
+  completed_steps=3756
+measured_result:
+  target/attention_tc_forward_l4_b8_900_20260620T075050Z.log
+  heldout_val_loss=4.104358
+  completed_steps=4331
+  stopped_by_wall_clock=true
+measured_effect:
+  Completed 575 more steps in the same 900-second budget.
+  Held-out validation loss improved by 0.028994.
+stability:
+  Finite for the full 900-second run.
+decision:
+  Promote this candidate as the current baseline.
+```
+
+```text
+date: 2026-06-20
+commit: this commit
+experiment: Matched-compute two-loop transformer block tying.
+status: measured, not promoted
+implementation:
+  GPT2_LOOP_COUNT=2 on the current L4/B8/d1024 baseline. This gives two
+  unique physical blocks applied as four logical passes in order 0,1,0,1.
+  Logical activation tapes stay per pass. Parameter gradients from the second
+  loop are accumulated into the matching physical block gradient buffers before
+  optimizer update. Residual projection init uses loop-aware scaling.
+baseline:
+  target/aurora_stage_unroll_l4_900s_20260620T062251Z.log
+  heldout_val_loss=4.133352
+  completed_steps=3756
+measured_result:
+  target/loop_count2_l4_900s_20260620T071755Z.log
+  heldout_val_loss=4.226233
+  completed_steps=4102
+  stopped_by_wall_clock=true
+measured_effect:
+  Completed 346 more steps than baseline in the same 900-second budget.
+  Held-out validation loss was worse by 0.092881.
+stability:
+  Finite for the full 900-second run.
+decision:
+  Do not promote this two-loop tied-block architecture. It improved step count
+  but failed the optimization target: lower held-out validation loss over fixed
+  wall-clock.
+```
+
+```text
+date: 2026-06-20
 commit: committed
 experiment: Unroll fixed Aurora Polar Express shared-memory staging loads.
 status: promoted at fixed-wall validation

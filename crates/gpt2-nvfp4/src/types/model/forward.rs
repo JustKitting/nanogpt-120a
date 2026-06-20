@@ -13,11 +13,13 @@ pub(super) fn forward<'a>(
     let Gpt2ForwardArgs {
         embeddings,
         attention_module,
+        attention_tc_module,
         quant_module,
         layer_norm_module,
         mlp_module,
         lm_head_module,
         mut hidden_nvfp4,
+        mut attention_tc_scratch,
         mut mlp_activation_nvfp4,
         attention_qkv_weights,
         attention_qkv_biases,
@@ -50,10 +52,12 @@ pub(super) fn forward<'a>(
     for (block_index, block) in weights.h.iter().enumerate() {
         hidden = block.forward(BlockForwardArgs {
             attention_module,
+            attention_tc_module,
             quant_module,
             layer_norm_module,
             mlp_module,
             hidden_nvfp4: hidden_nvfp4.reborrow(),
+            attention_tc_scratch: attention_tc_scratch.reborrow(),
             mlp_activation_nvfp4: mlp_activation_nvfp4.reborrow(),
             projections: AttentionProjectionTensors {
                 qkv_weight: attention_qkv_weights[block_index],

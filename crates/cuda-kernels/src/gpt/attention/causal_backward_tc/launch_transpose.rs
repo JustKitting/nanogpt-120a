@@ -6,7 +6,6 @@ use super::types::CausalAttentionBackwardTcScratch;
 pub(super) struct TransposeShape {
     pub batch_head: u32,
     pub seq_len: u32,
-    pub head_dim: u32,
 }
 
 pub(super) fn run_transposes(
@@ -15,33 +14,6 @@ pub(super) fn run_transposes(
     scratch: &mut CausalAttentionBackwardTcScratch<'_>,
     shape: TransposeShape,
 ) -> Result<(), DriverError> {
-    transpose(
-        module,
-        stream,
-        scratch.k,
-        scratch.k_t,
-        shape.batch_head,
-        shape.seq_len,
-        shape.head_dim,
-    )?;
-    transpose(
-        module,
-        stream,
-        scratch.q,
-        scratch.q_t,
-        shape.batch_head,
-        shape.seq_len,
-        shape.head_dim,
-    )?;
-    transpose(
-        module,
-        stream,
-        scratch.d_out,
-        scratch.d_out_t,
-        shape.batch_head,
-        shape.seq_len,
-        shape.head_dim,
-    )?;
     transpose(
         module,
         stream,

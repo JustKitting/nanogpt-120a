@@ -44,8 +44,10 @@ impl Gpt2BlockWeights {
 
         let hidden = AttentionWeights::forward(AttentionWeights::input_from_embeddings_with_tape(
             args.attention_module,
+            args.attention_tc_module,
             args.quant_module,
             hidden_nvfp4.reborrow(),
+            args.attention_tc_scratch,
             args.projections,
             &mut *qkv,
             &mut *attention_log_sum_exp,

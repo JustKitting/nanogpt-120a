@@ -8,14 +8,15 @@ use gpt2_nvfp4::{
     HiddenVectorShape, Nvfp4Shape, QkvActivation, QkvVectorShape, QkvWeightShape,
     ResidualWeightShape,
 };
-use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionTcScratch};
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 const E4M3_ONE: u8 = 0x38;
 const HEAD_DIM: usize = GPT2_N_EMBD / GPT2_N_HEAD;
-const ATTENTION_TOLERANCE: f32 = 1.0e-7;
+const ATTENTION_TOLERANCE: f32 = 1.0e-6;
 const RESIDUAL_TOLERANCE: f32 = 1.0e-7;
 
 #[ignore = "requires generated sm_120a PTX"]
@@ -26,6 +27,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let stream = ctx.new_stream()?;
     let module = ctx.load_module_from_file(ptx_path().as_str())?;
     let attention_module = AttentionModule::from_module(module.clone())?;
+    let tc_module = F16TcMatmulModule::from_module(module.clone())?;
     let quant_module = Nvfp4QuantModule::from_module(module)?;
 
     let (hidden, amax) = hidden_input();
@@ -41,6 +43,13 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
     let mut attention_log_sum_exp_dev =
         DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
+    let mut tc_q_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
+    let mut tc_k_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
+    let mut tc_v_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
+    let square = GPT2_N_HEAD * GPT2_CONTEXT_LEN * GPT2_CONTEXT_LEN;
+    let mut tc_scores_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
+    let mut tc_probs_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
+    let mut tc_out_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
 
     let weight_bytes = qkv_identity_weight_bytes();
     let weight_scales = vec![E4M3_ONE; QkvWeightShape::SCALE_LEN];
@@ -65,11 +74,20 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
 
     AttentionWeights::forward(AttentionWeights::input_from_embeddings(
         &attention_module,
+        &tc_module,
         &quant_module,
         HiddenStateNvfp4 {
             bytes: &mut input_bytes_dev,
             scales: &mut input_scales_dev,
             global_scales: &mut input_global_scales_dev,
+        },
+        CausalAttentionTcScratch {
+            q: &mut tc_q_dev,
+            k: &mut tc_k_dev,
+            v: &mut tc_v_dev,
+            scores: &mut tc_scores_dev,
+            probs: &mut tc_probs_dev,
+            compact_out: &mut tc_out_dev,
         },
         AttentionProjectionTensors {
             qkv_weight: Nvfp4FourSixMmaWeightTensor {
@@ -198,8 +216,9 @@ fn assert_attention_matches(qkv: &[f32], out: &[f32]) {
             for dim in [0, 1, HEAD_DIM / 2, HEAD_DIM - 1] {
                 let mut expected = 0.0;
                 for (key, score) in scores.iter().copied().enumerate() {
-                    let weight = (score - score_max).exp() / denom;
-                    expected += weight * qkv_value(qkv, key, head, dim, 2 * GPT2_N_EMBD);
+                    let weight = tc_f16((score - score_max).exp() / denom);
+                    let value = tc_f16(qkv_value(qkv, key, head, dim, 2 * GPT2_N_EMBD));
+                    expected += weight * value;
                 }
 
                 let col = head * HEAD_DIM + dim;
@@ -220,8 +239,9 @@ fn attention_scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
     for key in 0..=query {
         let mut dot = 0.0;
         for dim in 0..HEAD_DIM {
-            dot +=
-                qkv_value(qkv, query, head, dim, 0) * qkv_value(qkv, key, head, dim, GPT2_N_EMBD);
+            let q = tc_f16(qkv_value(qkv, query, head, dim, 0));
+            let k = tc_f16(qkv_value(qkv, key, head, dim, GPT2_N_EMBD));
+            dot += q * k;
         }
         scores.push(dot / (HEAD_DIM as f32).sqrt());
     }
@@ -230,6 +250,75 @@ fn attention_scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
 
 fn qkv_value(qkv: &[f32], token: usize, head: usize, dim: usize, offset: usize) -> f32 {
     qkv[token * GPT2_QKV + offset + head * HEAD_DIM + dim]
+}
+
+fn tc_f16(value: f32) -> f32 {
+    f16_bits_to_f32(f32_to_f16_bits(value))
+}
+
+fn f32_to_f16_bits(value: f32) -> u16 {
+    let bits = value.to_bits();
+    let sign = ((bits >> 16) & 0x8000) as u16;
+    let exp = ((bits >> 23) & 0xff) as i32;
+    let mant = bits & 0x7f_ffff;
+
+    if exp == 0xff {
+        return sign | if mant == 0 { 0x7c00 } else { 0x7e00 };
+    }
+
+    let half_exp = exp - 127 + 15;
+    if half_exp >= 0x1f {
+        return sign | 0x7c00;
+    }
+    if half_exp <= 0 {
+        if half_exp < -10 {
+            return sign;
+        }
+        let mantissa = mant | 0x80_0000;
+        let shift = (14 - half_exp) as u32;
+        let mut half_mant = (mantissa >> shift) as u16;
+        let round = (mantissa >> (shift - 1)) & 1;
+        let sticky = mantissa & ((1_u32 << (shift - 1)) - 1);
+        if round != 0 && (sticky != 0 || (half_mant & 1) != 0) {
+            half_mant += 1;
+        }
+        return sign | half_mant;
+    }
+
+    let mut half = sign | ((half_exp as u16) << 10) | ((mant >> 13) as u16);
+    let round = (mant >> 12) & 1;
+    let sticky = mant & 0x0fff;
+    if round != 0 && (sticky != 0 || (half & 1) != 0) {
+        half += 1;
+    }
+    half
+}
+
+fn f16_bits_to_f32(bits: u16) -> f32 {
+    let sign = ((bits as u32) & 0x8000) << 16;
+    let exp = ((bits >> 10) & 0x1f) as i32;
+    let mant = (bits & 0x03ff) as u32;
+
+    if exp == 0 {
+        if mant == 0 {
+            return f32::from_bits(sign);
+        }
+        let mut mantissa = mant;
+        let mut exponent = -14;
+        while mantissa & 0x0400 == 0 {
+            mantissa <<= 1;
+            exponent -= 1;
+        }
+        mantissa &= 0x03ff;
+        let f_exp = ((exponent + 127) as u32) << 23;
+        return f32::from_bits(sign | f_exp | (mantissa << 13));
+    }
+    if exp == 0x1f {
+        return f32::from_bits(sign | 0x7f80_0000 | (mant << 13));
+    }
+
+    let f_exp = ((exp - 15 + 127) as u32) << 23;
+    f32::from_bits(sign | f_exp | (mant << 13))
 }
 
 fn assert_output_amax(out: &[f32], output_amax: &[f32]) {

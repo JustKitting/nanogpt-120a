@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{AttentionCoreScratch, GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_SEQ_LEN};
-use rust_kernels_cuda::attention::CausalAttentionBackwardTcScratch;
+use rust_kernels_cuda::attention::{CausalAttentionBackwardTcScratch, CausalAttentionTcScratch};
 
 pub struct AttentionCoreScratchBuffers {
     softmax_d: DeviceBuffer<f32>,
@@ -68,6 +68,17 @@ impl AttentionCoreScratchBuffers {
                 d_k: &mut self.d_k,
                 d_v: &mut self.d_v,
             },
+        }
+    }
+
+    pub fn forward_tc(&mut self) -> CausalAttentionTcScratch<'_> {
+        CausalAttentionTcScratch {
+            q: &mut self.q,
+            k: &mut self.k,
+            v: &mut self.v,
+            scores: &mut self.scores,
+            probs: &mut self.p,
+            compact_out: &mut self.d_out,
         }
     }
 }

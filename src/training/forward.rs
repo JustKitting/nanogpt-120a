@@ -28,6 +28,7 @@ impl Trainer {
                 inv_std: &mut buffers.inv_std,
             },
             attention_module: &self.runtime.attention,
+            attention_tc_module: &self.runtime.f16_tc_matmul,
             quant_module: &self.runtime.quant,
             layer_norm_module: &self.runtime.layer_norm,
             mlp_module: &self.runtime.mlp,
@@ -37,6 +38,7 @@ impl Trainer {
                 scales: &mut buffers.hidden_scales,
                 global_scales: &mut buffers.hidden_globals,
             },
+            attention_tc_scratch: buffers.scratch.attention_core.forward_tc(),
             mlp_activation_nvfp4: MlpActivationNvfp4 {
                 bytes: &mut buffers.mlp_bytes,
                 scales: &mut buffers.mlp_scales,

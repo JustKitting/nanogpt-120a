@@ -4,6 +4,7 @@ mod cta;
 mod cta_add_f32;
 mod cta_add_f32_rhs_transposed_base;
 mod cta_f32;
+mod cta_f32_rhs;
 pub(crate) mod cta_stage;
 mod cta_stage_f32;
 mod cta_store;
@@ -18,6 +19,6 @@ mod prepare;
 
 pub use args::{
     F16TcMatmulAddArgs, F16TcMatmulAddRhsTransposeBaseArgs, F16TcMatmulArgs, F16TcMatmulF32Args,
-    F16TcMatmulScratch, f16_tc_matmul_elements, f16_tc_matmul_padded_k,
+    F16TcMatmulF32RhsArgs, F16TcMatmulScratch, f16_tc_matmul_elements, f16_tc_matmul_padded_k,
 };
 pub use launcher::F16TcMatmulModule;

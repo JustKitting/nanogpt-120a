@@ -22,8 +22,10 @@ impl AttentionWeights {
 
     pub fn input_from_embeddings<'a, 'scratch>(
         module: &'a rust_kernels_cuda::attention::AttentionModule,
+        tc_module: &'a rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule,
         quant_module: &'a rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule,
         input_nvfp4: HiddenStateNvfp4<'scratch>,
+        tc_scratch: rust_kernels_cuda::attention::CausalAttentionTcScratch<'scratch>,
         projections: AttentionProjectionTensors<'a>,
         qkv: &'scratch mut cuda_core::DeviceBuffer<f32>,
         attention_log_sum_exp: &'scratch mut cuda_core::DeviceBuffer<f32>,
@@ -31,8 +33,10 @@ impl AttentionWeights {
     ) -> AttentionForwardArgs<'a, 'scratch> {
         Self::input_from_embeddings_with_tape(
             module,
+            tc_module,
             quant_module,
             input_nvfp4,
+            tc_scratch,
             projections,
             qkv,
             attention_log_sum_exp,
@@ -44,8 +48,10 @@ impl AttentionWeights {
     #[allow(clippy::too_many_arguments)]
     pub fn input_from_embeddings_with_tape<'a, 'scratch>(
         module: &'a rust_kernels_cuda::attention::AttentionModule,
+        tc_module: &'a rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule,
         quant_module: &'a rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule,
         input_nvfp4: HiddenStateNvfp4<'scratch>,
+        tc_scratch: rust_kernels_cuda::attention::CausalAttentionTcScratch<'scratch>,
         projections: AttentionProjectionTensors<'a>,
         qkv: &'scratch mut cuda_core::DeviceBuffer<f32>,
         attention_log_sum_exp: &'scratch mut cuda_core::DeviceBuffer<f32>,
@@ -54,8 +60,10 @@ impl AttentionWeights {
     ) -> AttentionForwardArgs<'a, 'scratch> {
         AttentionForwardArgs {
             module,
+            tc_module,
             quant_module,
             input_nvfp4,
+            tc_scratch,
             projections,
             qkv,
             attention_log_sum_exp,

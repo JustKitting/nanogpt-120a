@@ -8,8 +8,9 @@ use gpt2_nvfp4::{
     MlpActivation, MlpActivationNvfp4, MlpDownTensors, MlpUpTensors, Nvfp4Shape, Nvfp4Tensor,
     QkvActivation, TokenEmbeddingArgs,
 };
-use rust_kernels_cuda::attention::AttentionModule;
+use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionTcScratch};
 use rust_kernels_cuda::embedding::EmbeddingModule;
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::lm_head::LmHeadModule;
 use rust_kernels_cuda::mlp::MlpModule;
@@ -31,6 +32,7 @@ fn run_forward() -> TestResult {
     let module = ctx.load_module_from_file(ptx_path().as_str())?;
     let embedding_module = EmbeddingModule::from_module(module.clone())?;
     let attention_module = AttentionModule::from_module(module.clone())?;
+    let attention_tc_module = F16TcMatmulModule::from_module(module.clone())?;
     let quant_module = Nvfp4QuantModule::from_module(module.clone())?;
     let layer_norm_module = LayerNormModule::from_module(module.clone())?;
     let mlp_module = MlpModule::from_module(module.clone())?;
@@ -70,6 +72,13 @@ fn run_forward() -> TestResult {
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
     let mut attention_log_sum_exp_dev =
         DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
+    let mut tc_q_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
+    let mut tc_k_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
+    let mut tc_v_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
+    let square = GPT2_BATCH_SIZE * gpt2_nvfp4::GPT2_N_HEAD * GPT2_SEQ_LEN * GPT2_SEQ_LEN;
+    let mut tc_scores_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
+    let mut tc_probs_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
+    let mut tc_out_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut logits_dev = DeviceBuffer::<f32>::zeroed(&stream, Logits::LEN)?;
 
     model.forward(Gpt2ForwardArgs {
@@ -88,6 +97,7 @@ fn run_forward() -> TestResult {
             inv_std: &mut inv_std_dev,
         },
         attention_module: &attention_module,
+        attention_tc_module: &attention_tc_module,
         quant_module: &quant_module,
         layer_norm_module: &layer_norm_module,
         mlp_module: &mlp_module,
@@ -96,6 +106,14 @@ fn run_forward() -> TestResult {
             bytes: &mut hidden_bytes_dev,
             scales: &mut hidden_scales_dev,
             global_scales: &mut hidden_global_scales_dev,
+        },
+        attention_tc_scratch: CausalAttentionTcScratch {
+            q: &mut tc_q_dev,
+            k: &mut tc_k_dev,
+            v: &mut tc_v_dev,
+            scores: &mut tc_scores_dev,
+            probs: &mut tc_probs_dev,
+            compact_out: &mut tc_out_dev,
         },
         mlp_activation_nvfp4: MlpActivationNvfp4 {
             bytes: &mut mlp_activation_bytes_dev,

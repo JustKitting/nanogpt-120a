@@ -11,7 +11,7 @@ pub struct BackwardScratchBuffers {
     final_head: LinearScratch,
     attention_c_proj: LinearScratch,
     attention_qkv: LinearScratch,
-    attention_core: AttentionCoreScratchBuffers,
+    pub attention_core: AttentionCoreScratchBuffers,
     mlp_down: LinearScratch,
     mlp_up: LinearScratch,
 }

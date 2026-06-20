@@ -88,7 +88,6 @@ impl AttentionModule {
             TransposeShape {
                 batch_head,
                 seq_len,
-                head_dim,
             },
         )?;
         run_grad_matmuls(&tc_ctx, &mut scratch)?;
