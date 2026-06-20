@@ -31,6 +31,46 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: this commit
+experiment: Source-faithful looped transformer boundary with loop_count=2.
+status: rejected_pre_gate
+change:
+  Tested a source-style z = F(x + z) loop boundary for GPT blocks with
+  GPT2_LOOP_COUNT=2. The implementation kept weights physical-layer sized,
+  saved activation tape per logical pass, added the saved embedding residual at
+  the second loop boundary, propagated loop-boundary gradients into both the
+  previous loop state and the embedding gradient, and folded tied logical
+  parameter gradients into the physical block before clipping/optimizer update.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  residual_backward -- --ignored --nocapture: pass, 2 tests.
+  Default loop_count=1 forward test:
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+  --nocapture: pass.
+launch_check:
+  target/loop_source_l4_b8_1_20260620T135518Z.log
+  finite=true, val_loss=10.344292, completed_steps=1.
+pre_gate_screen:
+  target/loop_source_l4_b8_100_20260620T135526Z.log
+  val_loss=7.301424, train_elapsed_s=28.490, completed_steps=100.
+baseline:
+  target/reusable_batch_l4_b8_100_20260620T122059Z.log
+  val_loss=6.545963, train_elapsed_s=19.350, completed_steps=100.
+measured_effect:
+  The source-faithful loop_count=2 candidate was much worse on held-out
+  validation at 100 steps and was about 9.140 seconds slower over the same
+  step count.
+decision:
+  Do not run the 900-second gate. Code was reverted to the promoted baseline.
+  Loop count 2 is the right source-backed starting count for this architecture
+  family, but this implementation does not pass the objective-facing pre-gate.
+```
+
+```text
+date: 2026-06-20
+commit: this commit
 experiment: AMUSE beta from future averaging coefficient.
 status: measured, rejected after 900-second gate; code reverted
 implementation:
