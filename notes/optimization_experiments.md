@@ -4514,3 +4514,28 @@ measured_effect:
 decision:
   Promote and make this the recorded baseline.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Reuse TokenDataLoader training batch Vec.
+status: rejected_pre_gate
+change:
+  Added an internal reusable Vec<u16> to TokenDataLoader and returned borrowed
+  batch-token slices instead of allocating a fresh TokenWindowBatch Vec each
+  training step.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/reusable_loader_batch_l4_b8_100_20260620T123955Z.log
+    val_loss=6.545901, train_elapsed_s=19.442, completed_steps=100.
+measured_effect:
+  Runtime regressed versus the promoted reusable-device-batch screen
+  target/reusable_batch_l4_b8_100_20260620T122059Z.log, which had
+  val_loss=6.545963 and train_elapsed_s=19.350.
+decision:
+  Do not promote and do not spend a 900-second gate. Code was reverted to the
+  promoted baseline.
+```
