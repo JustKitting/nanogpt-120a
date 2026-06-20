@@ -31,6 +31,33 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Aurora phase/block geometry p2/c45.
+status: measured, rejected before profile and 900-second gate
+implementation:
+  Built with AURORA_MATRIX_PHASES=2 and AURORA_COOPERATIVE_BLOCKS=45.
+  This keeps the same total L4 cooperative scheduling capacity as the baseline
+  p4/c90 build, but halves per-kernel phase loops and blocks per matrix.
+baseline:
+  target/grad_clip_l4_b8_100_20260620T101549Z.log
+  train_elapsed_s=19.436, val_loss=6.548097.
+measured_result:
+  target/aurora_p2_c45_l4_b8_100_20260620T110342Z.log
+  train_elapsed_s=21.095, val_loss=6.546229, completed_steps=100.
+measured_effect:
+  100-step held-out validation was effectively unchanged, but runtime worsened
+  by 1.659 seconds over 100 steps.
+runtime_effect:
+  Slower than baseline on the objective-facing pre-gate screen.
+stability:
+  Finite for 100 steps.
+decision:
+  Reject. Do not profile or run the 900-second gate for this geometry because
+  the pre-gate runtime filter regressed.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Add non-constant Aurora rectangular recurrence test.
 status: test-only guardrail; no training-path change
 implementation:
