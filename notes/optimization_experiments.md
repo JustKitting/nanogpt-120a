@@ -31,8 +31,39 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: uncommitted
-experiment: Source-backed loop-state transformer with loop_count=2.
+experiment: Increase current L4 Aurora cooperative blocks from 90 to 120.
 status: rejected_pre_gate
+change:
+  Rebuilt the current promoted L4/B8/d1024 baseline with
+  AURORA_COOPERATIVE_BLOCKS=120 and AURORA_MATRIX_PHASES=4. This preserves the
+  same four active matrices per Aurora phase and only changes cooperative CTA
+  participation per matrix.
+verification:
+  AURORA_COOPERATIVE_BLOCKS=120 AURORA_MATRIX_PHASES=4 cargo build --release:
+  pass.
+  100-step SYNTH screen:
+    target/aurora_blocks120_p4_l4_b8_100_20260620T144633Z.log
+    val_loss=6.547503, train_elapsed_s=19.282, completed_steps=100.
+baseline:
+  Current promoted pre-gate reference:
+    target/reusable_batch_l4_b8_100_20260620T122059Z.log
+    val_loss=6.545963, train_elapsed_s=19.350, completed_steps=100.
+measured_effect:
+  The candidate was about 0.068s faster over 100 steps, but held-out
+  validation loss worsened by 0.001540. The optimization target is validation
+  loss over fixed wall-clock, so the speed-only gain is not enough to justify a
+  900-second gate.
+decision:
+  Do not promote and do not spend a 900-second gate. Restore the default
+  promoted baseline geometry, AURORA_COOPERATIVE_BLOCKS=90 and
+  AURORA_MATRIX_PHASES=4.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Source-backed loop-state transformer with loop_count=2.
+status: never_properly_tested
 change:
   Implemented the requested looped-transformer shape as a loop state rather
   than physical block repetition: z0 starts from token embeddings, the second
@@ -60,8 +91,9 @@ measured_effect:
   pre-gate by about 9.063s.
 decision:
   Do not promote and do not spend a 900-second gate. Code was reverted to the
-  promoted baseline. This rejects this local loop-state implementation on the
-  current objective; it is not evidence for arbitrary loop shortcuts.
+  promoted baseline. This result should be treated as evidence that the local
+  implementation was likely wrong or incomplete. It is not a valid test of the
+  looped-transformer architecture.
 ```
 
 ```text
@@ -133,7 +165,7 @@ decision:
 date: 2026-06-20
 commit: this commit
 experiment: Source-faithful looped transformer boundary with loop_count=2.
-status: rejected_pre_gate
+status: never_properly_tested
 change:
   Tested a source-style z = F(x + z) loop boundary for GPT blocks with
   GPT2_LOOP_COUNT=2. The implementation kept weights physical-layer sized,
@@ -166,7 +198,8 @@ measured_effect:
 decision:
   Do not run the 900-second gate. Code was reverted to the promoted baseline.
   Loop count 2 is the right source-backed starting count for this architecture
-  family, but this implementation does not pass the objective-facing pre-gate.
+  family, but this run should be treated as an invalid/incomplete local
+  implementation, not as a proper architecture test.
 ```
 
 ```text
@@ -4520,14 +4553,19 @@ source_findings:
   residual updates need explicit loop-aware scaling. Any future looped
   implementation must include that scaling from the start.
 local_evidence:
-  Two prior local loop shortcuts already failed the actual objective:
+  Two prior local loop shortcuts and two later source-shaped local attempts
+  produced bad objective results:
     target/loop_count2_l4_900s_20260620T071755Z.log:
       val_loss=4.226233, completed_steps=4102.
     target/loop2_l4_b8_900_20260620T084124Z.log:
       val_loss=4.200931, completed_steps=3047.
+    target/loop_source_l4_b8_100_20260620T135526Z.log:
+      val_loss=7.301424, completed_steps=100.
+    target/loop_state2_l4_b8_100_20260620T143756Z.log:
+      val_loss=8.954576, completed_steps=100.
   These runs should not be treated as evidence against a real source-faithful
-  looped candidate. They rejected local shortcuts that did not implement the
-  paper's loop-state structure or loop-aware residual scaling.
+  looped candidate. The state of looped-transformer work in this repo is:
+  never properly tested.
 decision:
   Do not run another arbitrary looped-forward shortcut. If looped transformer
   is tested again, treat it as a major architecture change and implement the
