@@ -267,13 +267,14 @@ decision:
 ```text
 date: 2026-06-20
 commit: uncommitted
-experiment: Real two-loop transformer with four physical blocks.
+experiment: Local two-loop four-physical-block shortcut.
 status: measured, rejected
 implementation:
   Tested GPT2_LOOP_COUNT=2 as four trainable physical blocks reused for eight
   logical passes. Forward tape and backward activation gradients were logical
   pass sized. Parameter gradients from pass i and i + GPT2_N_LAYER were folded
-  into the matching physical block before optimizer update.
+  into the matching physical block before optimizer update. This was not a
+  source-faithful looped-transformer implementation.
 baseline:
   target/attention_backward_no_transpose_l4_b8_900_20260620T081345Z.log
   heldout_val_loss=4.077696
@@ -290,9 +291,10 @@ runtime_effect:
 stability:
   Finite for the full 900-second run.
 decision:
-  Do not promote the two-loop four-physical-block architecture in this form.
-  The paper-backed loop count is two, but this repo implementation loses the
-  fixed-wall-clock validation target versus the current L4 baseline.
+  Do not promote this local shortcut. The paper-backed language-model loop
+  count is two, but this implementation was arbitrary relative to the source
+  architecture and loses the fixed-wall-clock validation target versus the
+  current L4 baseline.
 ```
 
 ```text
@@ -4368,6 +4370,9 @@ source_findings:
   shared transformer block applied repeatedly after embedding, but reports that
   looped language models are worse on perplexity than iso-flop non-looped
   baselines while being better on reasoning-style downstream tasks.
+  The language-model comparison highlights the 12-layer block looped twice
+  shape, so a local test should start from loop count 2 rather than an arbitrary
+  loop count or arbitrary block repetition.
   The same paper proposes a layer-similarity regularizer as the way to inherit
   looped-model inductive bias without hurting perplexity.
   The residual-scaling paper for tied residual blocks reports that looped/tied
@@ -4538,6 +4543,31 @@ measured_effect:
 decision:
   Do not promote and do not spend a 900-second gate. Code was reverted to the
   promoted baseline.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Four-way unroll of Aurora momentum orientation pass.
+status: rejected_pre_gate
+change:
+  Replaced the scalar strided loop in
+  crates/cuda-kernels/src/gpt/optimizer/aurora/fused/momentum.rs with four
+  explicit strided updates per thread.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/aurora_momentum_unroll_l4_b8_100_20260620T125303Z.log
+    val_loss=6.546121, train_elapsed_s=19.515, completed_steps=100.
+measured_effect:
+  Runtime regressed versus the promoted reusable-device-batch screen
+  target/reusable_batch_l4_b8_100_20260620T122059Z.log, which had
+  val_loss=6.545963 and train_elapsed_s=19.350.
+decision:
+  Do not promote and do not spend a 900-second gate. Code was reverted to the
+  promoted baseline; the compiler/current memory path favors the scalar loop.
 ```
 
 ```text
