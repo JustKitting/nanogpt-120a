@@ -4412,3 +4412,34 @@ decision:
   Do not promote and do not spend a 900-second gate on this candidate. Code was
   reverted to baseline; note kept to prevent repeating the same micro-edit.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Pair-store no-bias CTA projection accumulator rows.
+status: rejected_pre_gate
+change:
+  Rewrote projection_cta/store/nobias.rs to store the two adjacent columns for
+  each accumulator row together, with one input-global-scale load per row
+  instead of one per element.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/projection_nobias_pair_store_l4_b8_100_20260620T120842Z.log
+    val_loss=6.544317, train_elapsed_s=19.428, completed_steps=100.
+profile_effect:
+  Baseline short profile:
+    target/nsys/current_l4_b8_20_20260620T120735Z_stats.txt
+    linear_backward_projection_cta_device_scale_kernel=761.753042ms/20.
+  Candidate short profile:
+    target/nsys/projection_nobias_pair_store_l4_b8_20_20260620T120910Z_stats.txt
+    linear_backward_projection_cta_device_scale_kernel=765.991748ms/20.
+measured_effect:
+  The affected projection kernel got slower by about 4.239ms over 20 steps.
+decision:
+  Do not promote and do not spend a 900-second gate. Code was reverted to
+  baseline; the compiler/current instruction mix favors the original scalar
+  stores here.
+```
