@@ -4,7 +4,6 @@ use super::gather::gather_body;
 use super::probs::prob_ds_body;
 use super::scatter::scatter_body;
 use super::softmax_d::softmax_d_body;
-use super::transpose::transpose_body;
 use super::types::CausalAttentionBackwardTcParams;
 
 #[allow(static_mut_refs)]
@@ -47,17 +46,6 @@ pub(super) mod module {
         params: CausalAttentionBackwardTcParams,
     ) {
         prob_ds_body(scores, dot, log_sum_exp, softmax_d, p, ds, params);
-    }
-
-    #[kernel]
-    pub fn transpose_matrix_kernel(
-        src: &[f32],
-        dst: DisjointSlice<f32>,
-        batch_count: u32,
-        rows: u32,
-        cols: u32,
-    ) {
-        transpose_body(src, dst, batch_count, rows, cols);
     }
 
     #[kernel]

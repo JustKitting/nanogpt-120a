@@ -1,6 +1,6 @@
 use cuda_core::DriverError;
 
-use super::matmul::{AttentionTcMatmulContext, run_tc_matmul_rhs};
+use super::matmul::{AttentionTcMatmulContext, run_tc_matmul_a_transposed_rhs, run_tc_matmul_rhs};
 use super::types::CausalAttentionBackwardTcScratch;
 
 pub(super) fn run_grad_matmuls(
@@ -18,10 +18,10 @@ pub(super) fn run_grad_matmuls(
         ctx.head_dim,
         ctx.seq_len,
     )?;
-    run_tc_matmul_rhs(
+    run_tc_matmul_a_transposed_rhs(
         ctx.stream,
         ctx.tc_module,
-        scratch.ds_t,
+        scratch.ds,
         scratch.q,
         scratch.d_k,
         ctx.batch_head,
@@ -29,10 +29,10 @@ pub(super) fn run_grad_matmuls(
         ctx.head_dim,
         ctx.seq_len,
     )?;
-    run_tc_matmul_rhs(
+    run_tc_matmul_a_transposed_rhs(
         ctx.stream,
         ctx.tc_module,
-        scratch.p_t,
+        scratch.p,
         scratch.d_out,
         scratch.d_v,
         ctx.batch_head,

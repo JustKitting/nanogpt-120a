@@ -31,6 +31,35 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: this commit
+experiment: Remove materialized attention-backward P and dS transposes.
+status: measured, promoted
+implementation:
+  Added an f32-input TC matmul variant that reads the left operand as a
+  logical transpose from row-major source while reading the RHS row-major.
+  Used it for dK = dS^T @ Q and dV = P^T @ dO, then deleted the old
+  transpose_matrix_kernel path and the unused q_t/k_t/d_out_t/p_t/ds_t
+  attention scratch buffers.
+baseline:
+  target/attention_tc_forward_l4_b8_900_20260620T075050Z.log
+  heldout_val_loss=4.104358
+  completed_steps=4331
+measured_result:
+  target/attention_backward_no_transpose_l4_b8_900_20260620T081345Z.log
+  heldout_val_loss=4.077696
+  completed_steps=4483
+  stopped_by_wall_clock=true
+measured_effect:
+  Completed 152 more steps in the same 900-second budget.
+  Held-out validation loss improved by 0.026662.
+stability:
+  Finite for the full 900-second run.
+decision:
+  Promote this candidate as the current baseline.
+```
+
+```text
+date: 2026-06-20
+commit: this commit
 experiment: Forward causal attention through TC matmul.
 status: measured, promoted
 implementation:

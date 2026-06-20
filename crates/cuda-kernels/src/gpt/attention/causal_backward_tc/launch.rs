@@ -3,7 +3,6 @@ use cuda_core::DriverError;
 use super::launch_config::{attention_config, linear_config, tc_params};
 use super::launch_grads::run_grad_matmuls;
 use super::launch_scores::run_pair_scores;
-use super::launch_transpose::{TransposeShape, run_transposes};
 use super::matmul::AttentionTcMatmulContext;
 use super::types::CausalAttentionBackwardTcArgs;
 use crate::attention::AttentionModule;
@@ -80,15 +79,6 @@ impl AttentionModule {
             scratch.p,
             scratch.ds,
             params,
-        )?;
-        run_transposes(
-            &self.causal_attention_backward_tc,
-            stream,
-            &mut scratch,
-            TransposeShape {
-                batch_head,
-                seq_len,
-            },
         )?;
         run_grad_matmuls(&tc_ctx, &mut scratch)?;
         self.causal_attention_backward_tc.scatter_dqkv_kernel(

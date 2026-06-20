@@ -1,6 +1,8 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
-use crate::f16_tc_matmul::{F16TcMatmulF32Args, F16TcMatmulF32RhsArgs, F16TcMatmulModule};
+use crate::f16_tc_matmul::{
+    F16TcMatmulF32ATransposedRhsArgs, F16TcMatmulF32Args, F16TcMatmulF32RhsArgs, F16TcMatmulModule,
+};
 
 pub(super) struct AttentionTcMatmulContext<'a> {
     pub stream: &'a CudaStream,
@@ -47,6 +49,30 @@ pub(super) fn run_tc_matmul_rhs(
     k: u32,
 ) -> Result<(), DriverError> {
     tc_module.batched_matmul_f32_rhs(F16TcMatmulF32RhsArgs {
+        stream,
+        a,
+        rhs,
+        out,
+        batch_count,
+        m,
+        n,
+        k,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn run_tc_matmul_a_transposed_rhs(
+    stream: &CudaStream,
+    tc_module: &F16TcMatmulModule,
+    a: &DeviceBuffer<f32>,
+    rhs: &DeviceBuffer<f32>,
+    out: &mut DeviceBuffer<f32>,
+    batch_count: u32,
+    m: u32,
+    n: u32,
+    k: u32,
+) -> Result<(), DriverError> {
+    tc_module.batched_matmul_f32_a_transposed_rhs(F16TcMatmulF32ATransposedRhsArgs {
         stream,
         a,
         rhs,
