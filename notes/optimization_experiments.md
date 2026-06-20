@@ -29,6 +29,304 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
 ```text
+date: 2026-06-20
+commit: pending
+experiment: Replace derived AMUSE beta schedule with the published AMUSE formula.
+status: promoted at fixed-wall validation
+hypothesis:
+  The previous beta_t implementation derived beta from the schedule-free
+  averaging coefficient. The AMUSE paper/repo define the post-warmup schedule
+  directly as beta_t = 1 - ((T0 - 1) / (t - 1))^rho * (1 - beta1). Using the
+  published gradient-evaluation interpolation should improve validation loss.
+implementation:
+  Changed only schedule_free_beta. Warmup behavior and all default hyperparams
+  were left unchanged.
+source:
+  https://github.com/kjeiun/amuse
+  README Method Overview lines define Y_t = (1 - beta_t) Z_t + beta_t X_t and
+  beta_t = beta1 during warmup, then
+  1 - ((T0 - 1) / (t - 1))^rho * (1 - beta1).
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+sustained_check:
+  target/amuse_beta_formula_100step_synth_20260620T014604Z.log
+  heldout_eval split=val val_loss=6.723605 at 100 steps; finite and nonzero.
+validation_result:
+  target/amuse_beta_formula_b8_l2d1024_900s_20260620T014632Z.log
+  stopped_by_wall_clock=true elapsed_s=900.072 completed_steps=5674.
+  heldout_eval split=val val_loss=4.030268 train_elapsed_s=900.230
+  completed_steps=5674.
+comparison:
+  Previous promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The candidate completed 9 fewer steps but validation loss improved by
+  0.099685, so it is a promotion under the held-out objective.
+decision:
+  Keep the formula change and update notes/sweep_baseline.env to the new
+  baseline. Future candidates must compare against val_loss=4.030268 at the
+  same 900-second wall-clock gate.
+```
+
+```text
+date: 2026-06-20
+commit: not committed
+experiment: BF16 Polar Express tensor-core fragments in Aurora.
+status: rejected at fixed-wall validation
+hypothesis:
+  Match official AMUSE more closely by running Aurora's Polar Express
+  orthogonalization matmuls with BF16 TC fragments instead of FP16 fragments.
+  The official AMUSE reference casts the matrix update to bfloat16 before the
+  Newton-Schulz / Polar Express iteration.
+implementation:
+  Added a temporary mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 wrapper
+  and a cvt.rn.bf16.f32 converter. Routed only the Aurora Polar Express staging
+  and tile compute path through BF16. The general attention-backward f16 TC
+  helper path was unchanged.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  The generated PTX contained both mma.sync ... bf16.bf16 and cvt.rn.bf16.f32.
+  CUDA_DEVICE_INDEX=0 cargo test --test optimizer -- --ignored --nocapture:
+  pass after updating the Aurora scalar test reference to BF16 operand rounding.
+sustained_check:
+  target/bf16_polar_100step_synth_20260620T011946Z.log
+  heldout_eval split=val val_loss=6.886864 at 100 steps; finite and nonzero.
+validation_result:
+  target/bf16_polar_b8_l2d1024_900s_20260620T012011Z.log
+  stopped_by_wall_clock=true elapsed_s=900.044 completed_steps=5680.
+  heldout_eval split=val val_loss=4.162605 train_elapsed_s=900.202
+  completed_steps=5680.
+comparison:
+  Current promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The candidate completed 3 fewer steps and validation loss regressed by
+  0.032652, so it is not a promotion.
+decision:
+  Revert the code. Matching AMUSE's BF16 Polar precision did not improve the
+  current 15-minute held-out validation objective.
+```
+
+```text
+date: 2026-06-20
+commit: not committed
+experiment: AMUSE-style second-moment-only Adam fallback for non-matrix tensors.
+status: rejected at fixed-wall validation
+hypothesis:
+  Match the official AMUSE non-Muon fallback more closely by removing the
+  Adam first-moment buffer from non-matrix tensors and using the current
+  gradient divided by the bias-corrected second-moment RMS. Aurora matrix
+  weights were unchanged.
+implementation:
+  Temporarily removed first_moment, beta1, and beta1_correction from the
+  AdamW update args, kernel, optimizer state, diagnostics, and optimizer test.
+  The Adam fallback updated z_master with grad / sqrt(v_hat) and then used the
+  existing schedule-free x_master average plus NVFP4 requantization path.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test --test optimizer -- --ignored --nocapture:
+  pass when run from crates/cuda-kernels so the generated PTX path resolved.
+sustained_check:
+  target/sf_adamw_aux_100step_synth_20260620T005503Z.log
+  heldout_eval split=val val_loss=6.606052 at 100 steps; finite and nonzero.
+validation_result:
+  target/sf_adamw_aux_b8_l2d1024_900s_20260620T005537Z.log
+  stopped_by_wall_clock=true elapsed_s=900.060 completed_steps=5692.
+  heldout_eval split=val val_loss=4.140446 train_elapsed_s=900.218
+  completed_steps=5692.
+comparison:
+  Current promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The candidate completed 9 more steps but validation loss regressed by
+  0.010493, so it is not a promotion.
+decision:
+  Revert the code. Official fallback alignment improved the early 100-step
+  check, but did not improve the 15-minute held-out validation objective under
+  the current baseline.
+```
+
+```text
+date: 2026-06-20
+commit: not committed
+experiment: Global parameter-gradient clipping at norm 1.0.
+status: rejected at fixed-wall validation
+hypothesis:
+  Match the llm.c/nanoGPT stability practice of clipping global gradient norm
+  to 1.0 before optimizer updates. The implementation clipped optimizer
+  parameter gradients after the tied embedding lookup gradient was accumulated,
+  so the tied token/LM-head gradient was clipped as one combined gradient.
+implementation:
+  Added GPU-only gradient clipping with a chunk pointer table over parameter
+  gradients: token/LM-head tied gradient, layer-norm weight/bias gradients,
+  attention and MLP matrix gradients, and all projection bias gradients.
+  Intermediate activation gradients were not included because they are not
+  optimizer parameters. The clip path used a device norm accumulator and scaled
+  gradients in place; there was no GPU-to-CPU norm readback per step.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer --
+  --ignored --nocapture: pass, 7 tests including the new grad-clip primitive.
+sustained_check:
+  target/grad_clip_global_norm_100step_synth_20260620T002611Z.log
+  heldout_eval val_loss=6.928789 at 100 steps; finite and nonzero.
+  The clip overhead logged around 0.004-0.009 ms per logged step.
+validation_result:
+  target/grad_clip_global_norm_b8_l2d1024_900s_20260620T002649Z.log
+  stopped_by_wall_clock=true elapsed_s=900.004 completed_steps=5654.
+  heldout_eval split=val val_loss=4.178542 train_elapsed_s=900.162
+  completed_steps=5654.
+comparison:
+  Current promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The candidate completed 29 fewer steps and validation loss regressed by
+  0.048589, so it is not a promotion.
+decision:
+  Revert the code. A fixed global clip norm of 1.0 is too restrictive for the
+  current AMUSE/Aurora setup. If clipping is revisited, it should be as a
+  coupled sweep dimension with LR/optimizer settings, not as a single manual
+  knob.
+```
+
+```text
+date: 2026-06-20
+commit: not committed
+experiment: Hoist QKV address arithmetic in scalar causal attention.
+status: rejected at fixed-wall validation
+hypothesis:
+  Preserve the existing scalar causal attention algorithm and arithmetic order,
+  but precompute batch, head, Q, K, and V base addresses once per block instead
+  of recomputing qkv_index through q_value/k_value/v_value helpers inside the
+  key loops.
+implementation:
+  causal_attention_kernel reused qkv_stride, batch_base, head_offset, q_base,
+  k_base, and v_base in the existing score and value loops. Added a CPU
+  reference forward-attention GPU test for nonzero QKV values.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  causal_attention_log_sum_exp -- --ignored --nocapture: pass, 3 tests.
+sustained_check:
+  target/causal_index_hoist_100step_synth_20260620T000346Z.log
+  heldout_eval val_loss=6.881987 at 100 steps; finite and nonzero.
+profile_effect:
+  target/nsys/causal_index_hoist_b8_l2d1024_20_20260619T235953Z_kernels_cuda_gpu_kern_sum.csv:
+    causal_attention_kernel: 387.022 ms / 42 launches.
+  Current promoted baseline profile:
+    target/nsys/f16_staged_attention_bwd_cleanup_b8_l2d1024_20_20260619T221654Z_kernels_cuda_gpu_kern_sum.csv:
+    causal_attention_kernel: 417.039 ms / 42 launches.
+  The candidate reduced forward causal attention time by about 30.0 ms over the
+  20-step profile.
+validation_result:
+  target/causal_index_hoist_b8_l2d1024_900s_20260620T000410Z.log
+  stopped_by_wall_clock=true elapsed_s=900.000 completed_steps=5687.
+  heldout_eval split=val val_loss=4.162406 train_elapsed_s=900.158
+  completed_steps=5687.
+comparison:
+  Current promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The candidate completed 4 more steps but validation loss regressed by
+  0.032453, so it is not a promotion.
+decision:
+  Revert the code. Even small exact-addressing/codegen changes can move the
+  training trajectory; promotion still requires the fixed-wall validation gate.
+```
+
+```text
+date: 2026-06-19
+commit: not committed
+experiment: Online-softmax causal attention forward kernel.
+status: rejected at fixed-wall validation
+hypothesis:
+  Replace the scalar forward causal attention kernel's shared score buffer plus
+  separate max, denominator, and value rescans with an online softmax recurrence
+  over keys. This preserves causal attention semantics, writes the same
+  log-sum-exp quantity for backward, and should reduce forward attention time.
+implementation:
+  causal_attention_kernel kept one block per (batch, head, query), but computed
+  running score_max, denominator, and value accumulation as each key score was
+  produced. Added a GPU test comparing forward outputs and log_sum_exp against
+  a CPU reference.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+  causal_attention_log_sum_exp -- --ignored --nocapture: pass, 3 tests.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+  --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward
+  -- --ignored --nocapture: pass.
+sustained_check:
+  target/online_causal_attention_100step_synth_20260619T234512Z.log
+  heldout_eval val_loss=6.884402 at 100 steps; finite and nonzero.
+profile_effect:
+  target/nsys/online_causal_attention_b8_l2d1024_20_20260619T234529Z_kernels_cuda_gpu_kern_sum.csv:
+    causal_attention_kernel: 333.522 ms / 42 launches.
+  Current promoted baseline profile:
+    target/nsys/f16_staged_attention_bwd_cleanup_b8_l2d1024_20_20260619T221654Z_kernels_cuda_gpu_kern_sum.csv:
+    causal_attention_kernel: 417.039 ms / 42 launches.
+  The candidate reduced forward causal attention time by about 83.5 ms over the
+  20-step profile.
+validation_result:
+  target/online_causal_attention_b8_l2d1024_900s_20260619T234555Z.log
+  stopped_by_wall_clock=true elapsed_s=900.021 completed_steps=5797.
+  heldout_eval split=val val_loss=4.139523 train_elapsed_s=900.176
+  completed_steps=5797.
+comparison:
+  Current promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The candidate completed 114 more steps but validation loss regressed by
+  0.009570, so it is not a promotion under the fixed-wall objective.
+decision:
+  Revert the code. Runtime-only improvement is insufficient when held-out
+  validation regresses.
+```
+
+```text
+date: 2026-06-19
+commit: not committed
+experiment: Disable AdamW weight decay for layer norm vectors and biases.
+status: rejected at fixed-wall validation
+hypothesis:
+  Match nanoGPT/llm.c parameter grouping by applying AdamW decay only to the
+  tied token embedding matrix on the Adam path, while leaving layer-norm weights
+  and all bias vectors with zero Adam weight decay. Aurora matrix weights were
+  unchanged.
+implementation:
+  Made Adam weight decay explicit at each Adam call site. Token embeddings used
+  ADAM_WEIGHT_DECAY=0.005; layer-norm weights, layer-norm biases, QKV biases,
+  attention c_proj biases, MLP up biases, and MLP down biases used zero decay.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+sustained_check:
+  target/no_decay_vectors_100step_synth_20260619T232536Z.log
+  heldout_eval val_loss=6.883940 at 100 steps; finite and nonzero.
+validation_result:
+  target/no_decay_vectors_b8_l2d1024_900s_20260619T232614Z.log
+  stopped_by_wall_clock=true elapsed_s=900.123 completed_steps=5684.
+  heldout_eval split=val val_loss=4.163834 train_elapsed_s=900.281
+  completed_steps=5684.
+comparison:
+  Current promoted baseline:
+    target/f16_staged_attention_bwd_b8_l2d1024_900s_20260619T222024Z.log
+    val_loss=4.129953, completed_steps=5683.
+  The candidate completed one extra step but validation loss regressed by
+  0.033881, so it is not a promotion.
+decision:
+  Revert the code change. Keep the measured result as a rejected quality
+  experiment; do not retry as a single-variable manual tweak.
+```
+
+```text
 date: 2026-06-19
 commit: not committed
 experiment: Add fixed-budget cosine LR decay.
