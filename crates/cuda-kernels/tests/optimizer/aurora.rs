@@ -2,6 +2,8 @@ use std::error::Error;
 
 #[path = "aurora/fixture.rs"]
 mod fixture;
+#[path = "aurora/nonconstant.rs"]
+mod nonconstant;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -19,4 +21,10 @@ fn aurora_mega_update_matches_tall_rectangular_recurrence() -> Result<(), Box<dy
 #[test]
 fn aurora_mega_update_matches_wide_rectangular_recurrence() -> Result<(), Box<dyn Error>> {
     fixture::run_first_iteration_case(32, 64)
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn aurora_mega_update_matches_nonconstant_wide_recurrence() -> Result<(), Box<dyn Error>> {
+    nonconstant::run_wide_case()
 }

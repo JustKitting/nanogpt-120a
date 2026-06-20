@@ -10,5 +10,9 @@ mod aurora;
 mod embedding;
 #[path = "optimizer/grad_clip.rs"]
 mod grad_clip;
+#[path = "optimizer/polar_coefficients.rs"]
+mod polar_coefficients;
 #[path = "optimizer/polar_reference.rs"]
 mod polar_reference;
+#[path = "optimizer/polar_vector.rs"]
+mod polar_vector;

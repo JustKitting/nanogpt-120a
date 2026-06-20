@@ -16,7 +16,7 @@ pub fn polar_first_iteration_scalar(x: f32, rows: usize, cols: usize) -> f32 {
     (17.300_388 / 1.051_010_1_f32).mul_add(aax, base)
 }
 
-fn round_f16_to_f32(value: f32) -> f32 {
+pub fn round_f16_to_f32(value: f32) -> f32 {
     let bits = value.to_bits();
     let sign = (bits >> 16) & 0x8000;
     let mut exp = ((bits >> 23) & 0xff) as i32 - 127 + 15;

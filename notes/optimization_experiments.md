@@ -31,6 +31,31 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Add non-constant Aurora rectangular recurrence test.
+status: test-only guardrail; no training-path change
+implementation:
+  Added a five-iteration wide rectangular Aurora GPU test using non-constant
+  gradients and a CPU reference for the Polar Express recurrence with f16-rounded
+  matmul inputs. This covers a vector-valued update instead of the previous
+  constant-gradient scalar recurrence.
+evidence:
+  cargo check --workspace --tests: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+  aurora_mega_update_matches -- --ignored --nocapture: pass, 4 tests.
+limitation:
+  This guard did not catch the rejected wide-orientation rewrite when tested
+  locally, so it must not be cited as proof for that specific failure mode. It is
+  still useful coverage for future Aurora math changes because it verifies a
+  non-constant five-iteration rectangular update path.
+decision:
+  Keep as correctness coverage only. It does not improve held-out validation
+  loss and does not make any candidate promotable.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Remove wide-matrix double transpose inside Aurora momentum orientation.
 status: measured, rejected; code reverted
 target:
