@@ -1,6 +1,6 @@
 use cuda_core::{DriverError, LaunchConfig};
 
-use super::super::args::{AdamWUpdateArgs, ScheduleFreeAverageArgs};
+use super::super::args::AdamWUpdateArgs;
 use super::super::threads::APPLY_THREADS_PER_BLOCK;
 use super::OptimizerModule;
 
@@ -21,6 +21,7 @@ impl OptimizerModule {
                 shared_mem_bytes: 0,
             },
             args.z_master,
+            args.x_master,
             args.grad,
             args.first_moment,
             args.second_moment,
@@ -31,16 +32,9 @@ impl OptimizerModule {
             args.beta1_correction,
             args.beta2_correction,
             args.eps,
+            args.average_coefficient,
             args.len,
         )?;
-
-        self.update_schedule_free_average(ScheduleFreeAverageArgs {
-            stream: args.stream,
-            x_master: args.x_master,
-            z_master: &*args.z_master,
-            len: args.len,
-            coefficient: args.average_coefficient,
-        })?;
 
         self.requantize(
             args.stream,
