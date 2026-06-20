@@ -30,6 +30,45 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-20
+commit: this commit
+experiment: AMUSE beta from future averaging coefficient.
+status: measured, rejected after 900-second gate; code reverted
+implementation:
+  Tested replacing the current README closed-form beta_t with the current
+  official implementation shape from github.com/kjeiun/amuse:
+  compute c_{t+1} from the same schedule-free averaging weight used for x,
+  remember c_warmup, then set beta_t from
+  c_{t+1}(1-c_warmup)/(c_warmup(1-c_{t+1})).
+  This changed only host-side schedule-free materialization beta; optimizer
+  grouping, LR scales, batch size, model shape, and kernels stayed unchanged.
+correctness_checks:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+pre_gate_screen:
+  target/amuse_ckp_beta_l4_b8_100_20260620T113954Z.log
+  val_loss=6.577282, train_elapsed_s=19.420, completed_steps=100.
+baseline:
+  target/grad_clip_l4_b8_900_20260620T101626Z.log
+  val_loss=4.044528, completed_steps=4520.
+measured_result:
+  target/amuse_ckp_beta_l4_b8_900_20260620T114040Z.log
+  stopped_by_wall_clock=true, val_loss=4.152211, completed_steps=4522.
+measured_effect:
+  Held-out validation loss worsened by 0.107683 while completing only two more
+  steps in the same 900-second wall-clock budget.
+runtime_effect:
+  Runtime was effectively unchanged versus the accepted baseline.
+stability:
+  Finite for the full 900-second run.
+decision:
+  Reject and revert. Although this matches the current official AMUSE code shape
+  more closely than the README closed form, it is worse for this repo's fixed
+  wall-clock held-out objective.
+```
+
+```text
+date: 2026-06-20
 commit: uncommitted
 experiment: NVFP4 projection CTA 64x64 tile.
 status: measured, rejected after 900-second gate; code reverted
