@@ -8,8 +8,10 @@ use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES,
     NVFP4_PROJECTION_CTA_B_PACKS, NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS,
     NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4DeviceScaleMmaWeightTensor,
-    Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionParams, nvfp4_projection_cta_nobias_kernel_body,
-    nvfp4_projection_nobias_kernel_body, projection_cta_grid_dim, projection_grid_dim,
+    Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
+    nvfp4_projection_cta_nobias_kernel_body, nvfp4_projection_cta_nobias_kernel_body_at,
+    nvfp4_projection_nobias_kernel_body, projection_cta_grid_dim, projection_cta_tile_count,
+    projection_grid_dim,
 };
 use crate::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 use crate::nvfp4_quant::{
@@ -247,12 +249,16 @@ impl LinearBackwardModule {
     ) -> Result<(), DriverError> {
         let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
+        let dinput_grid = projection_cta_grid_dim(args.token_count, args.input_dim);
+        let dweight_grid = projection_cta_grid_dim(args.output_dim, args.input_dim);
+        let dinput_tiles = projection_cta_tile_count(args.token_count, args.input_dim);
+        let dweight_tiles = projection_cta_tile_count(args.output_dim, args.input_dim);
 
         self.module
-            .linear_backward_projection_cta_device_scale_kernel(
+            .linear_backward_projection_pair_cta_device_scale_kernel(
                 args.stream,
                 LaunchConfig {
-                    grid_dim: projection_cta_grid_dim(args.token_count, args.input_dim),
+                    grid_dim: (dinput_tiles + dweight_tiles, 1, 1),
                     block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
                     shared_mem_bytes: 0,
                 },
@@ -263,6 +269,16 @@ impl LinearBackwardModule {
                 args.weight_t_h.scales,
                 args.weight_t_h.global_scale,
                 args.dinput,
+                dinput_grid.0,
+                dinput_tiles,
+                args.e_t_h.bytes,
+                args.e_t_h.scales,
+                args.e_t_h.global_scales,
+                args.input_t_h.bytes,
+                args.input_t_h.scales,
+                args.input_t_h.global_scale,
+                args.dweight,
+                dweight_grid.0,
                 Nvfp4ProjectionParams {
                     token_count: args.token_count,
                     input_dim: dinput_k,
@@ -272,23 +288,6 @@ impl LinearBackwardModule {
                     residual_add: 0,
                     activation: NVFP4_PROJECTION_ACTIVATION_NONE,
                 },
-            )?;
-
-        self.module
-            .linear_backward_projection_cta_device_scale_kernel(
-                args.stream,
-                LaunchConfig {
-                    grid_dim: projection_cta_grid_dim(args.output_dim, args.input_dim),
-                    block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
-                    shared_mem_bytes: 0,
-                },
-                args.e_t_h.bytes,
-                args.e_t_h.scales,
-                args.e_t_h.global_scales,
-                args.input_t_h.bytes,
-                args.input_t_h.scales,
-                args.input_t_h.global_scale,
-                args.dweight,
                 Nvfp4ProjectionParams {
                     token_count: args.output_dim,
                     input_dim: dweight_k,
@@ -585,6 +584,82 @@ mod kernels {
             unsafe { &mut A_SCALES },
             unsafe { &mut B_SCALES },
         );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[kernel]
+    pub fn linear_backward_projection_pair_cta_device_scale_kernel(
+        dinput_input_bytes: &[u8],
+        dinput_input_scales: &[u8],
+        dinput_input_global_scales: &[f32],
+        dinput_weight_bytes: &[u8],
+        dinput_weight_scales: &[u8],
+        dinput_weight_global_scale: &[f32],
+        mut dinput_out: DisjointSlice<f32>,
+        dinput_grid_cols: u32,
+        dinput_tile_count: u32,
+        dweight_input_bytes: &[u8],
+        dweight_input_scales: &[u8],
+        dweight_input_global_scales: &[f32],
+        dweight_weight_bytes: &[u8],
+        dweight_weight_scales: &[u8],
+        dweight_weight_global_scale: &[f32],
+        mut dweight_out: DisjointSlice<f32>,
+        dweight_grid_cols: u32,
+        mut dinput_params: Nvfp4ProjectionParams,
+        mut dweight_params: Nvfp4ProjectionParams,
+    ) {
+        static mut A_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
+        static mut B_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS> = SharedArray::UNINIT;
+        static mut A_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
+        static mut B_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES> = SharedArray::UNINIT;
+
+        let tile_index = thread::blockIdx_x();
+        let thread_id = thread::threadIdx_x();
+
+        if tile_index < dinput_tile_count {
+            let tile_col = tile_index - (tile_index / dinput_grid_cols) * dinput_grid_cols;
+            let tile_row = tile_index / dinput_grid_cols;
+            let tile = Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row, thread_id);
+
+            dinput_params.weight_global_scale = dinput_weight_global_scale[0];
+            nvfp4_projection_cta_nobias_kernel_body_at(
+                dinput_input_bytes,
+                dinput_input_scales,
+                dinput_input_global_scales,
+                dinput_weight_bytes,
+                dinput_weight_scales,
+                &mut dinput_out,
+                dinput_params,
+                unsafe { &mut A_PACKS },
+                unsafe { &mut B_PACKS },
+                unsafe { &mut A_SCALES },
+                unsafe { &mut B_SCALES },
+                tile,
+            );
+        } else {
+            let dweight_tile_index = tile_index - dinput_tile_count;
+            let tile_col =
+                dweight_tile_index - (dweight_tile_index / dweight_grid_cols) * dweight_grid_cols;
+            let tile_row = dweight_tile_index / dweight_grid_cols;
+            let tile = Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row, thread_id);
+
+            dweight_params.weight_global_scale = dweight_weight_global_scale[0];
+            nvfp4_projection_cta_nobias_kernel_body_at(
+                dweight_input_bytes,
+                dweight_input_scales,
+                dweight_input_global_scales,
+                dweight_weight_bytes,
+                dweight_weight_scales,
+                &mut dweight_out,
+                dweight_params,
+                unsafe { &mut A_PACKS },
+                unsafe { &mut B_PACKS },
+                unsafe { &mut A_SCALES },
+                unsafe { &mut B_SCALES },
+                tile,
+            );
+        }
     }
 
     #[kernel]

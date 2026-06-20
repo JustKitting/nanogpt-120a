@@ -24,11 +24,15 @@ pub struct Nvfp4ProjectionCtaTile {
 
 impl Nvfp4ProjectionCtaTile {
     pub fn new(thread_id: u32) -> Self {
+        Self::from_grid_tile(thread::blockIdx_x(), thread::blockIdx_y(), thread_id)
+    }
+
+    pub fn from_grid_tile(tile_col: u32, tile_row: u32, thread_id: u32) -> Self {
         let lane = thread_id & 31;
         let warp = thread_id >> 5;
         Self {
-            row_base: thread::blockIdx_y() * NVFP4_PROJECTION_CTA_M,
-            col_base: thread::blockIdx_x() * NVFP4_PROJECTION_CTA_N,
+            row_base: tile_row * NVFP4_PROJECTION_CTA_M,
+            col_base: tile_col * NVFP4_PROJECTION_CTA_N,
             warp_m: warp >> 2,
             warp_n: warp & 3,
             group: lane >> 2,
@@ -53,4 +57,9 @@ pub fn projection_cta_grid_dim(token_count: u32, output_dim: u32) -> (u32, u32, 
         token_count.div_ceil(NVFP4_PROJECTION_CTA_M),
         1,
     )
+}
+
+pub fn projection_cta_tile_count(token_count: u32, output_dim: u32) -> u32 {
+    let grid = projection_cta_grid_dim(token_count, output_dim);
+    grid.0 * grid.1
 }

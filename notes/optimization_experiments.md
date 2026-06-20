@@ -4837,6 +4837,45 @@ decision:
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Pair the two linear-backward CTA projection launches.
+status: accepted_900s
+change:
+  Replaced the two separate linear_backward_projection_cta_device_scale_kernel
+  launches in each linear backward call with one paired CTA kernel. The paired
+  kernel maps a linear tile range to dinput or dweight and reuses the existing
+  NVFP4 CTA no-bias MMA body for both outputs. Training math, optimizer state,
+  data order, and validation sample selection were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  GPU tests:
+    cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+    cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  100-step SYNTH screen:
+    target/paired_linear_backward_l4_b8_100_20260620T170345Z.log
+    val_loss=6.549596, train_elapsed_s=19.285, completed_steps=100.
+  20-step nsys:
+    target/nsys/paired_linear_backward_l4_b8_20_20260620T170414Z.run.log
+    linear backward projection launches dropped from 680 to 340 over 20 steps.
+    20-step train_elapsed_s changed from 3.891 to 3.811 versus
+    target/nsys/direct_materialize_fused_adam_l4_b8_20_20260620T163922Z.run.log.
+  900-second held-out gate:
+    target/paired_linear_backward_l4_b8_900_20260620T170432Z.log
+    val_loss=4.054840, completed_steps=4539.
+measured_effect:
+  Compared with baseline target/direct_materialize_fused_adam_l4_b8_900_20260620T163956Z.log,
+  validation loss changed from 4.050065 to 4.054840 (+0.118%) while completed
+  steps increased from 4529 to 4539.
+decision:
+  Accept under the current rule: validation loss moved less than 1% and the
+  fixed-wall run completed more steps. notes/sweep_baseline.env now points to
+  this run as the baseline.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Sparse train-loss logging with existing TRAIN_LOG_INTERVAL.
 status: rejected_pre_gate
 change:
