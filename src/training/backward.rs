@@ -32,8 +32,7 @@ impl Trainer {
                 &self.buffers.logits,
             );
             let weights = backward_weights(&self.uploaded);
-            let mut backward = self.buffers.backward.parts();
-            super::grad_clear::clear_backward_parts(stream, &mut backward)?;
+            let backward = self.buffers.backward.parts();
 
             gpt2_backward(Gpt2BackwardArgs {
                 stream,

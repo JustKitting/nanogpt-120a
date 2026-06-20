@@ -4010,3 +4010,29 @@ verification:
     GPT2_BATCH_SIZE=8, GPT2_N_LAYER=2, GPT2_N_HEAD=16, GPT2_N_EMBD=1024
     AURORA_COOPERATIVE_BLOCKS=80, AURORA_MATRIX_PHASES=2
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Remove redundant backward buffer clears.
+status: promoted
+baseline:
+  log: target/attention_backward_no_transpose_l4_b8_900_20260620T081345Z.log
+  val_loss: 4.077696
+  completed_steps: 4483
+candidate:
+  log: target/no_backward_clear_l4_b8_900_20260620T090607Z.log
+  val_loss: 4.069893
+  completed_steps: 4535
+measured_effect:
+  Validation loss improved by 0.007803 over the same 900-second held-out SYNTH
+  gate, and completed steps increased by 52.
+  The 20-step nsys run showed CUDA memset count dropping from 2560 to 560 and
+  CUDA memset time dropping from 57.804744 ms to 8.651551 ms.
+stability:
+  100-step SYNTH check stayed finite and nonzero.
+  900-second run stayed finite and completed normally.
+interpretation:
+  The cleared buffers were overwritten before use. Removing the clears reduces
+  launch/memset overhead without changing optimizer math or data semantics.
+```
