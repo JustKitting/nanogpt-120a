@@ -2888,12 +2888,12 @@ date: 2026-06-18
 commit: uncommitted
 experiment: Compact upper-triangle CTA scheduling for the symmetric Polar Gram
   stage.
-status: rejected; real cooperative training launch fails
+status: implementation_rejected; concept still open
 decision:
-  Keep the branch-skip symmetric scheduler. It computes only upper-triangle
-  Gram tiles but still iterates over the square tile index space. Attempts to
-  compact the tile index space changed device resource usage enough to fail the
-  real cooperative training launch.
+  Do not promote either attempted compact-index implementation. This does not
+  rule out compact upper-triangle scheduling itself; it only shows that these
+  two mappings changed cooperative-kernel resource usage enough to fail the real
+  training launch.
 attempt:
   First tried inverse-square-root mapping from compact triangular index to
   tile_row/tile_col. Then tried a small integer row-width walk to avoid sqrt.
@@ -2911,9 +2911,9 @@ verification:
   100-step Shakespeare direct GPU training run: failed at launch for both
   compact mapping variants
 notes:
-  This is a useful negative result: the real cooperative launch constraint is
-  sensitive to device code shape, and the small optimizer tests are not enough
-  evidence for launch viability.
+  This is a useful implementation failure, not an algorithmic rejection. A
+  correct follow-up should preserve cooperative launch viability while avoiding
+  the square tile-space branch skip, then verify with the full training path.
 ```
 
 ```text
