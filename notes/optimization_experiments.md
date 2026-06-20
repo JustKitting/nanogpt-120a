@@ -31,6 +31,38 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: this commit
+experiment: Direct MLP FP32 activation writes into forward tape.
+status: rejected_pre_gate
+change:
+  During training, routed the MLP up-projection pre-activation and relu2 output
+  directly into the block forward tape buffers instead of writing to shared
+  scratch and copying both 134 MB tensors into tape afterward.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+  --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward
+  -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored
+  --nocapture: pass.
+pre_gate_screen:
+  target/mlp_direct_tape_l4_b8_100_20260620T141011Z.log
+  val_loss=6.548380, train_elapsed_s=19.199, completed_steps=100.
+baseline:
+  target/reusable_batch_l4_b8_100_20260620T122059Z.log
+  val_loss=6.545963, train_elapsed_s=19.350, completed_steps=100.
+measured_effect:
+  Runtime improved by about 0.151 seconds over 100 steps, but held-out
+  validation loss moved in the wrong direction by 0.002417.
+decision:
+  Do not run the 900-second gate. Code was reverted to the promoted baseline.
+```
+
+```text
+date: 2026-06-20
+commit: this commit
 experiment: Source-faithful looped transformer boundary with loop_count=2.
 status: rejected_pre_gate
 change:
