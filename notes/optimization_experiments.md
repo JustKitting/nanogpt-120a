@@ -4079,3 +4079,37 @@ decision:
   Do not promote. The optimization target is held-out validation loss over
   fixed wall-clock, not speed alone. Code reverted to the prior baseline.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: AdamW no-decay policy for layer norm and bias tensors.
+status: rejected
+source_basis:
+  nanoGPT/llm.c-style optimizer grouping decays 2D matrix and embedding
+  tensors, but not layer-norm vectors or bias vectors.
+change:
+  Token embedding AdamW kept ADAM_WEIGHT_DECAY.
+  Layer norm weights/biases and linear bias tensors used zero AdamW weight
+  decay. Diagnostics were updated to predict Adam deltas with the same decay
+  policy.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --workspace --tests: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH check stayed finite and nonzero:
+    target/adam_no_decay_vectors_100_20260620T094811Z.log
+    heldout_eval val_loss=6.604518, completed_steps=100.
+heldout_result:
+  Baseline:
+    target/no_backward_clear_l4_b8_900_20260620T090607Z.log
+    val_loss=4.069893, completed_steps=4535.
+  Candidate:
+    target/adam_no_decay_vectors_l4_b8_900_20260620T094843Z.log
+    val_loss=4.096563, completed_steps=4534.
+measured_effect:
+  Held-out validation loss worsened by 0.026670 over the same 900-second SYNTH
+  gate, with effectively identical step count.
+decision:
+  Do not promote. Code reverted to the prior baseline.
+```
