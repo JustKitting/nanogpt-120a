@@ -4573,6 +4573,36 @@ decision:
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Batch linear bias-gradient reductions.
+status: rejected_pre_gate
+change:
+  Tried replacing the 16 per-step linear_bias_grad_kernel launches with a
+  pointer-table based batched kernel. The first version used one max-width
+  launch for all bias tensors; the second grouped tensors by output width
+  (QKV, hidden width, MLP width) to avoid empty blocks.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screens:
+    target/batched_bias_grad_l4_b8_100_20260620T125913Z.log
+    val_loss=6.547208, train_elapsed_s=19.390, completed_steps=100.
+    target/grouped_bias_grad_l4_b8_100_20260620T130125Z.log
+    val_loss=6.550293, train_elapsed_s=19.407, completed_steps=100.
+measured_effect:
+  Both variants failed the pre-gate versus the promoted baseline screen
+  target/reusable_batch_l4_b8_100_20260620T122059Z.log, which had
+  val_loss=6.545963 and train_elapsed_s=19.350. The grouped version reduced
+  reported backward enqueue time but did not improve end-to-end objective-facing
+  runtime and changed validation loss in the wrong direction.
+decision:
+  Do not promote and do not spend a 900-second gate. Code was reverted to the
+  promoted baseline.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Reuse Aurora encode half-warp loads through shuffles.
 status: rejected_pre_gate
 change:
