@@ -31,6 +31,39 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: this commit
+experiment: Fuse row amax and four/six rowwise activation quantization.
+status: rejected_pre_gate
+change:
+  Added a fused rowwise derived-amax four/six quantization kernel for
+  attention-output and MLP-activation requantization. The candidate preserved
+  the old amax scratch side effect after the attention test caught the missing
+  write.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l2_attention --
+  --ignored --nocapture: pass after restoring the amax side effect.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored
+  --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+  --nocapture: pass.
+pre_gate_screen:
+  target/fused_rowwise_amax_quant_l4_b8_100_20260620T141740Z.log
+  val_loss=6.549544, train_elapsed_s=19.305, completed_steps=100.
+baseline:
+  target/reusable_batch_l4_b8_100_20260620T122059Z.log
+  val_loss=6.545963, train_elapsed_s=19.350, completed_steps=100.
+measured_effect:
+  Runtime improved by about 0.045 seconds over 100 steps, but held-out
+  validation loss moved in the wrong direction by 0.003581.
+decision:
+  Do not run the 900-second gate. Code was reverted to the promoted baseline.
+```
+
+```text
+date: 2026-06-20
+commit: this commit
 experiment: Direct MLP FP32 activation writes into forward tape.
 status: rejected_pre_gate
 change:
