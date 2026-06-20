@@ -31,6 +31,52 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: pending
+experiment: Fresh post-AMUSE-beta coupled sweep, trial 2.
+status: promoted at fixed-wall validation
+hypothesis:
+  After correcting the AMUSE beta_t formula, the old sweep history was no
+  longer valid for proposing candidates. A clean coupled sweep seeded only with
+  the post-formula baseline could find a better schedule/runtime point without
+  mixing stale pre-formula results.
+implementation:
+  Used a temporary target-local seed file containing only the promoted
+  post-AMUSE-beta baseline. Ran a coupled sweep over model shape, Aurora
+  cooperative launch shape, and optimizer schedule fields. The sweep was
+  stopped after trial 3 had started, but trial 2 had already completed a full
+  fixed-wall validation and was automatically promoted by the sweep harness.
+sweep:
+  target/sweeps/post_amuse_beta_900_20260620T020520Z
+completed_trials:
+  trial_0000:
+    key=b8_l8_d1536_h12_p16_c80_lr0.5814_alr2.2599_w5_s0.00_b0.60_r1.00
+    val_loss=5.801490, completed_steps=636, rejected.
+  trial_0001:
+    key=b8_l4_d1024_h16_p16_c80_lr0.9708_alr1.7773_w20_s0.10_b0.20_r0.80
+    val_loss=4.728477, completed_steps=1979, rejected.
+  trial_0002:
+    key=b8_l2_d1024_h16_p2_c90_lr2.2089_alr1.4141_w20_s0.20_b0.60_r0.50
+    val_loss=3.995972, completed_steps=5962, promoted.
+validation_result:
+  target/sweeps/post_amuse_beta_900_20260620T020520Z/trial_0002/train.log
+  stopped_by_wall_clock=true elapsed_s=900.060 completed_steps=5962.
+  heldout_eval split=val val_loss=3.995972 train_elapsed_s=900.210
+  completed_steps=5962.
+comparison:
+  Previous promoted baseline:
+    target/amuse_beta_formula_b8_l2d1024_900s_20260620T014632Z.log
+    val_loss=4.030268, completed_steps=5674.
+  Trial 2 completed 288 more steps and improved validation loss by 0.034296.
+decision:
+  Keep the sweep promotion. The new baseline is b8_l2_d1024_h16 with
+  AURORA_MATRIX_PHASES=2, AURORA_COOPERATIVE_BLOCKS=90,
+  TRAIN_LR_SCALE=2.208900, TRAIN_ADAM_LR_SCALE=1.414137,
+  TRAIN_LR_WARMUP_STEPS=20, TRAIN_LR_START_RATIO=0.200000,
+  TRAIN_AMUSE_BETA1=0.600000, TRAIN_AMUSE_RHO=0.500000.
+```
+
+```text
+date: 2026-06-20
+commit: pending
 experiment: Replace derived AMUSE beta schedule with the published AMUSE formula.
 status: promoted at fixed-wall validation
 hypothesis:
