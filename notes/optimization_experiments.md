@@ -4662,6 +4662,34 @@ decision:
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Two-slot pinned host staging for reusable training batch.
+status: rejected_pre_gate
+change:
+  Replaced the single pinned host token/target staging buffer in
+  ReusableTokenBatch with two rotating pinned host slots and one CUDA event per
+  slot. Device token/target buffers, stream ordering, data order, optimizer
+  math, and validation sample selection were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/double_host_staging_l4_b8_100_20260620T133840Z.log
+    val_loss=6.546112, train_elapsed_s=19.329, completed_steps=100.
+measured_effect:
+  Runtime changed by only about -0.021s versus the promoted reusable-batch
+  screen target/reusable_batch_l4_b8_100_20260620T122059Z.log, which had
+  val_loss=6.545963 and train_elapsed_s=19.350. Validation loss moved in the
+  wrong direction and the runtime effect is too small to justify a 900-second
+  gate.
+decision:
+  Do not promote and do not spend a 900-second gate. Code was reverted to the
+  promoted baseline.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Reuse Aurora encode half-warp loads through shuffles.
 status: rejected_pre_gate
 change:
