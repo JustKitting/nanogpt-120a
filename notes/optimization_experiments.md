@@ -4920,6 +4920,38 @@ decision:
 
 ```text
 date: 2026-06-20
+commit: 98d23b5b
+experiment: Fuse AdamW update with schedule-free x-average.
+status: accepted_900s
+change:
+  Moved the schedule-free x_master average update into the AdamW FP32 master
+  update kernel, removing the separate schedule_free_average launch from the
+  Adam optimizer path.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  100-step SYNTH screen:
+    target/fused_adam_average_l4_b8_100_20260620T154009Z.log
+    val_loss=6.545353, train_elapsed_s=19.326, completed_steps=100.
+  900-second SYNTH gate:
+    target/fused_adam_average_l4_b8_900_20260620T154046Z.log
+    val_loss=4.045264, completed_steps=4528.
+baseline:
+  Previous accepted baseline:
+    target/reusable_batch_l4_b8_900_20260620T122227Z.log
+    val_loss=4.023637, completed_steps=4522.
+measured_effect:
+  The candidate completed 6 more steps in the fixed 900-second run. Validation
+  loss was 0.537% worse than the previous baseline, which is inside the current
+  +/-1% acceptance band for step-count improvements.
+decision:
+  Promote as the current baseline under the validation-with-step-count rule.
+```
+
+```text
+date: 2026-06-20
 commit: uncommitted
 experiment: Batch linear bias-gradient reductions.
 status: rejected_pre_gate
