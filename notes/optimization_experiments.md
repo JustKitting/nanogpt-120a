@@ -4953,6 +4953,44 @@ decision:
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Direct schedule-free materialization on fused Adam baseline.
+status: accepted_900s
+change:
+  Replaced schedule-free materialization's
+  interpolate(z_master, x_master) -> f32 scratch -> amax -> NVFP4 encode path
+  with direct schedule-free amax and direct NVFP4 encode kernels over
+  z + beta * (x - z). Removed the unused optimizer materialized scratch buffer
+  and the dead schedule_free_average kernel left over after Adam average fusion.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  100-step SYNTH screen:
+    target/direct_materialize_fused_adam_l4_b8_100_20260620T163848Z.log
+    val_loss=6.551194, train_elapsed_s=19.325, completed_steps=100.
+  20-step nsys profile:
+    target/nsys/direct_materialize_fused_adam_l4_b8_20_20260620T163922Z.run.log
+    cuLaunchKernel calls dropped from 14348 to 13328 versus
+    target/nsys/current_fused_adam_l4_b8_20_20260620T162020Z.run.log.
+heldout_result:
+  Baseline:
+    target/fused_adam_average_l4_b8_900_20260620T154046Z.log
+    val_loss=4.045264, completed_steps=4528.
+  Candidate:
+    target/direct_materialize_fused_adam_l4_b8_900_20260620T163956Z.log
+    val_loss=4.050065, completed_steps=4529.
+measured_effect:
+  The candidate completed 1 more step in the fixed 900-second run. Validation
+  loss was 0.119% worse than the previous baseline, inside the current +/-1%
+  acceptance band for step-count improvements.
+decision:
+  Promote as the current baseline under the validation-with-step-count rule.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Batch linear bias-gradient reductions.
 status: rejected_pre_gate
 change:

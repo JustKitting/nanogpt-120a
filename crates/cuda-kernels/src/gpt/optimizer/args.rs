@@ -58,19 +58,10 @@ pub struct ScheduleFreeMaterializeArgs<'a> {
     pub global_scale: &'a mut DeviceBuffer<f32>,
     pub z_master: &'a DeviceBuffer<f32>,
     pub x_master: &'a DeviceBuffer<f32>,
-    pub materialized: &'a mut DeviceBuffer<f32>,
     pub amax: &'a mut DeviceBuffer<f32>,
     pub chunk_amax: &'a mut DeviceBuffer<f32>,
     pub len: u32,
     pub beta: f32,
-}
-
-pub struct ScheduleFreeAverageArgs<'a> {
-    pub stream: &'a CudaStream,
-    pub x_master: &'a mut DeviceBuffer<f32>,
-    pub z_master: &'a DeviceBuffer<f32>,
-    pub len: u32,
-    pub coefficient: f32,
 }
 
 pub struct EmbeddingLookupGradArgs<'a, 'out> {

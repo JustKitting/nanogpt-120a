@@ -5,7 +5,6 @@ use rust_kernels_cuda::nvfp4_quant::nvfp4_tensor_amax_chunks;
 pub struct OptimizerScratch {
     pub(super) amax: DeviceBuffer<f32>,
     pub(super) chunk_amax: DeviceBuffer<f32>,
-    pub(super) materialized: DeviceBuffer<f32>,
 }
 
 impl OptimizerScratch {
@@ -16,7 +15,6 @@ impl OptimizerScratch {
                 stream,
                 nvfp4_tensor_amax_chunks(GPT2_VOCAB_SIZE * GPT2_N_EMBD),
             )?,
-            materialized: DeviceBuffer::zeroed(stream, GPT2_VOCAB_SIZE * GPT2_N_EMBD)?,
         })
     }
 }

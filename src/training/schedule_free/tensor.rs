@@ -58,7 +58,6 @@ impl<'a> Materializer<'a> {
                 global_scale: &mut tensor.global_scale,
                 z_master,
                 x_master,
-                materialized: &mut self.scratch.materialized,
                 amax: &mut self.scratch.amax,
                 chunk_amax: &mut self.scratch.chunk_amax,
                 len: tensor.len as u32,

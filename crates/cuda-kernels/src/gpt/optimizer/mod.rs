@@ -23,7 +23,7 @@ mod work_grid;
 
 pub use args::{
     AdamWUpdateArgs, AuroraMegaUpdateArgs, EmbeddingLookupGradArgs, GradientClipArgs,
-    ScheduleFreeAverageArgs, ScheduleFreeMaterializeArgs,
+    ScheduleFreeMaterializeArgs,
 };
 pub use grad_clip::GRAD_CLIP_VALUES_PER_CHUNK;
 pub use launcher::OptimizerModule;
