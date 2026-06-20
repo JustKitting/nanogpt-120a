@@ -30,7 +30,45 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-20
-commit: 72afcd59
+commit: committed
+experiment: Unroll fixed Aurora Polar Express shared-memory staging loads.
+status: promoted at fixed-wall validation
+hypothesis:
+  Aurora's Polar Express TC matmul staging path loaded CTA_A_ELEMS and
+  CTA_B_ELEMS with two fixed-count while loops. With CTA_ELEMS=1024 and
+  CTA_THREADS=256, each thread performs exactly four staging offsets for A and
+  four for B. Explicitly unrolling those loads should reduce loop overhead in
+  the active optimizer path without changing optimizer math.
+implementation:
+  Replaced the two staging while loops in
+  crates/cuda-kernels/src/gpt/optimizer/aurora/polar/fused/stage.rs with four
+  explicit stage_a calls and four explicit stage_b calls.
+measured_effect:
+  100-step sanity:
+    target/aurora_stage_unroll_l4_100step_20260620T062209Z.log
+    train_elapsed_s=23.429, val_loss=6.605456.
+stability_effect:
+  The run stayed finite/nonzero. The Aurora optimizer GPU recurrence tests
+  passed after regenerating sm_120a PTX.
+validation_result:
+  target/aurora_stage_unroll_l4_900s_20260620T062251Z.log
+  stopped_by_wall_clock=true elapsed_s=900.090 completed_steps=3756.
+  heldout_eval split=val val_loss=4.133352 train_elapsed_s=900.329
+  completed_steps=3756.
+comparison:
+  Previous measured baseline:
+    target/square_cta_tape_l4_900s_20260620T055702Z.log
+    val_loss=4.136663, completed_steps=3692.
+  The staging unroll completed 64 more steps and improved validation loss by
+  0.003311 under the same 900-second wall-clock gate.
+decision:
+  Promote this as the current baseline. Continue looking for active-path
+  square/TC optimizer improvements before changing model architecture.
+```
+
+```text
+date: 2026-06-20
+commit: committed
 experiment: Audit attempted c_proj tape CTA route and retain best repeated 900-second baseline.
 status: baseline updated, optimization claim invalidated
 hypothesis:
@@ -74,7 +112,7 @@ decision:
 
 ```text
 date: 2026-06-20
-commit: 72afcd59
+commit: committed
 experiment: Use 32x32 CTA NVFP4 projection tiles for forward attention and MLP projections.
 status: promoted at fixed-wall validation
 hypothesis:
@@ -115,7 +153,7 @@ decision:
 
 ```text
 date: 2026-06-20
-commit: 72afcd59
+commit: committed
 experiment: Back off failed non-uniform/active-width work to the L4 floor.
 status: rollback to last stable L4-minimum patch
 measured_effect:

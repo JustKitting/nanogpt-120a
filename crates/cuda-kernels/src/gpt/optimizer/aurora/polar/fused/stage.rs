@@ -17,36 +17,90 @@ pub(super) fn stage_tiles(
     k_base: u32,
     rhs_transposed: bool,
 ) {
-    let mut offset = thread::threadIdx_x();
-    while offset < CTA_A_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.row_base + row;
-        let global_col = k_base + col;
-        a_tile[offset as usize] = if global_row < m && global_col < k {
-            cvt_rn_f16_f32(read_f32(a, global_row * k + global_col))
-        } else {
-            0
-        };
-        offset += CTA_THREADS;
-    }
+    let offset = thread::threadIdx_x();
+    stage_a(a, a_tile, tile, m, k, k_base, offset);
+    stage_a(a, a_tile, tile, m, k, k_base, offset + CTA_THREADS);
+    stage_a(a, a_tile, tile, m, k, k_base, offset + CTA_THREADS * 2);
+    stage_a(a, a_tile, tile, m, k, k_base, offset + CTA_THREADS * 3);
 
-    let mut offset = thread::threadIdx_x();
-    while offset < CTA_B_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.col_base + row;
-        let global_col = k_base + col;
-        b_tile[offset as usize] = if global_row < n && global_col < k {
-            let index = if rhs_transposed {
-                global_col * n + global_row
-            } else {
-                global_row * k + global_col
-            };
-            cvt_rn_f16_f32(read_f32(b, index))
+    stage_b(b, b_tile, tile, n, k, k_base, rhs_transposed, offset);
+    stage_b(
+        b,
+        b_tile,
+        tile,
+        n,
+        k,
+        k_base,
+        rhs_transposed,
+        offset + CTA_THREADS,
+    );
+    stage_b(
+        b,
+        b_tile,
+        tile,
+        n,
+        k,
+        k_base,
+        rhs_transposed,
+        offset + CTA_THREADS * 2,
+    );
+    stage_b(
+        b,
+        b_tile,
+        tile,
+        n,
+        k,
+        k_base,
+        rhs_transposed,
+        offset + CTA_THREADS * 3,
+    );
+}
+
+#[inline(always)]
+fn stage_a(
+    a: *const f32,
+    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+    tile: CtaTile,
+    m: u32,
+    k: u32,
+    k_base: u32,
+    offset: u32,
+) {
+    let row = offset / CTA_K;
+    let col = offset - row * CTA_K;
+    let global_row = tile.row_base + row;
+    let global_col = k_base + col;
+    a_tile[offset as usize] = if global_row < m && global_col < k {
+        cvt_rn_f16_f32(read_f32(a, global_row * k + global_col))
+    } else {
+        0
+    };
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+fn stage_b(
+    b: *const f32,
+    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    tile: CtaTile,
+    n: u32,
+    k: u32,
+    k_base: u32,
+    rhs_transposed: bool,
+    offset: u32,
+) {
+    let row = offset / CTA_K;
+    let col = offset - row * CTA_K;
+    let global_row = tile.col_base + row;
+    let global_col = k_base + col;
+    b_tile[offset as usize] = if global_row < n && global_col < k {
+        let index = if rhs_transposed {
+            global_col * n + global_row
         } else {
-            0
+            global_row * k + global_col
         };
-        offset += CTA_THREADS;
-    }
+        cvt_rn_f16_f32(read_f32(b, index))
+    } else {
+        0
+    };
 }
