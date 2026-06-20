@@ -5244,6 +5244,42 @@ decision:
 ```
 ```text
 date: 2026-06-20
+commit: c921cd84 baseline, rejected candidate uncommitted
+experiment: Aligned Polar Express CTA load/store path inside Aurora.
+status: rejected_pre_gate
+change:
+  Added aligned Polar Express CTA staging and aligned store variants for the
+  current L4/d1024 matrix shapes, moving the alignment branch outside the tile
+  loop for the full candidate. The math, optimizer settings, data order, and
+  validation split were unchanged.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  load-only 100-step SYNTH screen:
+    target/polar_aligned_load_l4_b8_100_20260620T190011Z.log
+    val_loss=6.546259, train_elapsed_s=19.107, completed_steps=100.
+  full aligned 100-step SYNTH screen:
+    target/polar_aligned_full_l4_b8_100_20260620T190357Z.log
+    val_loss=6.546829, train_elapsed_s=19.066, completed_steps=100.
+  full aligned 20-step nsys:
+    target/nsys/polar_aligned_full_l4_b8_20_20260620T190427Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.766, completed_steps=20.
+measured_effect:
+  The load-only version regressed versus the accepted 100-step screen
+  target/linear_bwd_aligned_l4_b8_100_20260620T183731Z.log, which had
+  train_elapsed_s=19.081. The full aligned version was only 0.015s faster on
+  the 100-step screen, but nsys showed no real device-kernel improvement:
+  aurora_mega_update_cooperative_kernel was 1.367624575s baseline versus
+  1.367621170s candidate over 20 steps, and total profiled train time stayed
+  3.766s.
+decision:
+  Reject before the 900-second gate. Code was reverted to c921cd84; only this
+  note remains.
+```
+
+```text
+date: 2026-06-20
 commit: uncommitted
 experiment: Aligned CTA path for paired linear-backward projection.
 status: accepted
