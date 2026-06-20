@@ -4036,3 +4036,46 @@ interpretation:
   The cleared buffers were overwritten before use. Removing the clears reduces
   launch/memset overhead without changing optimizer math or data semantics.
 ```
+
+```text
+date: 2026-06-20
+commit: uncommitted
+experiment: Multi-warp MS-EDEN pack kernels.
+status: rejected
+change:
+  Changed MS-EDEN packing kernels from one 32-thread warp per CTA to eight
+  warps per CTA, with each warp packing one 32-value Hadamard chunk.
+verification:
+  cargo check --workspace --tests: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  100-step SYNTH check stayed finite and nonzero:
+    target/ms_eden_pack_warp8_100_20260620T092605Z.log
+profile_effect:
+  20-step nsys log:
+    target/nsys/ms_eden_pack_warp8_l4_b8_20_20260620T092633Z.log
+  Compared to target/nsys/no_backward_clear_l4_b8_20_20260620T090522Z.log:
+    fp32_to_nvfp4_ms_eden_device_scale_kernel:
+      162.017935 ms -> 86.824742 ms.
+    fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel:
+      167.198477 ms -> 119.333682 ms.
+    rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel:
+      74.137109 ms -> 62.847135 ms.
+    nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel:
+      24.967339 ms -> 19.067413 ms.
+heldout_result:
+  Baseline:
+    target/no_backward_clear_l4_b8_900_20260620T090607Z.log
+    val_loss=4.069893, completed_steps=4535.
+  Candidate:
+    target/ms_eden_pack_warp8_l4_b8_900_20260620T092657Z.log
+    val_loss=4.101368, completed_steps=4697.
+measured_effect:
+  The candidate increased completed steps by 162 but worsened held-out
+  validation loss by 0.031475 over the same 900-second SYNTH gate.
+decision:
+  Do not promote. The optimization target is held-out validation loss over
+  fixed wall-clock, not speed alone. Code reverted to the prior baseline.
+```
