@@ -31,6 +31,47 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-20
 commit: uncommitted
+experiment: Defer optimizer NVFP4 writeback until eval/save/generate boundaries.
+status: rejected_pre_gate
+change:
+  Tested skipping end-of-step NVFP4 requantization for Adam and Aurora optimizer
+  updates, then materializing weights before held-out eval. The first version
+  used schedule-free interpolation with beta=1.0 at eval; the second version
+  used direct x_master requantization to better match the previous eval state.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer --
+  --ignored --nocapture: pass, 7 tests.
+baseline:
+  Current promoted 100-step reference:
+    target/reusable_batch_l4_b8_100_20260620T122059Z.log
+    val_loss=6.545963, train_elapsed_s=19.350, completed_steps=100.
+pre_gate_screens:
+  target/defer_optimizer_writeback_l4_b8_100_20260620T152803Z.log
+    beta=1.0 eval interpolation
+    val_loss=6.549026, train_elapsed_s=19.289, completed_steps=100.
+  target/defer_optimizer_writeback_direct_eval_l4_b8_100_20260620T153039Z.log
+    direct x_master eval requantization
+    val_loss=6.546259, train_elapsed_s=19.305, completed_steps=100.
+  target/defer_optimizer_writeback_direct_eval_l4_b8_100_log250_20260620T153113Z.log
+    direct x_master eval requantization, TRAIN_LOG_INTERVAL=250
+    val_loss=6.549611, train_elapsed_s=19.417, completed_steps=100.
+measured_effect:
+  Skipping intermediate writeback reduced local optimizer timing, but the
+  objective-facing screens did not improve held-out validation. The best screen
+  was about 0.045s faster over 100 steps but still worsened validation by
+  0.000296.
+decision:
+  Reject and revert. Do not spend a 900-second gate unless a future version
+  proves bit-equivalent eval/training behavior or shows a stronger pre-gate
+  validation result.
+```
+
+```text
+date: 2026-06-20
+commit: uncommitted
 experiment: Replace per-step token upload event sync with a 1024-slot batch ring.
 status: rejected_pre_gate
 change:
