@@ -6749,6 +6749,45 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted
+experiment: Split Aurora Polar f16 RHS staging by row-major/transposed source.
+status: rejected_900s
+change:
+  Split the Aurora Polar f16 shared-memory B staging path into row-major and
+  transposed helper bodies, moving the rhs_transposed branch outside the
+  per-staged-element index calculation.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys screen:
+    target/nsys/aurora_stage_split_rhs_l4_b8_20_20260621T120206Z.run.log
+    val_loss=8.506022, train_elapsed_s=3.473, completed_steps=20.
+  100-step SYNTH screen:
+    target/aurora_stage_split_rhs_l4_b8_100_20260621T120254Z.log
+    val_loss=6.547944, train_elapsed_s=17.387, completed_steps=100.
+  900-second held-out gate:
+    target/aurora_stage_split_rhs_l4_b8_900_20260621T120326Z.log
+    val_loss=4.034446, train_elapsed_s=900.001, completed_steps=5026.
+measured_effect:
+  Against the accepted MS-EDEN source split profile
+  target/nsys/ms_eden_split_fp32_source_l4_b8_20_20260621T112900Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1.382451463s to
+  1.379752055s, linear_backward_projection_pair_cta_device_scale_kernel moved
+  from 651.431430ms to 649.217101ms, and f16_cta_tc_matmul_f32_kernel moved
+  from 225.104836ms to 224.361996ms over 20 profiled steps. Profiled train
+  time still moved from 3.397s to 3.473s, so the profiler screen was noisy.
+  The full 900-second gate matched the accepted completed step count, 5026, but
+  worsened held-out validation loss from 3.947354 to 4.034446.
+decision:
+  Reject and revert the code. The fixed-wall validation result failed the
+  promotion rule even though a few kernel totals moved slightly in the 20-step
+  profile.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: F16 CTA matmul M128/N32 tile shape.
 status: rejected_correctness
