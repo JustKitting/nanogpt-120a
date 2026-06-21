@@ -7,6 +7,9 @@ use super::run_output::RunOutput;
 pub const DEFAULT_SEED: u64 = 0x4750_5432;
 const DEFAULT_TRAIN_MAX_SECONDS: f64 = 900.0;
 const DEFAULT_TRAIN_STEP_CAP: usize = 1_000_000;
+const AUTO_GENERATE_MIN_TRAIN_SECONDS: f64 = 900.0;
+const DEFAULT_SYNTH_PROMPT: &str = "The";
+const DEFAULT_SHAKESPEARE_PROMPT: &str = "KING:";
 
 pub struct TrainConfig {
     pub seed: u64,
@@ -49,8 +52,11 @@ pub fn loss_graph_path(run_output: &RunOutput) -> PathBuf {
         .unwrap_or_else(|| run_output.path("loss.png"))
 }
 
-pub fn generate_prompt() -> Option<String> {
-    env_nonempty("TRAIN_GENERATE_PROMPT")
+pub fn generate_prompt(dataset: &str, train_elapsed_s: f64) -> Option<String> {
+    env_nonempty("TRAIN_GENERATE_PROMPT").or_else(|| {
+        (train_elapsed_s >= AUTO_GENERATE_MIN_TRAIN_SECONDS)
+            .then(|| default_generate_prompt(dataset).to_string())
+    })
 }
 
 pub fn generate_tokens() -> usize {
@@ -75,6 +81,13 @@ pub fn should_eval_step(step: usize, step_cap: usize, eval_interval: Option<usiz
 
 fn env_nonempty(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|value| !value.is_empty())
+}
+
+fn default_generate_prompt(dataset: &str) -> &'static str {
+    match dataset {
+        "shakespeare" => DEFAULT_SHAKESPEARE_PROMPT,
+        _ => DEFAULT_SYNTH_PROMPT,
+    }
 }
 
 fn env_usize(name: &str) -> Option<usize> {

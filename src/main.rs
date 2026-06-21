@@ -94,7 +94,7 @@ fn main() -> AppResult {
     let loss_graph_path = app::artifacts::write_loss_graph(&run_output, logger.loss_curve())?;
     println!("loss_graph={}", loss_graph_path.display());
 
-    if let Some(prompt) = app::config::generate_prompt() {
+    if let Some(prompt) = app::config::generate_prompt(&dataset, train_elapsed_s) {
         let text = trainer.generate_sampled(
             &prompt,
             app::config::generate_tokens(),
