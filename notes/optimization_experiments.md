@@ -6377,3 +6377,31 @@ decision:
   Reject before the 900-second gate. The target-kernel gain was too small and
   the short wall-clock regressed. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Move LM-head aligned/generic selection from device branch to host launcher.
+status: rejected_screen
+change:
+  Added a separate lm_head_aligned_kernel and made the host launcher call it
+  when token_count, vocab_size, and input_dim were CTA-aligned. The generic
+  kernel remained for non-aligned tests and shapes.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/lm_head_host_aligned_split_l4_b8_20_20260621T081804Z.run.log
+    val_loss=8.506057, train_elapsed_s=3.585, completed_steps=20.
+measured_effect:
+  Against the promoted f16 CTA sync baseline
+  target/nsys/f16_skip_final_cta_sync_l4_b8_20_20260621T073906Z.run.log,
+  lm_head moved from 112.481106ms to 112.720425ms over 20 profiled steps.
+  Profiled train time moved from 3.582s to 3.585s.
+decision:
+  Reject before the 900-second gate. The target kernel and short wall-clock
+  both regressed. Code was reverted.
+```
