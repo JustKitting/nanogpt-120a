@@ -6350,3 +6350,30 @@ decision:
   Reject before the 900-second gate. The target kernel and short wall-clock
   both regressed. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Remove second barrier from attention backward softmax_d reduction.
+status: rejected_screen
+change:
+  Changed softmax_d_kernel's two-warp head reduction so only dim 0 read the
+  final shared sum, removing the second block-wide sync from the reduction.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/softmax_d_single_sync_l4_b8_20_20260621T081514Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.589, completed_steps=20.
+measured_effect:
+  Against the promoted f16 CTA sync baseline
+  target/nsys/f16_skip_final_cta_sync_l4_b8_20_20260621T073906Z.run.log,
+  softmax_d_kernel moved from 4.716164ms to 4.709215ms over 20 profiled steps,
+  but profiled train time moved from 3.582s to 3.589s.
+decision:
+  Reject before the 900-second gate. The target-kernel gain was too small and
+  the short wall-clock regressed. Code was reverted.
+```
