@@ -106,11 +106,11 @@ impl Model {
             .map(|(j, i)| (values[*i] - self.design_means[j]) / self.design_stds[j])
             .collect::<Vec<_>>();
         let standard_score = super::stats::dot(&z, &self.beta);
-        let variance = linear::quadratic_form(&z, &self.covariance).max(0.0);
+        let leverage = linear::quadratic_form(&z, &self.covariance).max(0.0);
         Prediction {
             value: self.y_mean + standard_score * self.y_std,
             standard_score,
-            uncertainty: variance.sqrt(),
+            uncertainty: self.residual_std * (1.0 + leverage).sqrt(),
         }
     }
 }

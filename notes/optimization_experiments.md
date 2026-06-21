@@ -7861,3 +7861,29 @@ decision:
   factorial-experiment behavior by using uncertainty in the fitted factors to
   place explicit low/high probes around the current best point.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Scale sweep prediction uncertainty by residual model error.
+status: accepted_tooling
+change:
+  Prediction uncertainty now uses residual_std * sqrt(1 + leverage), where
+  leverage is x^T covariance x. The previous acquisition uncertainty used only
+  leverage, so it ignored the fitted model's residual error.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_residual_scaled_uncertainty_20260621T174749Z
+measured_effect:
+  candidate_0000_score.txt still selected a model-ranked factorial candidate.
+  The selected candidate now reports uncertainty=1.134338, with per-response
+  quality_uncertainty=0.631499, speed_uncertainty=1.134338, and
+  stability_uncertainty=1.082089.
+decision:
+  Accept as sweep infrastructure. The acquisition uncertainty now reflects both
+  model residual noise and candidate leverage, matching the intended confidence
+  and variance-driven sweep behavior more closely.
+```
