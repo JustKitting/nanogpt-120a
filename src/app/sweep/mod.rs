@@ -1,3 +1,4 @@
+mod analysis;
 mod baseline;
 mod candidate;
 mod chain;

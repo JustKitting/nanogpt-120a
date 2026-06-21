@@ -34,6 +34,40 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Replace heuristic sweep proposal scoring with multivariable statistical analysis.
+status: accepted_tooling_dry_run
+change:
+  Added per-iteration sweep analysis files for main effects, pairwise
+  interactions, prediction uncertainty, quality, speed, and stability. Candidate
+  proposals now score sampled candidates with the fitted multivariable surrogate
+  instead of a manual good/bad KDE split. Screen rejects and failed runs remain
+  evidence, so the next proposal is informed by prior failures automatically.
+  This is not a full Gaussian-process Bayesian optimizer; it is a ridge
+  regularized multivariable surrogate with uncertainty and interaction
+  reporting.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo test --bin sweep: pass.
+  dry-run analysis:
+    target/sweeps/dryrun_stat_analysis_20260621T171039Z
+    generated analysis_summary.md, analysis_effects.tsv,
+    analysis_interactions.tsv, and candidate_0000_score.txt.
+observed_effect:
+  Existing history produced fitted response models for screen_quality,
+  screen_tokens_per_s, full_quality, full_tokens_per_s, and stability.
+  Example dry-run top effects included n_embd as a negative driver for
+  full_tokens_per_s and n_layer as a negative driver for stability. The same
+  run recorded pairwise effects such as n_layer*aurora_phases for full_quality
+  and stability.
+decision:
+  Accept as sweep infrastructure. This does not promote any training
+  hyperparameter result by itself.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Add 500-step screen gate to Bayesian hyperparameter sweep.
 status: accepted_infra_no_baseline_change
 change:

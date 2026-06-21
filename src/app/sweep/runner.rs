@@ -6,6 +6,7 @@ use std::{
 use time::OffsetDateTime;
 
 use super::{
+    analysis,
     baseline::Baseline,
     candidate::Candidate,
     chain,
@@ -45,15 +46,19 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             &shared_history.trials,
             &history.trials,
         );
+        let sweep_analysis = analysis::analyze(&all_trials, &config);
+        analysis::write(&sweep_dir, &sweep_analysis)?;
+        analysis::print_summary(&sweep_analysis);
         let seen = chain::seen_keys(&all_trials);
         let candidate = optimizer::propose(
             &all_trials,
             &seen,
             &mut rng,
-            config.random_trials,
-            config.candidate_samples,
+            &config,
+            &sweep_analysis,
             baseline.candidate(),
         );
+        write_candidate_score(&sweep_dir, index, &candidate, &config, &sweep_analysis)?;
         let trial_dir = sweep_dir.join(format!("trial_{index:04}"));
         println!("sweep_trial_begin index={index} key={}", candidate.key());
         let trial = run_trial(
@@ -93,8 +98,49 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
                 config.baseline.display()
             );
         }
+        let baseline_trial = baseline.measured_trial();
+        let all_trials = chain::all_trials_with_baseline(
+            baseline_trial.as_ref(),
+            &shared_history.trials,
+            &history.trials,
+        );
+        let sweep_analysis = analysis::analyze(&all_trials, &config);
+        analysis::write(&sweep_dir, &sweep_analysis)?;
     }
     Ok(())
+}
+
+fn write_candidate_score(
+    sweep_dir: &Path,
+    index: usize,
+    candidate: &Candidate,
+    config: &SweepConfig,
+    sweep_analysis: &analysis::SweepAnalysis,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let score = analysis::score_candidate(sweep_analysis, config, candidate);
+    fs::write(
+        sweep_dir.join(format!("candidate_{index:04}_score.txt")),
+        format!(
+            "candidate={}\nscore={:.6}\nquality={}\nspeed={}\nstability={}\n",
+            candidate.key(),
+            score.score,
+            fmt_prediction(score.predicted_quality),
+            fmt_prediction(score.predicted_speed),
+            fmt_prediction(score.predicted_stability)
+        ),
+    )?;
+    Ok(())
+}
+
+fn fmt_prediction(value: Option<analysis::Prediction>) -> String {
+    value
+        .map(|prediction| {
+            format!(
+                "value={:.6},z={:.6},uncertainty={:.6}",
+                prediction.value, prediction.standard_score, prediction.uncertainty
+            )
+        })
+        .unwrap_or_else(|| "n/a".to_string())
 }
 
 fn screen_baseline(

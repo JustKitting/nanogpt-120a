@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
 use super::{
+    analysis,
     baseline::Baseline,
     candidate::{Candidate, MIN_N_LAYER, valid_aurora_phases},
     chain,
+    config::SweepConfig,
     history::History,
     history::Trial,
     parse::RunResult,
@@ -19,8 +21,16 @@ fn exposes_profiled_l2_aurora_phase_layout() {
 #[test]
 fn starts_fresh_sweep_from_best_measured_baseline() {
     let measured = measured_candidate();
-    let baseline =
-        super::optimizer::propose(&[], &Default::default(), &mut rng(), 3, 32, Some(&measured));
+    let config = config(3, 32);
+    let analysis = analysis::analyze(&[], &config);
+    let baseline = super::optimizer::propose(
+        &[],
+        &Default::default(),
+        &mut rng(),
+        &config,
+        &analysis,
+        Some(&measured),
+    );
 
     assert_eq!(baseline.batch_size, 8);
     assert_eq!(baseline.n_layer, MIN_N_LAYER);
@@ -43,12 +53,14 @@ fn measured_baseline_is_not_rerun_as_next_candidate() {
     let baseline_trial = trial("success", Some(4.2), baseline_candidate.clone());
     let all_trials = chain::all_trials_with_baseline(Some(&baseline_trial), &seed_history, &[]);
     let seen = chain::seen_keys(&all_trials);
+    let config = config(1, 16);
+    let analysis = analysis::analyze(&all_trials, &config);
     let proposal = super::optimizer::propose(
         &all_trials,
         &seen,
         &mut rng(),
-        1,
-        16,
+        &config,
+        &analysis,
         Some(&baseline_candidate),
     );
 
@@ -67,7 +79,16 @@ fn random_candidates_respect_min_layer_count() {
 #[test]
 fn optimizer_ignores_sub_min_layer_history() {
     let trials = [trial("success", Some(1.0), candidate(8, 2, 1.0))];
-    let proposal = super::optimizer::propose(&trials, &Default::default(), &mut rng(), 3, 16, None);
+    let config = config(3, 16);
+    let analysis = analysis::analyze(&trials, &config);
+    let proposal = super::optimizer::propose(
+        &trials,
+        &Default::default(),
+        &mut rng(),
+        &config,
+        &analysis,
+        None,
+    );
 
     assert!(proposal.n_layer >= MIN_N_LAYER);
 }
@@ -182,6 +203,30 @@ fn candidate(batch_size: usize, n_layer: usize, lr_scale: f64) -> Candidate {
         start_ratio: 0.0,
         amuse_beta1: 0.4,
         amuse_rho: 0.8,
+    }
+}
+
+fn config(random_trials: usize, candidate_samples: usize) -> SweepConfig {
+    SweepConfig {
+        trials: 4,
+        random_trials,
+        candidate_samples,
+        max_seconds: 900.0,
+        screen_steps: 500,
+        screen_max_seconds: 180.0,
+        sweep_quality_weight: 1.0,
+        sweep_speed_weight: 0.25,
+        sweep_stability_weight: 0.75,
+        sweep_exploration_weight: 0.35,
+        log_interval: 500,
+        dataset: "synth".to_string(),
+        arch: "sm_120a".to_string(),
+        cuda_device: None,
+        sweep_dir: None,
+        seed_history: PathBuf::from("notes/sweep_seed_current.tsv"),
+        baseline: PathBuf::from("notes/sweep_baseline.env"),
+        seed: 0x4750_5432,
+        dry_run: false,
     }
 }
 

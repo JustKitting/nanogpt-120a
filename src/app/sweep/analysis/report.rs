@@ -1,0 +1,98 @@
+use std::{fs, io, path::Path};
+
+use super::SweepAnalysis;
+
+pub fn write(sweep_dir: &Path, analysis: &SweepAnalysis) -> io::Result<()> {
+    fs::write(sweep_dir.join("analysis_summary.md"), summary(analysis))?;
+    fs::write(
+        sweep_dir.join("analysis_effects.tsv"),
+        effects_tsv(analysis),
+    )?;
+    fs::write(
+        sweep_dir.join("analysis_interactions.tsv"),
+        interactions_tsv(analysis),
+    )
+}
+
+fn summary(analysis: &SweepAnalysis) -> String {
+    let mut text = String::new();
+    text.push_str("# Sweep Statistical Analysis\n\n");
+    text.push_str(&format!("trial_count={}\n\n", analysis.trial_count));
+    for response in &analysis.models {
+        response_summary(&mut text, response);
+    }
+    text
+}
+
+fn response_summary(text: &mut String, response: &super::ResponseModel) {
+    text.push_str(&format!("## {}\n\n", response.name));
+    text.push_str(&format!(
+        "n={} residual_std={:.6}\n\n",
+        response.model.n, response.model.residual_std
+    ));
+    text.push_str("| factor | coefficient | stderr | t | p_positive |\n");
+    text.push_str("|---|---:|---:|---:|---:|\n");
+    for effect in response.model.effects.iter().take(12) {
+        text.push_str(&format!(
+            "| {} | {:.6} | {:.6} | {:.3} | {:.3} |\n",
+            effect.name, effect.coefficient, effect.stderr, effect.t, effect.p_positive
+        ));
+    }
+    text.push('\n');
+    interaction_summary(text, response);
+}
+
+fn interaction_summary(text: &mut String, response: &super::ResponseModel) {
+    if response.interactions.is_empty() {
+        return;
+    }
+
+    text.push_str("Top pairwise standardized product effects:\n\n");
+    text.push_str("| interaction | coefficient | stderr | t | p_positive |\n");
+    text.push_str("|---|---:|---:|---:|---:|\n");
+    for effect in response.interactions.iter().take(12) {
+        text.push_str(&format!(
+            "| {} | {:.6} | {:.6} | {:.3} | {:.3} |\n",
+            effect.name, effect.coefficient, effect.stderr, effect.t, effect.p_positive
+        ));
+    }
+    text.push('\n');
+}
+
+fn effects_tsv(analysis: &SweepAnalysis) -> String {
+    let mut text = String::from("response\tn\tfactor\tcoefficient\tstderr\tt\tp_positive\n");
+    for response in &analysis.models {
+        for effect in &response.model.effects {
+            text.push_str(&format!(
+                "{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
+                response.name,
+                response.model.n,
+                effect.name,
+                effect.coefficient,
+                effect.stderr,
+                effect.t,
+                effect.p_positive
+            ));
+        }
+    }
+    text
+}
+
+fn interactions_tsv(analysis: &SweepAnalysis) -> String {
+    let mut text = String::from("response\tn\tinteraction\tcoefficient\tstderr\tt\tp_positive\n");
+    for response in &analysis.models {
+        for effect in &response.interactions {
+            text.push_str(&format!(
+                "{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
+                response.name,
+                response.model.n,
+                effect.name,
+                effect.coefficient,
+                effect.stderr,
+                effect.t,
+                effect.p_positive
+            ));
+        }
+    }
+    text
+}
