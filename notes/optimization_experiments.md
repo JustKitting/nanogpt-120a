@@ -4,6 +4,9 @@ This note tracks throughput goals, measured baselines, experiments already tried
 and the next optimization work. Keep this file factual: add measured commands and
 results before changing the plan.
 
+Decision rules live in [optimization_rules.md](optimization_rules.md). Apply
+those rules when accepting, rejecting, or comparing experiments in this file.
+
 ## Goal
 
 Train a GPT-2-small-shaped model with local Rust/CUDA kernels, targeting
