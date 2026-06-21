@@ -1,6 +1,7 @@
 mod analysis;
 mod baseline;
 mod candidate;
+mod candidate_space;
 mod chain;
 mod config;
 mod history;

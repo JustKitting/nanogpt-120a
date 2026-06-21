@@ -1,8 +1,7 @@
-use super::rng::SweepRng;
+use super::{candidate_space, rng::SweepRng};
 
-const AURORA_BLOCK_CHOICES: [usize; 5] = [80, 90, 120, 160, 180];
-const AURORA_PHASE_CHOICES: [usize; 4] = [2, 4, 8, 16];
 pub const MIN_N_LAYER: usize = 4;
+pub(super) use candidate_space::valid_aurora_phases;
 
 #[derive(Clone, Debug)]
 pub struct Candidate {
@@ -22,25 +21,7 @@ pub struct Candidate {
 
 impl Candidate {
     pub fn random(rng: &mut SweepRng) -> Self {
-        let (n_embd, n_head) = rng.choose(&[(1024, 16), (2048, 16)]);
-        let n_layer = rng.choose(&[MIN_N_LAYER, 8]);
-        let slots = n_layer * 4;
-        let aurora_blocks = rng.choose(&AURORA_BLOCK_CHOICES);
-        let phases = valid_aurora_phases(slots, aurora_blocks);
-        Self {
-            batch_size: rng.choose(&[4, 8, 16]),
-            n_layer,
-            n_embd,
-            n_head,
-            aurora_phases: rng.choose(&phases),
-            aurora_blocks,
-            lr_scale: rng.log_uniform(0.5, 2.5),
-            adam_lr_scale: rng.log_uniform(0.5, 2.5),
-            warmup_steps: rng.choose(&[5, 20, 50, 100]),
-            start_ratio: rng.choose(&[0.0, 0.05, 0.1, 0.2]),
-            amuse_beta1: rng.choose(&[0.2, 0.4, 0.6]),
-            amuse_rho: rng.choose(&[0.5, 0.8, 1.0]),
-        }
+        candidate_space::random(rng)
     }
 
     pub fn with_min_layers(&self) -> Self {
@@ -49,7 +30,7 @@ impl Candidate {
         }
 
         let n_layer = MIN_N_LAYER;
-        let phases = valid_aurora_phases(n_layer * 4, self.aurora_blocks);
+        let phases = candidate_space::valid_aurora_phases(n_layer * 4, self.aurora_blocks);
         let aurora_phases = phases
             .iter()
             .copied()
@@ -102,15 +83,4 @@ impl Candidate {
             ("TRAIN_AMUSE_RHO", format!("{:.6}", self.amuse_rho)),
         ]
     }
-}
-
-pub(super) fn valid_aurora_phases(slots: usize, blocks: usize) -> Vec<usize> {
-    AURORA_PHASE_CHOICES
-        .into_iter()
-        .filter(|phase| slots % phase == 0 && cooperative_blocks(slots, *phase, blocks) <= 360)
-        .collect()
-}
-
-fn cooperative_blocks(slots: usize, phases: usize, blocks: usize) -> usize {
-    blocks * (slots / phases)
 }

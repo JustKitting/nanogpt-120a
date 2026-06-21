@@ -7803,3 +7803,30 @@ decision:
   Reject and revert the code. The extra completed steps do not compensate for
   validation loss moving outside the +/-1% no-meaningful-change band.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Use continuous scalar ranges in sweep candidate space.
+status: accepted_tooling
+change:
+  Centralized sweep candidate-space ownership. Kept only build/kernel shape
+  choices discrete: batch size, layer count, embedding/head shape, Aurora
+  cooperative blocks, and Aurora phases. Changed scalar training knobs to
+  range-sampled values instead of small buckets: LR scale, Adam LR scale,
+  warmup steps, LR start ratio, AMUSE beta1, and AMUSE rho.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_continuous_candidate_space_20260621T174129Z
+measured_effect:
+  candidate_0000_ranked.tsv now contains non-anchor scalar values such as
+  lr1.7457, alr0.5475, w21, s0.12, b0.46, r0.78 and guided candidates with
+  values such as lr1.6826, w86, s0.17, b0.28, r0.59.
+decision:
+  Accept as sweep infrastructure. This fixes the bucketed scalar search space
+  and preserves discrete choices only where compilation or cooperative launch
+  constraints make them discrete.
+```
