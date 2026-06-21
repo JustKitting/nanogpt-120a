@@ -6041,3 +6041,31 @@ decision:
   small fixed loop well enough, and the short wall-clock screen regressed.
   Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Skip final CTA projection shared-memory sync after last K tile.
+status: rejected_screen
+change:
+  Changed projection_accumulator and projection_accumulator_aligned to run the
+  post-MMA block sync only when another K tile follows.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/proj_cta_skip_final_sync_l4_b8_20_20260621T064931Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.586, completed_steps=20.
+measured_effect:
+  Against the promoted MS-EDEN chunk-scale baseline
+  target/nsys/ms_eden_chunk_scale_unroll4_l4_b8_20_20260621T062103Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  621.664121ms to 621.771841ms over 20 profiled steps, and profiled train time
+  moved from 3.584s to 3.586s.
+decision:
+  Reject before the 900-second gate. Removing the final barrier did not improve
+  the target kernel or short wall-clock. Code was reverted.
+```
