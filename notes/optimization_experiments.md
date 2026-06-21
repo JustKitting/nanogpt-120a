@@ -6735,3 +6735,30 @@ decision:
   Reject before the 900-second gate and revert the code. The helper adds a
   runtime match and did not reduce the Aurora cooperative kernel time.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Delay Aurora transpose index division until transposed slots.
+status: rejected_pre_gate
+change:
+  Moved row/col division in momentum_orient and update_one behind the
+  transposed branch so non-transposed matrix slots could use index directly.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aurora_transpose_index_branch_l4_b8_20_20260621T093226Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.439, completed_steps=20.
+measured_effect:
+  Against the accepted linear-backward tile-shift profile
+  target/nsys/linear_bwd_tile_shift_l4_b8_20_20260621T090938Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1.362562731s to
+  1.364992942s over 20 profiled steps. Profiled train time moved from 3.434s
+  to 3.439s.
+decision:
+  Reject before the 900-second gate and revert the code. The branch shape did
+  not improve the current Aurora cooperative kernel profile.
+```
