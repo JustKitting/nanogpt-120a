@@ -24,6 +24,7 @@ struct Record {
     screen_loss: Option<f64>,
     screen_completed_steps: Option<usize>,
     screen_elapsed_s: Option<f64>,
+    screen_reason: Option<String>,
     log_path: PathBuf,
     candidate: Candidate,
 }
@@ -57,6 +58,7 @@ impl Baseline {
             screen_val_loss: record.screen_loss,
             screen_completed_steps: record.screen_completed_steps,
             screen_elapsed_s: record.screen_elapsed_s,
+            screen_reason: record.screen_reason.clone(),
             log_path: record.log_path.clone(),
         })
     }
@@ -120,6 +122,9 @@ impl Baseline {
         if let Some(elapsed_s) = record.screen_elapsed_s {
             writeln!(file, "SCREEN_ELAPSED_S={elapsed_s:.6}")?;
         }
+        if let Some(reason) = &record.screen_reason {
+            writeln!(file, "SCREEN_REASON={reason}")?;
+        }
         writeln!(file, "LOG_PATH={}", record.log_path.display())?;
         writeln!(file, "GPT2_SEQ_LEN={DEFAULT_SEQ_LEN}")?;
         write_env(&mut file, record.candidate.build_env())?;
@@ -148,6 +153,7 @@ fn trial_record(trial: &Trial) -> Option<Record> {
         screen_loss: trial.screen_val_loss,
         screen_completed_steps: trial.screen_completed_steps,
         screen_elapsed_s: trial.screen_elapsed_s,
+        screen_reason: trial.screen_reason.clone(),
         log_path: trial.log_path.clone(),
         candidate: trial.candidate.clone(),
     })
@@ -162,6 +168,7 @@ fn parse(text: &str) -> Option<Record> {
         screen_completed_steps: value(text, "SCREEN_COMPLETED_STEPS")
             .and_then(|value| value.parse().ok()),
         screen_elapsed_s: value(text, "SCREEN_ELAPSED_S").and_then(|value| value.parse().ok()),
+        screen_reason: value(text, "SCREEN_REASON").map(ToString::to_string),
         log_path: PathBuf::from(value(text, "LOG_PATH").unwrap_or("")),
         candidate: Candidate {
             batch_size: value(text, "GPT2_BATCH_SIZE")?.parse().ok()?,

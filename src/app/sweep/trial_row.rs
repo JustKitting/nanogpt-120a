@@ -26,13 +26,13 @@ pub fn append(path: &Path, trial: &Trial) -> std::io::Result<()> {
 }
 
 fn header() -> &'static str {
-    "status\tval_loss\tcompleted_steps\tbatch_size\tn_layer\tn_embd\tn_head\taurora_phases\taurora_blocks\tlr_scale\tadam_lr_scale\twarmup_steps\tstart_ratio\tamuse_beta1\tamuse_rho\tlog_path\telapsed_s\tscreen_val_loss\tscreen_completed_steps\tscreen_elapsed_s"
+    "status\tval_loss\tcompleted_steps\tbatch_size\tn_layer\tn_embd\tn_head\taurora_phases\taurora_blocks\tlr_scale\tadam_lr_scale\twarmup_steps\tstart_ratio\tamuse_beta1\tamuse_rho\tlog_path\telapsed_s\tscreen_val_loss\tscreen_completed_steps\tscreen_elapsed_s\tscreen_reason"
 }
 
 fn format_trial(trial: &Trial) -> String {
     let c = &trial.candidate;
     format!(
-        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}",
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}",
         trial.status,
         trial.val_loss.map(fmt).unwrap_or_else(|| "NaN".to_string()),
         trial
@@ -58,13 +58,14 @@ fn format_trial(trial: &Trial) -> String {
             .screen_completed_steps
             .map(|value| value.to_string())
             .unwrap_or_default(),
-        trial.screen_elapsed_s.map(fmt).unwrap_or_default()
+        trial.screen_elapsed_s.map(fmt).unwrap_or_default(),
+        trial.screen_reason.as_deref().unwrap_or_default()
     )
 }
 
 fn parse_trial(line: &str) -> Option<Trial> {
     let p = line.split('\t').collect::<Vec<_>>();
-    if !(16..=20).contains(&p.len()) {
+    if !(16..=21).contains(&p.len()) {
         return None;
     }
     Some(Trial {
@@ -77,6 +78,7 @@ fn parse_trial(line: &str) -> Option<Trial> {
         screen_val_loss: p.get(17).and_then(|value| parse_loss(value)),
         screen_completed_steps: p.get(18).and_then(|value| value.parse().ok()),
         screen_elapsed_s: p.get(19).and_then(|value| parse_loss(value)),
+        screen_reason: p.get(20).and_then(|value| non_empty(value)),
     })
 }
 
@@ -99,6 +101,10 @@ fn parse_candidate(p: &[&str]) -> Option<Candidate> {
 
 fn parse_loss(value: &str) -> Option<f64> {
     value.parse::<f64>().ok().filter(|value| value.is_finite())
+}
+
+fn non_empty(value: &str) -> Option<String> {
+    (!value.is_empty()).then(|| value.to_string())
 }
 
 fn fmt(value: f64) -> String {
@@ -124,6 +130,7 @@ mod tests {
             screen_val_loss: Some(6.25),
             screen_completed_steps: Some(500),
             screen_elapsed_s: Some(90.25),
+            screen_reason: Some("screen_loss_improved".to_string()),
         };
 
         let parsed = parse_trial(&format_trial(&trial)).unwrap();
@@ -131,6 +138,10 @@ mod tests {
         assert_eq!(parsed.screen_val_loss, Some(6.25));
         assert_eq!(parsed.screen_completed_steps, Some(500));
         assert_eq!(parsed.screen_elapsed_s, Some(90.25));
+        assert_eq!(
+            parsed.screen_reason.as_deref(),
+            Some("screen_loss_improved")
+        );
         assert_eq!(parsed.completed_steps, Some(512));
         assert_eq!(parsed.candidate.key(), trial.candidate.key());
     }
@@ -146,6 +157,7 @@ mod tests {
         assert_eq!(parsed.screen_val_loss, None);
         assert_eq!(parsed.screen_completed_steps, None);
         assert_eq!(parsed.screen_elapsed_s, None);
+        assert_eq!(parsed.screen_reason, None);
         assert_eq!(parsed.completed_steps, Some(512));
         assert_eq!(parsed.candidate.batch_size, 8);
     }

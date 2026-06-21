@@ -194,7 +194,7 @@ fn run_trial(
             &run_result,
         )?;
         return Ok(trial(
-            candidate, "dry_run", None, None, None, None, None, None, trial_dir,
+            candidate, "dry_run", None, None, None, None, None, None, None, trial_dir,
         ));
     }
 
@@ -220,6 +220,7 @@ fn run_trial(
         return Ok(trial(
             candidate,
             "failed_build",
+            None,
             None,
             None,
             None,
@@ -257,6 +258,7 @@ fn run_trial(
             screen_result.val_loss,
             screen_result.completed_steps,
             screen_result.last_elapsed_s,
+            Some(screen_decision.reason),
             trial_dir,
             "screen.log",
         ));
@@ -294,6 +296,7 @@ fn run_trial(
         screen_result.val_loss,
         screen_result.completed_steps,
         screen_result.last_elapsed_s,
+        Some(screen_decision.reason),
         trial_dir,
     ))
 }
@@ -307,6 +310,7 @@ fn trial(
     screen_val_loss: Option<f64>,
     screen_completed_steps: Option<usize>,
     screen_elapsed_s: Option<f64>,
+    screen_reason: Option<&str>,
     trial_dir: &Path,
 ) -> Trial {
     trial_with_log(
@@ -318,6 +322,7 @@ fn trial(
         screen_val_loss,
         screen_completed_steps,
         screen_elapsed_s,
+        screen_reason,
         trial_dir,
         "train.log",
     )
@@ -352,6 +357,7 @@ fn trial_with_log(
     screen_val_loss: Option<f64>,
     screen_completed_steps: Option<usize>,
     screen_elapsed_s: Option<f64>,
+    screen_reason: Option<&str>,
     trial_dir: &Path,
     log_name: &str,
 ) -> Trial {
@@ -365,6 +371,7 @@ fn trial_with_log(
         screen_val_loss,
         screen_completed_steps,
         screen_elapsed_s,
+        screen_reason: screen_reason.map(ToString::to_string),
     }
 }
 
@@ -406,6 +413,7 @@ mod tests {
             screen_val_loss: Some(3.25),
             screen_completed_steps: Some(500),
             screen_elapsed_s: Some(90.0),
+            screen_reason: Some("screen_loss_improved".to_string()),
             log_path: dir.join("train.log"),
         };
 

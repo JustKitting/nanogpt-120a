@@ -17,6 +17,7 @@ pub struct Trial {
     pub screen_val_loss: Option<f64>,
     pub screen_completed_steps: Option<usize>,
     pub screen_elapsed_s: Option<f64>,
+    pub screen_reason: Option<String>,
 }
 
 #[derive(Debug)]

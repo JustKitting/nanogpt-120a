@@ -105,6 +105,7 @@ fn trial(candidate: Candidate, val_loss: f64) -> Trial {
         screen_val_loss: Some(val_loss + 1.0),
         screen_completed_steps: Some(10),
         screen_elapsed_s: Some(5.0),
+        screen_reason: Some("screen_loss_improved".to_string()),
         log_path: PathBuf::from("train.log"),
     }
 }

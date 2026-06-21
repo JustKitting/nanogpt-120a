@@ -8386,3 +8386,31 @@ decision:
   Accept as sweep infrastructure. Proposal allocation and acquisition choices
   are now directly recorded as sweep artifacts.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Preserve screen rejection reasons for stability modeling.
+status: accepted_tooling
+change:
+  trials.tsv now appends screen_reason while preserving older row formats.
+  The runner stores the screen gate reason on both rejected-screen and
+  full-run trials, and promoted baseline env files write/read SCREEN_REASON.
+  Stability rows now treat screen reasons nan, incomplete, and missing_val_loss
+  as stability failures while keeping screen_loss_worse as a survived
+  quality-screen rejection.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 41 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_screen_reason_20260621T190245Z
+measured_effect:
+  Added unit coverage proving incomplete screen rejection maps to stability=0
+  and screen_loss_worse maps to stability=1. The dry-run trials.tsv emitted the
+  new screen_reason header column.
+decision:
+  Accept as sweep infrastructure. The stability/survival target now preserves
+  useful screen-gate failure information instead of flattening all screen
+  rejections into one status.
+```
