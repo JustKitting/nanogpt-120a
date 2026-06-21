@@ -6573,3 +6573,35 @@ decision:
   Promote under the current acceptance rule: held-out validation stayed within
   the +/-1% no-meaningful-change band and completed step count increased.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Add aligned fast paths to f16 RHS-transposed CTA matmul variants.
+status: rejected_screen
+change:
+  Tried adding aligned staging and aligned stores to
+  f16_cta_tc_matmul_f32_rhs_kernel and
+  f16_cta_tc_matmul_f32_a_transposed_rhs_kernel, mirroring the existing aligned
+  path used by the plain f32-input CTA matmul body.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/f16_rhs_aligned_l4_b8_20_20260621T090042Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.448, completed_steps=20.
+measured_effect:
+  Against the accepted multi-warp MS-EDEN baseline
+  target/nsys/ms_eden_pack_warp8_current_l4_b8_20_20260621T083902Z.run.log,
+  f16_cta_tc_matmul_f32_rhs_kernel moved from 121.833720ms to
+  129.082962ms, and f16_cta_tc_matmul_f32_a_transposed_rhs_kernel moved from
+  121.801569ms to 126.011788ms over 20 profiled steps. Profiled train time
+  moved from 3.435s to 3.448s.
+decision:
+  Reject before the 900-second gate. The target kernels and short wall-clock
+  got slower. Code was reverted.
+```
