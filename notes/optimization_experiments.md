@@ -6497,3 +6497,35 @@ decision:
   produce a meaningful short-run wall-clock gain and regressed another
   projection user. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Unroll 32-point MS-EDEN Hadamard transform stages.
+status: rejected_screen
+change:
+  Replaced the fixed five-stage Hadamard while loop in the MS-EDEN pack body
+  with explicit shuffle stages for strides 1, 2, 4, 8, and 16.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test nvfp4_quant -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_unroll_hadamard_l4_b8_20_20260621T083411Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.584, completed_steps=20.
+measured_effect:
+  Against the promoted f16 CTA sync baseline
+  target/nsys/f16_skip_final_cta_sync_l4_b8_20_20260621T073906Z.run.log,
+  fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel moved from
+  161.869875ms to 162.155047ms, and
+  fp32_to_nvfp4_ms_eden_device_scale_kernel moved from 160.623396ms to
+  160.712656ms over 20 profiled steps. Profiled train time moved from
+  3.582s to 3.584s.
+decision:
+  Reject before the 900-second gate. The explicit unroll made the target
+  kernels and short wall-clock slower. Code was reverted.
+```
