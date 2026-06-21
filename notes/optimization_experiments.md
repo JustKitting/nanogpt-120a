@@ -6099,3 +6099,37 @@ decision:
   backward probability kernel regressed, and the short wall-clock regressed.
   Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Use aligned CTA projection path for aligned LM-head shapes.
+status: accepted
+change:
+  lm_head_kernel now uses the aligned no-bias NVFP4 CTA projection body when
+  token_count, vocab_size, and input_dim are divisible by the CTA M/N/K tile
+  sizes. The generic path remains for non-aligned tests and shapes. The CUDA
+  module was split into gpt/lm_head/kernels.rs to keep file ownership small.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/lm_head_aligned_path_l4_b8_20_20260621T065355Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.584, completed_steps=20.
+  900-second held-out gate:
+    target/lm_head_aligned_path_l4_b8_900_20260621T065424Z.log
+    val_loss=4.016790, train_elapsed_s=900.004, completed_steps=4798.
+measured_effect:
+  Against the promoted MS-EDEN chunk-scale baseline
+  target/nsys/ms_eden_chunk_scale_unroll4_l4_b8_20_20260621T062103Z.run.log,
+  lm_head_kernel moved from 113.621970ms to 112.524121ms over 20 profiled
+  steps. The 20-step train time stayed at 3.584s. The 900-second gate completed
+  12 more steps than the previous promoted baseline while validation loss moved
+  from 4.002436 to 4.016790, a +0.359% change.
+decision:
+  Promote under the current acceptance rule: validation loss stayed within the
+  +/-1% no-meaningful-change band and completed step count increased.
+```
