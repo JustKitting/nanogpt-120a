@@ -50,7 +50,11 @@ pub fn propose(
         return proposal("random", unseen_random(seen, rng), analysis, config);
     }
 
-    let mut ranked = proposal_pool::sample(seen, rng, config, analysis, baseline)
+    let observed = trials
+        .iter()
+        .map(|trial| trial.candidate.clone())
+        .collect::<Vec<_>>();
+    let mut ranked = proposal_pool::sample(seen, rng, config, analysis, baseline, &observed)
         .into_iter()
         .map(|pooled| {
             let score = analysis::score_candidate(analysis, config, &pooled.candidate);

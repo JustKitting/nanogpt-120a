@@ -8183,3 +8183,33 @@ decision:
   screen loss instead of rerunning that baseline screen just to initialize the
   screen gate.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Add design-coverage candidates to the sweep proposal pool.
+status: accepted_tooling
+change:
+  Added a coverage proposal source that chooses candidates far from already
+  observed trials in normalized factor space. The proposal pool now reserves
+  slots for guided, factorial, variance, and coverage proposals, then fills the
+  rest with random candidates. This gives the sweep an explicit mechanism to
+  probe under-covered regions and reduce model-design uncertainty instead of
+  relying only on random sampling.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 29 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_design_coverage_20260621T183410Z
+measured_effect:
+  Added unit coverage proving the coverage score prefers an uncovered region
+  over a near-observed region. Existing proposal-pool coverage now asserts that
+  guided, factorial, variance, coverage, and random sources are all present.
+  The dry-run candidate_0000_ranked.tsv contained coverage rows in the normal
+  proposal artifact.
+decision:
+  Accept as sweep infrastructure. The sweep now has a dedicated variance-
+  reducing design-space exploration source in addition to model-guided and
+  random proposals.
+```

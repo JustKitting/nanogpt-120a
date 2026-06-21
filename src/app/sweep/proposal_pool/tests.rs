@@ -13,12 +13,17 @@ fn guided_pool_uses_main_effect_direction() {
     ];
     let analysis = analysis::analyze(&trials, &config);
     let center = candidate(8, 4);
+    let observed = trials
+        .iter()
+        .map(|trial| trial.candidate.clone())
+        .collect::<Vec<_>>();
     let pool = super::sample(
         &HashSet::new(),
         &mut super::super::rng::SweepRng::new(0x1234),
         &config,
         &analysis,
         Some(&center),
+        &observed,
     );
 
     assert_eq!(pool[0].source, "guided");
@@ -26,6 +31,7 @@ fn guided_pool_uses_main_effect_direction() {
     assert_eq!(pool[0].candidate.n_layer, 8);
     assert!(pool.iter().any(|candidate| candidate.source == "factorial"));
     assert!(pool.iter().any(|candidate| candidate.source == "variance"));
+    assert!(pool.iter().any(|candidate| candidate.source == "coverage"));
     assert!(pool.iter().any(|candidate| candidate.source == "random"));
 }
 
@@ -37,12 +43,17 @@ fn factorial_pool_can_probe_more_than_four_supported_factors() {
         .collect::<Vec<_>>();
     let analysis = analysis::analyze(&trials, &config);
     let center = wide_candidate(0);
+    let observed = trials
+        .iter()
+        .map(|trial| trial.candidate.clone())
+        .collect::<Vec<_>>();
     let pool = super::sample(
         &HashSet::new(),
         &mut super::super::rng::SweepRng::new(0x8822),
         &config,
         &analysis,
         Some(&center),
+        &observed,
     );
     let factorial = pool
         .iter()
