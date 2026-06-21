@@ -6435,3 +6435,32 @@ decision:
   Reject before the 900-second gate. The extra launch count lost to the paired
   kernel despite removing the pair branch. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Skip terminal shared-memory barrier in Aurora Polar CTA tile.
+status: rejected_screen
+change:
+  Added a per-tile flag so Aurora Polar CTA matmul skipped the final
+  thread::sync_threads() only when the same block had no later tile to stage.
+  The conservative form kept the barrier for any block that would continue the
+  tile loop.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aurora_polar_skip_terminal_tile_sync_l4_b8_20_20260621T082808Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.591, completed_steps=20.
+measured_effect:
+  Against the promoted f16 CTA sync baseline
+  target/nsys/f16_skip_final_cta_sync_l4_b8_20_20260621T073906Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1362.072601ms to
+  1373.652972ms over 20 profiled steps. Profiled train time moved from
+  3.582s to 3.591s.
+decision:
+  Reject before the 900-second gate. The Aurora kernel and short wall-clock
+  both regressed. Code was reverted.
+```
