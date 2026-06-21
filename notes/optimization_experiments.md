@@ -6707,3 +6707,31 @@ decision:
   validation loss and higher completed step count under the same 900-second
   budget.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Decode Aurora Polar CTA tile coordinates with power-of-two shifts.
+status: rejected_pre_gate
+change:
+  Replaced the tile_row/tile_col division in run_plain_tiles, run_next_tiles,
+  and run_symmetric_tiles with a match-based power-of-two shift/mask helper and
+  kept the division path as a fallback for unsupported tile counts.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aurora_tile_decode_shift_l4_b8_20_20260621T092943Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.445, completed_steps=20.
+measured_effect:
+  Against the accepted linear-backward tile-shift profile
+  target/nsys/linear_bwd_tile_shift_l4_b8_20_20260621T090938Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1.362562731s to
+  1.371600995s over 20 profiled steps. Profiled train time moved from 3.434s
+  to 3.445s.
+decision:
+  Reject before the 900-second gate and revert the code. The helper adds a
+  runtime match and did not reduce the Aurora cooperative kernel time.
+```
