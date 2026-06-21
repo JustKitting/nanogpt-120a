@@ -5404,6 +5404,39 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Unroll cross-entropy vocab scans by four.
+status: rejected_screen
+change:
+  Unrolled the max, denominator, and dlogits vocab scans inside
+  cross_entropy_kernel by four per thread stride. The visit order and math were
+  otherwise unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/cross_entropy_unroll4_l4_b8_20_20260621T071444Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.584, completed_steps=20.
+measured_effect:
+  Against the promoted LM-head aligned baseline
+  target/nsys/lm_head_aligned_path_l4_b8_20_20260621T065355Z.run.log,
+  cross_entropy_kernel moved from 55.299974ms to 55.286411ms over 20 profiled
+  steps. Profiled train time stayed at 3.584s. Neighboring kernels drifted
+  slightly worse: linear_backward_projection_pair_cta_device_scale_kernel moved
+  from 621.812208ms to 622.345509ms,
+  fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel moved from 161.931077ms
+  to 162.030945ms, and fp32_to_nvfp4_ms_eden_device_scale_kernel moved from
+  160.628750ms to 160.694076ms.
+decision:
+  Reject before the 900-second gate. The target delta was noise-level, short
+  wall-clock did not improve, and adjacent kernel timing drifted slightly
+  worse. Code was reverted.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Aligned f32-input staging and store path for f16 TC QK matmuls.
 status: accepted
