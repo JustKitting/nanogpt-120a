@@ -5434,6 +5434,40 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Route LM-head through the existing aligned no-edge NVFP4 CTA
+  projection body.
+status: rejected_pre_gate
+change:
+  Replaced the LM-head generic edge-checked CTA body with the aligned no-edge
+  body and widened the focused LM-head test fixture to aligned dimensions.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/lm_head_aligned_only_l4_b8_20_20260621T035845Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.599, completed_steps=20.
+  100-step SYNTH screen:
+    target/lm_head_aligned_only_l4_b8_100_20260621T035900Z.log
+    val_loss=6.546818, train_elapsed_s=18.390, completed_steps=100.
+measured_effect:
+  The 20-step profile showed only a tiny LM-head improvement versus the
+  promoted N=64 baseline profile
+  target/nsys/projection_cta_n64_l4_b8_20_20260621T032524Z.run.log:
+  lm_head_kernel moved from 113.609475ms to 112.248891ms and profiled train
+  time moved from 3.603s to 3.599s. The 100-step screen did not confirm a
+  runtime win: train_elapsed_s regressed from 18.360 to 18.390 and validation
+  loss moved from 6.546121 to 6.546818.
+decision:
+  Reject before the 900-second gate. The candidate did not produce a meaningful
+  sustained speedup, and code was reverted to the promoted baseline.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Warp-shuffle MS-EDEN Hadamard rotation.
 status: accepted
