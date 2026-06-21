@@ -22,11 +22,12 @@ pub fn write(
 }
 
 fn selected_text(proposal: &Proposal) -> String {
-    let selected = selected_score(proposal);
+    let (source, selected) = selected_score(proposal);
     format!(
-        "candidate={}\nreason={}\nscore={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nspeed={}\nstability={}\n",
+        "candidate={}\nreason={}\nsource={}\nscore={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nspeed={}\nstability={}\n",
         proposal.candidate.key(),
         proposal.reason,
+        source,
         selected.score,
         selected.uncertainty,
         selected.exploration,
@@ -38,7 +39,7 @@ fn selected_text(proposal: &Proposal) -> String {
 
 fn ranked_tsv(proposal: &Proposal) -> String {
     let mut text = String::from(
-        "rank\tselected\tcandidate\tscore\tuncertainty\texploration\tquality_value\tquality_z\tquality_uncertainty\tspeed_value\tspeed_z\tspeed_uncertainty\tstability_value\tstability_z\tstability_uncertainty\n",
+        "rank\tselected\tsource\tcandidate\tscore\tuncertainty\texploration\tquality_value\tquality_z\tquality_uncertainty\tspeed_value\tspeed_z\tspeed_uncertainty\tstability_value\tstability_z\tstability_uncertainty\n",
     );
     for (rank, scored) in proposal.ranked.iter().enumerate() {
         push_ranked_row(
@@ -56,9 +57,10 @@ fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, sel
     let speed = scored.score.predicted_speed;
     let stability = scored.score.predicted_stability;
     text.push_str(&format!(
-        "{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+        "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
         rank,
         selected,
+        scored.source,
         scored.candidate.key(),
         scored.score.score,
         scored.score.uncertainty,
@@ -75,13 +77,13 @@ fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, sel
     ));
 }
 
-fn selected_score(proposal: &Proposal) -> &CandidateScore {
+fn selected_score(proposal: &Proposal) -> (&'static str, &CandidateScore) {
     proposal
         .ranked
         .iter()
         .find(|scored| scored.candidate.key() == proposal.candidate.key())
-        .map(|scored| &scored.score)
-        .unwrap_or(&proposal.ranked[0].score)
+        .map(|scored| (scored.source, &scored.score))
+        .unwrap_or((proposal.ranked[0].source, &proposal.ranked[0].score))
 }
 
 fn fmt_prediction(value: Option<Prediction>) -> String {

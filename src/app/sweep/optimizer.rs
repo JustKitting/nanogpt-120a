@@ -22,6 +22,7 @@ pub struct Proposal {
 #[derive(Clone, Debug)]
 pub struct ScoredCandidate {
     pub candidate: Candidate,
+    pub source: &'static str,
     pub score: CandidateScore,
 }
 
@@ -50,9 +51,13 @@ pub fn propose(
 
     let mut ranked = proposal_pool::sample(seen, rng, config, analysis)
         .into_iter()
-        .map(|candidate| {
-            let score = analysis::score_candidate(analysis, config, &candidate);
-            ScoredCandidate { candidate, score }
+        .map(|pooled| {
+            let score = analysis::score_candidate(analysis, config, &pooled.candidate);
+            ScoredCandidate {
+                candidate: pooled.candidate,
+                source: pooled.source,
+                score,
+            }
         })
         .collect::<Vec<_>>();
     ranked.sort_by(|a, b| b.score.score.total_cmp(&a.score.score));
@@ -77,7 +82,11 @@ fn proposal(
     Proposal {
         candidate: candidate.clone(),
         reason,
-        ranked: vec![ScoredCandidate { candidate, score }],
+        ranked: vec![ScoredCandidate {
+            candidate,
+            source: reason,
+            score,
+        }],
     }
 }
 

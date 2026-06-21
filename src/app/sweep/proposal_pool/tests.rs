@@ -19,8 +19,11 @@ fn guided_pool_uses_main_effect_direction() {
         &analysis,
     );
 
-    assert_eq!(pool[0].batch_size, 16);
-    assert_eq!(pool[0].n_layer, 8);
+    assert_eq!(pool[0].source, "guided");
+    assert_eq!(pool[0].candidate.batch_size, 16);
+    assert_eq!(pool[0].candidate.n_layer, 8);
+    assert!(pool.iter().any(|candidate| candidate.source == "variance"));
+    assert!(pool.iter().any(|candidate| candidate.source == "random"));
 }
 
 fn trial(candidate: Candidate, val_loss: f64) -> Trial {

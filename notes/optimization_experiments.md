@@ -34,6 +34,36 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Add explicit variance-directed sweep candidates.
+status: accepted_tooling_dry_run
+change:
+  The proposal pool now has three recorded sources: guided, variance, and
+  random. Variance candidates are selected from a larger random search batch by
+  highest model uncertainty before the final interaction-aware scorer ranks the
+  whole candidate set. Ranked candidate TSVs now include a source column, and
+  candidate_NNNN_score.txt records the selected candidate source.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo test --bin sweep: pass.
+  dry-run analysis:
+    target/sweeps/dryrun_variance_source_20260621T173018Z
+    candidate_0000_ranked.tsv contained guided, variance, and random rows.
+observed_effect:
+  candidate_0000_ranked.tsv source counts were 11 guided, 11 variance, and
+  10 random candidates plus the header. The selected rank-0 candidate was from
+  source=guided with score=3.95386689 and uncertainty=51.36550742. Variance
+  rows explicitly preserved high-uncertainty alternatives, e.g. rank 2 from
+  source=variance had uncertainty=59.51639535.
+decision:
+  Accept as sweep infrastructure. This directly addresses the requirement to
+  place some runs in regions that test and reduce model variance, while still
+  letting the final acquisition score choose the best candidate.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Add statistic-guided sweep candidate pool.
 status: accepted_tooling_dry_run
 change:
