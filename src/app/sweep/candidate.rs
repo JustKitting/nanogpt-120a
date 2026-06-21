@@ -22,7 +22,7 @@ pub struct Candidate {
 
 impl Candidate {
     pub fn random(rng: &mut SweepRng) -> Self {
-        let (n_embd, n_head) = rng.choose(&[(1024, 16), (1536, 12), (2048, 16)]);
+        let (n_embd, n_head) = rng.choose(&[(1024, 16), (2048, 16)]);
         let n_layer = rng.choose(&[MIN_N_LAYER, 8]);
         let slots = n_layer * 4;
         let aurora_blocks = rng.choose(&AURORA_BLOCK_CHOICES);

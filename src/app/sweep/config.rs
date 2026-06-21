@@ -15,6 +15,8 @@ pub struct SweepConfig {
     pub max_seconds: f64,
     #[arg(long, default_value_t = 500)]
     pub screen_steps: usize,
+    #[arg(long, default_value_t = 180.0)]
+    pub screen_max_seconds: f64,
     #[arg(long, default_value_t = 1)]
     pub log_interval: usize,
     #[arg(long, default_value = "synth")]

@@ -68,6 +68,13 @@ impl Stage {
             Self::Full => "train.log",
         }
     }
+
+    fn max_seconds(self, config: &SweepConfig) -> f64 {
+        match self {
+            Self::Screen => config.screen_max_seconds,
+            Self::Full => config.max_seconds,
+        }
+    }
 }
 
 fn run_candidate_stage(
@@ -82,7 +89,10 @@ fn run_candidate_stage(
     let mut command = Command::new("./target/release/rust-kernels");
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     command.env("TRAIN_DATASET", &config.dataset);
-    command.env("TRAIN_MAX_SECONDS", format!("{:.3}", config.max_seconds));
+    command.env(
+        "TRAIN_MAX_SECONDS",
+        format!("{:.3}", stage.max_seconds(config)),
+    );
     command.env("TRAIN_LOG_INTERVAL", config.log_interval.to_string());
     command.env("TRAIN_RUN_DIR", trial_dir.join(stage.run_dir_name()));
     if matches!(stage, Stage::Screen) {

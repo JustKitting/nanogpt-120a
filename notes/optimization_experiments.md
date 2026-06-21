@@ -71,6 +71,17 @@ follow_up:
   target/sweeps/dryrun_screen_penalty_20260621T151027Z proposed d1024 phase-16
   candidates first, then d1536/L8 exploration; it did not immediately repeat
   the same rejected d2048 screen candidates.
+  A later capped sweep showed d1536/h12 candidates fail deterministically at
+  crates/cuda-kernels/src/gpt/linear_backward.rs:253 with
+  assertion failed: dinput_grid.0.is_power_of_two(). Candidate generation now
+  excludes d1536/h12 until that kernel shape is supported.
+  The capped run target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z
+  used screen_max_seconds=180. Baseline screen was val_loss=5.446744 at 500
+  steps. All eight candidates were rejected_screen; no full 900-second gate ran.
+  d2048 candidates that previously could consume a full screen gate were stopped
+  at 90-170 completed steps when the 180-second screen cap expired.
+  Dry-run target/sweeps/dryrun_no_d1536_20260621T155257Z confirmed the next
+  candidate set no longer includes d1536.
 ```
 
 ```text

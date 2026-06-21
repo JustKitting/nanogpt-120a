@@ -119,6 +119,11 @@ fn screen_baseline(
     }
 
     let result = run_train::run_screen_candidate(&candidate, config, sweep_dir, &trial_dir, 0)?;
+    if result.completed_steps.unwrap_or(0) < config.screen_steps {
+        println!("sweep_screen_baseline_failed=incomplete");
+        return Ok(None);
+    }
+
     if let Some(val_loss) = result.val_loss {
         println!(
             "sweep_screen_baseline val_loss={val_loss:.6} completed_steps={}",
@@ -189,7 +194,7 @@ fn run_trial(
 
     let screen_result =
         run_train::run_screen_candidate(&candidate, config, sweep_dir, trial_dir, index)?;
-    if !passes_screen(screen_result.val_loss, screen_baseline) {
+    if !passes_screen(&screen_result, screen_baseline, config.screen_steps) {
         status::record(
             sweep_dir,
             trial_dir,
@@ -232,8 +237,11 @@ fn run_trial(
     ))
 }
 
-fn passes_screen(screen_loss: Option<f64>, baseline_loss: Option<f64>) -> bool {
-    let Some(screen_loss) = screen_loss else {
+fn passes_screen(result: &RunResult, baseline_loss: Option<f64>, screen_steps: usize) -> bool {
+    if result.completed_steps.unwrap_or(0) < screen_steps {
+        return false;
+    }
+    let Some(screen_loss) = result.val_loss else {
         return false;
     };
     baseline_loss

@@ -21,3 +21,16 @@ rejected_screen	NaN	500	8	4	1024	16	4	90	0.959417	1.807236	5	0.100000	0.400000	0
 rejected_screen	NaN	500	8	4	1024	16	4	90	1.923903	0.810103	20	0.100000	0.400000	1.000000	target/sweeps/hyperparam_screen500_900_20260621T143115Z/trial_0005/screen.log
 rejected_screen	NaN	500	8	4	2048	16	4	90	0.890843	1.145253	20	0.000000	0.400000	1.000000	target/sweeps/hyperparam_screen500_900_20260621T143115Z/trial_0006/screen.log
 rejected_screen	NaN	500	8	4	1024	16	4	90	0.838918	1.755754	20	0.050000	0.400000	1.000000	target/sweeps/hyperparam_screen500_900_20260621T143115Z/trial_0007/screen.log
+rejected_screen	NaN	500	8	4	1024	16	16	120	1.107112	1.263375	20	0.000000	0.200000	1.000000	target/sweeps/hyperparam_screen500_penalty_900_20260621T151114Z/trial_0000/screen.log
+rejected_screen	NaN		8	8	1536	12	16	180	0.893469	1.499537	5	0.050000	0.600000	1.000000	target/sweeps/hyperparam_screen500_penalty_900_20260621T151114Z/trial_0001/screen.log
+rejected_screen	NaN		4	8	1536	12	16	80	0.560127	2.075913	50	0.050000	0.200000	0.500000	target/sweeps/hyperparam_screen500_penalty_900_20260621T151114Z/trial_0002/screen.log
+rejected_screen	NaN	500	4	4	1024	16	16	80	0.888887	2.363485	20	0.100000	0.600000	0.500000	target/sweeps/hyperparam_screen500_penalty_900_20260621T151114Z/trial_0003/screen.log
+rejected_screen	NaN	362	8	8	2048	16	16	90	0.530559	1.343557	20	0.000000	0.200000	1.000000	target/sweeps/hyperparam_screen500_penalty_900_20260621T151114Z/trial_0004/screen.log
+rejected_screen	NaN		8	8	1536	12	16	80	0.692900	1.557209	20	0.050000	0.600000	0.500000	target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z/trial_0000/screen.log
+rejected_screen	NaN	90	8	4	2048	16	16	80	0.590754	1.838191	50	0.000000	0.200000	0.500000	target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z/trial_0001/screen.log
+rejected_screen	NaN	500	8	4	1024	16	16	120	0.721721	1.983287	5	0.100000	0.600000	0.500000	target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z/trial_0002/screen.log
+rejected_screen	NaN	170	8	4	2048	16	4	80	0.581287	1.132290	5	0.200000	0.600000	0.800000	target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z/trial_0003/screen.log
+rejected_screen	NaN	170	8	4	2048	16	4	80	2.330972	1.993168	100	0.200000	0.200000	1.000000	target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z/trial_0004/screen.log
+rejected_screen	NaN	500	8	4	1024	16	8	120	1.212081	0.512848	5	0.050000	0.400000	1.000000	target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z/trial_0005/screen.log
+rejected_screen	NaN	500	4	4	1024	16	8	80	1.203753	1.707769	5	0.100000	0.400000	0.500000	target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z/trial_0006/screen.log
+rejected_screen	NaN		8	4	1536	12	8	120	0.562896	2.156327	20	0.100000	0.200000	0.500000	target/sweeps/hyperparam_screen500_cap180_900_20260621T153515Z/trial_0007/screen.log
