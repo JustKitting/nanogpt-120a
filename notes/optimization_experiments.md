@@ -6794,6 +6794,35 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Skip final post-MMA sync in NVFP4 CTA projection accumulator.
+status: rejected_pre_gate
+change:
+  In projection_accumulator and projection_accumulator_aligned, kept the
+  post-MMA block sync only when another k tile remained, on the assumption that
+  the sync only protected shared tiles from the next staging step.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/projection_skip_final_sync_l4_b8_20_20260621T101539Z.run.log
+    val_loss=8.505588, train_elapsed_s=3.452, completed_steps=20.
+measured_effect:
+  Against the current accepted MS-EDEN reciprocal profile
+  target/nsys/ms_eden_inv_scale_l4_b8_20_20260621T093759Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  625.867638ms to 635.276893ms, lm_head_kernel moved from 112.801360ms to
+  114.414818ms, and profiled train time moved from 3.424s to 3.452s.
+decision:
+  Reject before the 900-second gate and revert the code. The conditional sync
+  shape made the CTA projection path slower.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Decode Aurora Polar CTA tile coordinates with power-of-two shifts.
 status: rejected_pre_gate
 change:
