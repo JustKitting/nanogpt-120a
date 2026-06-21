@@ -5977,3 +5977,35 @@ decision:
   Promote under the current acceptance rule because held-out validation loss
   improved, even though completed step count decreased by two.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Unroll Aurora Polar Frobenius norm source scan by four.
+status: rejected_screen
+change:
+  In the fused Aurora Polar normalization path, each thread accumulated four
+  stride-separated source values per loop before the existing block reduction.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aurora_norm_sum_unroll4_l4_b8_20_20260621T064443Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.587, completed_steps=20.
+measured_effect:
+  Against the promoted MS-EDEN chunk-scale baseline
+  target/nsys/ms_eden_chunk_scale_unroll4_l4_b8_20_20260621T062103Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1361.184230ms to
+  1360.497890ms over 20 profiled steps, but profiled train time moved from
+  3.584s to 3.587s. Neighboring kernels also drifted slightly worse:
+    linear_backward_projection_pair_cta_device_scale_kernel 621.664121ms -> 623.041158ms
+    fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel 161.960962ms -> 162.229717ms
+    fp32_to_nvfp4_ms_eden_device_scale_kernel 160.685299ms -> 160.852854ms
+decision:
+  Reject before the 900-second gate. The target-kernel delta was too small and
+  the short wall-clock screen regressed. Code was reverted.
+```
