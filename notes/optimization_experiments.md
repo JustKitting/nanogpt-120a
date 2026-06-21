@@ -5571,6 +5571,40 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted after profile screen
+experiment: M64/N64 projection CTA shape for NVFP4 projection matmuls.
+status: rejected_pre_gate
+change:
+  Increased NVFP4_PROJECTION_CTA_M from 32 to 64 while keeping
+  NVFP4_PROJECTION_CTA_N=64 and NVFP4_PROJECTION_CTA_K=64. This raised CTA
+  threads from 512 to 1024 and added an aligned B-pack staging guard needed for
+  the larger thread count.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/projection_cta_m64_n64_l4_b8_20_20260621T042316Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.656, completed_steps=20.
+measured_effect:
+  The candidate regressed the projection-heavy kernels versus the promoted
+  N64 baseline at target/nsys/projection_cta_n64_l4_b8_20_20260621T032524Z.run.log.
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  621.646763ms to 664.434445ms over 20 profiled steps. lm_head_kernel moved
+  from 113.609475ms to 124.122706ms. mlp_projection_kernel moved from
+  66.576347ms to 74.347681ms. mlp_projection_relu2_kernel moved from
+  64.256203ms to 73.871560ms. attention_projection_kernel moved from
+  62.718027ms to 70.668438ms. Total profiled train time regressed from
+  3.603s to 3.656s.
+decision:
+  Reject before the 100-step and 900-second gates. Code was reverted to the
+  promoted N64 baseline.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: Aligned staging fast path inside the fused Aurora Polar Express
   tile compute loop.
