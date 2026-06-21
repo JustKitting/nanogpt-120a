@@ -8359,3 +8359,30 @@ decision:
   Accept as sweep infrastructure. Candidate generation now reacts to confidence
   and variance instead of using a fixed source split.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Emit proposal source summary artifacts.
+status: accepted_tooling
+change:
+  Each proposal now writes candidate_NNNN_sources.tsv next to the existing
+  score and ranked candidate artifacts. The source summary records per-source
+  candidate counts, whether that source produced the selected candidate, the
+  best rank for the source, and the best source-level score/acquisition fields.
+  This makes the adaptive source budget auditable without manually counting
+  rows in candidate_NNNN_ranked.tsv.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 39 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_source_summary_20260621T185743Z
+measured_effect:
+  Added unit coverage proving source summaries count ranked candidate sources.
+  The dry-run emitted candidate_0000_sources.tsv with the adaptive source mix
+  and the best candidate per source.
+decision:
+  Accept as sweep infrastructure. Proposal allocation and acquisition choices
+  are now directly recorded as sweep artifacts.
+```
