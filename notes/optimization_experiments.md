@@ -5504,6 +5504,34 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: generated-artifact-only candidate, rebuilt baseline after screen
+experiment: Retest Aurora phase-4 cooperative blocks=120 on the promoted N=64
+  projection baseline.
+status: rejected_pre_gate
+change:
+  Rebuilt generated PTX/host artifacts with AURORA_COOPERATIVE_BLOCKS=120 and
+  AURORA_MATRIX_PHASES=4. No source files or training hyperparameters changed.
+verification:
+  AURORA_COOPERATIVE_BLOCKS=120 AURORA_MATRIX_PHASES=4 cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aurora_blocks120_p4_n64_l4_b8_20_20260621T042119Z.run.log
+    val_loss=8.503331, train_elapsed_s=3.607, completed_steps=20.
+measured_effect:
+  Aurora mega-kernel time improved slightly versus the promoted N=64 baseline
+  profile target/nsys/projection_cta_n64_l4_b8_20_20260621T032524Z.run.log:
+  1.361030472s to 1.354902796s over 20 calls. The overall profile did not
+  improve: train_elapsed_s moved from 3.603 to 3.607, and
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  621.646763ms to 626.128349ms.
+decision:
+  Reject before the 100-step and 900-second gates. Baseline artifacts were
+  rebuilt with the promoted AURORA_COOPERATIVE_BLOCKS=90 and
+  AURORA_MATRIX_PHASES=4 settings.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Warp-shuffle MS-EDEN Hadamard rotation.
 status: accepted
