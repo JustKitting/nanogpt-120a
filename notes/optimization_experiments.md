@@ -5316,6 +5316,45 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Aligned f32-input staging and store path for f16 TC QK matmuls.
+status: accepted
+change:
+  Added an aligned path for f16_cta_tc_matmul_f32_kernel when m, n, and k are
+  exact CTA tile multiples. The generic edge-checked path remains active for
+  non-aligned shapes. The attempted aligned RHS variants were measured
+  separately and removed before this gate because they regressed.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l2_attention -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/f16_qk_aligned_stage_l4_b8_20_20260621T043243Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.591, completed_steps=20.
+  100-step SYNTH screen:
+    target/f16_qk_aligned_stage_l4_b8_100_20260621T043300Z.log
+    val_loss=6.545244, train_elapsed_s=18.333, completed_steps=100.
+  900-second held-out gate:
+    target/f16_qk_aligned_stage_l4_b8_900_20260621T043330Z.log
+    val_loss=4.012894, train_elapsed_s=900.167, completed_steps=4777.
+measured_effect:
+  Against the promoted N64 baseline
+  target/nsys/projection_cta_n64_l4_b8_20_20260621T032524Z.run.log,
+  f16_cta_tc_matmul_f32_kernel moved from 232.576737ms to 218.798849ms
+  over 20 profiled steps. Total profiled train time moved from 3.603s to
+  3.591s. The 900-second gate completed 11 more steps than the promoted
+  N64 baseline while validation loss moved from 4.002766 to 4.012894,
+  a +0.25% change.
+decision:
+  Promote under the current acceptance rule: validation loss stayed within the
+  +/-1% no-meaningful-change band and completed step count increased.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: N=64 CTA width for NVFP4 projection matmuls.
 status: accepted
 change:
