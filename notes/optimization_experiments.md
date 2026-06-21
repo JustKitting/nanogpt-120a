@@ -6009,3 +6009,35 @@ decision:
   Reject before the 900-second gate. The target-kernel delta was too small and
   the short wall-clock screen regressed. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Unroll fixed 32-lane Hadamard transform in MS-EDEN packing.
+status: rejected_screen
+change:
+  Replaced the five-iteration Hadamard loop used by MS-EDEN packing with a
+  fixed 1/2/4/8/16 butterfly utility.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_hadamard_unroll_l4_b8_20_20260621T064734Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.587, completed_steps=20.
+measured_effect:
+  Against the promoted MS-EDEN chunk-scale baseline
+  target/nsys/ms_eden_chunk_scale_unroll4_l4_b8_20_20260621T062103Z.run.log,
+  profiled train time moved from 3.584s to 3.587s. The main pack kernels did
+  not improve:
+    fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel 161.960962ms -> 162.152785ms
+    fp32_to_nvfp4_ms_eden_device_scale_kernel 160.685299ms -> 160.712347ms
+    rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel 71.743201ms -> 71.816529ms
+decision:
+  Reject before the 900-second gate. The compiler/runtime already handles the
+  small fixed loop well enough, and the short wall-clock screen regressed.
+  Code was reverted.
+```
