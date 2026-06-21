@@ -31,6 +31,34 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
+experiment: Hoist Aurora update decay and scaled learning-rate invariants.
+status: rejected_pre_gate
+change:
+  Moved decay = 1.0 - learning_rate * weight_decay and
+  update_scale = learning_rate * 0.2 * sqrt(max(rows, cols)) out of the
+  per-element Aurora update_one path and passed the precomputed values through
+  update_four_amax. Optimizer semantics were intended to remain unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aurora_update_invariant_hoist_l4_b8_20_20260621T103114Z.run.log
+    target/nsys/aurora_update_invariant_hoist_l4_b8_20_20260621T103114Z_stats.txt
+    val_loss=8.503360, train_elapsed_s=3.413, completed_steps=20.
+measured_effect:
+  Against the accepted MS-EDEN reciprocal profile
+  target/nsys/ms_eden_inv_scale_l4_b8_20_20260621T093759Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1.362570839s to
+  1.383341516s over 20 calls. The intended top kernel regressed.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
 experiment: Hoist cross-entropy dlogits grad_scale reciprocal.
 status: rejected_pre_gate
 change:
