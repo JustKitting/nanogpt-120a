@@ -29,6 +29,45 @@ fn scoring_uses_pairwise_interaction_signal() {
 }
 
 #[test]
+fn scoring_reports_expected_improvement_against_best_observed_quality() {
+    let config = config();
+    let trials = [
+        trial(candidate(4, 4), 9.0),
+        trial(candidate(4, 8), 5.0),
+        trial(candidate(16, 4), 5.0),
+        trial(candidate(16, 8), 1.0),
+    ];
+    let analysis = super::analyze(&trials, &config);
+    let best_like = super::score_candidate(&analysis, &config, &candidate(16, 8));
+    let bad_like = super::score_candidate(&analysis, &config, &candidate(4, 4));
+
+    assert!((0.0..=1.0).contains(&best_like.probability_improvement));
+    assert!(best_like.expected_improvement.is_finite());
+    assert!(best_like.probability_improvement > bad_like.probability_improvement);
+    assert!(best_like.expected_improvement >= bad_like.expected_improvement);
+}
+
+#[test]
+fn scoring_uses_speed_weight_when_configured() {
+    let mut config = config();
+    config.sweep_quality_weight = 0.0;
+    config.sweep_speed_weight = 1.0;
+    config.sweep_exploration_weight = 0.0;
+    let trials = [
+        trial(candidate(4, 4), 4.0),
+        trial(candidate(4, 8), 4.1),
+        trial(candidate(16, 4), 4.2),
+        trial(candidate(16, 8), 4.3),
+    ];
+    let analysis = super::analyze(&trials, &config);
+    let small_batch = super::score_candidate(&analysis, &config, &candidate(4, 4));
+    let large_batch = super::score_candidate(&analysis, &config, &candidate(16, 4));
+
+    assert!(large_batch.expected_speed > small_batch.expected_speed);
+    assert!(large_batch.score > small_batch.score);
+}
+
+#[test]
 fn factor_beliefs_aggregate_direction_and_confidence() {
     let config = config();
     let trials = [

@@ -8241,3 +8241,35 @@ decision:
   survival and speed priors without confusing screen-stage timing with full
   900-second validation timing.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Add expected-improvement acquisition to sweep scoring.
+status: accepted_tooling
+change:
+  Regression models now retain the best observed response value and standardized
+  best score. Candidate scoring computes probability_improvement and
+  expected_improvement from the predicted mean, predictive uncertainty, and
+  observed best response. The score still defaults to validation-quality
+  acquisition; speed affects ranking only when sweep_speed_weight is explicitly
+  nonzero. Proposal artifacts now print expected_speed,
+  probability_improvement, and expected_improvement for auditability.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 32 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_expected_improvement_20260621T184532Z
+measured_effect:
+  Added unit coverage proving the quality scorer reports improvement
+  acquisition against the current best observed quality, and that
+  sweep_speed_weight changes ranking only when configured. The dry-run
+  candidate_0000_ranked.tsv emitted probability_improvement and
+  expected_improvement columns.
+decision:
+  Accept as sweep infrastructure. Candidate selection now combines the fitted
+  response mean and predictive variance through an expected-improvement term,
+  which is closer to the requested automatic Bayesian-style sweep loop than
+  raw z-score ranking alone.
+```

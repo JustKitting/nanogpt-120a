@@ -37,8 +37,11 @@ fn summary(analysis: &SweepAnalysis) -> String {
 fn response_summary(text: &mut String, response: &super::ResponseModel) {
     text.push_str(&format!("## {}\n\n", response.name));
     text.push_str(&format!(
-        "n={} residual_std={:.6}\n\n",
-        response.model.n, response.model.residual_std
+        "n={} residual_std={:.6} best_value={:.6} best_z={:.6}\n\n",
+        response.model.n,
+        response.model.residual_std,
+        response.model.best_value,
+        response.model.best_standard_score
     ));
     text.push_str("| factor | coefficient | stderr | t | p_positive |\n");
     text.push_str("|---|---:|---:|---:|---:|\n");

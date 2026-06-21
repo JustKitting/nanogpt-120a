@@ -23,6 +23,8 @@ pub struct Model {
     pub n: usize,
     pub y_mean: f64,
     pub y_std: f64,
+    pub best_value: f64,
+    pub best_standard_score: f64,
     pub residual_std: f64,
     base_stats: design::BaseStats,
     terms: Vec<design::Term>,
@@ -45,6 +47,8 @@ pub fn fit(rows: Vec<(Candidate, f64)>) -> Option<Model> {
     if y_std <= EPS {
         return None;
     }
+    let best_value = y.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let best_standard_score = (best_value - y_mean) / y_std;
 
     let base_rows = rows
         .iter()
@@ -84,6 +88,8 @@ pub fn fit(rows: Vec<(Candidate, f64)>) -> Option<Model> {
         n: rows.len(),
         y_mean,
         y_std,
+        best_value,
+        best_standard_score,
         residual_std,
         base_stats,
         terms,

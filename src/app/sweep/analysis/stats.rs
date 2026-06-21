@@ -23,3 +23,14 @@ pub fn dot(a: &[f64], b: &[f64]) -> f64 {
 pub fn logistic(x: f64) -> f64 {
     1.0 / (1.0 + (-x.clamp(-32.0, 32.0)).exp())
 }
+
+pub fn normal_pdf(x: f64) -> f64 {
+    const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
+    INV_SQRT_2PI * (-0.5 * x * x).exp()
+}
+
+pub fn normal_cdf(x: f64) -> f64 {
+    let x = x.clamp(-8.0, 8.0);
+    let inner = 0.797_884_560_802_865_4 * (x + 0.044_715 * x * x * x);
+    (0.5 * (1.0 + inner.tanh())).clamp(0.0, 1.0)
+}
