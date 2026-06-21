@@ -57,17 +57,12 @@ pub fn stage_tiles_aligned(
     b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
 ) {
     let thread_id = thread::threadIdx_x();
-    let mut offset = thread_id;
-    while offset < NVFP4_PROJECTION_CTA_A_PACKS as u32 {
-        a_packs[offset as usize] = load_a_pack_aligned(input_bytes, tile, offset, k_base, params);
-        offset += NVFP4_PROJECTION_CTA_THREADS;
+    if thread_id < NVFP4_PROJECTION_CTA_A_PACKS as u32 {
+        a_packs[thread_id as usize] =
+            load_a_pack_aligned(input_bytes, tile, thread_id, k_base, params);
     }
-
-    let mut offset = thread_id;
-    while offset < NVFP4_PROJECTION_CTA_B_PACKS as u32 {
-        b_packs[offset as usize] = load_b_pack_aligned(weight_bytes, tile, offset, k_base, params);
-        offset += NVFP4_PROJECTION_CTA_THREADS;
-    }
+    b_packs[thread_id as usize] =
+        load_b_pack_aligned(weight_bytes, tile, thread_id, k_base, params);
 
     if thread_id < NVFP4_PROJECTION_CTA_A_SCALES as u32 {
         a_scales[thread_id as usize] =

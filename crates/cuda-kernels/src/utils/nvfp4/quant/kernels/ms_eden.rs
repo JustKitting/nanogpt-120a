@@ -23,7 +23,6 @@ pub(crate) mod module {
     const FP4_MAX: f32 = 6.0;
     const AMAX_WARPS_PER_BLOCK: u32 = crate::nvfp4_quant::config::WARPS_PER_BLOCK;
 
-    static mut ROTATED: SharedArray<f32, { HADAMARD_DIM as usize }> = SharedArray::UNINIT;
     static mut AMAX_REDUCE: SharedArray<f32, { AMAX_WARPS_PER_BLOCK as usize }> =
         SharedArray::UNINIT;
 
@@ -445,11 +444,7 @@ pub(crate) mod module {
         let row = element / dst_row_len;
         let row_offset = element - row * dst_row_len;
 
-        unsafe {
-            ROTATED[lane as usize] = input;
-        }
-        thread::sync_threads();
-        let value = hadamard_transform_lane(lane);
+        let value = hadamard_transform_lane(input, lane);
 
         if row_offset == 0 {
             unsafe {
@@ -501,11 +496,13 @@ pub(crate) mod module {
 
         thread::sync_threads();
 
+        let pair = group_leader + (lane_in_group & 0x7) * 2;
+        let hi_value = warp::shuffle_f32_sync(0xffff_ffff, value, pair);
+        let lo_value = warp::shuffle_f32_sync(0xffff_ffff, value, pair + 1);
         if lane_in_group < GROUP_SIZE / 2 {
-            let pair = group_leader + lane_in_group * 2;
             let byte = chunk_base / 2 + (lane / GROUP_SIZE) * (GROUP_SIZE / 2) + lane_in_group;
-            let hi = unsafe { ROTATED[pair as usize] } / (scale * safe_global_scale);
-            let lo = unsafe { ROTATED[pair as usize + 1] } / (scale * safe_global_scale);
+            let hi = hi_value / (scale * safe_global_scale);
+            let lo = lo_value / (scale * safe_global_scale);
             unsafe {
                 *out_fp4.get_unchecked_mut(byte as usize) = cvt_rn_satfinite_e2m1x2_f32(lo, hi);
             }
@@ -655,25 +652,19 @@ pub(crate) mod module {
     }
 
     #[inline(always)]
-    fn hadamard_transform_lane(lane: u32) -> f32 {
+    fn hadamard_transform_lane(mut value: f32, lane: u32) -> f32 {
         let mut stride = 1;
         while stride < HADAMARD_DIM {
-            let a = unsafe { ROTATED[lane as usize] };
-            let b = unsafe { ROTATED[(lane ^ stride) as usize] };
-            let next = if lane & stride == 0 { a + b } else { b - a };
-            unsafe {
-                ROTATED[lane as usize] = next;
-            }
-            thread::sync_threads();
+            let peer = warp::shuffle_xor_f32_sync(0xffff_ffff, value, stride);
+            value = if lane & stride == 0 {
+                value + peer
+            } else {
+                peer - value
+            };
             stride <<= 1;
         }
 
-        let value = unsafe { ROTATED[lane as usize] } * INV_SQRT_32;
-        unsafe {
-            ROTATED[lane as usize] = value;
-        }
-        thread::sync_threads();
-        value
+        value * INV_SQRT_32
     }
 
     #[inline(always)]

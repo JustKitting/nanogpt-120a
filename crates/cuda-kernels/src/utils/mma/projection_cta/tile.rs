@@ -1,9 +1,9 @@
 use cuda_device::thread;
 
 pub const NVFP4_PROJECTION_CTA_M: u32 = 32;
-pub const NVFP4_PROJECTION_CTA_N: u32 = 32;
+pub const NVFP4_PROJECTION_CTA_N: u32 = 64;
 pub const NVFP4_PROJECTION_CTA_K: u32 = 64;
-pub const NVFP4_PROJECTION_CTA_THREADS: u32 = 256;
+pub const NVFP4_PROJECTION_CTA_THREADS: u32 = 512;
 pub const NVFP4_PROJECTION_CTA_PACKS_PER_ROW: u32 = NVFP4_PROJECTION_CTA_K / 8;
 pub const NVFP4_PROJECTION_CTA_A_PACKS: usize =
     (NVFP4_PROJECTION_CTA_M * NVFP4_PROJECTION_CTA_PACKS_PER_ROW) as usize;
@@ -33,8 +33,8 @@ impl Nvfp4ProjectionCtaTile {
         Self {
             row_base: tile_row * NVFP4_PROJECTION_CTA_M,
             col_base: tile_col * NVFP4_PROJECTION_CTA_N,
-            warp_m: warp >> 2,
-            warp_n: warp & 3,
+            warp_m: warp >> 3,
+            warp_n: warp & 7,
             group: lane >> 2,
             thread_in_group: lane & 3,
         }

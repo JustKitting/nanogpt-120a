@@ -39,7 +39,7 @@ impl TrainingLogger {
         let ema = self.update_loss_ema(stats.loss);
         self.loss_curve.push(step, stats.loss, ema);
         println!(
-            "step={step} elapsed_s={:.3} source={} offset={} batch_size={} seq_len={} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} aurora_lr={:.6e} forward_ms={:.3} backward_enqueue_ms={:.3} loss_host_wait_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
+            "step={step} elapsed_s={:.3} source={} offset={} batch_size={} seq_len={} tokens={} logits={} loss={:.6} loss_ema={:.6} delta={} finite={} nonzero={} adam_lr={:.6e} aurora_lr={:.6e} timing_scope=host_wall_not_gpu_time forward_ms={:.3} backward_enqueue_ms={:.3} loss_host_wait_wall_ms={:.3} optimizer_ms={:.3} aurora_ms={:.3} adam_ms={:.3} embed_lookup_ms={:.3} token_embed_ms={:.3} final_norm_ms={:.3} blocks_ms={:.3}",
             context.elapsed_s,
             context.source,
             context.offset,

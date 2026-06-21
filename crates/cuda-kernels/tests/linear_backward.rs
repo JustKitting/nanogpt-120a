@@ -13,7 +13,7 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 mod common;
 
 const TOKEN_COUNT: usize = 64;
-const INPUT_DIM: usize = 8;
+const INPUT_DIM: usize = 64;
 const OUTPUT_DIM: usize = 64;
 const E4M3_ONE: u8 = 0x38;
 const TOLERANCE: f32 = 1.0e-7;
@@ -206,6 +206,7 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
         output_dim: OUTPUT_DIM as u32,
         sign_seed: 0x1234_5678,
         scale_seed: 0x9abc_def0,
+        precomputed_e_amax_chunks: None,
     })?;
 
     let dinput = dinput_dev.to_host_vec(&stream)?;

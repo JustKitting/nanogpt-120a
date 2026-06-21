@@ -5312,3 +5312,296 @@ decision:
   Promote under the current acceptance rule: validation loss stayed within the
   +/-1% no-meaningful-change band and completed step count increased.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: N=64 CTA width for NVFP4 projection matmuls.
+status: accepted
+change:
+  Increased the generic NVFP4 projection CTA tile from 32x32 with 256 threads
+  to 32x64 with 512 threads, keeping K=64. The aligned staging path now guards
+  A-pack loads because the CTA has more threads than A packs, while every
+  thread stages one B pack.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/projection_cta_n64_l4_b8_20_20260621T032524Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.603, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_cta_n64_l4_b8_100_20260621T032703Z.log
+    val_loss=6.546121, train_elapsed_s=18.360, completed_steps=100.
+  900-second held-out gate:
+    target/projection_cta_n64_l4_b8_900_20260621T032732Z.log
+    val_loss=4.002766, train_elapsed_s=900.027, completed_steps=4766.
+measured_effect:
+  Against the previous promoted baseline
+  target/ms_eden_shuffle_rht_l4_b8_900_20260621T030612Z.log, held-out
+  validation loss improved from 4.052978 to 4.002766 and completed steps
+  increased from 4635 to 4766. The 20-step nsys screen showed
+  linear_backward_projection_pair_cta_device_scale_kernel dropping from
+  676.216689ms to 621.646763ms, lm_head_kernel dropping from 134.820340ms to
+  113.609475ms, and profiled train time dropping from 3.709s to 3.603s.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower validation
+  loss and higher completed step count under the same 900-second budget.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before screen
+experiment: Reuse Aurora four-six encoder lane values with half-warp shuffles
+  for payload packing.
+status: rejected_unverified
+change:
+  Replaced the second FP32 loads during Aurora in-kernel four-six payload
+  packing with half-warp shuffles from the value already loaded for local scale
+  selection.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture:
+    did not complete. The optimizer test binary remained alive for more than
+    three minutes, used 100% of GPU0, and produced no additional output after
+    the first four tests. The process was killed manually.
+measured_effect:
+  No valid performance or validation-loss evidence. The check did not reach a
+  100-step screen or a 900-second gate.
+decision:
+  Reject and revert. Do not treat this as a passed optimizer-path change.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before 100-step screen
+experiment: N=128 CTA width for NVFP4 projection matmuls.
+status: rejected_screen
+change:
+  Increased the generic NVFP4 projection CTA tile from 32x64 with 512 threads
+  to 32x128 with 1024 threads. The warp map changed to two row groups by
+  sixteen eight-column groups.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture:
+    passed after temporarily widening the test fixture to 128x128.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/projection_cta_n128_l4_b8_20_20260621T035213Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.798, completed_steps=20.
+measured_effect:
+  Runtime regressed versus the accepted N=64 CTA profile
+  target/nsys/projection_cta_n64_l4_b8_20_20260621T032524Z.run.log.
+  linear_backward_projection_pair_cta_device_scale_kernel increased from
+  621.646763ms to 780.410516ms, lm_head_kernel increased from 113.609475ms to
+  139.015822ms, and profiled train time increased from 3.603s to 3.798s.
+decision:
+  Reject before the 100-step and 900-second gates. Code was reverted to the
+  accepted N=64 projection CTA shape.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Inline aligned projection CTA no-bias stores.
+status: rejected_screen
+change:
+  Replaced four store_one_aligned calls with direct row/scale/base computation
+  for the two-row, two-column aligned accumulator store pattern.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/proj_store_aligned_l4_b8_20_20260621T032324Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.717, completed_steps=20.
+measured_effect:
+  The target projection kernel regressed from 676.216689ms to 676.719952ms
+  over 20 profiled steps versus
+  target/nsys/ms_eden_shuffle_rht_l4_b8_20_20260621T030524Z.run.log. Profiled
+  train time regressed from 3.709s to 3.717s.
+decision:
+  Reject before the 900-second gate. Code was reverted to the promoted
+  baseline.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Warp-shuffle MS-EDEN Hadamard rotation.
+status: accepted
+change:
+  Replaced the 32-lane MS-EDEN Hadamard transform shared-memory scratch and
+  repeated block synchronizations with warp shuffle butterfly operations. The
+  same transformed lane values are used for scale estimation and payload
+  packing; the scale/correction math was unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test nvfp4_quant -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_shuffle_rht_l4_b8_20_20260621T030524Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.709, completed_steps=20.
+  100-step SYNTH screen:
+    target/ms_eden_shuffle_rht_l4_b8_100_20260621T030541Z.log
+    val_loss=6.549100, train_elapsed_s=18.930, completed_steps=100.
+  900-second held-out gate:
+    target/ms_eden_shuffle_rht_l4_b8_900_20260621T030612Z.log
+    val_loss=4.052978, train_elapsed_s=900.157, completed_steps=4635.
+measured_effect:
+  Against the promoted CTA staging baseline
+  target/nsys/cta_stage_direct_l4_b8_20_20260621T012017Z.run.log, profiled
+  train time moved from 3.721s to 3.709s. The direct FP32 MS-EDEN kernel moved
+  from 160.804455ms to 160.550770ms over 20 steps, and the FP32-transpose
+  MS-EDEN kernel moved from 164.520236ms to 162.279622ms. The 900-second gate
+  completed 21 more steps than the previous baseline while validation loss
+  moved from 4.047531 to 4.052978, a +0.13% change.
+decision:
+  Promote under the current acceptance rule: validation loss stayed within the
+  +/-1% no-meaningful-change band and completed step count increased.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Aligned staging fast path inside the fused Aurora Polar Express
+  tile compute loop.
+status: rejected_screen
+change:
+  Added a checked aligned branch that used a separate no-bounds staging helper
+  for full CTA tiles in the fused Polar matmul path.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  100-step SYNTH screen:
+    target/polar_stage_aligned_l4_b8_100_20260621T014325Z.log
+    val_loss=6.542066, train_elapsed_s=19.009, completed_steps=100.
+  20-step nsys screen:
+    target/nsys/polar_stage_aligned_l4_b8_20_20260621T014505Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.730, completed_steps=20.
+measured_effect:
+  The intended Aurora kernel regressed:
+  aurora_mega_update_cooperative_kernel increased from 1.363230788s to
+  1.373115164s over 20 profiled steps versus
+  target/nsys/cta_stage_direct_l4_b8_20_20260621T012017Z.run.log. The profiled
+  train time also regressed from 3.721s to 3.730s.
+decision:
+  Reject before the 900-second gate. Code was reverted to the promoted
+  baseline.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Move Aurora master-update tail guard from per-element updates to a
+  chunk-level checked/unchecked split.
+status: rejected_pre_gate
+change:
+  Added an unchecked four-value update path for full 1024-value Aurora update
+  chunks, keeping the old checked path only for tail chunks. Current promoted
+  matrix lengths are all divisible by 1024, so this was intended to remove an
+  unreachable per-element bounds branch.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass after rerun.
+  100-step SYNTH screen:
+    target/aurora_update_tail_chunk_l4_b8_100_20260621T014025Z.log
+    val_loss=6.544455, train_elapsed_s=19.002, completed_steps=100.
+  20-step nsys screen:
+    target/nsys/aurora_update_tail_chunk_l4_b8_20_20260621T014052Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.751, completed_steps=20.
+measured_effect:
+  The intended Aurora kernel regressed: aurora_mega_update_cooperative_kernel
+  increased from 1.363230788s to 1.370852406s over 20 profiled steps versus
+  target/nsys/cta_stage_direct_l4_b8_20_20260621T012017Z.run.log. Total
+  profiled train time also regressed from 3.721s to 3.751s. The 100-step screen
+  was stable but did not offset the profiler regression.
+decision:
+  Reject before the 900-second gate. Code was reverted to the promoted
+  baseline.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted after gate
+experiment: AdamW schedule-free updates for all linear matrix weights.
+status: rejected_gate
+change:
+  Added an explicit TRAIN_MATRIX_OPTIMIZER=adam route that replaced Aurora for
+  QKV, attention c_proj, MLP up, and MLP down matrix weights while keeping the
+  existing AdamW/schedule-free quantized writeback path for embeddings,
+  layer norms, and biases.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  cargo build --release: pass.
+  100-step SYNTH screen:
+    target/adam_matrix_l4_b8_100_20260621T005724Z.log
+    val_loss=7.641207, train_elapsed_s=12.510, completed_steps=100.
+  900-second held-out gate:
+    target/adam_matrix_l4_b8_900_20260621T005752Z.log
+    val_loss=9.394782, train_elapsed_s=900.032, completed_steps=7063.
+measured_effect:
+  Adam-matrix mode ran more steps than the accepted Aurora baseline but failed
+  the held-out objective badly. The accepted Aurora baseline at
+  target/linear_bwd_aligned_l4_b8_900_20260620T184019Z.log had
+  val_loss=4.031730 and completed_steps=4587. The Adam-matrix run learned
+  early but drifted upward later, ending with train loss around 9.27 and
+  validation loss 9.394782.
+decision:
+  Reject after the 900-second gate. Code was reverted; keep Aurora for linear
+  matrix weights.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Direct one-thread-per-pack CTA staging for aligned linear backward
+  projection tiles.
+status: accepted
+change:
+  The aligned CTA projection staging path now relies on the current shape
+  contract where A packs, B packs, and CTA threads are all 256. Each thread
+  stages exactly one A pack and one B pack instead of entering stride loops
+  whose second iteration is unreachable for the accepted aligned shape.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/cta_stage_direct_l4_b8_20_20260621T012017Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.721, completed_steps=20.
+  100-step SYNTH screen:
+    target/cta_stage_direct_l4_b8_100_20260621T012038Z.log
+    val_loss=6.550644, train_elapsed_s=18.996, completed_steps=100.
+  900-second held-out gate:
+    target/cta_stage_direct_l4_b8_900_20260621T012116Z.log
+    val_loss=4.047531, train_elapsed_s=900.052, completed_steps=4614.
+measured_effect:
+  The 20-step nsys screen showed
+  linear_backward_projection_pair_cta_device_scale_kernel dropping from
+  711.226580ms to 680.398853ms versus the aligned baseline profile, and
+  profiled train time moved from 3.766s to 3.721s. The 900-second gate
+  completed 27 more steps than the previous promoted baseline while validation
+  loss moved from 4.031730 to 4.047531, a +0.39% change.
+decision:
+  Promote under the current acceptance rule: validation loss stayed within the
+  +/-1% no-meaningful-change band and completed step count increased.
+```
