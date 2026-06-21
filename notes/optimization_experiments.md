@@ -8531,3 +8531,45 @@ decision:
   is dominated by probability/gradient math and memory traffic, not the score
   index decode.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before 100-step screen
+experiment: N=128 projection CTA tile after K=128 staging.
+status: rejected_screen
+source:
+  Colfax's SM12x NVFP4 tutorial uses a 128x128x128 CTA tile for blockscaled
+  GEMM. The older local N=128 rejection predated the accepted K=128 staging
+  change, so this candidate retested the wider N tile under the current
+  two-K-atom shared-memory stage.
+change:
+  Temporarily changed the generic NVFP4 projection CTA from M32/N64/K128 with
+  512 threads to M32/N128/K128 with 1024 threads. The MMA atom, K staging, and
+  math were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas verbose for affected kernels: 0 spills.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys baseline:
+    target/nsys/current_goal_b16_20_20260621T214016Z.run.log
+    val_loss=9.213204, train_elapsed_s=5.720, completed_steps=20.
+  20-step nsys candidate:
+    target/nsys/projection_n128_k128_b16_20_20260621T214521Z.run.log
+    val_loss=9.213204, train_elapsed_s=5.898, completed_steps=20.
+measured_effect:
+  The wider tile regressed the dominant projection path. Over 20 profiled
+  steps, linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1214.207ms to 1351.379ms. lm_head_kernel moved from 222.632ms to 233.517ms,
+  mlp_projection_kernel from 121.813ms to 133.809ms,
+  mlp_projection_relu2_kernel from 122.478ms to 132.851ms, and
+  attention_projection_kernel from 115.695ms to 129.237ms. Aurora was flat.
+decision:
+  Reject and revert before the 100-step and 900-second gates. In this kernel,
+  the extra warps/thread count and wider N tile reduce effective throughput
+  despite matching the Colfax tutorial CTA extent in N.
+```
