@@ -6257,3 +6257,41 @@ decision:
   Promote under the current acceptance rule: validation loss stayed within the
   +/-1% no-meaningful-change band and completed step count increased.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Skip final CTA shared-memory barrier in f16 tensor-core matmul bodies.
+status: accepted
+change:
+  Added a shared helper that keeps the CTA tile-reuse barrier between K chunks
+  but skips it after the final K chunk before global stores. Applied the helper
+  to the six f16 CTA matmul bodies plus the base f16 CTA path.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/f16_skip_final_cta_sync_l4_b8_20_20260621T073906Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.582, completed_steps=20.
+  900-second held-out gate:
+    target/f16_skip_final_cta_sync_l4_b8_900_20260621T074127Z.log
+    val_loss=3.993229, train_elapsed_s=900.120, completed_steps=4790.
+measured_effect:
+  Against the promoted LM-head aligned baseline
+  target/nsys/lm_head_aligned_path_l4_b8_20_20260621T065355Z.run.log,
+  f16_cta_tc_matmul_f32_kernel moved from 218.561695ms to 216.870461ms over
+  20 profiled steps. f16_cta_tc_matmul_f32_rhs_kernel moved from 121.649975ms
+  to 121.494588ms, while f16_cta_tc_matmul_f32_a_transposed_rhs_kernel moved
+  from 121.392258ms to 121.406391ms. Profiled train time moved from 3.584s to
+  3.582s.
+  The 900-second gate validation loss improved from 4.016790 to 3.993229
+  while completed steps moved from 4798 to 4790.
+decision:
+  Promote under the current acceptance rule: validation loss improved on the
+  fixed 900-second held-out gate.
+```

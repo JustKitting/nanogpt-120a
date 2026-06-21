@@ -11,6 +11,7 @@ mod cta_stage_f32;
 mod cta_stage_f32_transposed;
 mod cta_store;
 mod cta_store_add;
+mod cta_sync;
 pub(crate) mod cta_tile;
 mod kernels;
 mod launch_ops;

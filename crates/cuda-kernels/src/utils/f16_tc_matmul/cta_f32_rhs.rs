@@ -3,6 +3,7 @@ use cuda_device::{DisjointSlice, SharedArray, thread};
 use super::cta_stage::{load_a_fragments, load_b_fragments};
 use super::cta_stage_f32::stage_tiles_f32_rhs_transposed;
 use super::cta_store::store;
+use super::cta_sync::sync_before_next_k;
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
 use crate::mma::mma_m16n8k16_f16_f16_f32;
 
@@ -53,7 +54,7 @@ pub(super) fn cta_matmul_f32_rhs_body(
             load_b_fragments(b_tile, tile, tile.warp_n0 + 3),
             &mut acc3,
         );
-        thread::sync_threads();
+        sync_before_next_k(k_base, k);
         k_base += CTA_K;
     }
     store(acc0, tile, tile.warp_n0, &mut out, m, n);
