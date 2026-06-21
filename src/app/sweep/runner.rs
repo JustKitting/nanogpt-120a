@@ -126,6 +126,10 @@ fn screen_baseline(
     let Some(candidate) = baseline.candidate().cloned() else {
         return Ok(None);
     };
+    if let Some(loss) = baseline.screen_loss() {
+        println!("sweep_screen_baseline_cached val_loss={loss:.6}");
+        return Ok(Some(loss));
+    }
     if config.dry_run {
         return Ok(None);
     }

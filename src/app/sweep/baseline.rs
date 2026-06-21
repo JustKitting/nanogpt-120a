@@ -21,6 +21,7 @@ struct Record {
     val_loss: f64,
     completed_steps: Option<usize>,
     elapsed_s: Option<f64>,
+    screen_loss: Option<f64>,
     log_path: PathBuf,
     candidate: Candidate,
 }
@@ -39,6 +40,10 @@ impl Baseline {
         self.record.as_ref().map(|record| record.val_loss)
     }
 
+    pub fn screen_loss(&self) -> Option<f64> {
+        self.record.as_ref().and_then(|record| record.screen_loss)
+    }
+
     pub fn measured_trial(&self) -> Option<Trial> {
         let record = self.record.as_ref()?;
         Some(Trial {
@@ -47,7 +52,7 @@ impl Baseline {
             val_loss: Some(record.val_loss),
             completed_steps: record.completed_steps,
             elapsed_s: record.elapsed_s,
-            screen_val_loss: None,
+            screen_val_loss: record.screen_loss,
             log_path: record.log_path.clone(),
         })
     }
@@ -102,6 +107,9 @@ impl Baseline {
         if let Some(elapsed_s) = record.elapsed_s {
             writeln!(file, "TRAIN_ELAPSED_S={elapsed_s:.6}")?;
         }
+        if let Some(screen_loss) = record.screen_loss {
+            writeln!(file, "SCREEN_LOSS={screen_loss:.6}")?;
+        }
         writeln!(file, "LOG_PATH={}", record.log_path.display())?;
         writeln!(file, "GPT2_SEQ_LEN={DEFAULT_SEQ_LEN}")?;
         write_env(&mut file, record.candidate.build_env())?;
@@ -127,6 +135,7 @@ fn trial_record(trial: &Trial) -> Option<Record> {
         val_loss: trial.val_loss.filter(|loss| loss.is_finite())?,
         completed_steps: trial.completed_steps,
         elapsed_s: trial.elapsed_s,
+        screen_loss: trial.screen_val_loss,
         log_path: trial.log_path.clone(),
         candidate: trial.candidate.clone(),
     })
@@ -137,6 +146,7 @@ fn parse(text: &str) -> Option<Record> {
         val_loss: value(text, "VAL_LOSS")?.parse().ok()?,
         completed_steps: value(text, "COMPLETED_STEPS").and_then(|value| value.parse().ok()),
         elapsed_s: value(text, "TRAIN_ELAPSED_S").and_then(|value| value.parse().ok()),
+        screen_loss: value(text, "SCREEN_LOSS").and_then(|value| value.parse().ok()),
         log_path: PathBuf::from(value(text, "LOG_PATH").unwrap_or("")),
         candidate: Candidate {
             batch_size: value(text, "GPT2_BATCH_SIZE")?.parse().ok()?,

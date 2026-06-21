@@ -170,11 +170,17 @@ fn promotes_baseline_file_when_validation_improves() {
 
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.contains("VAL_LOSS=4.200000"));
+    assert!(text.contains("SCREEN_LOSS=5.200000"));
     assert!(text.contains("GPT2_BATCH_SIZE=8"));
     assert!(text.contains("GPT2_N_LAYER=4"));
     assert!(text.contains("GPT2_N_EMBD=1536"));
     assert!(text.contains("AURORA_MATRIX_PHASES=8"));
     assert!(text.contains("TRAIN_LR_SCALE=2.000000"));
+    let loaded = Baseline::load(path.clone())
+        .unwrap()
+        .measured_trial()
+        .unwrap();
+    assert_eq!(loaded.screen_val_loss, Some(5.2));
     let _ = std::fs::remove_file(path);
 }
 

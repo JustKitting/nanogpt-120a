@@ -8157,3 +8157,29 @@ decision:
   statistical samples for screen-quality modeling after logs are moved,
   cleaned, or unavailable.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Cache promoted baseline screen loss.
+status: accepted_tooling
+change:
+  Promoted baseline env files now write/read SCREEN_LOSS from the trial's
+  screen_val_loss. Baseline::measured_trial keeps that screen value, and the
+  sweep runner uses the cached baseline screen loss before launching a baseline
+  screen run. Full-run VAL_LOSS remains the only baseline promotion target.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 28 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_baseline_screen_cache_20260621T182952Z
+measured_effect:
+  Extended baseline promotion coverage to verify SCREEN_LOSS is written and
+  reloads through measured_trial(). Dry-run sweep artifacts still emit through
+  the normal proposal and analysis path.
+decision:
+  Accept as sweep infrastructure. Chained sweeps can now reuse known baseline
+  screen loss instead of rerunning that baseline screen just to initialize the
+  screen gate.
+```
