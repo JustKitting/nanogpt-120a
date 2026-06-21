@@ -6320,3 +6320,33 @@ decision:
   Reject and revert. Do not retry this shuffle substitution without first
   isolating why the Aurora optimizer test runtime explodes.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Pair aligned nobias projection stores by shared row scale.
+status: rejected_screen
+change:
+  Changed store_accumulator_aligned to store acc[0]/acc[1] and acc[2]/acc[3]
+  as row pairs so each row's input_global_scale was loaded and multiplied once
+  instead of once per scalar store.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/proj_store_pair_aligned_l4_b8_20_20260621T081302Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.606, completed_steps=20.
+measured_effect:
+  Against the promoted f16 CTA sync baseline
+  target/nsys/f16_skip_final_cta_sync_l4_b8_20_20260621T073906Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  621.385509ms to 628.303774ms over 20 profiled steps. Profiled train time
+  moved from 3.582s to 3.606s.
+decision:
+  Reject before the 900-second gate. The target kernel and short wall-clock
+  both regressed. Code was reverted.
+```
