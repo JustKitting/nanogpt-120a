@@ -5,6 +5,7 @@ use super::{
     candidate::{Candidate, MIN_N_LAYER},
     config::SweepConfig,
     history::Trial,
+    proposal_pool,
     rng::SweepRng,
 };
 
@@ -47,14 +48,13 @@ pub fn propose(
         return proposal("random", unseen_random(seen, rng), analysis, config);
     }
 
-    let mut ranked = Vec::new();
-    let mut sample_seen = seen.clone();
-    for _ in 0..config.candidate_samples.max(1) {
-        let candidate = unseen_random(&sample_seen, rng);
-        sample_seen.insert(candidate.key());
-        let score = analysis::score_candidate(analysis, config, &candidate);
-        ranked.push(ScoredCandidate { candidate, score });
-    }
+    let mut ranked = proposal_pool::sample(seen, rng, config, analysis)
+        .into_iter()
+        .map(|candidate| {
+            let score = analysis::score_candidate(analysis, config, &candidate);
+            ScoredCandidate { candidate, score }
+        })
+        .collect::<Vec<_>>();
     ranked.sort_by(|a, b| b.score.score.total_cmp(&a.score.score));
     let candidate = ranked
         .first()

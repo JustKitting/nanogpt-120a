@@ -34,6 +34,39 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Add statistic-guided sweep candidate pool.
+status: accepted_tooling_dry_run
+change:
+  Proposal generation now mixes random candidates with guided candidates derived
+  from the fitted multivariable model's weighted main-effect directions. The
+  first guided candidate follows the inferred direction deterministically; later
+  guided candidates add jitter, and the remaining pool stays random. The
+  interaction-aware scorer still ranks the whole combined pool, so interactions,
+  uncertainty, speed, quality, and stability continue to determine the final
+  selected proposal.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo test --bin sweep: pass.
+  dry-run analysis:
+    target/sweeps/dryrun_guided_pool_20260621T172640Z
+    candidate_0000_ranked.tsv contained 32 candidates plus header.
+observed_effect:
+  The selected rank-0 candidate was
+  b16_l4_d1024_h16_p8_c160_lr1.9121_alr0.6693_w50_s0.20_b0.40_r0.50
+  with score=4.89670338, uncertainty=27.99442934, and
+  exploration=3.36710372. A focused unit test verifies that when full_quality
+  says higher batch_size and n_layer are better, the guided pool's first
+  candidate moves to batch_size=16 and n_layer=8.
+decision:
+  Accept as sweep infrastructure. This changes the sweep from random candidate
+  generation plus statistical ranking to mixed random/statistically guided
+  generation plus statistical ranking.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Persist ranked sweep acquisition candidates.
 status: accepted_tooling_dry_run
 change:
