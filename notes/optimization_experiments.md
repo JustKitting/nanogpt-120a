@@ -6800,6 +6800,42 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: M64/N32 projection CTA shape for NVFP4 projection matmuls.
+status: rejected_screen
+change:
+  Tested a 64-row by 32-column projection CTA tile while keeping K=64 and
+  512 threads. The warp map changed from 2x8 row/column warp groups to 4x4,
+  and the aligned B-pack staging path was guarded for the smaller B tile.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/projection_cta_m64_n32_l4_b8_20_20260621T112337Z.run.log
+    val_loss=8.506022, train_elapsed_s=3.398, completed_steps=20.
+measured_effect:
+  Against the accepted linear-bias coalescing profile
+  target/nsys/linear_bias_coalesced_l4_b8_20_20260621T105744Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  652.037706ms to 654.433265ms over 20 profiled steps. lm_head_kernel improved
+  from 117.359029ms to 113.551149ms, but mlp_projection_kernel moved from
+  69.572840ms to 70.141766ms, mlp_projection_relu2_kernel moved from
+  66.691061ms to 66.791260ms, and attention_projection_kernel moved from
+  64.989959ms to 65.382372ms. The plain 20-step training log moved from
+  3.401s to 3.398s, which is too small to outweigh the mixed kernel result.
+decision:
+  Reject before the 100-step and 900-second gates. The main linear-backward
+  projection kernel regressed and the small wall-clock change is not a reliable
+  fixed-wall objective signal. Code was reverted.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Adam no-decay for layer-norm tensors and linear biases.
 status: rejected_900s
