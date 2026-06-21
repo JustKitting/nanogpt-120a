@@ -8414,3 +8414,42 @@ decision:
   useful screen-gate failure information instead of flattening all screen
   rejections into one status.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Stage two K64 NVFP4 projection CTA atoms per shared-memory load.
+status: accepted
+change:
+  Increased the shared-memory projection CTA K stage from 64 to 128 and issued
+  two m16n8k64 NVFP4 MMA atoms per stage. This reduces loop/sync overhead for
+  aligned GPT projection shapes while keeping the existing one-warp projection
+  path as the fallback for K64 or otherwise unaligned shapes.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  100-step SYNTH sanity:
+    target/k128_projection_cta_sanity_100_20260621T210354Z.log
+    val_loss=6.406075, completed_steps=100, train_elapsed_s=28.584.
+  EOS-only 900-second comparison baseline:
+    target/eos_baseline_900_20260621T204225Z.log
+    val_loss=3.672471, completed_steps=3025, train_elapsed_s=900.296.
+  K128 projection CTA 900-second gate:
+    target/k128_projection_cta_900_20260621T210437Z.log
+    val_loss=3.663287, completed_steps=3071, train_elapsed_s=900.222.
+measured_effect:
+  Compared to the EOS-only baseline, the K128 projection CTA patch completed
+  46 more steps in the fixed 900-second budget and improved held-out validation
+  loss by 0.009184. Logged backward enqueue wall timing moved from roughly
+  70.4ms at steady state to roughly 69.5ms. Timing fields are host wall timing,
+  not isolated GPU kernel time.
+decision:
+  Promote. The change improves held-out validation loss and completed steps in
+  the required 900-second gate while preserving correctness tests and the K64
+  fallback path.
+```

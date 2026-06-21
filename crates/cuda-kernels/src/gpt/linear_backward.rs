@@ -246,8 +246,11 @@ impl LinearBackwardModule {
     ) -> Result<(), DriverError> {
         let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
-        assert_projection_cta_aligned(args.token_count, args.input_dim, dinput_k);
-        assert_projection_cta_aligned(args.output_dim, args.input_dim, dweight_k);
+        if !projection_cta_aligned(args.token_count, args.input_dim, dinput_k)
+            || !projection_cta_aligned(args.output_dim, args.input_dim, dweight_k)
+        {
+            return self.backward_device_scale(args);
+        }
         let dinput_grid = projection_cta_grid_dim(args.token_count, args.input_dim);
         let dweight_grid = projection_cta_grid_dim(args.output_dim, args.input_dim);
         assert!(dinput_grid.0.is_power_of_two());
@@ -459,10 +462,10 @@ impl LinearBackwardModule {
     }
 }
 
-fn assert_projection_cta_aligned(rows: u32, cols: u32, k: u32) {
-    assert_eq!(rows % NVFP4_PROJECTION_CTA_M, 0);
-    assert_eq!(cols % NVFP4_PROJECTION_CTA_N, 0);
-    assert_eq!(k % NVFP4_PROJECTION_CTA_K, 0);
+fn projection_cta_aligned(rows: u32, cols: u32, k: u32) -> bool {
+    rows % NVFP4_PROJECTION_CTA_M == 0
+        && cols % NVFP4_PROJECTION_CTA_N == 0
+        && k % NVFP4_PROJECTION_CTA_K == 0
 }
 
 struct QuantizeOperandArgs<'a, 'out> {
