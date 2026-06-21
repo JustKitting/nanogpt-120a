@@ -6762,3 +6762,31 @@ decision:
   Reject before the 900-second gate and revert the code. The branch shape did
   not improve the current Aurora cooperative kernel profile.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Early return inactive causal attention probability/dS entries.
+status: rejected_pre_gate
+change:
+  In attention_prob_ds_kernel, wrote zero p/ds values and returned immediately
+  for masked causal positions, and computed the log-sum-exp index once for
+  active positions.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/attention_prob_ds_active_return_l4_b8_20_20260621T093510Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.436, completed_steps=20.
+measured_effect:
+  Against the accepted linear-backward tile-shift profile
+  target/nsys/linear_bwd_tile_shift_l4_b8_20_20260621T090938Z.run.log,
+  attention_prob_ds_kernel moved from 90.615654ms to 90.675556ms over 20
+  profiled steps. Profiled train time moved from 3.434s to 3.436s.
+decision:
+  Reject before the 900-second gate and revert the code. The branch/return
+  shape did not improve the current attention backward profile.
+```
