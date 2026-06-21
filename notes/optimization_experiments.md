@@ -8301,3 +8301,32 @@ decision:
   proposal direction and candidate scoring, while the default objective remains
   held-out validation-loss acquisition.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Use structured variance proposals over the sweep domain.
+status: accepted_tooling
+change:
+  Added candidate_space::from_unit so proposal sources can map normalized
+  factor coordinates into valid sweep candidates. The variance proposal source
+  now evaluates a shifted Halton-style low-discrepancy design over the full
+  factor domain, ranks those candidates by predictive uncertainty, and only
+  falls back to random generation when needed. This replaces the old
+  best-of-small-random-pool variance source.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 36 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_structured_variance_20260621T185113Z
+measured_effect:
+  Added unit coverage proving normalized coordinates map into valid candidate
+  bounds, Halton units cover each factor range, and variance proposals return
+  unique structured points. The dry-run candidate_0000_ranked.tsv included
+  variance-source candidates selected from the structured scan.
+decision:
+  Accept as sweep infrastructure. Variance minimization now probes the actual
+  multivariable design space deliberately instead of depending on a small
+  random candidate pool.
+```
