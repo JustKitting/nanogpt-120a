@@ -6711,6 +6711,34 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Unroll aligned FP16 CTA f32 staging loops.
+status: rejected_pre_gate
+change:
+  In f16_cta_tc_matmul_f32_kernel's aligned f32 staging path, replaced the
+  four-iteration per-thread staging loops for A and transposed B tiles with
+  explicit fixed-offset unrolled stores.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/f16_stage_aligned_unroll_l4_b8_20_20260621T095707Z.run.log
+    val_loss=8.505588, train_elapsed_s=3.433, completed_steps=20.
+measured_effect:
+  Against the current accepted MS-EDEN reciprocal profile
+  target/nsys/ms_eden_inv_scale_l4_b8_20_20260621T093759Z.run.log,
+  f16_cta_tc_matmul_f32_kernel moved from 217.291413ms to 220.397478ms
+  over 20 profiled steps. Profiled train time moved from 3.424s to 3.433s.
+decision:
+  Reject before the 900-second gate and revert the code. The unrolled staging
+  shape made the target f16 CTA matmul slower in the current profile.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Decode Aurora Polar CTA tile coordinates with power-of-two shifts.
 status: rejected_pre_gate
 change:
