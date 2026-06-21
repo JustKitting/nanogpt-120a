@@ -14,7 +14,7 @@ use super::{
     history::{self, History, Trial},
     optimizer,
     parse::RunResult,
-    run_build, run_train, status,
+    proposal_log, run_build, run_train, status,
 };
 
 pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
@@ -50,7 +50,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
         analysis::write(&sweep_dir, &sweep_analysis)?;
         analysis::print_summary(&sweep_analysis);
         let seen = chain::seen_keys(&all_trials);
-        let candidate = optimizer::propose(
+        let proposal = optimizer::propose(
             &all_trials,
             &seen,
             &mut rng,
@@ -58,7 +58,8 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             &sweep_analysis,
             baseline.candidate(),
         );
-        write_candidate_score(&sweep_dir, index, &candidate, &config, &sweep_analysis)?;
+        proposal_log::write(&sweep_dir, index, &proposal)?;
+        let candidate = proposal.candidate;
         let trial_dir = sweep_dir.join(format!("trial_{index:04}"));
         println!("sweep_trial_begin index={index} key={}", candidate.key());
         let trial = run_trial(
@@ -108,41 +109,6 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
         analysis::write(&sweep_dir, &sweep_analysis)?;
     }
     Ok(())
-}
-
-fn write_candidate_score(
-    sweep_dir: &Path,
-    index: usize,
-    candidate: &Candidate,
-    config: &SweepConfig,
-    sweep_analysis: &analysis::SweepAnalysis,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let score = analysis::score_candidate(sweep_analysis, config, candidate);
-    fs::write(
-        sweep_dir.join(format!("candidate_{index:04}_score.txt")),
-        format!(
-            "candidate={}\nscore={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nspeed={}\nstability={}\n",
-            candidate.key(),
-            score.score,
-            score.uncertainty,
-            score.exploration,
-            fmt_prediction(score.predicted_quality),
-            fmt_prediction(score.predicted_speed),
-            fmt_prediction(score.predicted_stability)
-        ),
-    )?;
-    Ok(())
-}
-
-fn fmt_prediction(value: Option<analysis::Prediction>) -> String {
-    value
-        .map(|prediction| {
-            format!(
-                "value={:.6},z={:.6},uncertainty={:.6}",
-                prediction.value, prediction.standard_score, prediction.uncertainty
-            )
-        })
-        .unwrap_or_else(|| "n/a".to_string())
 }
 
 fn screen_baseline(

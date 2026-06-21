@@ -34,6 +34,37 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Persist ranked sweep acquisition candidates.
+status: accepted_tooling_dry_run
+change:
+  The optimizer now returns a proposal containing the selected candidate, the
+  acquisition reason, and the ranked scored sample set used to make the choice.
+  Each sweep trial writes candidate_NNNN_score.txt plus
+  candidate_NNNN_ranked.tsv. The ranked TSV includes score, uncertainty,
+  exploration, and predicted quality/speed/stability value, z score, and
+  uncertainty for every sampled candidate.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo test --bin sweep: pass.
+  dry-run analysis:
+    target/sweeps/dryrun_ranked_acquisition_20260621T172207Z
+    candidate_0000_score.txt recorded reason=model and the selected candidate.
+    candidate_0000_ranked.tsv contained 32 ranked samples plus header.
+observed_effect:
+  The selected rank-0 candidate was
+  b16_l8_d1024_h16_p8_c90_lr1.4222_alr0.7757_w20_s0.10_b0.20_r0.50
+  with score=4.00244483, uncertainty=49.27732722, and
+  exploration=3.91755422. Lower-ranked rows preserve the alternative scores, so
+  the sweep decision is auditable without rerunning the sampler.
+decision:
+  Accept as sweep infrastructure. This makes the automatic acquisition decision
+  inspectable and keeps variance/uncertainty evidence attached to each trial.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Use pairwise factorial terms in sweep acquisition.
 status: accepted_tooling_dry_run
 change:

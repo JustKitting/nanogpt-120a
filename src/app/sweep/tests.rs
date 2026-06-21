@@ -30,7 +30,8 @@ fn starts_fresh_sweep_from_best_measured_baseline() {
         &config,
         &analysis,
         Some(&measured),
-    );
+    )
+    .candidate;
 
     assert_eq!(baseline.batch_size, 8);
     assert_eq!(baseline.n_layer, MIN_N_LAYER);
@@ -64,8 +65,8 @@ fn measured_baseline_is_not_rerun_as_next_candidate() {
         Some(&baseline_candidate),
     );
 
-    assert_ne!(proposal.key(), baseline_candidate.key());
-    assert!(proposal.n_layer >= MIN_N_LAYER);
+    assert_ne!(proposal.candidate.key(), baseline_candidate.key());
+    assert!(proposal.candidate.n_layer >= MIN_N_LAYER);
 }
 
 #[test]
@@ -90,7 +91,39 @@ fn optimizer_ignores_sub_min_layer_history() {
         None,
     );
 
-    assert!(proposal.n_layer >= MIN_N_LAYER);
+    assert!(proposal.candidate.n_layer >= MIN_N_LAYER);
+    assert_eq!(proposal.reason, "random");
+    assert_eq!(proposal.ranked.len(), 1);
+}
+
+#[test]
+fn model_proposal_records_sorted_ranked_candidates() {
+    let trials = [
+        trial("success", Some(5.0), candidate(4, 4, 0.8)),
+        trial("success", Some(4.0), candidate(8, 4, 1.0)),
+        trial("success", Some(3.5), candidate(16, 8, 1.2)),
+        trial("rejected_screen", None, candidate(4, 8, 2.0)),
+    ];
+    let config = config(0, 8);
+    let analysis = analysis::analyze(&trials, &config);
+    let proposal = super::optimizer::propose(
+        &trials,
+        &Default::default(),
+        &mut rng(),
+        &config,
+        &analysis,
+        None,
+    );
+
+    assert_eq!(proposal.reason, "model");
+    assert_eq!(proposal.ranked.len(), config.candidate_samples);
+    assert_eq!(proposal.candidate.key(), proposal.ranked[0].candidate.key());
+    assert!(
+        proposal
+            .ranked
+            .windows(2)
+            .all(|pair| { pair[0].score.score >= pair[1].score.score })
+    );
 }
 
 #[test]

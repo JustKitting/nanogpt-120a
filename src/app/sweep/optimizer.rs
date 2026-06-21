@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::{
-    analysis::{self, SweepAnalysis},
+    analysis::{self, CandidateScore, SweepAnalysis},
     candidate::{Candidate, MIN_N_LAYER},
     config::SweepConfig,
     history::Trial,
@@ -11,6 +11,19 @@ use super::{
 const NAN_PENALTY_LOSS: f64 = 1.0e6;
 const SCREEN_REJECT_PENALTY_LOSS: f64 = 1.0e5;
 
+#[derive(Clone, Debug)]
+pub struct Proposal {
+    pub candidate: Candidate,
+    pub reason: &'static str,
+    pub ranked: Vec<ScoredCandidate>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ScoredCandidate {
+    pub candidate: Candidate,
+    pub score: CandidateScore,
+}
+
 pub fn propose(
     trials: &[Trial],
     seen: &HashSet<String>,
@@ -18,11 +31,11 @@ pub fn propose(
     config: &SweepConfig,
     analysis: &SweepAnalysis,
     baseline: Option<&Candidate>,
-) -> Candidate {
+) -> Proposal {
     if let Some(candidate) = baseline {
         let candidate = candidate.with_min_layers();
         if !seen.contains(&candidate.key()) {
-            return candidate;
+            return proposal("baseline", candidate, analysis, config);
         }
     }
 
@@ -31,20 +44,41 @@ pub fn propose(
         .filter(|trial| score_loss(trial).is_some())
         .count();
     if completed < config.random_trials {
-        return unseen_random(seen, rng);
+        return proposal("random", unseen_random(seen, rng), analysis, config);
     }
 
-    let mut best = unseen_random(seen, rng);
-    let mut best_score = f64::NEG_INFINITY;
+    let mut ranked = Vec::new();
+    let mut sample_seen = seen.clone();
     for _ in 0..config.candidate_samples.max(1) {
-        let candidate = unseen_random(seen, rng);
-        let score = analysis::score_candidate(analysis, config, &candidate).score;
-        if score > best_score {
-            best_score = score;
-            best = candidate;
-        }
+        let candidate = unseen_random(&sample_seen, rng);
+        sample_seen.insert(candidate.key());
+        let score = analysis::score_candidate(analysis, config, &candidate);
+        ranked.push(ScoredCandidate { candidate, score });
     }
-    best
+    ranked.sort_by(|a, b| b.score.score.total_cmp(&a.score.score));
+    let candidate = ranked
+        .first()
+        .map(|scored| scored.candidate.clone())
+        .unwrap_or_else(|| unseen_random(seen, rng));
+    Proposal {
+        candidate,
+        reason: "model",
+        ranked,
+    }
+}
+
+fn proposal(
+    reason: &'static str,
+    candidate: Candidate,
+    analysis: &SweepAnalysis,
+    config: &SweepConfig,
+) -> Proposal {
+    let score = analysis::score_candidate(analysis, config, &candidate);
+    Proposal {
+        candidate: candidate.clone(),
+        reason,
+        ranked: vec![ScoredCandidate { candidate, score }],
+    }
 }
 
 fn score_loss(trial: &Trial) -> Option<f64> {

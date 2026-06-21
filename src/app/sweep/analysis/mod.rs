@@ -13,7 +13,7 @@ mod tests;
 use super::{config::SweepConfig, history::Trial};
 
 pub use regression::Prediction;
-pub use scoring::score_candidate;
+pub use scoring::{CandidateScore, score_candidate};
 
 #[derive(Clone, Debug)]
 pub struct SweepAnalysis {

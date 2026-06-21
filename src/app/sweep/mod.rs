@@ -6,6 +6,7 @@ mod config;
 mod history;
 mod optimizer;
 mod parse;
+mod proposal_log;
 mod rng;
 mod run_build;
 mod run_train;
