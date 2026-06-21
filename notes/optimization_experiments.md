@@ -7987,3 +7987,29 @@ decision:
   Accept as sweep infrastructure. This removes a manual/stale-state failure
   mode from chained sweeps after an automatic baseline promotion.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Count failed real trials toward sweep random-phase progression.
+status: accepted_tooling
+change:
+  failed_build and failed_run outcomes now count as observed sweep samples for
+  deciding when to leave the initial random/fuzzing phase. They receive a large
+  penalty only for phase accounting; promotion remains successful held-out
+  validation loss only, and stability analysis still records the failure signal.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 19 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_failed_outcome_progress_20260621T180930Z
+measured_effect:
+  Added optimizer unit coverage proving failed_build and failed_run trials
+  advance the sweep from random proposal mode into model proposal mode once
+  random_trials is satisfied.
+decision:
+  Accept as sweep infrastructure. Failed builds/runs are real observations for
+  the sweep's stability prior and should not trap an automatic sweep in
+  endless random sampling.
+```

@@ -11,6 +11,7 @@ use super::{
 
 const NAN_PENALTY_LOSS: f64 = 1.0e6;
 const SCREEN_REJECT_PENALTY_LOSS: f64 = 1.0e5;
+const FAILED_TRIAL_PENALTY_LOSS: f64 = 5.0e5;
 
 #[derive(Clone, Debug)]
 pub struct Proposal {
@@ -43,7 +44,7 @@ pub fn propose(
 
     let completed = trials
         .iter()
-        .filter(|trial| score_loss(trial).is_some())
+        .filter(|trial| observed_loss(trial).is_some())
         .count();
     if completed < config.random_trials {
         return proposal("random", unseen_random(seen, rng), analysis, config);
@@ -90,12 +91,15 @@ fn proposal(
     }
 }
 
-fn score_loss(trial: &Trial) -> Option<f64> {
+fn observed_loss(trial: &Trial) -> Option<f64> {
     if trial.candidate.n_layer < MIN_N_LAYER {
         return None;
     }
     if trial.status == "dry_run" {
         return None;
+    }
+    if trial.status == "failed_build" || trial.status == "failed_run" {
+        return Some(FAILED_TRIAL_PENALTY_LOSS);
     }
     if trial.status == "rejected_screen" {
         return Some(SCREEN_REJECT_PENALTY_LOSS);

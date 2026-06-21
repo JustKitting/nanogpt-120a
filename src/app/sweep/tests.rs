@@ -97,6 +97,27 @@ fn optimizer_ignores_sub_min_layer_history() {
 }
 
 #[test]
+fn failed_trials_count_toward_random_phase_progression() {
+    let trials = [
+        trial("failed_build", None, candidate(8, 4, 1.0)),
+        trial("failed_run", None, candidate(16, 4, 1.2)),
+    ];
+    let config = config(2, 8);
+    let analysis = analysis::analyze(&trials, &config);
+    let proposal = super::optimizer::propose(
+        &trials,
+        &Default::default(),
+        &mut rng(),
+        &config,
+        &analysis,
+        None,
+    );
+
+    assert_eq!(proposal.reason, "model");
+    assert_eq!(proposal.ranked.len(), config.candidate_samples);
+}
+
+#[test]
 fn model_proposal_records_sorted_ranked_candidates() {
     let trials = [
         trial("success", Some(5.0), candidate(4, 4, 0.8)),
