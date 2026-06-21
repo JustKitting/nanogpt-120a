@@ -6633,3 +6633,36 @@ decision:
   Reject before the 900-second gate. Extra global traffic outweighed removing
   the second exp. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Increase MS-EDEN pack CTA from 8 warps to 16 warps.
+status: rejected_screen
+change:
+  Split pack launch constants from the general quant constants and tested
+  packing sixteen independent 32-value MS-EDEN chunks per CTA with 512 threads,
+  leaving tensor/row amax kernels at the existing 256-thread shape.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test nvfp4_quant -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_pack_warp16_l4_b8_20_20260621T090700Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.441, completed_steps=20.
+measured_effect:
+  Against the accepted 8-warp MS-EDEN pack baseline
+  target/nsys/ms_eden_pack_warp8_current_l4_b8_20_20260621T083902Z.run.log,
+  fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel moved from
+  109.203520ms to 111.253414ms, and
+  fp32_to_nvfp4_ms_eden_device_scale_kernel moved from 71.279059ms to
+  73.603381ms over 20 profiled steps. Profiled train time moved from
+  3.435s to 3.441s.
+decision:
+  Reject before the 900-second gate. The larger pack CTA reduced block count
+  but slowed the target kernels. Code was reverted.
+```
