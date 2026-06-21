@@ -1,7 +1,6 @@
 mod attention;
 mod block;
 mod block_attention;
-mod device_copy;
 pub mod final_head;
 mod layer_norm;
 mod mlp;

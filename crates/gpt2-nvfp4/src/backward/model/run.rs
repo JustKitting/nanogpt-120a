@@ -3,9 +3,9 @@ use cuda_core::DriverError;
 use super::blocks::run_blocks;
 use super::final_head::run_final_head;
 use super::types::Gpt2BackwardArgs;
+use crate::GPT2_N_LAYER;
 use crate::backward::{Gpt2LayerNormBackwardArgs, layer_norm_backward};
 use crate::types::{Gpt2BackwardGrads, LayerNormGrads};
-use crate::{GPT2_N_LAYER, backward::device_copy::copy_device};
 
 pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
     let Gpt2BackwardArgs {
@@ -29,7 +29,7 @@ pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         final_norm,
     } = grads;
     let LayerNormGrads {
-        d_residual: d_final_residual,
+        d_residual: _,
         d_normalized: d_final_normalized,
         d_weight: d_final_weight,
         d_bias: d_final_bias,
@@ -54,17 +54,12 @@ pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         weights: weights.ln_f,
         saved: saved.final_norm,
         grads: LayerNormGrads {
-            d_residual: d_final_residual,
+            d_residual: blocks[GPT2_N_LAYER - 1].d_residual_out,
             d_normalized: d_final_normalized,
             d_weight: d_final_weight,
             d_bias: d_final_bias,
         },
     })?;
-    copy_device(
-        stream,
-        d_final_residual,
-        blocks[GPT2_N_LAYER - 1].d_residual_out,
-    )?;
     run_blocks(
         stream,
         modules,

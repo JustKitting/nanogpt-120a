@@ -6710,6 +6710,51 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Write residual-chain gradients directly to the next backward
+  destination.
+status: accepted_900s
+change:
+  Removed the backward-only device-to-device copies that moved final layer-norm
+  d_residual into the last block's d_residual_out and each block's
+  d_residual_in into the previous block's d_residual_out or embedding residual.
+  The residual add/layer-norm kernels now write those values directly into the
+  destination consumed by the next backward step. The old backward device-copy
+  helper became unused and was removed.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test residual_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/direct_residual_grad_l4_b8_20_20260621T131424Z.run.log
+    val_loss=8.506022, train_elapsed_s=3.470, completed_steps=20.
+  100-step SYNTH screen:
+    target/direct_residual_grad_l4_b8_100_20260621T131445Z.log
+    val_loss=6.543701, train_elapsed_s=17.386, completed_steps=100.
+  900-second held-out gate:
+    target/direct_residual_grad_l4_b8_900_20260621T131534Z.log
+    val_loss=3.954098, train_elapsed_s=900.126, completed_steps=5028.
+measured_effect:
+  Against the accepted MS-EDEN source-split profile
+  target/nsys/ms_eden_split_fp32_source_l4_b8_20_20260621T112900Z.nsys-rep,
+  D2D memcpy count moved from 2671 to 2571 over 20 profiled steps and D2D
+  memcpy time moved from 63.187351ms to 61.899231ms. The 20-step profiled
+  train_elapsed_s was noisier and moved from 3.397 to 3.470, so this should
+  not be read as a large profiler win.
+  The 100-step screen improved train_elapsed_s from 17.426 to 17.386 and
+  validation loss from 6.544603 to 6.543701. The 900-second gate completed 2
+  more steps than the accepted baseline while validation loss moved from
+  3.947354 to 3.954098, a +0.171% change.
+decision:
+  Promote under the current acceptance rule: held-out validation stayed within
+  the +/-1% no-meaningful-change band and completed step count increased.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Decouple Aurora square Polar tile from rectangular host f16 attention tile.
 status: rejected_screen
 change:
