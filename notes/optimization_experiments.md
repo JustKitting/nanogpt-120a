@@ -5468,6 +5468,42 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted after gate
+experiment: Increase cross_entropy_kernel row block from 256 to 512 threads.
+status: rejected_gate
+change:
+  Changed CROSS_ENTROPY_THREADS_PER_BLOCK from 256 to 512 so each token row
+  used more warps for the max, denominator, and dlogits vocab scans. The loss
+  math, targets, optimizer path, and data order were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/cross_entropy_512_l4_b8_20_20260621T040316Z.run.log
+    val_loss=8.502732, train_elapsed_s=3.594, completed_steps=20.
+  100-step SYNTH screen:
+    target/cross_entropy_512_l4_b8_100_20260621T040329Z.log
+    val_loss=6.546054, train_elapsed_s=18.356, completed_steps=100.
+  900-second held-out gate:
+    target/cross_entropy_512_l4_b8_900_20260621T040404Z.log
+    val_loss=4.044516, train_elapsed_s=900.164, completed_steps=4776.
+measured_effect:
+  The short profile improved the target kernel: cross_entropy_kernel moved from
+  55.340644ms to 44.623598ms over 20 profiled steps versus the promoted N=64
+  baseline profile target/nsys/projection_cta_n64_l4_b8_20_20260621T032524Z.run.log.
+  The 100-step screen was also slightly faster, moving from 18.360s to
+  18.356s. The full fixed-wall gate did not pass: completed steps increased
+  from 4766 to 4776, but validation loss moved from 4.002766 to 4.044516,
+  which is slightly outside the current +1% acceptance band.
+decision:
+  Reject after the 900-second gate. Code was reverted to the promoted 256-thread
+  cross entropy baseline.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Warp-shuffle MS-EDEN Hadamard rotation.
 status: accepted
