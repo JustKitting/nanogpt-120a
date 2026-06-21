@@ -6815,6 +6815,44 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted
+experiment: Write QKV and attention log-sum-exp directly into block tape.
+status: rejected_900s
+change:
+  Routed training forward QKV and attention log-sum-exp outputs directly into
+  the per-block tape buffers instead of writing to shared scratch and copying
+  those two buffers into tape after attention. Inference/no-tape mode kept the
+  original scratch path.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/direct_qkv_lse_tape_l4_b8_20_20260621T122611Z.run.log
+    val_loss=8.503760, train_elapsed_s=3.460, completed_steps=20.
+  100-step SYNTH screen:
+    target/direct_qkv_lse_tape_l4_b8_100_20260621T122649Z.log
+    val_loss=6.544517, train_elapsed_s=17.344, completed_steps=100.
+  900-second held-out gate:
+    target/direct_qkv_lse_tape_l4_b8_900_20260621T122715Z.log
+    val_loss=4.002939, train_elapsed_s=900.064, completed_steps=5045.
+measured_effect:
+  Against the accepted MS-EDEN source split profile
+  target/nsys/ms_eden_split_fp32_source_l4_b8_20_20260621T112900Z.run.log,
+  device-to-device copy volume dropped from 62296.613 MB to 53796.856 MB over
+  20 profiled steps, and device-to-device copy time dropped from 63.244391ms to
+  48.260440ms. The 100-step screen was slightly faster, 17.344s versus
+  17.426s. The full fixed-wall gate completed 5045 steps versus the accepted
+  5026, but held-out validation loss worsened from 3.947354 to 4.002939.
+decision:
+  Reject and revert the code. The memory-copy reduction was real, but the
+  fixed-wall held-out loss worsened by more than the +/-1% acceptance band.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: F16 CTA matmul M128/N32 tile shape.
 status: rejected_correctness
