@@ -31,8 +31,11 @@ impl Trainer {
         let mut top_tokens_dev = DeviceBuffer::<u32>::zeroed(stream.as_ref(), top_k)?;
         let mut top_logits_dev = DeviceBuffer::<f32>::zeroed(stream.as_ref(), top_k)?;
 
+        let bos_token = tokenizer.bos_token();
+        let eos_token = tokenizer.eos_token();
+
         for _ in 0..max_new_tokens {
-            let (windows, row) = generation_batch(&tokens, tokenizer.eos_token())?;
+            let (windows, row) = generation_batch(&tokens, bos_token)?;
             let batch = TokenBatch::from_default_batch(stream.as_ref(), &windows)?;
             self.forward_step(&batch)?;
             self.runtime.logits.top_k(LogitsTopKArgs {
@@ -54,6 +57,9 @@ impl Trainer {
                 &mut self.rng,
             );
             tokens.push(next);
+            if next == eos_token {
+                break;
+            }
         }
 
         tokenizer.decode(&tokens)

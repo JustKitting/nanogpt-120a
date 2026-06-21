@@ -8,9 +8,10 @@ pub fn tokenize_doc(
     tokenizer: &Llama2Tokenizer,
     writer: &mut ShardWriter,
 ) -> AppResult<()> {
-    let mut ids = Vec::with_capacity(1 + text.len() / 4);
+    let mut ids = Vec::with_capacity(2 + text.len() / 4);
     ids.push(tokenizer.bos_token());
     ids.extend(tokenizer.encode_ordinary(text)?);
+    ids.push(tokenizer.eos_token());
 
     for id in ids {
         let token = u16::try_from(id)?;

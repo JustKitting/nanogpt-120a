@@ -18,6 +18,7 @@ const SHAKESPEARE_URL: &str =
 const SHAKESPEARE_DIR: &str = "data/shakespeare";
 const SHAKESPEARE_RAW: &str = "input.txt";
 const SHAKESPEARE_SHARD: &str = "shakespeare_llama2_train_000000.bin";
+const SYNTH_EOS_MARKER: &str = ".llama2_eos_boundaries";
 const VALIDATION_WINDOWS: usize = 4;
 
 pub struct TokenDataLoader {
@@ -297,10 +298,12 @@ fn is_full_synth_shard(path: &Path) -> bool {
 fn ensure_synth_shards() -> AppResult<()> {
     if train_shards().is_ok_and(|shards| shards.len() >= DEFAULT_TRAIN_SHARD_COUNT)
         && first_val_shard().is_ok()
+        && synth_eos_marker().exists()
     {
         return Ok(());
     }
 
+    clear_synth_shards()?;
     synth_prep::parse_data_for_train_shards(DEFAULT_TRAIN_SHARD_COUNT)?;
     let train_shard_count = train_shards()?.len();
     if train_shard_count < DEFAULT_TRAIN_SHARD_COUNT {
@@ -312,11 +315,37 @@ fn ensure_synth_shards() -> AppResult<()> {
     first_val_shard().map(|_| ())
 }
 
+fn synth_eos_marker() -> PathBuf {
+    synth_shard_dir().join(SYNTH_EOS_MARKER)
+}
+
+fn clear_synth_shards() -> AppResult<()> {
+    let dir = synth_shard_dir();
+    if !dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(&dir)? {
+        let path = entry?.path();
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if (file_name.starts_with(SHARD_FILE_PREFIX) && file_name.ends_with(".bin"))
+            || file_name == SYNTH_EOS_MARKER
+        {
+            fs::remove_file(path)?;
+        }
+    }
+
+    Ok(())
+}
+
 fn ensure_shakespeare_shard() -> AppResult<PathBuf> {
     let dir = Path::new(SHAKESPEARE_DIR);
     let shard_dir = dir.join(SHARDS_DIR);
     let shard_path = shard_dir.join(SHAKESPEARE_SHARD);
-    if shard_path.exists() {
+    let tokenizer = Llama2Tokenizer::from_default_assets()?;
+    if shard_path.exists() && shard_contains_token(&shard_path, tokenizer.eos_token())? {
         return Ok(shard_path);
     }
 
@@ -331,14 +360,19 @@ fn ensure_shakespeare_shard() -> AppResult<PathBuf> {
     }
 
     let text = fs::read_to_string(raw_path)?;
-    let tokenizer = Llama2Tokenizer::from_default_assets()?;
     let mut tokens = Vec::new();
     tokens.push(u16::try_from(tokenizer.bos_token())?);
     for id in tokenizer.encode_ordinary(&text)? {
         tokens.push(u16::try_from(id)?);
     }
+    tokens.push(u16::try_from(tokenizer.eos_token())?);
     write_u16_tokens(&shard_path, &tokens)?;
     Ok(shard_path)
+}
+
+fn shard_contains_token(path: &Path, token: u32) -> AppResult<bool> {
+    let token = u16::try_from(token)?;
+    Ok(read_u16_tokens(path)?.contains(&token))
 }
 
 fn read_u16_tokens(path: &Path) -> AppResult<Vec<u16>> {

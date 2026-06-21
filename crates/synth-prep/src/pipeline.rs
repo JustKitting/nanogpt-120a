@@ -30,5 +30,10 @@ pub fn parse_data_for_train_shards(target_train_shards: usize) -> AppResult<()> 
         }
     }
 
-    writer.finish()
+    writer.finish()?;
+    std::fs::write(
+        data_dir.join(SHARDS_DIR).join(".llama2_eos_boundaries"),
+        b"1\n",
+    )?;
+    Ok(())
 }
