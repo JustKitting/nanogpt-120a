@@ -11,7 +11,7 @@ use gpt2_nvfp4::GPT2_N_LAYER;
 use crate::AppResult;
 use crate::checkpoint::format::{CheckpointReader, CheckpointTensor, CheckpointWriter};
 use crate::upload::{
-    UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNvfp4,
+    UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4,
 };
 
 pub fn save_uploaded_model(stream: &CudaStream, model: &UploadedModel, path: &Path) -> AppResult {
@@ -35,6 +35,7 @@ pub fn save_uploaded_model(stream: &CudaStream, model: &UploadedModel, path: &Pa
         write_block(&mut writer, stream, index, block)?;
     }
     write_layer_norm(&mut writer, stream, "ln_f", &model.ln_f)?;
+    write_next_latent(&mut writer, stream, &model.next_latent)?;
     writer.finish()
 }
 
@@ -62,6 +63,7 @@ pub fn load_uploaded_model(stream: &CudaStream, path: &Path) -> AppResult<Upload
         token_embedding: take_uploaded_tensor(stream, &mut tensors, "token_embedding")?,
         blocks: load_blocks(stream, &mut tensors)?,
         ln_f: load_layer_norm(stream, &mut tensors, "ln_f")?,
+        next_latent: load_next_latent(stream, &mut tensors)?,
     })
 }
 
@@ -124,6 +126,32 @@ fn write_linear(
     write_tensor(writer, stream, &format!("{prefix}.bias"), &linear.bias)
 }
 
+fn write_next_latent(
+    writer: &mut CheckpointWriter<impl std::io::Write>,
+    stream: &CudaStream,
+    next_latent: &UploadedNextLat,
+) -> AppResult {
+    write_layer_norm(writer, stream, "next_latent.norm", &next_latent.norm)?;
+    write_linear(
+        writer,
+        stream,
+        "next_latent.input_projection",
+        &next_latent.input_projection,
+    )?;
+    write_linear(
+        writer,
+        stream,
+        "next_latent.transition",
+        &next_latent.transition,
+    )?;
+    write_linear(
+        writer,
+        stream,
+        "next_latent.output_projection",
+        &next_latent.output_projection,
+    )
+}
+
 fn write_tensor(
     writer: &mut CheckpointWriter<impl std::io::Write>,
     stream: &CudaStream,
@@ -140,11 +168,11 @@ fn write_tensor(
 }
 
 fn tensor_count(model: &UploadedModel) -> u32 {
-    1 + 2 + model.blocks.len() as u32 * 12
+    1 + 2 + 8 + model.blocks.len() as u32 * 12
 }
 
 fn expected_tensor_count() -> u32 {
-    1 + 2 + GPT2_N_LAYER as u32 * 12
+    1 + 2 + 8 + GPT2_N_LAYER as u32 * 12
 }
 
 fn load_blocks(
@@ -184,6 +212,18 @@ fn load_linear(
     Ok(UploadedLinear {
         weight: take_uploaded_tensor(stream, tensors, &format!("{prefix}.weight"))?,
         bias: take_uploaded_tensor(stream, tensors, &format!("{prefix}.bias"))?,
+    })
+}
+
+fn load_next_latent(
+    stream: &CudaStream,
+    tensors: &mut HashMap<String, CheckpointTensor>,
+) -> AppResult<UploadedNextLat> {
+    Ok(UploadedNextLat {
+        norm: load_layer_norm(stream, tensors, "next_latent.norm")?,
+        input_projection: load_linear(stream, tensors, "next_latent.input_projection")?,
+        transition: load_linear(stream, tensors, "next_latent.transition")?,
+        output_projection: load_linear(stream, tensors, "next_latent.output_projection")?,
     })
 }
 
