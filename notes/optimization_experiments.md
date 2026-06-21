@@ -7959,3 +7959,31 @@ decision:
   sweep: spending full 900-second runs on candidates likely to improve held-out
   validation loss, while using stability only as a survival prior.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Keep screen baseline synchronized after promotion.
+status: accepted_tooling
+change:
+  The sweep loop now updates its in-memory screen baseline after a trial
+  promotes the full-run baseline. It reads SCREEN_LOSS from the promoted trial's
+  screen_decision.env and uses that value for later screen decisions. If the
+  screen decision artifact is unavailable, it falls back to rerunning the
+  current baseline screen path. This prevents later trials from being gated
+  against a stale pre-promotion screen loss.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 18 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_promoted_screen_baseline_20260621T180611Z
+measured_effect:
+  Added direct runner unit coverage for reading SCREEN_LOSS from a promoted
+  trial's screen_decision.env. The dry-run verifies the surrounding sweep
+  proposal and artifact path still executes; dry-run intentionally does not
+  execute screen/full training stages.
+decision:
+  Accept as sweep infrastructure. This removes a manual/stale-state failure
+  mode from chained sweeps after an automatic baseline promotion.
+```

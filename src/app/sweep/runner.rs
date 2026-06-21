@@ -36,7 +36,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             config.baseline.display()
         );
     }
-    let screen_baseline = screen_baseline(&baseline, &config, &sweep_dir)?;
+    let mut baseline_screen_loss = screen_baseline(&baseline, &config, &sweep_dir)?;
     let mut rng = chain::sweep_rng(config.seed, history.trials.len());
 
     for index in history.trials.len()..config.trials {
@@ -69,7 +69,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             &trial_dir,
             candidate,
             &config,
-            screen_baseline,
+            baseline_screen_loss,
             screen_score.as_ref(),
         )?;
         println!(
@@ -87,10 +87,12 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
         );
         history.append_unique(trial.clone())?;
         let promoted = baseline.promote_trial(&trial, config.dry_run)?;
-        if !config.dry_run {
-            shared_history.append_unique(trial)?;
-        }
         if promoted {
+            baseline_screen_loss = if let Some(loss) = promoted_screen_loss(&trial) {
+                Some(loss)
+            } else {
+                screen_baseline(&baseline, &config, &sweep_dir)?
+            };
             println!(
                 "sweep_baseline_promoted val_loss={:.6} key={} path={}",
                 baseline.val_loss().unwrap_or(f64::NAN),
@@ -100,6 +102,9 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
                     .unwrap_or_default(),
                 config.baseline.display()
             );
+        }
+        if !config.dry_run {
+            shared_history.append_unique(trial)?;
         }
         let baseline_trial = baseline.measured_trial();
         let all_trials = chain::all_trials_with_baseline(
@@ -286,6 +291,18 @@ fn trial(
     )
 }
 
+fn promoted_screen_loss(trial: &Trial) -> Option<f64> {
+    let text = fs::read_to_string(trial.log_path.with_file_name("screen_decision.env")).ok()?;
+    value(&text, "SCREEN_LOSS")?.parse().ok()
+}
+
+fn value<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    text.lines().find_map(|line| {
+        let (name, value) = line.split_once('=')?;
+        (name == key).then_some(value)
+    })
+}
+
 fn selected_score(proposal: &optimizer::Proposal) -> Option<analysis::CandidateScore> {
     proposal
         .ranked
@@ -326,4 +343,46 @@ fn utc_stamp() -> String {
         now.minute(),
         now.second()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::{Trial, promoted_screen_loss};
+    use crate::sweep::candidate::Candidate;
+
+    #[test]
+    fn reads_promoted_screen_loss_from_decision_artifact() {
+        let dir = std::env::temp_dir().join(format!("sweep-screen-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("screen_decision.env"), "SCREEN_LOSS=3.250000\n").unwrap();
+        let trial = Trial {
+            candidate: candidate(),
+            status: "success".to_string(),
+            val_loss: Some(3.0),
+            completed_steps: Some(100),
+            log_path: dir.join("train.log"),
+        };
+
+        assert_eq!(promoted_screen_loss(&trial), Some(3.25));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    fn candidate() -> Candidate {
+        Candidate {
+            batch_size: 8,
+            n_layer: 4,
+            n_embd: 1024,
+            n_head: 16,
+            aurora_phases: 4,
+            aurora_blocks: 80,
+            lr_scale: 1.0,
+            adam_lr_scale: 1.0,
+            warmup_steps: 20,
+            start_ratio: 0.1,
+            amuse_beta1: 0.4,
+            amuse_rho: 0.8,
+        }
+    }
 }
