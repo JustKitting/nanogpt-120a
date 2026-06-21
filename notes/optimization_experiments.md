@@ -6801,6 +6801,37 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Adam no-decay for layer-norm tensors and linear biases.
+status: rejected_900s
+change:
+  Tested nanoGPT-style AdamW parameter grouping for the Adam-managed tensors:
+  token embeddings kept weight decay, while layer-norm weights, layer-norm
+  biases, and linear biases used zero weight decay. Aurora-managed matrix
+  weights were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  100-step SYNTH screen:
+    target/adam_no_decay_bias_ln_l4_b8_100_20260621T103611Z.log
+    val_loss=6.551615, train_elapsed_s=17.445, completed_steps=100.
+  900-second held-out gate:
+    target/adam_no_decay_bias_ln_l4_b8_900_20260621T103646Z.log
+    val_loss=4.012671, train_elapsed_s=900.142, completed_steps=5004.
+measured_effect:
+  Against the accepted baseline
+  target/ms_eden_inv_scale_l4_b8_900_20260621T093858Z.log, held-out
+  validation loss moved from 3.943465 to 4.012671, and completed steps moved
+  from 5011 to 5004.
+decision:
+  Reject and revert the code. This changed optimizer semantics but worsened
+  held-out validation by about 1.75% and reduced completed step count under the
+  same fixed-wall budget.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Unroll aligned FP16 CTA f32 staging loops.
 status: rejected_pre_gate
 change:
