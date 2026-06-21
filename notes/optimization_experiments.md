@@ -6069,3 +6069,33 @@ decision:
   Reject before the 900-second gate. Removing the final barrier did not improve
   the target kernel or short wall-clock. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Cache flattened attention softmax/probability indices.
+status: rejected_screen
+change:
+  Cached the score index in attention_softmax_forward_kernel's probability
+  store loop and cached the log-sum-exp row index in attention_prob_ds_kernel.
+  Masked probability and gradient stores still wrote zeros as before.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_log_sum_exp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/attention_index_cache_l4_b8_20_20260621T065123Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.585, completed_steps=20.
+measured_effect:
+  Against the promoted MS-EDEN chunk-scale baseline
+  target/nsys/ms_eden_chunk_scale_unroll4_l4_b8_20_20260621T062103Z.run.log,
+  attention_prob_ds_kernel moved from 90.620948ms to 90.690734ms over 20
+  profiled steps. attention_softmax_forward_kernel moved from 45.188987ms to
+  45.180041ms, but profiled train time still moved from 3.584s to 3.585s.
+decision:
+  Reject before the 900-second gate. The forward softmax delta was tiny, the
+  backward probability kernel regressed, and the short wall-clock regressed.
+  Code was reverted.
+```
