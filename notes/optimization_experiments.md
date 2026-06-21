@@ -6769,6 +6769,31 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Use warp shuffles for Aurora four/six encode pair values.
+status: rejected_correctness
+change:
+  In Aurora's fused four/six encode writeback, replaced the pair-lane global
+  reloads used for FP4 payload packing with half-warp shuffles from the value
+  already loaded for group amax/error estimation.
+verification:
+  cargo fmt --all --check: initially failed only on line wrapping.
+  cargo fmt --all: pass.
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: timeout.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: timeout in aurora::aurora_mega_update_matches_first_iteration_recurrence.
+measured_effect:
+  No profiling run. The candidate failed the Aurora optimizer verification gate
+  before profiling.
+decision:
+  Reject and revert. Avoid using this shuffle rewrite unless the Aurora encode
+  correctness issue is isolated first.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Decode Aurora Polar CTA tile coordinates with power-of-two shifts.
 status: rejected_pre_gate
 change:
