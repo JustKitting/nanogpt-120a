@@ -7,6 +7,23 @@ use std::{
 
 use super::{candidate::Candidate, config::SweepConfig, parse::RunResult, status};
 
+pub fn run_screen_candidate(
+    candidate: &Candidate,
+    config: &SweepConfig,
+    sweep_dir: &Path,
+    trial_dir: &Path,
+    trial_index: usize,
+) -> std::io::Result<RunResult> {
+    run_candidate_stage(
+        candidate,
+        config,
+        sweep_dir,
+        trial_dir,
+        trial_index,
+        Stage::Screen,
+    )
+}
+
 pub fn run_candidate(
     candidate: &Candidate,
     config: &SweepConfig,
@@ -14,13 +31,63 @@ pub fn run_candidate(
     trial_dir: &Path,
     trial_index: usize,
 ) -> std::io::Result<RunResult> {
-    let mut log = File::create(trial_dir.join("train.log"))?;
+    run_candidate_stage(
+        candidate,
+        config,
+        sweep_dir,
+        trial_dir,
+        trial_index,
+        Stage::Full,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum Stage {
+    Screen,
+    Full,
+}
+
+impl Stage {
+    fn event_prefix(self) -> &'static str {
+        match self {
+            Self::Screen => "screen",
+            Self::Full => "training",
+        }
+    }
+
+    fn run_dir_name(self) -> &'static str {
+        match self {
+            Self::Screen => "screen",
+            Self::Full => "run",
+        }
+    }
+
+    fn log_name(self) -> &'static str {
+        match self {
+            Self::Screen => "screen.log",
+            Self::Full => "train.log",
+        }
+    }
+}
+
+fn run_candidate_stage(
+    candidate: &Candidate,
+    config: &SweepConfig,
+    sweep_dir: &Path,
+    trial_dir: &Path,
+    trial_index: usize,
+    stage: Stage,
+) -> std::io::Result<RunResult> {
+    let mut log = File::create(trial_dir.join(stage.log_name()))?;
     let mut command = Command::new("./target/release/rust-kernels");
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     command.env("TRAIN_DATASET", &config.dataset);
     command.env("TRAIN_MAX_SECONDS", format!("{:.3}", config.max_seconds));
     command.env("TRAIN_LOG_INTERVAL", config.log_interval.to_string());
-    command.env("TRAIN_RUN_DIR", trial_dir.join("run"));
+    command.env("TRAIN_RUN_DIR", trial_dir.join(stage.run_dir_name()));
+    if matches!(stage, Stage::Screen) {
+        command.env("TRAIN_STEPS", config.screen_steps.to_string());
+    }
     if let Some(device) = &config.cuda_device {
         command.env("CUDA_DEVICE_INDEX", device);
     }
@@ -36,7 +103,7 @@ pub fn run_candidate(
         trial_dir,
         trial_index,
         candidate,
-        "training_started",
+        &format!("{}_started", stage.event_prefix()),
         &result,
     )?;
     for line in BufReader::new(stdout).lines() {
@@ -55,7 +122,7 @@ pub fn run_candidate(
                 trial_dir,
                 trial_index,
                 candidate,
-                "training_progress",
+                &format!("{}_progress", stage.event_prefix()),
                 &result,
             )?;
         }
@@ -85,7 +152,7 @@ pub fn run_candidate(
         trial_dir,
         trial_index,
         candidate,
-        "training_exited",
+        &format!("{}_exited", stage.event_prefix()),
         &result,
     )?;
     Ok(result)

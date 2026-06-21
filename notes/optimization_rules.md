@@ -18,9 +18,9 @@ Training loss, one-step runs, 100-step runs, tokens/s, and isolated profiler
 timings are diagnostics. They do not prove that an optimization should be
 promoted.
 
-## Acceptance Rule
+## Kernel/Runtime Acceptance Rule
 
-The current acceptance rule is:
+The current kernel/runtime acceptance rule is:
 
 - Accept if 900-second held-out validation loss improves.
 - Accept if 900-second held-out validation loss is within `+/-1%` of the current
@@ -32,6 +32,9 @@ The `+/-1%` band is an active noise band, not an old rule and not a weaker
 objective. Seed variance can move validation loss within that band, so higher
 completed step count inside the band can be a valid long-run improvement.
 
+This rule is for math-preserving kernel/runtime changes. It does not apply to
+hyperparameter sweep promotion.
+
 ## Sweep Rule
 
 Do not run a new hyperparameter sweep for same-math kernel/runtime edits. Use
@@ -39,6 +42,11 @@ profiling and fixed 900-second validation for those changes.
 
 Run a multivariable sweep only after a major math or architecture change, or
 when explicitly requested.
+
+Sweep baseline promotion is stricter than kernel/runtime acceptance: promote a
+hyperparameter candidate only when its 900-second held-out validation loss is
+lower than the current sweep baseline. Do not promote a sweep candidate only
+because it completed more steps inside the `+/-1%` noise band.
 
 ## Promotion Rule
 

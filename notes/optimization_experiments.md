@@ -33,6 +33,42 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-21
+commit: uncommitted
+experiment: Add 500-step screen gate to Bayesian hyperparameter sweep.
+status: accepted_infra_no_baseline_change
+change:
+  Sweep trials now run a step-capped screen before the full 900-second gate.
+  The sweep first builds and screens the current baseline candidate for the same
+  500-step horizon, then rejects candidate trials whose 500-step held-out
+  validation loss does not beat that screen baseline. Screen rejects are stored
+  with status=rejected_screen and no comparable 900-second val_loss.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass.
+  cargo check --all-targets: pass.
+run:
+  target/sweeps/hyperparam_screen500_900_20260621T143115Z
+  screen baseline:
+    val_loss=5.450167, completed_steps=500, train_elapsed_s=88.667.
+  trials:
+    0 rejected_screen val_loss=5.550757, d=2048.
+    1 rejected_screen val_loss=5.855838, d=2048.
+    2 rejected_screen val_loss=5.891170, d=1024.
+    3 rejected_screen val_loss=5.940176, d=1024.
+    4 rejected_screen val_loss=5.687976, d=1024.
+    5 rejected_screen val_loss=5.727386, d=1024.
+    6 rejected_screen val_loss=5.654946, d=2048.
+    7 rejected_screen val_loss=5.569425, d=1024.
+result:
+  No candidate passed the screen, so no full 900-second gate ran and
+  notes/sweep_baseline.env stayed at val_loss=3.954098, completed_steps=5028.
+decision:
+  Keep the screen gate as sweep infrastructure. Do not promote any
+  hyperparameter candidate from this sweep.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: Hoist Aurora update decay and scaled learning-rate invariants.
 status: rejected_pre_gate
