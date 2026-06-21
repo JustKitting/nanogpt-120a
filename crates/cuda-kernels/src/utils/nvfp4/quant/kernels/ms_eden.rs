@@ -494,8 +494,6 @@ pub(crate) mod module {
             }
         }
 
-        thread::sync_threads();
-
         let pair = group_leader + (lane_in_group & 0x7) * 2;
         let hi_value = warp::shuffle_f32_sync(0xffff_ffff, value, pair);
         let lo_value = warp::shuffle_f32_sync(0xffff_ffff, value, pair + 1);

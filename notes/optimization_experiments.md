@@ -5776,3 +5776,44 @@ decision:
   Promote under the current acceptance rule: validation loss stayed within the
   +/-1% no-meaningful-change band and completed step count increased.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Remove redundant one-warp MS-EDEN pack barrier.
+status: accepted
+change:
+  Removed the block-wide sync after MS-EDEN scale-bit stores in the one-warp
+  fp32/NVFP4 transpose pack path. The following FP4 payload store reads only
+  lane-local values and warp shuffles, not the stored scales, so the barrier
+  was unnecessary for the current 32-thread launch contract.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_no_pack_barrier_l4_b8_20_20260621T045551Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.588, completed_steps=20.
+  100-step SYNTH screen:
+    target/ms_eden_no_pack_barrier_l4_b8_100_20260621T045631Z.log
+    val_loss=6.545762, train_elapsed_s=18.300, completed_steps=100.
+  900-second held-out gate:
+    target/ms_eden_no_pack_barrier_l4_b8_900_20260621T045707Z.log
+    val_loss=4.013671, train_elapsed_s=900.101, completed_steps=4788.
+measured_effect:
+  Against the previous promoted profile
+  target/nsys/f16_qk_aligned_stage_l4_b8_20_20260621T043243Z.run.log,
+  fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel moved from
+  162.245027ms to 161.850259ms over 20 profiled steps, and
+  fp32_to_nvfp4_ms_eden_device_scale_kernel moved from 160.688510ms to
+  160.560723ms. Profiled train time moved from 3.591s to 3.588s.
+  The 900-second gate completed 11 more steps than the previous promoted
+  baseline while validation loss moved from 4.012894 to 4.013671, a +0.019%
+  change.
+decision:
+  Promote under the current acceptance rule: validation loss stayed well within
+  the +/-1% no-meaningful-change band and completed step count increased.
+```
