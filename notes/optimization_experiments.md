@@ -5500,6 +5500,34 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Skip the final cooperative grid sync in Aurora mega update.
+status: rejected_screen
+change:
+  Kept the cooperative grid syncs between Aurora matrix phases but skipped the
+  terminal sync immediately before aurora_mega_update_cooperative_kernel
+  returns.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aurora_skip_final_grid_sync_l4_b8_20_20260621T073447Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.590, completed_steps=20.
+measured_effect:
+  Against the promoted LM-head aligned baseline
+  target/nsys/lm_head_aligned_path_l4_b8_20_20260621T065355Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1361.609071ms to
+  1370.387667ms over 20 profiled steps. Profiled train time moved from 3.584s
+  to 3.590s.
+decision:
+  Reject before the 900-second gate. The target Aurora kernel regressed and
+  short wall-clock regressed. Code was reverted.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Aligned f32-input staging and store path for f16 TC QK matmuls.
 status: accepted
