@@ -344,10 +344,19 @@ pub(crate) mod module {
         let warp_in_block = thread / 32;
         let mut chunk = thread;
         let mut local_amax = 0.0;
+        let stride = thread::blockDim_x();
 
         while chunk < chunk_count {
-            local_amax = max_f32(local_amax, chunk_amax[chunk as usize]);
-            chunk += thread::blockDim_x();
+            local_amax = max_f32(
+                local_amax,
+                max4_f32(
+                    chunk_amax_or_zero(chunk_amax, chunk, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk + stride, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk + stride * 2, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk + stride * 3, chunk_count),
+                ),
+            );
+            chunk += stride * 4;
         }
 
         let warp_amax = warp_max_f32(local_amax);
@@ -377,6 +386,15 @@ pub(crate) mod module {
                     *out_global_scale.get_unchecked_mut(0) = global_scale;
                 }
             }
+        }
+    }
+
+    #[inline(always)]
+    fn chunk_amax_or_zero(chunk_amax: &[f32], chunk: u32, chunk_count: u32) -> f32 {
+        if chunk < chunk_count {
+            chunk_amax[chunk as usize]
+        } else {
+            0.0
         }
     }
 

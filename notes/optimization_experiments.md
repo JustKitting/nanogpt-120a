@@ -5938,3 +5938,42 @@ decision:
   Reject before the 900-second gate. The tiny projection-kernel delta did not
   improve the short wall-clock or validation screen. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Unroll MS-EDEN global-scale chunk reduction by four.
+status: accepted
+change:
+  In quartet_backward_ms_eden_global_scale_from_chunks_kernel, each thread now
+  checks four stride-separated chunk amax values per loop iteration and reduces
+  them with max4_f32 before the existing warp/block reduction.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass after rerun with completed PTX build.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_chunk_scale_unroll4_l4_b8_20_20260621T062103Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.584, completed_steps=20.
+  900-second held-out gate:
+    target/ms_eden_chunk_scale_unroll4_l4_b8_900_20260621T062140Z.log
+    val_loss=4.002436, train_elapsed_s=900.150, completed_steps=4786.
+measured_effect:
+  Against the promoted MS-EDEN barrier baseline
+  target/nsys/ms_eden_no_pack_barrier_l4_b8_20_20260621T045551Z.run.log,
+  quartet_backward_ms_eden_global_scale_from_chunks_kernel moved from
+  7.784846ms to 3.215699ms over 20 profiled steps. Profiled train time moved
+  from 3.588s to 3.584s. The adjacent device-scale pack kernels were
+  effectively unchanged:
+    fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel 161.850259ms -> 161.960962ms
+    fp32_to_nvfp4_ms_eden_device_scale_kernel 160.560723ms -> 160.685299ms
+    rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel 71.623581ms -> 71.743201ms
+  The 900-second gate lowered validation loss from 4.013671 to 4.002436 while
+  completed steps moved from 4788 to 4786.
+decision:
+  Promote under the current acceptance rule because held-out validation loss
+  improved, even though completed step count decreased by two.
+```
