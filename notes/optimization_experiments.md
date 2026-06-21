@@ -6666,6 +6666,49 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted
+experiment: Split FP32 MS-EDEN source gather paths.
+status: accepted_900s
+change:
+  Split the shared FP32 MS-EDEN Hadamard input helper into separate row-major
+  and transposed source helpers. The non-transposed and transposed kernels were
+  already separate launch symbols; this removes the per-lane transpose_source
+  branch from the hot gather path without changing seeds, scaling, RHT, or pack
+  math.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_split_fp32_source_l4_b8_20_20260621T112900Z.run.log
+    val_loss=8.506022, train_elapsed_s=3.397, completed_steps=20.
+  100-step SYNTH screen:
+    target/ms_eden_split_fp32_source_l4_b8_100_20260621T112925Z.log
+    val_loss=6.544603, train_elapsed_s=17.426, completed_steps=100.
+  900-second held-out gate:
+    target/ms_eden_split_fp32_source_l4_b8_900_20260621T112956Z.log
+    val_loss=3.947354, train_elapsed_s=900.104, completed_steps=5026.
+measured_effect:
+  Against the accepted coalesced linear-bias profile
+  target/nsys/linear_bias_coalesced_l4_b8_20_20260621T105744Z.run.log,
+  fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel moved from
+  108.275280ms to 108.253016ms over 20 profiled steps,
+  fp32_to_nvfp4_ms_eden_device_scale_kernel moved from 65.408980ms to
+  65.337191ms, and rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel
+  moved from 63.461071ms to 63.420185ms. The 900-second gate improved held-out
+  validation loss from 3.976525 to 3.947354 and completed steps from 5024 to
+  5026.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  budget.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: Add aligned fast paths to f16 RHS-transposed CTA matmul variants.
 status: rejected_screen

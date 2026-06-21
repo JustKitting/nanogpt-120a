@@ -56,8 +56,6 @@ pub(crate) mod module {
             chunk,
             src_row_len,
             dst_row_len,
-            src_row_len,
-            0,
             global_scale,
             scale_override,
             sign_seed,
@@ -95,8 +93,6 @@ pub(crate) mod module {
             chunk,
             src_row_len,
             dst_row_len,
-            src_row_len,
-            0,
             global_scale[0],
             scale_override,
             sign_seed,
@@ -126,7 +122,7 @@ pub(crate) mod module {
             return;
         }
 
-        fp32_to_nvfp4_ms_eden_body(
+        fp32_transpose_to_nvfp4_ms_eden_body(
             x,
             &mut out_fp4,
             &mut out_scales,
@@ -136,7 +132,6 @@ pub(crate) mod module {
             source_rows,
             dst_row_len,
             source_cols,
-            1,
             global_scale[0],
             scale_override,
             sign_seed,
@@ -442,8 +437,6 @@ pub(crate) mod module {
         chunk: u32,
         src_row_len: u32,
         dst_row_len: u32,
-        source_cols: u32,
-        transpose_source: u32,
         global_scale: f32,
         scale_override: f32,
         sign_seed: u32,
@@ -452,14 +445,48 @@ pub(crate) mod module {
         let lane = warp::lane_id();
         let chunk_base = chunk * HADAMARD_DIM;
 
-        let input = hadamard_input(
+        let input = hadamard_input(x, chunk_base, lane, src_row_len, dst_row_len, sign_seed);
+        ms_eden_pack_chunk(
+            input,
+            out_fp4,
+            out_scales,
+            out_global_scales,
+            out_chunk_amax,
+            chunk,
+            dst_row_len,
+            global_scale,
+            scale_override,
+            scale_seed,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn fp32_transpose_to_nvfp4_ms_eden_body(
+        x: &[f32],
+        out_fp4: &mut DisjointSlice<'_, u8>,
+        out_scales: &mut DisjointSlice<'_, u8>,
+        out_global_scales: &mut DisjointSlice<'_, f32>,
+        out_chunk_amax: &mut DisjointSlice<'_, f32>,
+        chunk: u32,
+        source_rows: u32,
+        dst_row_len: u32,
+        source_cols: u32,
+        global_scale: f32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        let lane = warp::lane_id();
+        let chunk_base = chunk * HADAMARD_DIM;
+
+        let input = transposed_hadamard_input(
             x,
             chunk_base,
             lane,
-            src_row_len,
+            source_rows,
             dst_row_len,
             source_cols,
-            transpose_source,
             sign_seed,
         );
         ms_eden_pack_chunk(
@@ -686,8 +713,6 @@ pub(crate) mod module {
         lane: u32,
         src_row_len: u32,
         dst_row_len: u32,
-        source_cols: u32,
-        transpose_source: u32,
         seed: u32,
     ) -> f32 {
         let row = chunk_base / dst_row_len;
@@ -695,11 +720,30 @@ pub(crate) mod module {
         let chunk_in_row = chunk_base - row_base;
         let input_col = chunk_in_row + lane;
         let input = if input_col < src_row_len {
-            let index = if transpose_source == 0 {
-                row * src_row_len + input_col
-            } else {
-                input_col * source_cols + row
-            };
+            let index = row * src_row_len + input_col;
+            x[index as usize]
+        } else {
+            0.0
+        };
+        input * random_sign(seed, input_col)
+    }
+
+    #[inline(always)]
+    fn transposed_hadamard_input(
+        x: &[f32],
+        chunk_base: u32,
+        lane: u32,
+        source_rows: u32,
+        dst_row_len: u32,
+        source_cols: u32,
+        seed: u32,
+    ) -> f32 {
+        let row = chunk_base / dst_row_len;
+        let row_base = row * dst_row_len;
+        let chunk_in_row = chunk_base - row_base;
+        let input_col = chunk_in_row + lane;
+        let input = if input_col < source_rows {
+            let index = input_col * source_cols + row;
             x[index as usize]
         } else {
             0.0
