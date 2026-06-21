@@ -8330,3 +8330,32 @@ decision:
   multivariable design space deliberately instead of depending on a small
   random candidate pool.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Add adaptive proposal source budgeting.
+status: accepted_tooling
+change:
+  The proposal pool no longer reserves a fixed one-fifth split for guided,
+  factorial, variance, coverage, and random candidates. It now computes source
+  weights from fitted-model availability, trial maturity, factor confidence,
+  and factor variance, then normalizes those weights into candidate counts.
+  Immature or uncertain analysis spends more candidates on design probes;
+  mature/confident analysis spends more on guided acquisition. Random
+  exploration remains an explicit budget share.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 38 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_adaptive_source_budget_20260621T185517Z
+measured_effect:
+  Added unit coverage proving no response model gets no guided budget and that
+  a mature fitted model increases guided allocation. The dry-run ranked
+  proposal artifact showed an adaptive source mix for the current history:
+  guided=13, variance=6, coverage=5, factorial=5, random=3.
+decision:
+  Accept as sweep infrastructure. Candidate generation now reacts to confidence
+  and variance instead of using a fixed source split.
+```
