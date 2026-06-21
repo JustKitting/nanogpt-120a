@@ -8,6 +8,8 @@ pub const GPT2_LAYER_NORM_EPSILON: f32 = 1.0e-5;
 
 pub const GPT2_MLP: usize = 4 * GPT2_N_EMBD;
 pub const GPT2_QKV: usize = 3 * GPT2_N_EMBD;
+pub const NEXTLAT_INPUT: usize = 2 * GPT2_N_EMBD;
+pub const NEXTLAT_HIDDEN: usize = NEXTLAT_INPUT;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Gpt2Config;

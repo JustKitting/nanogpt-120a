@@ -25,6 +25,7 @@ pub use backward::{
 pub use config::{
     GPT2_BATCH_SIZE, GPT2_CONTEXT_LEN, GPT2_LAYER_NORM_EPSILON, GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD,
     GPT2_N_LAYER, GPT2_QKV, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, GPT2_VOCAB_SIZE, Gpt2Config,
+    NEXTLAT_HIDDEN, NEXTLAT_INPUT,
 };
 
 pub use tensor::{FixedBytes, Nvfp4Shape, Nvfp4Tensor};
@@ -38,13 +39,15 @@ pub use types::{
     Gpt2ForwardTape, Gpt2Weights, HiddenStateDevice, HiddenStateNvfp4, LayerNormForwardArgs,
     LayerNormGrads, LayerNormSaved, LayerNormTape, LayerNormTensors, LayerNormWeights,
     LinearWeights, MlpActivationNvfp4, MlpDownTensors, MlpForwardArgs, MlpForwardTape,
-    MlpProjectionTensors, MlpScratch, MlpUpTensors, MlpWeights, RowwiseNvfp4Scratch,
-    RowwiseNvfp4Tape, TokenEmbeddingArgs,
+    MlpProjectionTensors, MlpScratch, MlpUpTensors, MlpWeights, NextLatWeights,
+    RowwiseNvfp4Scratch, RowwiseNvfp4Tape, TokenEmbeddingArgs,
 };
 
 pub use types::{
-    HiddenVectorShape, MlpDownWeightShape, MlpUpWeightShape, MlpVectorShape, QkvVectorShape,
-    QkvWeightShape, ResidualWeightShape, TokenEmbeddingShape,
+    HiddenVectorShape, MlpDownWeightShape, MlpUpWeightShape, MlpVectorShape, NextLatHiddenShape,
+    NextLatInputShape, NextLatOutWeightShape, NextLatProjectionWeightShape,
+    NextLatTransitionWeightShape, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
+    TokenEmbeddingShape,
 };
 
 pub use types::{

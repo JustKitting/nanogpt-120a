@@ -6,6 +6,7 @@ mod l4_block;
 mod l5_layer_norm;
 mod linear;
 mod model;
+mod next_latent;
 mod nvfp4_scratch;
 mod shapes;
 mod tape;
@@ -26,11 +27,14 @@ pub use l4_block::{BlockForwardArgs, Gpt2BlockWeights};
 pub use l5_layer_norm::{LayerNormForwardArgs, LayerNormTensors, LayerNormWeights};
 pub use linear::LinearWeights;
 pub use model::{Gpt2, Gpt2ForwardArgs, Gpt2Weights};
+pub use next_latent::NextLatWeights;
 pub use nvfp4_scratch::{HiddenStateNvfp4, MlpActivationNvfp4, RowwiseNvfp4Scratch};
 pub(crate) use shapes::Nvfp4ShapeInit;
 pub use shapes::{
     HiddenVectorShape, LayerNormTensor, MlpDownLinear, MlpDownWeightShape, MlpUpLinear,
-    MlpUpWeightShape, MlpVectorShape, QkvLinear, QkvVectorShape, QkvWeightShape, ResidualLinear,
-    ResidualWeightShape, TokenEmbedding, TokenEmbeddingShape, nvfp4_bytes, nvfp4_scales,
+    MlpUpWeightShape, MlpVectorShape, NextLatHiddenShape, NextLatInputShape, NextLatOutWeightShape,
+    NextLatProjectionWeightShape, NextLatTransitionWeightShape, QkvLinear, QkvVectorShape,
+    QkvWeightShape, ResidualLinear, ResidualWeightShape, TokenEmbedding, TokenEmbeddingShape,
+    nvfp4_bytes, nvfp4_scales,
 };
 pub use tape::{BlockForwardTape, Gpt2ForwardTape, LayerNormTape, RowwiseNvfp4Tape};

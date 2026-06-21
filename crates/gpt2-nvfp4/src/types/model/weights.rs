@@ -3,7 +3,9 @@ use cuda_core::DriverError;
 use super::args::Gpt2ForwardArgs;
 use super::forward;
 use crate::random::InitRng;
-use crate::types::{EmbeddingWeights, Gpt2BlockWeights, HiddenStateDevice, LayerNormWeights};
+use crate::types::{
+    EmbeddingWeights, Gpt2BlockWeights, HiddenStateDevice, LayerNormWeights, NextLatWeights,
+};
 use crate::{GPT2_N_LAYER, Gpt2Config};
 
 #[derive(Clone, Debug)]
@@ -12,6 +14,7 @@ pub struct Gpt2Weights {
     pub embeddings: EmbeddingWeights,
     pub h: [Gpt2BlockWeights; GPT2_N_LAYER],
     pub ln_f: LayerNormWeights,
+    pub next_latent: NextLatWeights,
 }
 
 impl Gpt2Weights {
@@ -22,6 +25,7 @@ impl Gpt2Weights {
             embeddings: EmbeddingWeights::init(rng),
             h: std::array::from_fn(|_| Gpt2BlockWeights::init(rng, residual_projection_scale)),
             ln_f: LayerNormWeights::init(),
+            next_latent: NextLatWeights::init(rng),
         }
     }
 

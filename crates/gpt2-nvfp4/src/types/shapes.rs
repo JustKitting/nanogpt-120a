@@ -1,6 +1,7 @@
 use crate::random::InitRng;
 use crate::{
-    FixedBytes, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE, Nvfp4Shape, Nvfp4Tensor,
+    FixedBytes, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE, NEXTLAT_HIDDEN, NEXTLAT_INPUT,
+    Nvfp4Shape, Nvfp4Tensor,
 };
 
 use super::LinearWeights;
@@ -107,6 +108,11 @@ nvfp4_shape!(ResidualWeightShape, GPT2_N_EMBD, GPT2_N_EMBD);
 nvfp4_shape!(MlpUpWeightShape, GPT2_N_EMBD, GPT2_MLP);
 nvfp4_shape!(MlpVectorShape, 1, GPT2_MLP);
 nvfp4_shape!(MlpDownWeightShape, GPT2_MLP, GPT2_N_EMBD);
+nvfp4_shape!(NextLatInputShape, 1, NEXTLAT_INPUT);
+nvfp4_shape!(NextLatHiddenShape, 1, NEXTLAT_HIDDEN);
+nvfp4_shape!(NextLatProjectionWeightShape, NEXTLAT_INPUT, NEXTLAT_HIDDEN);
+nvfp4_shape!(NextLatTransitionWeightShape, NEXTLAT_HIDDEN, NEXTLAT_HIDDEN);
+nvfp4_shape!(NextLatOutWeightShape, NEXTLAT_HIDDEN, GPT2_N_EMBD);
 
 pub type TokenEmbedding = Nvfp4Tensor<TokenEmbeddingShape>;
 pub type LayerNormTensor = Nvfp4Tensor<HiddenVectorShape>;
