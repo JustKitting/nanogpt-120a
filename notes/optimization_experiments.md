@@ -6874,6 +6874,36 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Coalesced 32-column layer-norm backward parameter reduction.
+status: rejected_pre_gate
+change:
+  Tested the same 32-column coalescing pattern used for linear bias gradients
+  on layer_norm_backward_params_kernel. Each warp lane owned one adjacent
+  embedding column and walked rows, then warp-0 summed the eight per-column
+  partials for d_weight and d_bias.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test layer_norm_backward_params -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test layer_norm_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/layer_norm_param_coalesced_l4_b8_20_20260621T111850Z.run.log
+    val_loss=8.505636, train_elapsed_s=3.399, completed_steps=20.
+measured_effect:
+  Against the accepted coalesced linear-bias profile
+  target/nsys/linear_bias_coalesced_l4_b8_20_20260621T105744Z.run.log,
+  layer_norm_backward_params_kernel moved from 22.020317ms to 24.767617ms
+  over 20 profiled steps.
+decision:
+  Reject before the 900-second gate and revert the code. The target kernel
+  regressed despite the short wall-clock being within profile noise.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Unroll aligned FP16 CTA f32 staging loops.
 status: rejected_pre_gate
