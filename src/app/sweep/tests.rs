@@ -239,6 +239,7 @@ fn trial(status: &str, val_loss: Option<f64>, candidate: Candidate) -> Trial {
         status: status.to_string(),
         val_loss,
         completed_steps: Some(10),
+        elapsed_s: Some(5.0),
         log_path: PathBuf::from("train.log"),
     }
 }

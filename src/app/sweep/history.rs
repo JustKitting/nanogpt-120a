@@ -13,6 +13,7 @@ pub struct Trial {
     pub val_loss: Option<f64>,
     pub completed_steps: Option<usize>,
     pub log_path: PathBuf,
+    pub elapsed_s: Option<f64>,
 }
 
 #[derive(Debug)]

@@ -10,6 +10,8 @@ pub struct Observation {
     pub screen: Option<LogMetrics>,
     pub full: Option<LogMetrics>,
     pub trial_val_loss: Option<f64>,
+    pub trial_completed_steps: Option<usize>,
+    pub trial_elapsed_s: Option<f64>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -30,6 +32,8 @@ pub fn observations(trials: &[Trial]) -> Vec<Observation> {
             screen: log_files::read_log(log_files::screen_path(trial)),
             full: log_files::read_log(log_files::full_path(trial)),
             trial_val_loss: trial.val_loss,
+            trial_completed_steps: trial.completed_steps,
+            trial_elapsed_s: trial.elapsed_s,
         })
         .collect()
 }
@@ -51,7 +55,15 @@ pub fn screen_quality_rows(
 pub fn screen_speed_rows(observations: &[Observation]) -> Vec<(Candidate, f64)> {
     observations
         .iter()
-        .filter_map(|obs| speed_row(&obs.candidate, obs.screen?))
+        .filter_map(|obs| {
+            obs.screen
+                .and_then(|log| speed_row(&obs.candidate, log))
+                .or_else(|| {
+                    (obs.status == "rejected_screen")
+                        .then_some(())
+                        .and_then(|_| trial_speed_row(obs))
+                })
+        })
         .collect()
 }
 
@@ -71,7 +83,11 @@ pub fn full_speed_rows(observations: &[Observation]) -> Vec<(Candidate, f64)> {
     observations
         .iter()
         .filter(|obs| obs.status == "success")
-        .filter_map(|obs| speed_row(&obs.candidate, obs.full?))
+        .filter_map(|obs| {
+            obs.full
+                .and_then(|log| speed_row(&obs.candidate, log))
+                .or_else(|| trial_speed_row(obs))
+        })
         .collect()
 }
 
@@ -97,4 +113,52 @@ fn speed_row(candidate: &Candidate, log: LogMetrics) -> Option<(Candidate, f64)>
         candidate.clone(),
         steps * candidate.batch_size as f64 * SEQ_LEN / elapsed,
     ))
+}
+
+fn trial_speed_row(obs: &Observation) -> Option<(Candidate, f64)> {
+    let steps = obs.trial_completed_steps? as f64;
+    let elapsed = obs.trial_elapsed_s?;
+    (steps > 0.0 && elapsed > 0.0).then_some((
+        obs.candidate.clone(),
+        steps * obs.candidate.batch_size as f64 * SEQ_LEN / elapsed,
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Observation, full_speed_rows};
+    use crate::sweep::candidate::Candidate;
+
+    #[test]
+    fn full_speed_uses_persisted_trial_elapsed_when_log_is_missing() {
+        let rows = full_speed_rows(&[Observation {
+            candidate: candidate(),
+            status: "success".to_string(),
+            screen: None,
+            full: None,
+            trial_val_loss: Some(4.0),
+            trial_completed_steps: Some(100),
+            trial_elapsed_s: Some(20.0),
+        }]);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].1, 100.0 * 8.0 * 1024.0 / 20.0);
+    }
+
+    fn candidate() -> Candidate {
+        Candidate {
+            batch_size: 8,
+            n_layer: 4,
+            n_embd: 1024,
+            n_head: 16,
+            aurora_phases: 4,
+            aurora_blocks: 80,
+            lr_scale: 1.0,
+            adam_lr_scale: 1.0,
+            warmup_steps: 20,
+            start_ratio: 0.1,
+            amuse_beta1: 0.4,
+            amuse_rho: 0.8,
+        }
+    }
 }

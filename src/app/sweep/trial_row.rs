@@ -26,13 +26,13 @@ pub fn append(path: &Path, trial: &Trial) -> std::io::Result<()> {
 }
 
 fn header() -> &'static str {
-    "status\tval_loss\tcompleted_steps\tbatch_size\tn_layer\tn_embd\tn_head\taurora_phases\taurora_blocks\tlr_scale\tadam_lr_scale\twarmup_steps\tstart_ratio\tamuse_beta1\tamuse_rho\tlog_path"
+    "status\tval_loss\tcompleted_steps\tbatch_size\tn_layer\tn_embd\tn_head\taurora_phases\taurora_blocks\tlr_scale\tadam_lr_scale\twarmup_steps\tstart_ratio\tamuse_beta1\tamuse_rho\tlog_path\telapsed_s"
 }
 
 fn format_trial(trial: &Trial) -> String {
     let c = &trial.candidate;
     format!(
-        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}",
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}",
         trial.status,
         trial.val_loss.map(fmt).unwrap_or_else(|| "NaN".to_string()),
         trial
@@ -51,13 +51,14 @@ fn format_trial(trial: &Trial) -> String {
         c.start_ratio,
         c.amuse_beta1,
         c.amuse_rho,
-        trial.log_path.display()
+        trial.log_path.display(),
+        trial.elapsed_s.map(fmt).unwrap_or_default()
     )
 }
 
 fn parse_trial(line: &str) -> Option<Trial> {
     let p = line.split('\t').collect::<Vec<_>>();
-    if p.len() != 16 {
+    if p.len() != 16 && p.len() != 17 {
         return None;
     }
     Some(Trial {
@@ -66,6 +67,7 @@ fn parse_trial(line: &str) -> Option<Trial> {
         completed_steps: p[2].parse().ok(),
         candidate: parse_candidate(&p)?,
         log_path: PathBuf::from(p[15]),
+        elapsed_s: p.get(16).and_then(|value| parse_loss(value)),
     })
 }
 
@@ -92,4 +94,58 @@ fn parse_loss(value: &str) -> Option<f64> {
 
 fn fmt(value: f64) -> String {
     format!("{value:.6}")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::{format_trial, parse_trial};
+    use crate::sweep::{candidate::Candidate, history::Trial};
+
+    #[test]
+    fn roundtrips_elapsed_time_in_new_rows() {
+        let trial = Trial {
+            status: "success".to_string(),
+            val_loss: Some(4.25),
+            completed_steps: Some(512),
+            candidate: candidate(),
+            log_path: PathBuf::from("target/train.log"),
+            elapsed_s: Some(123.5),
+        };
+
+        let parsed = parse_trial(&format_trial(&trial)).unwrap();
+        assert_eq!(parsed.elapsed_s, Some(123.5));
+        assert_eq!(parsed.completed_steps, Some(512));
+        assert_eq!(parsed.candidate.key(), trial.candidate.key());
+    }
+
+    #[test]
+    fn parses_old_rows_without_elapsed_time() {
+        let parsed = parse_trial(
+            "success\t4.250000\t512\t8\t4\t1024\t16\t4\t80\t1.000000\t1.000000\t20\t0.100000\t0.400000\t0.800000\ttarget/train.log",
+        )
+        .unwrap();
+
+        assert_eq!(parsed.elapsed_s, None);
+        assert_eq!(parsed.completed_steps, Some(512));
+        assert_eq!(parsed.candidate.batch_size, 8);
+    }
+
+    fn candidate() -> Candidate {
+        Candidate {
+            batch_size: 8,
+            n_layer: 4,
+            n_embd: 1024,
+            n_head: 16,
+            aurora_phases: 4,
+            aurora_blocks: 80,
+            lr_scale: 1.0,
+            adam_lr_scale: 1.0,
+            warmup_steps: 20,
+            start_ratio: 0.1,
+            amuse_beta1: 0.4,
+            amuse_rho: 0.8,
+        }
+    }
 }

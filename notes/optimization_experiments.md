@@ -8101,3 +8101,31 @@ decision:
   Accept as sweep infrastructure. This removes arbitrary factorial scheduling
   and makes the variance-probing proposal source match the intended design.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Persist elapsed time for sweep speed analysis.
+status: accepted_tooling
+change:
+  trials.tsv now appends an elapsed_s column while preserving backward
+  compatibility with old rows. Runtime trials store the final elapsed time from
+  the parsed training output, rejected screen trials store screen elapsed time,
+  and promoted baselines write/read TRAIN_ELAPSED_S. Speed analysis still reads
+  logs first, but it now falls back to persisted completed_steps and elapsed_s
+  when logs are unavailable.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 27 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_persist_elapsed_speed_20260621T182405Z
+measured_effect:
+  Added unit coverage for heldout_eval train_elapsed_s parsing, new-row
+  elapsed_s roundtrip, old-row parsing without elapsed_s, and full-speed rows
+  reconstructed from persisted trial timing when no log can be read. The
+  dry-run trials.tsv emitted the new elapsed_s header column.
+decision:
+  Accept as sweep infrastructure. The sweep can now keep learning speed
+  correlations from shared history even when old run logs are not available.
+```

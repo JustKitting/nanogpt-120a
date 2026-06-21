@@ -23,10 +23,12 @@ impl RunResult {
         }
         if line.starts_with("stopped_by_wall_clock=true") {
             self.completed_steps = field(line, "completed_steps=").and_then(parse_usize);
+            self.last_elapsed_s = field(line, "elapsed_s=").and_then(parse_f64);
         }
         if line.starts_with("heldout_eval ") {
             self.val_loss = field(line, "val_loss=").and_then(parse_f64);
             self.completed_steps = field(line, "completed_steps=").and_then(parse_usize);
+            self.last_elapsed_s = field(line, "train_elapsed_s=").and_then(parse_f64);
         }
     }
 }
@@ -56,5 +58,17 @@ mod tests {
         assert!(result.saw_nan);
         assert_eq!(result.completed_steps, Some(1251));
         assert_eq!(result.val_loss, None);
+    }
+
+    #[test]
+    fn parses_final_heldout_elapsed_time() {
+        let mut result = RunResult::default();
+        result.update(
+            "heldout_eval split=val val_loss=4.125000 train_elapsed_s=900.250 completed_steps=4096",
+        );
+
+        assert_eq!(result.val_loss, Some(4.125));
+        assert_eq!(result.completed_steps, Some(4096));
+        assert_eq!(result.last_elapsed_s, Some(900.25));
     }
 }

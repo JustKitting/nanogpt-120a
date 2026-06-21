@@ -20,6 +20,7 @@ pub struct Baseline {
 struct Record {
     val_loss: f64,
     completed_steps: Option<usize>,
+    elapsed_s: Option<f64>,
     log_path: PathBuf,
     candidate: Candidate,
 }
@@ -45,6 +46,7 @@ impl Baseline {
             status: "success".to_string(),
             val_loss: Some(record.val_loss),
             completed_steps: record.completed_steps,
+            elapsed_s: record.elapsed_s,
             log_path: record.log_path.clone(),
         })
     }
@@ -96,6 +98,9 @@ impl Baseline {
         if let Some(steps) = record.completed_steps {
             writeln!(file, "COMPLETED_STEPS={steps}")?;
         }
+        if let Some(elapsed_s) = record.elapsed_s {
+            writeln!(file, "TRAIN_ELAPSED_S={elapsed_s:.6}")?;
+        }
         writeln!(file, "LOG_PATH={}", record.log_path.display())?;
         writeln!(file, "GPT2_SEQ_LEN={DEFAULT_SEQ_LEN}")?;
         write_env(&mut file, record.candidate.build_env())?;
@@ -120,6 +125,7 @@ fn trial_record(trial: &Trial) -> Option<Record> {
     Some(Record {
         val_loss: trial.val_loss.filter(|loss| loss.is_finite())?,
         completed_steps: trial.completed_steps,
+        elapsed_s: trial.elapsed_s,
         log_path: trial.log_path.clone(),
         candidate: trial.candidate.clone(),
     })
@@ -129,6 +135,7 @@ fn parse(text: &str) -> Option<Record> {
     Some(Record {
         val_loss: value(text, "VAL_LOSS")?.parse().ok()?,
         completed_steps: value(text, "COMPLETED_STEPS").and_then(|value| value.parse().ok()),
+        elapsed_s: value(text, "TRAIN_ELAPSED_S").and_then(|value| value.parse().ok()),
         log_path: PathBuf::from(value(text, "LOG_PATH").unwrap_or("")),
         candidate: Candidate {
             batch_size: value(text, "GPT2_BATCH_SIZE")?.parse().ok()?,

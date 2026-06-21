@@ -189,7 +189,7 @@ fn run_trial(
             "dry_run",
             &run_result,
         )?;
-        return Ok(trial(candidate, "dry_run", None, None, trial_dir));
+        return Ok(trial(candidate, "dry_run", None, None, None, trial_dir));
     }
 
     status::record(
@@ -211,7 +211,14 @@ fn run_trial(
             "failed_build",
             &run_result,
         )?;
-        return Ok(trial(candidate, "failed_build", None, None, trial_dir));
+        return Ok(trial(
+            candidate,
+            "failed_build",
+            None,
+            None,
+            None,
+            trial_dir,
+        ));
     }
 
     let screen_result =
@@ -237,6 +244,7 @@ fn run_trial(
             "rejected_screen",
             None,
             screen_result.completed_steps,
+            screen_result.last_elapsed_s,
             trial_dir,
             "screen.log",
         ));
@@ -270,6 +278,7 @@ fn run_trial(
         status_name,
         run_result.val_loss,
         run_result.completed_steps,
+        run_result.last_elapsed_s,
         trial_dir,
     ))
 }
@@ -279,6 +288,7 @@ fn trial(
     status: &str,
     val_loss: Option<f64>,
     completed_steps: Option<usize>,
+    elapsed_s: Option<f64>,
     trial_dir: &Path,
 ) -> Trial {
     trial_with_log(
@@ -286,6 +296,7 @@ fn trial(
         status,
         val_loss,
         completed_steps,
+        elapsed_s,
         trial_dir,
         "train.log",
     )
@@ -316,6 +327,7 @@ fn trial_with_log(
     status: &str,
     val_loss: Option<f64>,
     completed_steps: Option<usize>,
+    elapsed_s: Option<f64>,
     trial_dir: &Path,
     log_name: &str,
 ) -> Trial {
@@ -325,6 +337,7 @@ fn trial_with_log(
         val_loss,
         completed_steps,
         log_path: PathBuf::from(trial_dir).join(log_name),
+        elapsed_s,
     }
 }
 
@@ -362,6 +375,7 @@ mod tests {
             status: "success".to_string(),
             val_loss: Some(3.0),
             completed_steps: Some(100),
+            elapsed_s: Some(900.0),
             log_path: dir.join("train.log"),
         };
 
