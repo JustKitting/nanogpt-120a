@@ -59,6 +59,7 @@ fn trial(candidate: Candidate, val_loss: f64) -> Trial {
         val_loss: Some(val_loss),
         completed_steps: Some(10),
         elapsed_s: Some(5.0),
+        screen_val_loss: Some(val_loss + 1.0),
         log_path: PathBuf::from("train.log"),
     }
 }

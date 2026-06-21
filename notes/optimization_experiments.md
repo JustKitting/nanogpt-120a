@@ -8129,3 +8129,31 @@ decision:
   Accept as sweep infrastructure. The sweep can now keep learning speed
   correlations from shared history even when old run logs are not available.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Persist screen validation loss for sweep analysis.
+status: accepted_tooling
+change:
+  trials.tsv now appends a screen_val_loss column while preserving compatibility
+  with older rows. Rejected-screen trials store the screen-stage validation
+  loss without overloading full-run val_loss, and successful full-run trials
+  also retain the screen-stage loss that allowed them to continue. Screen
+  quality analysis still reads screen.log first, but falls back to persisted
+  screen_val_loss when logs are unavailable.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 28 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_persist_screen_loss_20260621T182712Z
+measured_effect:
+  Added unit coverage proving screen_quality_rows can reconstruct a screen
+  response from persisted screen_val_loss with no screen.log. The dry-run
+  trials.tsv emitted the new screen_val_loss header column.
+decision:
+  Accept as sweep infrastructure. Screen rejections now remain useful
+  statistical samples for screen-quality modeling after logs are moved,
+  cleaned, or unavailable.
+```

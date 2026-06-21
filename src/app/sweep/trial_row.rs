@@ -26,13 +26,13 @@ pub fn append(path: &Path, trial: &Trial) -> std::io::Result<()> {
 }
 
 fn header() -> &'static str {
-    "status\tval_loss\tcompleted_steps\tbatch_size\tn_layer\tn_embd\tn_head\taurora_phases\taurora_blocks\tlr_scale\tadam_lr_scale\twarmup_steps\tstart_ratio\tamuse_beta1\tamuse_rho\tlog_path\telapsed_s"
+    "status\tval_loss\tcompleted_steps\tbatch_size\tn_layer\tn_embd\tn_head\taurora_phases\taurora_blocks\tlr_scale\tadam_lr_scale\twarmup_steps\tstart_ratio\tamuse_beta1\tamuse_rho\tlog_path\telapsed_s\tscreen_val_loss"
 }
 
 fn format_trial(trial: &Trial) -> String {
     let c = &trial.candidate;
     format!(
-        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}",
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}",
         trial.status,
         trial.val_loss.map(fmt).unwrap_or_else(|| "NaN".to_string()),
         trial
@@ -52,13 +52,14 @@ fn format_trial(trial: &Trial) -> String {
         c.amuse_beta1,
         c.amuse_rho,
         trial.log_path.display(),
-        trial.elapsed_s.map(fmt).unwrap_or_default()
+        trial.elapsed_s.map(fmt).unwrap_or_default(),
+        trial.screen_val_loss.map(fmt).unwrap_or_default()
     )
 }
 
 fn parse_trial(line: &str) -> Option<Trial> {
     let p = line.split('\t').collect::<Vec<_>>();
-    if p.len() != 16 && p.len() != 17 {
+    if p.len() != 16 && p.len() != 17 && p.len() != 18 {
         return None;
     }
     Some(Trial {
@@ -68,6 +69,7 @@ fn parse_trial(line: &str) -> Option<Trial> {
         candidate: parse_candidate(&p)?,
         log_path: PathBuf::from(p[15]),
         elapsed_s: p.get(16).and_then(|value| parse_loss(value)),
+        screen_val_loss: p.get(17).and_then(|value| parse_loss(value)),
     })
 }
 
@@ -112,10 +114,12 @@ mod tests {
             candidate: candidate(),
             log_path: PathBuf::from("target/train.log"),
             elapsed_s: Some(123.5),
+            screen_val_loss: Some(6.25),
         };
 
         let parsed = parse_trial(&format_trial(&trial)).unwrap();
         assert_eq!(parsed.elapsed_s, Some(123.5));
+        assert_eq!(parsed.screen_val_loss, Some(6.25));
         assert_eq!(parsed.completed_steps, Some(512));
         assert_eq!(parsed.candidate.key(), trial.candidate.key());
     }
@@ -128,6 +132,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(parsed.elapsed_s, None);
+        assert_eq!(parsed.screen_val_loss, None);
         assert_eq!(parsed.completed_steps, Some(512));
         assert_eq!(parsed.candidate.batch_size, 8);
     }

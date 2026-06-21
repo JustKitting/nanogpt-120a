@@ -12,6 +12,7 @@ pub struct Observation {
     pub trial_val_loss: Option<f64>,
     pub trial_completed_steps: Option<usize>,
     pub trial_elapsed_s: Option<f64>,
+    pub trial_screen_val_loss: Option<f64>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -34,6 +35,7 @@ pub fn observations(trials: &[Trial]) -> Vec<Observation> {
             trial_val_loss: trial.val_loss,
             trial_completed_steps: trial.completed_steps,
             trial_elapsed_s: trial.elapsed_s,
+            trial_screen_val_loss: trial.screen_val_loss,
         })
         .collect()
 }
@@ -45,9 +47,15 @@ pub fn screen_quality_rows(
     observations
         .iter()
         .filter_map(|obs| {
-            let screen = obs.screen?;
-            (screen.completed_steps.unwrap_or(0) >= screen_steps)
-                .then_some((obs.candidate.clone(), -screen.val_loss?))
+            obs.screen
+                .and_then(|screen| {
+                    (screen.completed_steps.unwrap_or(0) >= screen_steps)
+                        .then_some((obs.candidate.clone(), -screen.val_loss?))
+                })
+                .or_else(|| {
+                    (obs.trial_completed_steps.unwrap_or(0) >= screen_steps)
+                        .then_some((obs.candidate.clone(), -obs.trial_screen_val_loss?))
+                })
         })
         .collect()
 }
@@ -139,10 +147,31 @@ mod tests {
             trial_val_loss: Some(4.0),
             trial_completed_steps: Some(100),
             trial_elapsed_s: Some(20.0),
+            trial_screen_val_loss: None,
         }]);
 
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].1, 100.0 * 8.0 * 1024.0 / 20.0);
+    }
+
+    #[test]
+    fn screen_quality_uses_persisted_screen_loss_when_log_is_missing() {
+        let rows = super::screen_quality_rows(
+            &[Observation {
+                candidate: candidate(),
+                status: "rejected_screen".to_string(),
+                screen: None,
+                full: None,
+                trial_val_loss: None,
+                trial_completed_steps: Some(500),
+                trial_elapsed_s: Some(90.0),
+                trial_screen_val_loss: Some(5.25),
+            }],
+            500,
+        );
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].1, -5.25);
     }
 
     fn candidate() -> Candidate {

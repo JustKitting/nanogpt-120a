@@ -47,6 +47,7 @@ impl Baseline {
             val_loss: Some(record.val_loss),
             completed_steps: record.completed_steps,
             elapsed_s: record.elapsed_s,
+            screen_val_loss: None,
             log_path: record.log_path.clone(),
         })
     }

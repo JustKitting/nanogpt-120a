@@ -240,6 +240,7 @@ fn trial(status: &str, val_loss: Option<f64>, candidate: Candidate) -> Trial {
         val_loss,
         completed_steps: Some(10),
         elapsed_s: Some(5.0),
+        screen_val_loss: val_loss.map(|loss| loss + 1.0),
         log_path: PathBuf::from("train.log"),
     }
 }
