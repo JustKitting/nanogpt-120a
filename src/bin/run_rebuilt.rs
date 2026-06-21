@@ -11,6 +11,15 @@ fn main() -> ExitCode {
         return ExitCode::from(build_status.code().unwrap_or(1) as u8);
     }
 
+    let host_status = Command::new("cargo")
+        .args(["build", "--release", "--bin", "rust-kernels"])
+        .status()
+        .expect("failed to start cargo release build");
+
+    if !host_status.success() {
+        return ExitCode::from(host_status.code().unwrap_or(1) as u8);
+    }
+
     let run_status = Command::new("./target/release/rust-kernels")
         .args(std::env::args().skip(1))
         .status()
