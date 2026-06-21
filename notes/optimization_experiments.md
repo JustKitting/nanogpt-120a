@@ -5437,6 +5437,37 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Schedule attention probability-gradient with a 3D grid.
+status: rejected_screen
+change:
+  Changed attention_prob_ds_kernel scheduling from a flat element index to
+  grid coordinates keyed by key tile, query, and batch-head, removing most
+  per-element index recovery divides/mods while keeping the same output layout.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/attention_prob_3d_grid_l4_b8_20_20260621T071943Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.579, completed_steps=20.
+measured_effect:
+  Against the promoted LM-head aligned baseline
+  target/nsys/lm_head_aligned_path_l4_b8_20_20260621T065355Z.run.log,
+  attention_prob_ds_kernel moved from 90.605765ms to 90.709205ms over 20
+  profiled steps. Profiled train time moved from 3.584s to 3.579s, but the
+  targeted kernel regressed and the wall-clock delta is within short-profile
+  noise.
+decision:
+  Reject before the 900-second gate. The target kernel regressed, so the small
+  short-run wall-clock fluctuation is not enough evidence to continue. Code was
+  reverted.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Aligned f32-input staging and store path for f16 TC QK matmuls.
 status: accepted
