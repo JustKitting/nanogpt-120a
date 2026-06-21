@@ -30,6 +30,41 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Host-routed aligned f32-input FP16 CTA matmul kernel.
+status: rejected_pre_gate
+change:
+  Added f16_cta_tc_matmul_f32_aligned_kernel and routed aligned
+  batched_matmul_f32_input calls to it from the host. The candidate removed
+  the per-K-tile aligned/generic branch from the hot f32-input FP16 CTA
+  matmul body while preserving the same staging, MMA, and store math.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/f16_f32_host_aligned_l4_b8_20_20260621T102555Z.run.log
+    target/nsys/f16_f32_host_aligned_l4_b8_20_20260621T102555Z_stats.txt
+    val_loss=8.505094, train_elapsed_s=3.421, completed_steps=20.
+measured_effect:
+  Against the accepted MS-EDEN reciprocal profile
+  target/nsys/ms_eden_inv_scale_l4_b8_20_20260621T093759Z.run.log,
+  the f32-input FP16 CTA matmul path regressed from
+  f16_cta_tc_matmul_f32_kernel=217.291413ms over 244 calls to
+  f16_cta_tc_matmul_f32_aligned_kernel=233.626397ms over 244 calls.
+  The short run wall-clock was effectively unchanged, but the targeted hot
+  kernel got slower.
+decision:
+  Reject before the 900-second gate and revert the code. Do not retry this
+  host-routed aligned split without a different staging/store implementation.
+```
+
+```text
+date: 2026-06-21
 commit: historical uncommitted candidate, reverted before note
 experiment: Eight-row unroll for linear_bias_grad_kernel.
 status: rejected_profile
