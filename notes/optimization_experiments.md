@@ -5468,6 +5468,38 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Route aligned affine and relu2 projections through aligned CTA bodies.
+status: rejected_screen
+change:
+  Added aligned CTA affine and relu2 projection bodies and routed QKV/c_proj and
+  MLP projections through them when token_count, output_dim, and input_dim were
+  tile-aligned. Generic paths stayed available for odd shapes.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l2_attention -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aligned_affine_relu2_l4_b8_20_20260621T072920Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.596, completed_steps=20.
+measured_effect:
+  Against the promoted LM-head aligned baseline
+  target/nsys/lm_head_aligned_path_l4_b8_20_20260621T065355Z.run.log,
+  mlp_projection_kernel moved from 66.480605ms to 74.798571ms, and
+  mlp_projection_relu2_kernel moved from 64.094471ms to 69.181360ms over 20
+  profiled steps. attention_projection_kernel moved from 62.614531ms to
+  62.415612ms, but the MLP regressions dominated. Profiled train time moved
+  from 3.584s to 3.596s.
+decision:
+  Reject before the 900-second gate. The candidate regressed two hot MLP
+  projection kernels and worsened short wall-clock. Code was reverted.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted
 experiment: Aligned f32-input staging and store path for f16 TC QK matmuls.
 status: accepted
