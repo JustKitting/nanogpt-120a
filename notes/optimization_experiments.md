@@ -65,6 +65,12 @@ result:
 decision:
   Keep the screen gate as sweep infrastructure. Do not promote any
   hyperparameter candidate from this sweep.
+follow_up:
+  Screen-rejected trials now feed the proposal scorer as bad evidence without
+  becoming comparable 900-second validation rows. Dry-run proposal check:
+  target/sweeps/dryrun_screen_penalty_20260621T151027Z proposed d1024 phase-16
+  candidates first, then d1536/L8 exploration; it did not immediately repeat
+  the same rejected d2048 screen candidates.
 ```
 
 ```text

@@ -7,6 +7,7 @@ use super::{
 };
 
 const NAN_PENALTY_LOSS: f64 = 1.0e6;
+const SCREEN_REJECT_PENALTY_LOSS: f64 = 1.0e5;
 
 pub fn propose(
     trials: &[Trial],
@@ -66,6 +67,9 @@ fn score_loss(trial: &Trial) -> Option<f64> {
     }
     if trial.status == "dry_run" {
         return None;
+    }
+    if trial.status == "rejected_screen" {
+        return Some(SCREEN_REJECT_PENALTY_LOSS);
     }
     if trial.status.starts_with("nan") {
         return Some(NAN_PENALTY_LOSS);
