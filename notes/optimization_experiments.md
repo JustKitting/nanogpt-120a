@@ -6405,3 +6405,33 @@ decision:
   Reject before the 900-second gate. The target kernel and short wall-clock
   both regressed. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Split paired linear backward CTA projection launch into two homogeneous launches.
+status: rejected_screen
+change:
+  Replaced linear_backward_projection_pair_cta_device_scale_kernel with two
+  calls to the existing linear_backward_projection_cta_device_scale_kernel,
+  one for dinput and one for dweight.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/linear_bwd_split_cta_launch_l4_b8_20_20260621T082033Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.594, completed_steps=20.
+measured_effect:
+  Against the promoted f16 CTA sync baseline
+  target/nsys/f16_skip_final_cta_sync_l4_b8_20_20260621T073906Z.run.log,
+  projection time moved from
+  linear_backward_projection_pair_cta_device_scale_kernel=621.385509ms to
+  linear_backward_projection_cta_device_scale_kernel=632.232545ms over 20
+  profiled steps. Profiled train time moved from 3.582s to 3.594s.
+decision:
+  Reject before the 900-second gate. The extra launch count lost to the paired
+  kernel despite removing the pair branch. Code was reverted.
+```
