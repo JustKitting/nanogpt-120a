@@ -6853,6 +6853,47 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted
+experiment: Write MLP up and relu2 activations directly into block tape.
+status: rejected_900s
+change:
+  Routed training forward MLP pre-activation and relu2 activation outputs
+  directly into the per-block tape buffers instead of writing to shared scratch
+  and copying those two large activation buffers into tape after the MLP.
+  Inference/no-tape mode kept the original scratch path.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/direct_mlp_tape_l4_b8_20_20260621T124522Z.run.log
+    val_loss=8.506022, train_elapsed_s=3.454, completed_steps=20.
+  100-step SYNTH screen:
+    target/direct_mlp_tape_l4_b8_100_20260621T124550Z.log
+    val_loss=6.543642, train_elapsed_s=17.313, completed_steps=100.
+  900-second held-out gate:
+    target/direct_mlp_tape_l4_b8_900_20260621T124615Z.log
+    val_loss=4.030444, train_elapsed_s=900.161, completed_steps=5071.
+measured_effect:
+  Against the accepted MS-EDEN source split profile
+  target/nsys/ms_eden_split_fp32_source_l4_b8_20_20260621T112900Z.run.log,
+  device-to-device copy volume dropped from 62296.613 MB to 39748.035 MB over
+  20 profiled steps, and device-to-device copy time dropped from 63.244391ms to
+  30.603698ms. The 100-step screen was faster, 17.313s versus 17.426s, with
+  similar held-out loss. The full fixed-wall gate completed 5071 steps versus
+  the accepted 5026, but held-out validation loss worsened from 3.947354 to
+  4.030444.
+decision:
+  Reject and revert the code. The memory-copy reduction and step-count increase
+  were real, but fixed-wall held-out loss worsened by more than the +/-1%
+  acceptance band.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: F16 CTA matmul M128/N32 tile shape.
 status: rejected_correctness
