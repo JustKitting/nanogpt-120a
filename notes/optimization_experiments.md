@@ -6605,3 +6605,31 @@ decision:
   Reject before the 900-second gate. The target kernels and short wall-clock
   got slower. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Cache cross-entropy exponentials in dlogits.
+status: rejected_screen
+change:
+  Tried writing exp(logit - row_max) into dlogits during the denominator pass,
+  then reading it back during the final dlogits pass. This removed one exp
+  calculation per vocab element but added an extra global write/read of the
+  full logits-shaped buffer.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/cross_entropy_cache_exp_l4_b8_20_20260621T090411Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.449, completed_steps=20.
+measured_effect:
+  Against the accepted multi-warp MS-EDEN baseline
+  target/nsys/ms_eden_pack_warp8_current_l4_b8_20_20260621T083902Z.run.log,
+  cross_entropy_kernel moved from 55.344469ms to 70.514102ms over 20 profiled
+  steps. Profiled train time moved from 3.435s to 3.449s.
+decision:
+  Reject before the 900-second gate. Extra global traffic outweighed removing
+  the second exp. Code was reverted.
+```
