@@ -54,6 +54,14 @@ pub struct NextLatGeluArgs<'a, 'out> {
     pub len: u32,
 }
 
+pub struct NextLatGeluBackwardArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub input: &'a DeviceBuffer<f32>,
+    pub d_out: &'a DeviceBuffer<f32>,
+    pub d_input: &'out mut DeviceBuffer<f32>,
+    pub len: u32,
+}
+
 pub struct NextLatResidualAddArgs<'a, 'out> {
     pub stream: &'a CudaStream,
     pub delta: &'a DeviceBuffer<f32>,
