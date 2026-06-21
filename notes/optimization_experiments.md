@@ -31,6 +31,33 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
+experiment: Hoist cross-entropy dlogits grad_scale reciprocal.
+status: rejected_pre_gate
+change:
+  Moved grad_scale = 1.0 / token_count out of the dlogits vocab loop in
+  cross_entropy_kernel. Loss math, dlogits layout, block size, and launch
+  shape were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/cross_entropy_grad_scale_hoist_l4_b8_20_20260621T102747Z.run.log
+    target/nsys/cross_entropy_grad_scale_hoist_l4_b8_20_20260621T102747Z_stats.txt
+    val_loss=8.505094, train_elapsed_s=3.416, completed_steps=20.
+measured_effect:
+  Against the accepted MS-EDEN reciprocal profile
+  target/nsys/ms_eden_inv_scale_l4_b8_20_20260621T093759Z.run.log,
+  cross_entropy_kernel moved from 55.345090ms to 55.366645ms over 21 calls.
+  The explicit hoist did not improve generated code for the current profile.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
 experiment: Host-routed aligned f32-input FP16 CTA matmul kernel.
 status: rejected_pre_gate
 change:
