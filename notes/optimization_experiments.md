@@ -6788,6 +6788,33 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted
+experiment: Hoist reciprocal denominator in cross-entropy dlogits loop.
+status: rejected_pre_gate
+change:
+  Replaced per-logit division by the row softmax denominator with one reciprocal
+  and a multiply in the dlogits write loop.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/cross_entropy_inv_denom_l4_b8_20_20260621T122202Z.run.log
+    val_loss=8.505426, train_elapsed_s=3.479, completed_steps=20.
+measured_effect:
+  Against the accepted MS-EDEN source split profile
+  target/nsys/ms_eden_split_fp32_source_l4_b8_20_20260621T112900Z.run.log,
+  cross_entropy_kernel moved from 55.353896ms to 55.338910ms over 20 profiled
+  steps. Profiled train time moved from 3.397s to 3.479s.
+decision:
+  Reject before the 100-step and 900-second gates and revert the code. The
+  kernel movement was far below profiler noise and did not justify a longer
+  fixed-wall gate.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: F16 CTA matmul M128/N32 tile shape.
 status: rejected_correctness
