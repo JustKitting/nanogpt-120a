@@ -13,6 +13,7 @@ mod rng;
 mod run_build;
 mod run_train;
 mod runner;
+mod screen_gate;
 mod status;
 mod trial_row;
 

@@ -14,7 +14,7 @@ use super::{
     history::{self, History, Trial},
     optimizer,
     parse::RunResult,
-    proposal_log, run_build, run_train, status,
+    proposal_log, run_build, run_train, screen_gate, status,
 };
 
 pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
@@ -59,6 +59,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             baseline.candidate(),
         );
         proposal_log::write(&sweep_dir, index, &proposal)?;
+        let screen_score = selected_score(&proposal);
         let candidate = proposal.candidate;
         let trial_dir = sweep_dir.join(format!("trial_{index:04}"));
         println!("sweep_trial_begin index={index} key={}", candidate.key());
@@ -69,6 +70,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             candidate,
             &config,
             screen_baseline,
+            screen_score.as_ref(),
         )?;
         println!(
             "sweep_trial_end index={index} status={} val_loss={} completed_steps={} log_path={}",
@@ -160,6 +162,7 @@ fn run_trial(
     candidate: Candidate,
     config: &SweepConfig,
     screen_baseline: Option<f64>,
+    screen_score: Option<&analysis::CandidateScore>,
 ) -> Result<Trial, Box<dyn std::error::Error>> {
     fs::create_dir_all(trial_dir)?;
     history::write_candidate(&trial_dir.join("candidate.env"), &candidate)?;
@@ -208,13 +211,20 @@ fn run_trial(
 
     let screen_result =
         run_train::run_screen_candidate(&candidate, config, sweep_dir, trial_dir, index)?;
-    if !passes_screen(&screen_result, screen_baseline, config.screen_steps) {
+    let screen_decision = screen_gate::decide(
+        &screen_result,
+        screen_baseline,
+        config.screen_steps,
+        screen_score,
+    );
+    screen_gate::write(&trial_dir.join("screen_decision.env"), &screen_decision)?;
+    if !screen_decision.pass {
         status::record(
             sweep_dir,
             trial_dir,
             index,
             &candidate,
-            "rejected_screen",
+            &format!("rejected_screen_{}", screen_decision.reason),
             &screen_result,
         )?;
         return Ok(trial_with_log(
@@ -226,6 +236,14 @@ fn run_trial(
             "screen.log",
         ));
     }
+    status::record(
+        sweep_dir,
+        trial_dir,
+        index,
+        &candidate,
+        "screen_passed",
+        &screen_result,
+    )?;
 
     run_result = run_train::run_candidate(&candidate, config, sweep_dir, trial_dir, index)?;
     let status_name = match (run_result.val_loss, run_result.saw_nan) {
@@ -251,18 +269,6 @@ fn run_trial(
     ))
 }
 
-fn passes_screen(result: &RunResult, baseline_loss: Option<f64>, screen_steps: usize) -> bool {
-    if result.completed_steps.unwrap_or(0) < screen_steps {
-        return false;
-    }
-    let Some(screen_loss) = result.val_loss else {
-        return false;
-    };
-    baseline_loss
-        .map(|baseline_loss| screen_loss < baseline_loss)
-        .unwrap_or(true)
-}
-
 fn trial(
     candidate: Candidate,
     status: &str,
@@ -278,6 +284,14 @@ fn trial(
         trial_dir,
         "train.log",
     )
+}
+
+fn selected_score(proposal: &optimizer::Proposal) -> Option<analysis::CandidateScore> {
+    proposal
+        .ranked
+        .iter()
+        .find(|scored| scored.candidate.key() == proposal.candidate.key())
+        .map(|scored| scored.score.clone())
 }
 
 fn trial_with_log(

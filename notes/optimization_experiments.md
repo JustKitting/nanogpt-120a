@@ -7927,3 +7927,35 @@ decision:
   stability used as a Bayesian-style survival prior rather than a separate
   promotion objective.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Make the screen gate use the validation-loss survival prior.
+status: accepted_tooling
+change:
+  Replaced the raw screen-loss-only gate with a screen decision module. NaN,
+  incomplete, and missing-validation screens still reject immediately. A
+  candidate now passes the screen when it improves screen validation loss, has
+  no screen baseline, or the existing acquisition model says the candidate has
+  positive expected validation quality with survival_prior >= 0.5. The gate
+  writes screen_decision.env into the trial directory. Full-run baseline
+  promotion is unchanged and still requires successful held-out validation loss.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 17 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_screen_gate_target_prior_20260621T180327Z
+measured_effect:
+  Added screen_gate unit coverage for:
+    worse screen loss can pass when expected_quality is positive and
+    survival_prior is high.
+    worse screen loss still rejects when survival_prior is low.
+  Dry-run proposal artifacts still include expected_quality and survival_prior,
+  proving the acquisition values used by the screen gate are generated.
+decision:
+  Accept as sweep infrastructure. Screening now aims at the same target as the
+  sweep: spending full 900-second runs on candidates likely to improve held-out
+  validation loss, while using stability only as a survival prior.
+```
