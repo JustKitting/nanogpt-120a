@@ -30,6 +30,34 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Early inactive return in attention_prob_ds_kernel.
+status: rejected_profile
+change:
+  Rewrote the backward attention probability/dS kernel to return immediately
+  for inactive causal-mask cells and to compute the log-sum-exp index once for
+  active cells.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/attention_prob_early_return_l4_b8_20_20260621T060045Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.589, completed_steps=20.
+measured_effect:
+  Compared with the promoted MS-EDEN barrier baseline profile
+  target/nsys/ms_eden_no_pack_barrier_l4_b8_20_20260621T045551Z.run.log,
+  attention_prob_ds_kernel moved from about 90.620ms to 90.675ms over 20
+  profiled steps. Total profiled train time also did not improve, moving from
+  3.588s to 3.589s.
+decision:
+  Reject before the 100-step and 900-second gates. The change did not improve
+  the target kernel or the short profiled wall-clock. Code was reverted.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted diagnostic
 experiment: NVFP4/RHT Polar Express estimator for Aurora.
 status: diagnostic
