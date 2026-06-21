@@ -8273,3 +8273,31 @@ decision:
   which is closer to the requested automatic Bayesian-style sweep loop than
   raw z-score ranking alone.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Wire speed objective into guided sweep beliefs.
+status: accepted_tooling
+change:
+  factor_beliefs now includes tokens_per_s response models when
+  sweep_speed_weight is nonzero. This keeps the default validation-loss
+  objective unchanged, but makes speed-weighted sweeps move guided proposals
+  along speed-correlated factors instead of only using speed during final
+  ranking.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 33 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_speed_weighted_beliefs_20260621T184735Z
+measured_effect:
+  Added unit coverage proving a speed-weighted analysis gives batch_size a
+  positive direction when larger batches produce more tokens/s. The dry-run
+  analysis_beliefs.tsv showed speed-weighted direction terms, and the selected
+  candidate score reported expected_speed.
+decision:
+  Accept as sweep infrastructure. Explicit speed objectives now affect both
+  proposal direction and candidate scoring, while the default objective remains
+  held-out validation-loss acquisition.
+```

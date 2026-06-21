@@ -89,6 +89,29 @@ fn factor_beliefs_aggregate_direction_and_confidence() {
 }
 
 #[test]
+fn factor_beliefs_include_speed_direction_when_weighted() {
+    let mut config = config();
+    config.sweep_quality_weight = 0.0;
+    config.sweep_speed_weight = 1.0;
+    config.sweep_exploration_weight = 0.0;
+    let trials = [
+        trial(candidate(4, 4), 4.0),
+        trial(candidate(4, 8), 4.1),
+        trial(candidate(16, 4), 4.2),
+        trial(candidate(16, 8), 4.3),
+    ];
+    let analysis = super::analyze(&trials, &config);
+    let beliefs = super::factor_beliefs(&analysis, &config);
+    let batch = beliefs
+        .iter()
+        .find(|belief| belief.factor == "batch_size")
+        .unwrap();
+
+    assert!(batch.direction > 0.0);
+    assert!(batch.confidence > 0.0);
+}
+
+#[test]
 fn stability_beliefs_do_not_create_target_direction() {
     let mut config = config();
     config.sweep_stability_weight = 1.0;
