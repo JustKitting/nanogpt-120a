@@ -39,12 +39,8 @@ pub(super) fn softmax_body(
     }
 
     let mut key = tid;
-    while key < params.seq_len {
-        let prob = if key <= query {
-            exp_f32(score(scores, batch, head, query, key, &params) - max_score) / denom
-        } else {
-            0.0
-        };
+    while key <= query {
+        let prob = exp_f32(score(scores, batch, head, query, key, &params) - max_score) / denom;
         unsafe {
             *probs.get_unchecked_mut(score_index(batch, head, query, key, &params)) = prob;
         }

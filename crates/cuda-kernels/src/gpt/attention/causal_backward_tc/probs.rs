@@ -25,20 +25,13 @@ pub(super) fn prob_ds_body(
     let batch = batch_head / params.head_count;
     let head = batch_head - batch * params.head_count;
     let row = batch * params.seq_len + query;
-    let active = key <= query && row < params.row_count;
-    let prob = if active {
-        exp_f32(
-            scores[index as usize] * params.scale
-                - log_sum_exp[log_sum_exp_index(batch, query, head, &params)],
-        )
-    } else {
-        0.0
-    };
-    let grad = if active {
-        prob * (dot[index as usize] - softmax_d[log_sum_exp_index(batch, query, head, &params)])
-    } else {
-        0.0
-    };
+    if key > query || row >= params.row_count {
+        return;
+    }
+
+    let lse_index = log_sum_exp_index(batch, query, head, &params);
+    let prob = exp_f32(scores[index as usize] * params.scale - log_sum_exp[lse_index]);
+    let grad = prob * (dot[index as usize] - softmax_d[lse_index]);
 
     unsafe {
         *p.get_unchecked_mut(index as usize) = prob;

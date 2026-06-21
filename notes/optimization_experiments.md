@@ -8573,3 +8573,50 @@ decision:
   the extra warps/thread count and wider N tile reduce effective throughput
   despite matching the Colfax tutorial CTA extent in N.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate
+experiment: Skip invariant causal-mask zero stores in attention probability kernels.
+status: accepted
+source:
+  Colfax FlashAttention-4 notes that Blackwell attention can be limited by
+  softmax/scalar work and memory movement outside the GEMMs, and highlights
+  scheduling and causal-mask overhead as optimization targets.
+change:
+  In the forward causal softmax, store probabilities only for key <= query
+  instead of rewriting the upper-triangle zeros. In backward probability/dS
+  generation, return early for masked entries and cache the row log-sum-exp
+  index once. The scratch probability and dS buffers are zero-initialized and
+  the masked upper triangle is invariant, so the math consumed by later dense
+  matmuls is unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys baseline:
+    target/nsys/current_goal_b16_20_20260621T214016Z.run.log
+    val_loss=9.213204, train_elapsed_s=5.720, completed_steps=20.
+  20-step nsys candidate:
+    target/nsys/causal_mask_skip_stores_b16_20_20260621T215208Z.run.log
+    val_loss=9.213204, train_elapsed_s=5.649, completed_steps=20.
+  100-step SYNTH screen:
+    target/causal_mask_skip_stores_b16_100_20260621T215234Z.log
+    val_loss=6.407254, train_elapsed_s=28.197, completed_steps=100.
+  900-second held-out gate:
+    target/causal_mask_skip_stores_b16_900_20260621T215315Z.log
+    val_loss=3.644228, train_elapsed_s=900.002, completed_steps=3116.
+measured_effect:
+  Over 20 profiled steps, attention_prob_ds_kernel moved from 183.346ms to
+  125.637ms, and attention_softmax_forward_kernel moved from 91.454ms to
+  64.040ms. The dominant linear_backward_projection_pair_cta_device_scale_kernel
+  was effectively flat at 1214.207ms to 1219.402ms, and Aurora was flat at
+  1593.264ms to 1594.792ms. The 900-second gate improved validation loss from
+  3.663287 to 3.644228 while completed steps increased from 3071 to 3116.
+decision:
+  Promote. The change improved held-out validation loss and completed more
+  steps under the fixed 900-second budget.
+```
