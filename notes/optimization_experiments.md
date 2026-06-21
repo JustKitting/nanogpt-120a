@@ -5817,3 +5817,35 @@ decision:
   Promote under the current acceptance rule: validation loss stayed well within
   the +/-1% no-meaningful-change band and completed step count increased.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
+experiment: Reuse row global scales in aligned NVFP4 CTA projection stores.
+status: rejected_screen
+change:
+  Changed the aligned no-bias CTA projection store to load the row global
+  scale twice for the two output rows and store adjacent column pairs directly,
+  instead of routing all four accumulator values through the generic aligned
+  store helper.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass after rerun with completed PTX build.
+  20-step nsys screen:
+    target/nsys/proj_store_scale_reuse_l4_b8_20_20260621T053351Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.588, completed_steps=20.
+  100-step SYNTH screen:
+    target/proj_store_scale_reuse_l4_b8_100_20260621T053413Z.log
+    val_loss=6.546121, train_elapsed_s=18.312, completed_steps=100.
+measured_effect:
+  The intended kernel moved only from 621.499531ms to 620.544267ms over
+  20 profiled steps versus the promoted MS-EDEN barrier baseline, while total
+  profiled train time stayed at 3.588s. The 100-step screen was slightly worse
+  than the promoted baseline, moving from val_loss=6.545762 and
+  train_elapsed_s=18.300 to val_loss=6.546121 and train_elapsed_s=18.312.
+decision:
+  Reject before the 900-second gate. The tiny projection-kernel delta did not
+  improve the short wall-clock or validation screen. Code was reverted.
+```
