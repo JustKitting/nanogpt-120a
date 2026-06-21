@@ -6739,6 +6739,36 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Hoist row scale loads in aligned NVFP4 CTA projection store.
+status: rejected_pre_gate
+change:
+  Specialized store_accumulator_aligned to compute the two output rows, two
+  adjacent output columns, and two row global scales once, then store all four
+  accumulator values directly instead of calling store_one_aligned four times.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/projection_store_pair_l4_b8_20_20260621T100124Z.run.log
+    val_loss=8.505588, train_elapsed_s=3.424, completed_steps=20.
+measured_effect:
+  Against the current accepted MS-EDEN reciprocal profile
+  target/nsys/ms_eden_inv_scale_l4_b8_20_20260621T093759Z.run.log,
+  lm_head_kernel moved from 112.801360ms to 112.570704ms over 20 profiled
+  steps, but the larger linear_backward_projection_pair_cta_device_scale_kernel
+  moved from 625.867638ms to 626.393080ms. Total profiled train time stayed at
+  3.424s.
+decision:
+  Reject before the 900-second gate and revert the code. The small LM-head win
+  did not offset the larger linear-backward projection regression.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Decode Aurora Polar CTA tile coordinates with power-of-two shifts.
 status: rejected_pre_gate
 change:
