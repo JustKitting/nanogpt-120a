@@ -18,25 +18,22 @@ pub fn candidates(
         return Vec::new();
     };
     let factors = uncertain_factors(config, analysis);
-    let width = factors.len().min(4);
-    if width == 0 {
+    if factors.is_empty() || count == 0 {
         return Vec::new();
     }
     let mut seen = used.clone();
     let mut out = Vec::new();
-    let masks = 1usize << width;
-    for mask in 0..masks {
-        if out.len() >= count {
-            break;
-        }
+    let mut row = 0;
+    while out.len() < count && row < count * 8 + 32 {
         let mut candidate = center.clone();
-        for (index, factor) in factors.iter().take(width).enumerate() {
-            set_factor(&mut candidate, factor, ((mask >> index) & 1) == 1);
+        for (index, factor) in factors.iter().enumerate() {
+            set_factor(&mut candidate, factor, high_level(row, index));
         }
         fix_phase(&mut candidate, rng);
         if seen.insert(candidate.key()) {
             out.push(candidate);
         }
+        row += 1;
     }
     out
 }
@@ -88,6 +85,10 @@ fn set_factor(candidate: &mut Candidate, name: &str, high: bool) {
 }
 fn level<T: Copy>(values: &[T], high: bool) -> T {
     values[if high { values.len() - 1 } else { 0 }]
+}
+fn high_level(row: usize, factor: usize) -> bool {
+    let mixed = (row + 1).wrapping_mul(factor.wrapping_mul(2).wrapping_add(1));
+    (mixed ^ factor.rotate_left(1)).count_ones() & 1 == 1
 }
 fn set_phase(candidate: &mut Candidate, high: bool) {
     let phases =

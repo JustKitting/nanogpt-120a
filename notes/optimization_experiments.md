@@ -7887,3 +7887,43 @@ decision:
   model residual noise and candidate leverage, matching the intended confidence
   and variance-driven sweep behavior more closely.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Make sweep acquisition target fixed-wall validation loss with stability as a survival prior.
+status: accepted_tooling
+change:
+  Candidate acquisition no longer adds speed and stability as separate
+  objectives. The score is expected validation-loss quality plus exploration:
+  predicted quality is multiplied by a survival prior derived from the
+  stability model, and likely failed candidates receive the failure side of the
+  expectation. Speed remains reported in candidate score/ranked artifacts but
+  does not improve acquisition score by default. Promotion remains full-run
+  held-out validation loss only.
+  Removed the arbitrary top-4 factorial cutoff. The factorial source now emits
+  fractional-factorial rows over every factor currently supported by the fitted
+  belief table.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 15 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_val_loss_survival_prior_20260621T175837Z
+measured_effect:
+  candidate_0000_score.txt includes:
+    expected_quality=1.253229
+    survival_prior=1.000000
+  candidate_0000_ranked.tsv includes expected_quality and survival_prior
+  columns while keeping speed columns diagnostic. The ranked pool still has
+  balanced source coverage:
+    factorial 8
+    guided 8
+    random 8
+    variance 8
+decision:
+  Accept as sweep infrastructure. This restores the single target:
+  lowest held-out validation loss over the fixed wall-clock budget, with
+  stability used as a Bayesian-style survival prior rather than a separate
+  promotion objective.
+```

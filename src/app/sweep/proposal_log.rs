@@ -24,11 +24,13 @@ pub fn write(
 fn selected_text(proposal: &Proposal) -> String {
     let (source, selected) = selected_score(proposal);
     format!(
-        "candidate={}\nreason={}\nsource={}\nscore={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nspeed={}\nstability={}\n",
+        "candidate={}\nreason={}\nsource={}\nscore={:.6}\nexpected_quality={:.6}\nsurvival_prior={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nspeed={}\nstability={}\n",
         proposal.candidate.key(),
         proposal.reason,
         source,
         selected.score,
+        selected.expected_quality,
+        selected.survival_prior,
         selected.uncertainty,
         selected.exploration,
         fmt_prediction(selected.predicted_quality),
@@ -39,7 +41,7 @@ fn selected_text(proposal: &Proposal) -> String {
 
 fn ranked_tsv(proposal: &Proposal) -> String {
     let mut text = String::from(
-        "rank\tselected\tsource\tcandidate\tscore\tuncertainty\texploration\tquality_value\tquality_z\tquality_uncertainty\tspeed_value\tspeed_z\tspeed_uncertainty\tstability_value\tstability_z\tstability_uncertainty\n",
+        "rank\tselected\tsource\tcandidate\tscore\texpected_quality\tsurvival_prior\tuncertainty\texploration\tquality_value\tquality_z\tquality_uncertainty\tspeed_value\tspeed_z\tspeed_uncertainty\tstability_value\tstability_z\tstability_uncertainty\n",
     );
     for (rank, scored) in proposal.ranked.iter().enumerate() {
         push_ranked_row(
@@ -57,12 +59,14 @@ fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, sel
     let speed = scored.score.predicted_speed;
     let stability = scored.score.predicted_stability;
     text.push_str(&format!(
-        "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+        "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
         rank,
         selected,
         scored.source,
         scored.candidate.key(),
         scored.score.score,
+        scored.score.expected_quality,
+        scored.score.survival_prior,
         scored.score.uncertainty,
         scored.score.exploration,
         value(quality),
