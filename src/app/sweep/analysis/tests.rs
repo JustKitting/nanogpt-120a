@@ -49,11 +49,43 @@ fn factor_beliefs_aggregate_direction_and_confidence() {
     assert!(batch.variance >= 0.0);
 }
 
+#[test]
+fn stability_beliefs_do_not_create_target_direction() {
+    let mut config = config();
+    config.sweep_stability_weight = 1.0;
+    let trials = [
+        trial_with_status(candidate(4, 4), "failed_build"),
+        trial_with_status(candidate(4, 8), "failed_build"),
+        trial_with_status(candidate(16, 4), "success"),
+        trial_with_status(candidate(16, 8), "success"),
+    ];
+    let analysis = super::analyze(&trials, &config);
+    let beliefs = super::factor_beliefs(&analysis, &config);
+
+    assert!(!beliefs.is_empty());
+    assert!(
+        beliefs
+            .iter()
+            .all(|belief| belief.direction.abs() < 1.0e-12)
+    );
+    assert!(beliefs.iter().any(|belief| belief.variance > 0.0));
+}
+
 fn trial(candidate: Candidate, val_loss: f64) -> Trial {
     Trial {
         candidate,
         status: "success".to_string(),
         val_loss: Some(val_loss),
+        completed_steps: Some(10),
+        log_path: PathBuf::from("train.log"),
+    }
+}
+
+fn trial_with_status(candidate: Candidate, status: &str) -> Trial {
+    Trial {
+        candidate,
+        status: status.to_string(),
+        val_loss: None,
         completed_steps: Some(10),
         log_path: PathBuf::from("train.log"),
     }

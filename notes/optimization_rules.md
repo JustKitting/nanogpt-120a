@@ -48,6 +48,11 @@ hyperparameter candidate only when its 900-second held-out validation loss is
 lower than the current sweep baseline. Do not promote a sweep candidate only
 because it completed more steps inside the `+/-1%` noise band.
 
+Stability is a Bayesian-style survival prior for screening and acquisition. It
+helps predict whether a candidate is likely to survive the longer validation
+run, and it can increase uncertainty/exploration pressure. It is not a separate
+objective and must not promote a candidate by itself.
+
 ## Promotion Rule
 
 Do not call a candidate promoted, accepted, or commit-worthy from:

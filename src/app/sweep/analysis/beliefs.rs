@@ -24,7 +24,11 @@ struct Accum {
 pub fn factor_beliefs(analysis: &SweepAnalysis, config: &SweepConfig) -> Vec<FactorBelief> {
     let mut factors = BTreeMap::<String, Accum>::new();
     for response in &analysis.models {
-        let response_weight = response_weight(response.name, config);
+        let direction_weight = direction_weight(response.name, config);
+        let uncertainty_weight = uncertainty_weight(response.name, config);
+        if direction_weight == 0.0 && uncertainty_weight == 0.0 {
+            continue;
+        }
         for effect in response
             .model
             .effects
@@ -32,11 +36,11 @@ pub fn factor_beliefs(analysis: &SweepAnalysis, config: &SweepConfig) -> Vec<Fac
             .filter(|effect| !effect.name.contains('*'))
         {
             let confidence = directional_confidence(effect.p_positive);
-            let weighted = effect.coefficient * response_weight * confidence;
+            let weighted = effect.coefficient * direction_weight * confidence;
             let entry = factors.entry(effect.name.clone()).or_default();
             entry.direction += weighted;
-            entry.confidence += confidence.abs() * response_weight.abs();
-            entry.variance += effect.stderr * effect.stderr;
+            entry.confidence += confidence.abs() * uncertainty_weight.abs();
+            entry.variance += effect.stderr * effect.stderr * uncertainty_weight.abs();
             entry.positive_probability += effect.p_positive;
             entry.evidence += 1;
         }
@@ -85,11 +89,17 @@ fn average(value: f64, count: usize) -> f64 {
     }
 }
 
-fn response_weight(name: &str, config: &SweepConfig) -> f64 {
+fn direction_weight(name: &str, config: &SweepConfig) -> f64 {
     if name.contains("quality") {
         config.sweep_quality_weight
-    } else if name.contains("speed") {
-        config.sweep_speed_weight
+    } else {
+        0.0
+    }
+}
+
+fn uncertainty_weight(name: &str, config: &SweepConfig) -> f64 {
+    if name.contains("quality") {
+        config.sweep_quality_weight
     } else if name == "stability" {
         config.sweep_stability_weight
     } else {

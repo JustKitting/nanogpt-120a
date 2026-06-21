@@ -8013,3 +8013,32 @@ decision:
   the sweep's stability prior and should not trap an automatic sweep in
   endless random sampling.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Align sweep beliefs with validation-loss survival-prior target.
+status: accepted_tooling
+change:
+  Factor beliefs now separate objective direction from survival-prior
+  uncertainty. Validation-loss quality models are the only response models that
+  can push guided proposal direction. Stability models can still contribute
+  uncertainty and variance for survival-prior exploration, but they do not
+  create a target direction by themselves. Speed models remain diagnostic and
+  are not used by factor beliefs for this target.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 20 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_target_belief_alignment_20260621T181346Z
+measured_effect:
+  Added unit coverage proving stability-only observations produce no guided
+  target direction while still contributing nonzero variance. The dry-run
+  proposal artifacts still include expected_quality and survival_prior, so the
+  full acquisition path keeps using stability as a survival prior.
+decision:
+  Accept as sweep infrastructure. This keeps the sweep target fixed on
+  held-out validation loss while using stability as a prior for whether a
+  candidate is worth spending a full validation run on.
+```
