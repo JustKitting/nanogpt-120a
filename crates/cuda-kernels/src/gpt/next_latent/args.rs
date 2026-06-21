@@ -1,5 +1,8 @@
 use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy};
 
+use crate::mma::{Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionParams};
+use crate::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct NextLatShape {
@@ -31,4 +34,42 @@ pub struct NextLatSmoothL1Args<'a, 'out> {
     pub seq_len: u32,
     pub embedding_dim: u32,
     pub lambda: f32,
+}
+
+pub struct NextLatProjectionArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub input: Nvfp4RowwiseDeviceTensor<'a>,
+    pub weight: Nvfp4FourSixMmaWeightTensor<'a>,
+    pub bias: Nvfp4DeviceTensor<'a>,
+    pub out: &'out mut DeviceBuffer<f32>,
+    pub token_count: u32,
+    pub input_dim: u32,
+    pub output_dim: u32,
+}
+
+pub struct NextLatGeluArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub input: &'a DeviceBuffer<f32>,
+    pub out: &'out mut DeviceBuffer<f32>,
+    pub len: u32,
+}
+
+pub struct NextLatResidualAddArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub delta: &'a DeviceBuffer<f32>,
+    pub residual: &'a DeviceBuffer<f32>,
+    pub out: &'out mut DeviceBuffer<f32>,
+    pub len: u32,
+}
+
+pub fn projection_params(args: &NextLatProjectionArgs<'_, '_>) -> Nvfp4ProjectionParams {
+    Nvfp4ProjectionParams {
+        token_count: args.token_count,
+        input_dim: args.input_dim,
+        output_dim: args.output_dim,
+        weight_global_scale: 1.0,
+        bias_global_scale: 1.0,
+        residual_add: 0,
+        activation: 0,
+    }
 }
