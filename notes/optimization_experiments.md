@@ -6832,6 +6832,49 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Coalesced 32-column linear bias-gradient reduction.
+status: accepted_900s
+change:
+  Replaced the one-block-per-output-column linear_bias_grad_kernel with a
+  32-column tile. Each warp lane owns one adjacent output column and walks rows,
+  so the warp reads contiguous e[row, col..col+31] values instead of
+  row-strided addresses separated by output_dim. Moved the bias-gradient body
+  into gpt/linear_backward/bias.rs to keep ownership out of the large
+  linear_backward.rs kernel shell.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/linear_bias_coalesced_l4_b8_20_20260621T105744Z.run.log
+    val_loss=8.506022, train_elapsed_s=3.401, completed_steps=20.
+  100-step SYNTH screen:
+    target/linear_bias_coalesced_l4_b8_100_20260621T105810Z.log
+    val_loss=6.543840, train_elapsed_s=17.444, completed_steps=100.
+  900-second held-out gate:
+    target/linear_bias_coalesced_l4_b8_900_20260621T105837Z.log
+    val_loss=3.976525, train_elapsed_s=900.005, completed_steps=5024.
+measured_effect:
+  Against the accepted MS-EDEN reciprocal profile
+  target/nsys/ms_eden_inv_scale_l4_b8_20_20260621T093759Z.run.log,
+  linear_bias_grad_kernel moved from 41.079015ms to 27.611254ms over 20
+  profiled steps. Profiled train time moved from 3.424s to 3.401s.
+  The 900-second gate completed 13 more steps than the previous promoted
+  baseline. Held-out validation moved from 3.943465 to 3.976525, a +0.84%
+  change.
+decision:
+  Promote under the current acceptance rule: held-out validation stayed within
+  the +/-1% no-meaningful-change band and completed step count increased.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Unroll aligned FP16 CTA f32 staging loops.
 status: rejected_pre_gate
 change:
