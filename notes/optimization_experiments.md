@@ -7111,6 +7111,38 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted
+experiment: Skip final CTA projection post-MMA barrier.
+status: rejected_pre_gate
+change:
+  In the shared CTA NVFP4 projection accumulator, removed the post-MMA
+  thread-block barrier on the final K tile while keeping barriers before
+  subsequent shared-memory staging.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/projection_final_sync_cut_l4_b8_20_20260621T133840Z.run.log
+    val_loss=8.506022, train_elapsed_s=3.476, completed_steps=20.
+measured_effect:
+  Against the accepted direct-residual-gradient profile
+  target/nsys/direct_residual_grad_l4_b8_20_20260621T131424Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  648.530862ms to 650.302720ms over 20 profiled steps. lm_head_kernel moved
+  from 116.768158ms to 117.191220ms. Profiled train time moved from 3.470s to
+  3.476s.
+decision:
+  Reject before the 900-second gate and revert the code. The candidate slowed
+  the projection path it was intended to improve.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: M64/N32 projection CTA shape for NVFP4 projection matmuls.
 status: rejected_screen
