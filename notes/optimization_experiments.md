@@ -29,6 +29,40 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
 ```text
+date: 2026-06-21
+commit: uncommitted diagnostic
+experiment: NVFP4/RHT Polar Express estimator for Aurora.
+status: diagnostic
+change:
+  Added an ignored GPU comparator that runs the existing NVFP4 MS-EDEN tensor
+  core matmul helper inside the Polar Express recurrence and compares the
+  resulting update direction against the current FP16-leaf Polar reference.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer nvfp4_rht_polar_estimator_reports_update_error -- --ignored --nocapture: pass.
+measured_effect:
+  Single first-iteration products were directionally close:
+    first_gram cosine=0.99911314 rel_l2=4.24877554e-2
+    first_ax_from_expected_gram cosine=0.99855441 rel_l2=5.37767597e-2
+    first_aax_from_expected_inputs cosine=0.99920607 rel_l2=4.01885584e-2
+  Full NVFP4/RHT Polar was unstable:
+    iterations=1 cosine=0.99815118 rel_l2=6.08224683e-2
+    iterations=2 cosine=0.96626502 rel_l2=2.65107155e-1
+    iterations=3 cosine=0.53992063 rel_l2=2.01288104e0
+    iterations=4 cosine=0.15201239 rel_l2=1.26888269e3
+    iterations=5 cosine=0.15815794 rel_l2=1.21603512e18
+  A one-iteration FP4 prefix followed by FP16 remained close:
+    hybrid_fp4_prefix=1 cosine=0.99875975 rel_l2=5.08906357e-2
+  Prefix lengths 2 and 3 became non-finite after the later recurrence.
+decision:
+  Do not replace all Aurora Polar GEMMs with NVFP4/RHT. The only viable
+  follow-up candidate from this diagnostic is a first-iteration-only NVFP4
+  Polar prefix, followed by the existing FP16 Polar leaf path.
+```
+
+```text
 date: 2026-06-20
 commit: uncommitted
 experiment: Compact upper-triangle tile enumeration inside Aurora Polar
