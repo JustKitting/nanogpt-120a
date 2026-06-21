@@ -121,9 +121,11 @@ fn write_candidate_score(
     fs::write(
         sweep_dir.join(format!("candidate_{index:04}_score.txt")),
         format!(
-            "candidate={}\nscore={:.6}\nquality={}\nspeed={}\nstability={}\n",
+            "candidate={}\nscore={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nspeed={}\nstability={}\n",
             candidate.key(),
             score.score,
+            score.uncertainty,
+            score.exploration,
             fmt_prediction(score.predicted_quality),
             fmt_prediction(score.predicted_speed),
             fmt_prediction(score.predicted_stability)

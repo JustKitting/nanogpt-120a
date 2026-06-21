@@ -1,7 +1,9 @@
 mod effects;
+mod features;
 mod linear;
 
 use super::super::candidate::Candidate;
+use super::design;
 use super::factors::{FEATURE_COUNT, candidate_features};
 use super::stats::{EPS, mean, stddev};
 
@@ -22,8 +24,10 @@ pub struct Model {
     pub y_mean: f64,
     pub y_std: f64,
     pub residual_std: f64,
-    means: Vec<f64>,
-    stds: Vec<f64>,
+    base_stats: design::BaseStats,
+    terms: Vec<design::Term>,
+    design_means: Vec<f64>,
+    design_stds: Vec<f64>,
     indices: Vec<usize>,
     beta: Vec<f64>,
     covariance: Vec<Vec<f64>>,
@@ -42,11 +46,21 @@ pub fn fit(rows: Vec<(Candidate, f64)>) -> Option<Model> {
         return None;
     }
 
-    let raw = rows
+    let base_rows = rows
         .iter()
         .map(|(candidate, _)| candidate_features(candidate))
         .collect::<Vec<_>>();
-    let (indices, means, stds) = active_features(&raw);
+    let base_stats = design::base_stats(&base_rows);
+    let terms = design::terms();
+    let raw = base_rows
+        .iter()
+        .map(|row| design::values_from_base(row, &base_stats, &terms))
+        .collect::<Vec<_>>();
+    let names = terms
+        .iter()
+        .map(|term| design::term_name(*term))
+        .collect::<Vec<_>>();
+    let (indices, design_means, design_stds) = features::active(&raw);
     if indices.is_empty() {
         return None;
     }
@@ -57,22 +71,24 @@ pub fn fit(rows: Vec<(Candidate, f64)>) -> Option<Model> {
             indices
                 .iter()
                 .enumerate()
-                .map(|(j, i)| (row[*i] - means[j]) / stds[j])
+                .map(|(j, i)| (row[*i] - design_means[j]) / design_stds[j])
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
     let yz = y.iter().map(|y| (y - y_mean) / y_std).collect::<Vec<_>>();
     let (beta, inverse) = linear::ridge_fit(&x, &yz)?;
     let residual_std = linear::residual_std(&x, &yz, &beta);
-    let effects = effects::build(&indices, &beta, &inverse, residual_std);
+    let effects = effects::build(&indices, &names, &beta, &inverse, residual_std);
 
     Some(Model {
         n: rows.len(),
         y_mean,
         y_std,
         residual_std,
-        means,
-        stds,
+        base_stats,
+        terms,
+        design_means,
+        design_stds,
         indices,
         beta,
         covariance: inverse,
@@ -82,11 +98,12 @@ pub fn fit(rows: Vec<(Candidate, f64)>) -> Option<Model> {
 
 impl Model {
     pub fn predict(&self, features: &[f64; FEATURE_COUNT]) -> Prediction {
+        let values = design::values_from_base(features, &self.base_stats, &self.terms);
         let z = self
             .indices
             .iter()
             .enumerate()
-            .map(|(j, i)| (features[*i] - self.means[j]) / self.stds[j])
+            .map(|(j, i)| (values[*i] - self.design_means[j]) / self.design_stds[j])
             .collect::<Vec<_>>();
         let standard_score = super::stats::dot(&z, &self.beta);
         let variance = linear::quadratic_form(&z, &self.covariance).max(0.0);
@@ -96,21 +113,4 @@ impl Model {
             uncertainty: variance.sqrt(),
         }
     }
-}
-
-fn active_features(raw: &[[f64; FEATURE_COUNT]]) -> (Vec<usize>, Vec<f64>, Vec<f64>) {
-    let mut indices = Vec::new();
-    let mut means = Vec::new();
-    let mut stds = Vec::new();
-    for i in 0..FEATURE_COUNT {
-        let values = raw.iter().map(|row| row[i]).collect::<Vec<_>>();
-        let m = mean(&values);
-        let s = stddev(&values, m);
-        if s > EPS {
-            indices.push(i);
-            means.push(m);
-            stds.push(s);
-        }
-    }
-    (indices, means, stds)
 }

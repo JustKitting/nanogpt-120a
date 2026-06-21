@@ -1,11 +1,14 @@
+mod design;
 mod factors;
-mod interactions;
 mod log_files;
 mod logs;
 mod regression;
 mod report;
 mod scoring;
 mod stats;
+
+#[cfg(test)]
+mod tests;
 
 use super::{config::SweepConfig, history::Trial};
 
@@ -22,7 +25,6 @@ pub struct SweepAnalysis {
 pub struct ResponseModel {
     pub name: &'static str,
     pub model: regression::Model,
-    pub interactions: Vec<interactions::InteractionEffect>,
 }
 
 pub fn analyze(trials: &[Trial], config: &SweepConfig) -> SweepAnalysis {
@@ -80,12 +82,7 @@ fn push_model(
     name: &'static str,
     rows: Vec<(super::candidate::Candidate, f64)>,
 ) {
-    let interactions = interactions::fit(&rows);
     if let Some(model) = regression::fit(rows) {
-        models.push(ResponseModel {
-            name,
-            model,
-            interactions,
-        });
+        models.push(ResponseModel { name, model });
     }
 }

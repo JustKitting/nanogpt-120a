@@ -1,11 +1,8 @@
-use super::super::{
-    factors::FEATURE_NAMES,
-    stats::{EPS, logistic},
-};
+use super::super::stats::{EPS, logistic};
 
 #[derive(Clone, Debug)]
 pub struct Effect {
-    pub name: &'static str,
+    pub name: String,
     pub coefficient: f64,
     pub stderr: f64,
     pub t: f64,
@@ -14,6 +11,7 @@ pub struct Effect {
 
 pub fn build(
     indices: &[usize],
+    names: &[String],
     beta: &[f64],
     inverse: &[Vec<f64>],
     residual_std: f64,
@@ -25,7 +23,7 @@ pub fn build(
             let stderr = (residual_std * residual_std * inverse[j][j].max(0.0)).sqrt();
             let t = if stderr > EPS { beta[j] / stderr } else { 0.0 };
             Effect {
-                name: FEATURE_NAMES[*index],
+                name: names[*index].clone(),
                 coefficient: beta[j],
                 stderr,
                 t,

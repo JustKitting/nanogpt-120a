@@ -43,14 +43,21 @@ fn response_summary(text: &mut String, response: &super::ResponseModel) {
 }
 
 fn interaction_summary(text: &mut String, response: &super::ResponseModel) {
-    if response.interactions.is_empty() {
+    let interactions = response
+        .model
+        .effects
+        .iter()
+        .filter(|effect| effect.name.contains('*'))
+        .take(12)
+        .collect::<Vec<_>>();
+    if interactions.is_empty() {
         return;
     }
 
     text.push_str("Top pairwise standardized product effects:\n\n");
     text.push_str("| interaction | coefficient | stderr | t | p_positive |\n");
     text.push_str("|---|---:|---:|---:|---:|\n");
-    for effect in response.interactions.iter().take(12) {
+    for effect in interactions {
         text.push_str(&format!(
             "| {} | {:.6} | {:.6} | {:.3} | {:.3} |\n",
             effect.name, effect.coefficient, effect.stderr, effect.t, effect.p_positive
@@ -81,7 +88,12 @@ fn effects_tsv(analysis: &SweepAnalysis) -> String {
 fn interactions_tsv(analysis: &SweepAnalysis) -> String {
     let mut text = String::from("response\tn\tinteraction\tcoefficient\tstderr\tt\tp_positive\n");
     for response in &analysis.models {
-        for effect in &response.interactions {
+        for effect in response
+            .model
+            .effects
+            .iter()
+            .filter(|effect| effect.name.contains('*'))
+        {
             text.push_str(&format!(
                 "{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
                 response.name,

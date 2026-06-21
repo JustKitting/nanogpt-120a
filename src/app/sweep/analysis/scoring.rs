@@ -8,6 +8,8 @@ use super::{
 #[derive(Clone, Debug)]
 pub struct CandidateScore {
     pub score: f64,
+    pub uncertainty: f64,
+    pub exploration: f64,
     pub predicted_quality: Option<Prediction>,
     pub predicted_speed: Option<Prediction>,
     pub predicted_stability: Option<Prediction>,
@@ -36,13 +38,16 @@ pub fn score_candidate(
         .flatten()
         .map(|p| p.uncertainty)
         .fold(0.0, f64::max);
+    let exploration = uncertainty.ln_1p();
     let score = config.sweep_quality_weight * quality
         + config.sweep_speed_weight * speed
         + config.sweep_stability_weight * stability
-        + config.sweep_exploration_weight * uncertainty;
+        + config.sweep_exploration_weight * exploration;
 
     CandidateScore {
         score,
+        uncertainty,
+        exploration,
         predicted_quality,
         predicted_speed,
         predicted_stability,

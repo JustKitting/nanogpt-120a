@@ -34,6 +34,41 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Use pairwise factorial terms in sweep acquisition.
+status: accepted_tooling_dry_run
+change:
+  Replaced the report-only interaction probe with one ridge-regularized design
+  matrix containing standardized main effects and standardized pairwise product
+  terms. Candidate scoring now uses that interaction-aware model directly, so
+  interaction effects influence the next proposed run instead of only appearing
+  in analysis files. Exploration still uses prediction uncertainty, but applies
+  ln(1 + uncertainty) so sparse high-dimensional uncertainty does not dominate
+  the quality/stability/speed terms.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo test --bin sweep: pass.
+  dry-run analysis:
+    target/sweeps/dryrun_interaction_acquisition_20260621T171734Z
+    generated interaction-aware analysis_summary.md,
+    analysis_interactions.tsv, and candidate_0000_score.txt.
+observed_effect:
+  The dry run reports interaction terms as first-class fitted effects. Example:
+  stability top term became n_embd*ln_warmup_steps, and candidate scoring
+  reported score=4.002445, uncertainty=49.277327, exploration=3.917554 for
+  b16_l8_d1024_h16_p8_c90_lr1.4222_alr0.7757_w20_s0.10_b0.20_r0.50.
+  A focused unit test verifies that if held-out quality is only recoverable from
+  batch_size*n_layer, the scorer gives the interaction-positive candidate a
+  higher predicted quality score than the crossed candidate.
+decision:
+  Accept as sweep infrastructure. This moves the implementation closer to the
+  factorial-design goal by using interaction terms in candidate acquisition, not
+  just reporting them.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Replace heuristic sweep proposal scoring with multivariable statistical analysis.
 status: accepted_tooling_dry_run
 change:
