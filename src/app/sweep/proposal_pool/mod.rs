@@ -1,4 +1,5 @@
 mod direction;
+mod factorial;
 mod guided;
 mod variance;
 
@@ -20,19 +21,29 @@ pub fn sample(
     rng: &mut SweepRng,
     config: &SweepConfig,
     analysis: &SweepAnalysis,
+    center: Option<&Candidate>,
 ) -> Vec<PooledCandidate> {
     let target = config.candidate_samples.max(1);
     let mut pool = Vec::with_capacity(target);
     let mut used = seen.clone();
     let direction = direction::from_analysis(analysis, config);
-    push_guided(&mut pool, &mut used, rng, &direction, target.div_ceil(3));
+    push_guided(&mut pool, &mut used, rng, &direction, target.div_ceil(4));
+    push_factorial(
+        &mut pool,
+        &mut used,
+        rng,
+        config,
+        analysis,
+        center,
+        target.div_ceil(4),
+    );
     push_variance(
         &mut pool,
         &mut used,
         rng,
         config,
         analysis,
-        target.div_ceil(3),
+        target.div_ceil(4),
     );
     push_random(&mut pool, &mut used, rng, target);
     pool
@@ -67,6 +78,22 @@ fn push_variance(
     let target = (pool.len() + count).min(config.candidate_samples.max(1));
     for candidate in variance::candidates(used, rng, config, analysis, target - pool.len()) {
         push_unique(pool, used, candidate, "variance");
+    }
+}
+
+fn push_factorial(
+    pool: &mut Vec<PooledCandidate>,
+    used: &mut HashSet<String>,
+    rng: &mut SweepRng,
+    config: &SweepConfig,
+    analysis: &SweepAnalysis,
+    center: Option<&Candidate>,
+    count: usize,
+) {
+    let target = (pool.len() + count).min(config.candidate_samples.max(1));
+    for candidate in factorial::candidates(used, rng, config, analysis, center, target - pool.len())
+    {
+        push_unique(pool, used, candidate, "factorial");
     }
 }
 

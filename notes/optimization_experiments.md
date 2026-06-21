@@ -7830,3 +7830,34 @@ decision:
   and preserves discrete choices only where compilation or cooperative launch
   constraints make them discrete.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Add factorial probe candidates to sweep acquisition pool.
+status: accepted_tooling
+change:
+  Added a factorial proposal source centered on the current best baseline
+  candidate. The source ranks factor beliefs by high variance and low
+  confidence, then emits low/high probes for the top uncertain factors. The
+  acquisition pool now balances guided, factorial, variance, and random
+  candidates before the model scores the ranked list.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_factorial_probe_pool_20260621T174549Z
+measured_effect:
+  candidate_0000_ranked.tsv contains balanced source coverage:
+    factorial 8
+    guided 8
+    random 8
+    variance 8
+  The selected candidate source was factorial, proving the new source is
+  persisted and participates in acquisition rather than only being generated.
+decision:
+  Accept as sweep infrastructure. This moves the sweep closer to the requested
+  factorial-experiment behavior by using uncertainty in the fitted factors to
+  place explicit low/high probes around the current best point.
+```

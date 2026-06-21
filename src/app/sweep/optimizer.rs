@@ -49,7 +49,7 @@ pub fn propose(
         return proposal("random", unseen_random(seen, rng), analysis, config);
     }
 
-    let mut ranked = proposal_pool::sample(seen, rng, config, analysis)
+    let mut ranked = proposal_pool::sample(seen, rng, config, analysis, baseline)
         .into_iter()
         .map(|pooled| {
             let score = analysis::score_candidate(analysis, config, &pooled.candidate);

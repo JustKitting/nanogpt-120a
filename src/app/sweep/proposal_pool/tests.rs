@@ -12,16 +12,19 @@ fn guided_pool_uses_main_effect_direction() {
         trial(candidate(16, 8), 1.0),
     ];
     let analysis = analysis::analyze(&trials, &config);
+    let center = candidate(8, 4);
     let pool = super::sample(
         &HashSet::new(),
         &mut super::super::rng::SweepRng::new(0x1234),
         &config,
         &analysis,
+        Some(&center),
     );
 
     assert_eq!(pool[0].source, "guided");
     assert_eq!(pool[0].candidate.batch_size, 16);
     assert_eq!(pool[0].candidate.n_layer, 8);
+    assert!(pool.iter().any(|candidate| candidate.source == "factorial"));
     assert!(pool.iter().any(|candidate| candidate.source == "variance"));
     assert!(pool.iter().any(|candidate| candidate.source == "random"));
 }
