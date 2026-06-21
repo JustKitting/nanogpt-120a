@@ -8074,3 +8074,30 @@ decision:
   rather than only a fitted response model that disappears in constant-outcome
   histories.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Use balanced Hadamard levels for factorial sweep probes.
+status: accepted_tooling
+change:
+  Replaced the ad hoc factorial high/low bit mixer with a Walsh-Hadamard
+  two-level schedule. Factorial candidates now use balanced low/high settings
+  across each factor and balanced pairwise cells over a Hadamard block, which
+  better matches the factorial experiment structure used to probe main effects
+  and interactions.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 23 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_hadamard_factorial_20260621T181911Z
+measured_effect:
+  Added unit coverage proving the first 16 factorial rows are balanced per
+  factor and cover all two-level pairwise cells evenly for the tested factors.
+  The dry-run selected a factorial candidate through the normal proposal path
+  and emitted the standard analysis/proposal artifacts.
+decision:
+  Accept as sweep infrastructure. This removes arbitrary factorial scheduling
+  and makes the variance-probing proposal source match the intended design.
+```

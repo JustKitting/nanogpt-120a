@@ -87,8 +87,7 @@ fn level<T: Copy>(values: &[T], high: bool) -> T {
     values[if high { values.len() - 1 } else { 0 }]
 }
 fn high_level(row: usize, factor: usize) -> bool {
-    let mixed = (row + 1).wrapping_mul(factor.wrapping_mul(2).wrapping_add(1));
-    (mixed ^ factor.rotate_left(1)).count_ones() & 1 == 1
+    ((row + 1) & (factor + 1)).count_ones() & 1 == 0
 }
 fn set_phase(candidate: &mut Candidate, high: bool) {
     let phases =
@@ -118,4 +117,34 @@ fn range_f64(range: (f64, f64), high: bool, log_scale: bool) -> f64 {
 fn range_usize(range: (usize, usize), high: bool) -> usize {
     let t = if high { 0.875 } else { 0.125 };
     range.0 + (((range.1 - range.0) as f64) * t).round() as usize
+}
+
+#[cfg(test)]
+mod tests {
+    use super::high_level;
+
+    #[test]
+    fn hadamard_levels_are_balanced_per_factor() {
+        let rows = 16;
+        for factor in 0..8 {
+            let highs = (0..rows).filter(|row| high_level(*row, factor)).count();
+            assert_eq!(highs, rows / 2);
+        }
+    }
+
+    #[test]
+    fn hadamard_factor_pairs_cover_all_two_level_cells() {
+        let rows = 16;
+        for left in 0..4 {
+            for right in left + 1..4 {
+                let mut cells = [0; 4];
+                for row in 0..rows {
+                    let a = usize::from(high_level(row, left));
+                    let b = usize::from(high_level(row, right));
+                    cells[a * 2 + b] += 1;
+                }
+                assert_eq!(cells, [rows / 4; 4]);
+            }
+        }
+    }
 }
