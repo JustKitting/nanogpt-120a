@@ -6790,3 +6790,45 @@ decision:
   Reject before the 900-second gate and revert the code. The branch/return
   shape did not improve the current attention backward profile.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Reuse reciprocal scale inside MS-EDEN pack.
+status: accepted_900s
+change:
+  In the MS-EDEN pack body, compute inv_scale = 1 / (scale * global_scale) once
+  per lane and reuse multiplication for x_scaled, hi, and lo instead of
+  repeating division by the same scale product.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_inv_scale_l4_b8_20_20260621T093759Z.run.log
+    val_loss=8.505094, train_elapsed_s=3.424, completed_steps=20.
+  100-step SYNTH screen:
+    target/ms_eden_inv_scale_l4_b8_100_20260621T093815Z.log
+    val_loss=6.535932, train_elapsed_s=17.490, completed_steps=100.
+  900-second held-out gate:
+    target/ms_eden_inv_scale_l4_b8_900_20260621T093858Z.log
+    val_loss=3.943465, train_elapsed_s=900.102, completed_steps=5011.
+measured_effect:
+  Against the accepted linear-backward tile-shift profile
+  target/nsys/linear_bwd_tile_shift_l4_b8_20_20260621T090938Z.run.log,
+  profiled train time moved from 3.434s to 3.424s over 20 steps.
+  fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel moved from 109.248375ms
+  to 107.043232ms, fp32_to_nvfp4_ms_eden_device_scale_kernel moved from
+  71.326169ms to 66.239611ms, and
+  rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel moved from
+  62.171738ms to 61.669028ms.
+  The 900-second gate improved held-out validation loss from 3.976722 to
+  3.943465 and completed steps from 4993 to 5011.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  budget.
+```

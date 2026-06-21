@@ -530,7 +530,8 @@ pub(crate) mod module {
             group_amax * scale_override / (FP4_MAX * safe_global_scale),
         );
         let scale = nonzero_scale(e4m3_value(scale_bits as u16));
-        let x_scaled = value / (scale * safe_global_scale);
+        let inv_scale = 1.0 / (scale * safe_global_scale);
+        let x_scaled = value * inv_scale;
         let payload = cvt_rn_satfinite_e2m1x2_f32(0.0, x_scaled) & 0x0f;
         let fp4_value = e2m1_value(payload);
 
@@ -551,8 +552,8 @@ pub(crate) mod module {
         let lo_value = warp::shuffle_f32_sync(0xffff_ffff, value, pair + 1);
         if lane_in_group < GROUP_SIZE / 2 {
             let byte = chunk_base / 2 + (lane / GROUP_SIZE) * (GROUP_SIZE / 2) + lane_in_group;
-            let hi = hi_value / (scale * safe_global_scale);
-            let lo = lo_value / (scale * safe_global_scale);
+            let hi = hi_value * inv_scale;
+            let lo = lo_value * inv_scale;
             unsafe {
                 *out_fp4.get_unchecked_mut(byte as usize) = cvt_rn_satfinite_e2m1x2_f32(lo, hi);
             }
