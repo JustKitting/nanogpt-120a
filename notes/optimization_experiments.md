@@ -8453,3 +8453,81 @@ decision:
   the required 900-second gate while preserving correctness tests and the K64
   fallback path.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before 100-step screen
+experiment: Column-major projection CTA tile scheduling for weight-tile reuse.
+status: rejected_screen
+source:
+  Colfax's GEMM scheduling guidance describes threadblock rasterization and
+  tile scheduling as a way to improve cache behavior. This candidate tested
+  the analogous projection-CTA work order by walking row tiles first for each
+  output-column tile, aiming to reuse the larger NVFP4 weight tile across
+  neighboring row tiles.
+change:
+  Temporarily changed generic projection CTA launches to use a transposed
+  grid mapping and changed the paired linear-backward projection kernel's 1D
+  tile stream to column-major tile order. The per-CTA MMA, staging, and store
+  math were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys baseline:
+    target/nsys/current_k128_b16_20_20260621T212738Z.run.log
+    val_loss=9.213204, train_elapsed_s=5.728, completed_steps=20.
+  20-step nsys candidate:
+    target/nsys/projection_col_major_b16_20_20260621T213114Z.run.log
+    val_loss=9.214709, train_elapsed_s=5.769, completed_steps=20.
+measured_effect:
+  The largest target regressed. Over 20 profiled steps,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1217.244ms to 1257.752ms. lm_head_kernel improved from 222.933ms to
+  222.015ms, but this was too small to offset the linear-backward regression.
+  Overall profiled train time moved from 5.728s to 5.769s.
+decision:
+  Reject and revert before the 100-step and 900-second gates. The cache-order
+  hypothesis helped LM head slightly but made the dominant projection kernel
+  slower.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before 100-step screen
+experiment: Power-of-two index decode fast path in attention_prob_ds_kernel.
+status: rejected_screen
+source:
+  Colfax FlashAttention material emphasizes reducing attention overhead outside
+  the MMA work, including scheduling and softmax-related scalar work. This
+  candidate targeted a local scalar/indexing cost in the backward probability
+  and dS kernel without changing attention math.
+change:
+  Temporarily added a seq_len=1024 fast path that decoded score indices with
+  shifts and masks instead of runtime division/modulo, and cached the
+  log-sum-exp index once per element.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys baseline:
+    target/nsys/current_k128_b16_20_20260621T212738Z.run.log
+    val_loss=9.213204, train_elapsed_s=5.728, completed_steps=20.
+  20-step nsys candidate:
+    target/nsys/attention_prob_decode_fast_b16_20_20260621T213559Z.run.log
+    val_loss=9.213204, train_elapsed_s=5.723, completed_steps=20.
+measured_effect:
+  The target kernel did not improve. attention_prob_ds_kernel moved from
+  183.381ms to 183.389ms over 20 profiled steps. The small total wall-clock
+  movement was noise from unrelated kernels.
+decision:
+  Reject and revert before the 100-step and 900-second gates. The runtime cost
+  is dominated by probability/gradient math and memory traffic, not the score
+  index decode.
+```
