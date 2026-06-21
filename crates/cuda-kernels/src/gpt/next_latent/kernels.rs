@@ -1,0 +1,109 @@
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
+
+use super::args::NextLatShape;
+use crate::float_ptx::abs_f32;
+use crate::layer_norm_reduce::layer_norm_block_reduce;
+use crate::warp_reduce::warp_sum_f32;
+
+const THREADS_PER_BLOCK: u32 = 256;
+const WARP_SIZE: u32 = 32;
+const WARPS_PER_BLOCK: u32 = THREADS_PER_BLOCK / WARP_SIZE;
+
+#[allow(static_mut_refs)]
+#[cuda_module]
+pub mod module {
+    use super::*;
+
+    #[kernel]
+    pub fn nextlat_concat_input_kernel(
+        next_token_embeddings: &[f32],
+        current_states: &[f32],
+        mut out: DisjointSlice<f32>,
+        shape: NextLatShape,
+    ) {
+        let row = thread::blockIdx_x();
+        let thread = thread::threadIdx_x();
+        if row < shape.row_count {
+            let row_base = row as usize * shape.embedding_dim as usize;
+            let out_base = row as usize * (shape.embedding_dim as usize * 2);
+            let mut col = thread;
+            while col < shape.embedding_dim {
+                let col_index = col as usize;
+                unsafe {
+                    *out.get_unchecked_mut(out_base + col_index) =
+                        next_token_embeddings[row_base + col_index];
+                    *out.get_unchecked_mut(out_base + shape.embedding_dim as usize + col_index) =
+                        current_states[row_base + col_index];
+                }
+                col += THREADS_PER_BLOCK;
+            }
+        }
+    }
+
+    #[kernel]
+    pub fn nextlat_smooth_l1_kernel(
+        predicted_next_states: &[f32],
+        target_states: &[f32],
+        mut losses: DisjointSlice<f32>,
+        mut d_predicted_next_states: DisjointSlice<f32>,
+        shape: NextLatShape,
+    ) {
+        static mut SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
+
+        let batch = thread::blockIdx_x();
+        let pos = thread::blockIdx_y();
+        let row = batch * shape.seq_len + pos;
+        let valid = batch < shape.batch_size && pos + 1 < shape.seq_len;
+        let thread = thread::threadIdx_x();
+        let lane = warp::lane_id();
+        let warp_in_block = thread / WARP_SIZE;
+        let valid_rows = shape.batch_size * (shape.seq_len - 1);
+        let grad_scale = shape.lambda / (valid_rows * shape.embedding_dim) as f32;
+
+        let mut local = 0.0;
+        let mut col = thread;
+        while col < shape.embedding_dim {
+            let offset = (row * shape.embedding_dim + col) as usize;
+            if valid {
+                let target_offset = ((row + 1) * shape.embedding_dim + col) as usize;
+                let diff = predicted_next_states[offset] - target_states[target_offset];
+                let abs = abs_f32(diff);
+                let grad = if abs < 1.0 {
+                    local += 0.5 * diff * diff;
+                    diff
+                } else {
+                    local += abs - 0.5;
+                    if diff < 0.0 { -1.0 } else { 1.0 }
+                };
+                unsafe {
+                    *d_predicted_next_states.get_unchecked_mut(offset) = grad * grad_scale;
+                }
+            } else {
+                unsafe {
+                    *d_predicted_next_states.get_unchecked_mut(offset) = 0.0;
+                }
+            }
+            col += THREADS_PER_BLOCK;
+        }
+
+        let sum = layer_norm_block_reduce!(
+            SUMS,
+            WARPS_PER_BLOCK,
+            local,
+            lane,
+            warp_in_block,
+            warp_sum_f32
+        );
+        let row_loss = if valid {
+            shape.lambda * sum / shape.embedding_dim as f32
+        } else {
+            0.0
+        };
+        if warp_in_block == 0 && lane == 0 {
+            unsafe {
+                let slot = losses.get_unchecked_mut(row as usize);
+                *slot += row_loss;
+            }
+        }
+    }
+}

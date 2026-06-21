@@ -34,6 +34,8 @@ pub mod loss;
 pub mod mlp;
 #[path = "utils/mma/mod.rs"]
 pub mod mma;
+#[path = "gpt/next_latent/mod.rs"]
+pub mod next_latent;
 #[path = "utils/nvfp4/mod.rs"]
 pub mod nvfp4;
 #[path = "utils/nvfp4/cast.rs"]
@@ -58,7 +60,7 @@ pub mod warp_reduce;
 pub mod gpt {
     pub use crate::{
         attention, embedding, layer_norm, layer_norm_backward, linear_backward, lm_head, logits,
-        loss, mlp, optimizer, residual,
+        loss, mlp, next_latent, optimizer, residual,
     };
 }
 
