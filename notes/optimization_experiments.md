@@ -6295,3 +6295,28 @@ decision:
   Promote under the current acceptance rule: validation loss improved on the
   fixed 900-second held-out gate.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before profile
+experiment: Reuse Aurora NVFP4 encode lane values with half-warp shuffles.
+status: rejected_correctness_gate
+change:
+  Tried replacing the second pair of global reads in Aurora's 16-value NVFP4
+  encode group with half-warp shuffles from the values already loaded for
+  amax/error calculation.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture:
+    aborted after more than 10 minutes. The test process was still running and
+    GPU0 was at 100% utilization, so the candidate did not pass the optimizer
+    correctness gate.
+measured_effect:
+  No nsys screen or 900-second gate was run. The candidate failed before
+  profiling.
+decision:
+  Reject and revert. Do not retry this shuffle substitution without first
+  isolating why the Aurora optimizer test runtime explodes.
+```
