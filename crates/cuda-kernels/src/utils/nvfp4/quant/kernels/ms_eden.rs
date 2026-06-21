@@ -34,6 +34,7 @@ pub(crate) mod module {
         mut out_scales: DisjointSlice<u8>,
         mut out_global_scales: DisjointSlice<f32>,
         mut out_chunk_amax: DisjointSlice<f32>,
+        chunk_count: u32,
         src_row_len: u32,
         dst_row_len: u32,
         global_scale: f32,
@@ -41,12 +42,18 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
+        let chunk = pack_chunk();
+        if chunk >= chunk_count {
+            return;
+        }
+
         fp32_to_nvfp4_ms_eden_body(
             x,
             &mut out_fp4,
             &mut out_scales,
             &mut out_global_scales,
             &mut out_chunk_amax,
+            chunk,
             src_row_len,
             dst_row_len,
             src_row_len,
@@ -67,18 +74,25 @@ pub(crate) mod module {
         mut out_global_scales: DisjointSlice<f32>,
         mut out_chunk_amax: DisjointSlice<f32>,
         global_scale: &[f32],
+        chunk_count: u32,
         src_row_len: u32,
         dst_row_len: u32,
         scale_override: f32,
         sign_seed: u32,
         scale_seed: u32,
     ) {
+        let chunk = pack_chunk();
+        if chunk >= chunk_count {
+            return;
+        }
+
         fp32_to_nvfp4_ms_eden_body(
             x,
             &mut out_fp4,
             &mut out_scales,
             &mut out_global_scales,
             &mut out_chunk_amax,
+            chunk,
             src_row_len,
             dst_row_len,
             src_row_len,
@@ -99,6 +113,7 @@ pub(crate) mod module {
         mut out_global_scales: DisjointSlice<f32>,
         mut out_chunk_amax: DisjointSlice<f32>,
         global_scale: &[f32],
+        chunk_count: u32,
         source_rows: u32,
         source_cols: u32,
         dst_row_len: u32,
@@ -106,12 +121,18 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
+        let chunk = pack_chunk();
+        if chunk >= chunk_count {
+            return;
+        }
+
         fp32_to_nvfp4_ms_eden_body(
             x,
             &mut out_fp4,
             &mut out_scales,
             &mut out_global_scales,
             &mut out_chunk_amax,
+            chunk,
             source_rows,
             dst_row_len,
             source_cols,
@@ -254,6 +275,7 @@ pub(crate) mod module {
         mut out_global_scales: DisjointSlice<f32>,
         mut out_chunk_amax: DisjointSlice<f32>,
         global_scale: &[f32],
+        chunk_count: u32,
         source_rows: u32,
         source_cols: u32,
         dst_row_len: u32,
@@ -262,7 +284,11 @@ pub(crate) mod module {
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
-        let chunk = thread::blockIdx_x();
+        let chunk = pack_chunk();
+        if chunk >= chunk_count {
+            return;
+        }
+
         let chunk_base = chunk * HADAMARD_DIM;
         let input = nvfp4_transposed_hadamard_input(
             bytes,
@@ -281,6 +307,7 @@ pub(crate) mod module {
             &mut out_scales,
             &mut out_global_scales,
             &mut out_chunk_amax,
+            chunk,
             dst_row_len,
             global_scale[0],
             scale_override,
@@ -299,6 +326,7 @@ pub(crate) mod module {
         mut out_global_scales: DisjointSlice<f32>,
         mut out_chunk_amax: DisjointSlice<f32>,
         global_scale: &[f32],
+        chunk_count: u32,
         source_rows: u32,
         source_cols: u32,
         dst_row_len: u32,
@@ -307,7 +335,11 @@ pub(crate) mod module {
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
-        let chunk = thread::blockIdx_x();
+        let chunk = pack_chunk();
+        if chunk >= chunk_count {
+            return;
+        }
+
         let chunk_base = chunk * HADAMARD_DIM;
         let input = rowwise_transposed_hadamard_input(
             bytes,
@@ -326,6 +358,7 @@ pub(crate) mod module {
             &mut out_scales,
             &mut out_global_scales,
             &mut out_chunk_amax,
+            chunk,
             dst_row_len,
             global_scale[0],
             scale_override,
@@ -406,6 +439,7 @@ pub(crate) mod module {
         out_scales: &mut DisjointSlice<'_, u8>,
         out_global_scales: &mut DisjointSlice<'_, f32>,
         out_chunk_amax: &mut DisjointSlice<'_, f32>,
+        chunk: u32,
         src_row_len: u32,
         dst_row_len: u32,
         source_cols: u32,
@@ -416,7 +450,6 @@ pub(crate) mod module {
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
-        let chunk = thread::blockIdx_x();
         let chunk_base = chunk * HADAMARD_DIM;
 
         let input = hadamard_input(
@@ -435,6 +468,7 @@ pub(crate) mod module {
             out_scales,
             out_global_scales,
             out_chunk_amax,
+            chunk,
             dst_row_len,
             global_scale,
             scale_override,
@@ -450,13 +484,13 @@ pub(crate) mod module {
         out_scales: &mut DisjointSlice<'_, u8>,
         out_global_scales: &mut DisjointSlice<'_, f32>,
         out_chunk_amax: &mut DisjointSlice<'_, f32>,
+        chunk: u32,
         dst_row_len: u32,
         global_scale: f32,
         scale_override: f32,
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
-        let chunk = thread::blockIdx_x();
         let chunk_base = chunk * HADAMARD_DIM;
         let element = chunk_base + lane;
         let row = element / dst_row_len;
@@ -523,6 +557,11 @@ pub(crate) mod module {
                 *out_fp4.get_unchecked_mut(byte as usize) = cvt_rn_satfinite_e2m1x2_f32(lo, hi);
             }
         }
+    }
+
+    #[inline(always)]
+    fn pack_chunk() -> u32 {
+        thread::blockIdx_x() * AMAX_WARPS_PER_BLOCK + thread::threadIdx_x() / 32
     }
 
     #[inline(always)]

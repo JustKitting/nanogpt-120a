@@ -8,7 +8,7 @@ use super::args::{
     QuartetBackwardMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenQuantArgs, RowAmaxArgs,
     RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs, TensorAmaxArgs,
 };
-use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK};
+use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 use super::kernels;
 use crate::quartet::{QUARTET_MS_EDEN_SCALE_OVERRIDE, quartet_backward_ms_eden_global_scale};
 
@@ -144,11 +144,12 @@ impl Nvfp4QuantModule {
 
     pub fn fp32_to_nvfp4_ms_eden(&self, args: MsEdenQuantArgs<'_, '_>) -> Result<(), DriverError> {
         let element_count = args.row_count * args.dst_row_len;
+        let chunk_count = ms_eden_chunk_count(element_count);
         self.ms_eden.fp32_to_nvfp4_ms_eden_kernel(
             args.stream,
             LaunchConfig {
-                grid_dim: (element_count.div_ceil(32), 1, 1),
-                block_dim: (32, 1, 1),
+                grid_dim: (pack_grid_dim(chunk_count), 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
                 shared_mem_bytes: 0,
             },
             args.x,
@@ -156,6 +157,7 @@ impl Nvfp4QuantModule {
             args.out_scales,
             args.out_global_scales,
             args.out_chunk_amax,
+            chunk_count,
             args.src_row_len,
             args.dst_row_len,
             args.global_scale,
@@ -170,11 +172,12 @@ impl Nvfp4QuantModule {
         args: MsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         let element_count = args.row_count * args.dst_row_len;
+        let chunk_count = ms_eden_chunk_count(element_count);
         self.ms_eden.fp32_to_nvfp4_ms_eden_device_scale_kernel(
             args.stream,
             LaunchConfig {
-                grid_dim: (element_count.div_ceil(32), 1, 1),
-                block_dim: (32, 1, 1),
+                grid_dim: (pack_grid_dim(chunk_count), 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
                 shared_mem_bytes: 0,
             },
             args.x,
@@ -183,6 +186,7 @@ impl Nvfp4QuantModule {
             args.out_global_scales,
             args.out_chunk_amax,
             args.global_scale,
+            chunk_count,
             args.src_row_len,
             args.dst_row_len,
             args.scale_override,
@@ -196,12 +200,13 @@ impl Nvfp4QuantModule {
         args: MsEdenTransposeDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         let element_count = args.source_cols * args.dst_row_len;
+        let chunk_count = ms_eden_chunk_count(element_count);
         self.ms_eden
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
                 LaunchConfig {
-                    grid_dim: (element_count.div_ceil(32), 1, 1),
-                    block_dim: (32, 1, 1),
+                    grid_dim: (pack_grid_dim(chunk_count), 1, 1),
+                    block_dim: (THREADS_PER_BLOCK, 1, 1),
                     shared_mem_bytes: 0,
                 },
                 args.x,
@@ -210,6 +215,7 @@ impl Nvfp4QuantModule {
                 args.out_global_scales,
                 args.out_chunk_amax,
                 args.global_scale,
+                chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -248,12 +254,13 @@ impl Nvfp4QuantModule {
         )?;
 
         let element_count = args.source_cols * args.dst_row_len;
+        let pack_chunk_count = ms_eden_chunk_count(element_count);
         self.ms_eden
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
                 LaunchConfig {
-                    grid_dim: (element_count.div_ceil(32), 1, 1),
-                    block_dim: (32, 1, 1),
+                    grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
+                    block_dim: (THREADS_PER_BLOCK, 1, 1),
                     shared_mem_bytes: 0,
                 },
                 args.input.bytes,
@@ -264,6 +271,7 @@ impl Nvfp4QuantModule {
                 args.out_global_scales,
                 args.out_chunk_amax,
                 &*args.out_global_scale,
+                pack_chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -301,12 +309,13 @@ impl Nvfp4QuantModule {
         )?;
 
         let element_count = args.source_cols * args.dst_row_len;
+        let pack_chunk_count = ms_eden_chunk_count(element_count);
         self.ms_eden
             .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
                 LaunchConfig {
-                    grid_dim: (element_count.div_ceil(32), 1, 1),
-                    block_dim: (32, 1, 1),
+                    grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
+                    block_dim: (THREADS_PER_BLOCK, 1, 1),
                     shared_mem_bytes: 0,
                 },
                 args.input.bytes,
@@ -317,6 +326,7 @@ impl Nvfp4QuantModule {
                 args.out_global_scales,
                 args.out_chunk_amax,
                 &*args.out_global_scale,
+                pack_chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -433,4 +443,14 @@ impl Nvfp4QuantModule {
             SCALE_OVERRIDE,
         )
     }
+}
+
+#[inline]
+fn ms_eden_chunk_count(element_count: u32) -> u32 {
+    element_count.div_ceil(32)
+}
+
+#[inline]
+fn pack_grid_dim(chunk_count: u32) -> u32 {
+    chunk_count.div_ceil(WARPS_PER_BLOCK)
 }

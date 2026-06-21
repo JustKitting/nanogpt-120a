@@ -6529,3 +6529,47 @@ decision:
   Reject before the 900-second gate. The explicit unroll made the target
   kernels and short wall-clock slower. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Restore multi-warp MS-EDEN pack kernels on the current L4/B8 baseline.
+status: accepted
+change:
+  Changed MS-EDEN pack launch shape from one 32-thread CTA per Hadamard chunk
+  to one 256-thread CTA packing eight independent 32-value chunks. Each warp
+  owns one chunk, and the kernel receives chunk_count so inactive tail warps
+  return before writing output.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test nvfp4_quant -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/ms_eden_pack_warp8_current_l4_b8_20_20260621T083902Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.435, completed_steps=20.
+  100-step SYNTH screen:
+    target/ms_eden_pack_warp8_current_l4_b8_100_20260621T083924Z.log
+    val_loss=6.548421, train_elapsed_s=17.535, completed_steps=100.
+  900-second held-out gate:
+    target/ms_eden_pack_warp8_current_l4_b8_900_20260621T083951Z.log
+    val_loss=4.010499, train_elapsed_s=900.019, completed_steps=4989.
+measured_effect:
+  Against the promoted f16 CTA sync baseline
+  target/nsys/f16_skip_final_cta_sync_l4_b8_20_20260621T073906Z.run.log,
+  fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel moved from
+  161.869875ms to 109.203520ms, and
+  fp32_to_nvfp4_ms_eden_device_scale_kernel moved from 160.623396ms to
+  71.279059ms over 20 profiled steps. The short profile train time moved from
+  3.582s to 3.435s.
+  The 900-second gate completed 4989 steps versus the previous promoted
+  baseline's 4790 steps. Held-out validation moved from 3.993229 to 4.010499,
+  a +0.43% change.
+decision:
+  Promote under the current acceptance rule: held-out validation stayed within
+  the +/-1% no-meaningful-change band and completed step count increased.
+```
