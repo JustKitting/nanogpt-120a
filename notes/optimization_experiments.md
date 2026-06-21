@@ -6710,6 +6710,44 @@ decision:
 ```text
 date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
+experiment: F16 CTA matmul M128/N32 tile shape.
+status: rejected_correctness
+change:
+  Tested changing the global f16 tensor-core CTA tile from M64/N64/K16 to
+  M128/N32/K16 with the same 256 threads. The warp map changed from four row
+  groups by two column groups to eight row groups by one column group.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/f16_tile_m128_n32_l4_b8_20_20260621T115024Z.run.log
+    step 0 finite, step 1 loss=NaN, heldout_eval val_loss=NaN.
+measured_effect:
+  The profile showed speedups in several kernels, but the full training path
+  became non-finite immediately. Against the accepted MS-EDEN source-split
+  profile, aurora_mega_update_cooperative_kernel moved from 1.382451463s to
+  1.279894511s and f16_cta_tc_matmul_f32_kernel moved from 225.104836ms to
+  215.321531ms over 20 profiled steps, but these timings are not usable
+  because training loss became NaN at step 1.
+likely_cause:
+  Aurora's symmetric Polar Gram path currently assumes the shared f16 CTA tile
+  is square: run_symmetric_tiles derives one tile_dim from CTA_M and mirrors
+  off-diagonal stores with the same tile shape. A global rectangular f16 tile
+  can pass standalone attention/f16 tests while breaking the optimizer path.
+decision:
+  Reject and revert. Do not change the global f16 CTA tile to a rectangular
+  shape while Aurora reuses it. The next valid version would need a separate
+  attention-only rectangular f16 kernel or a rectangular-safe Aurora Polar path.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted candidate, reverted before gate
 experiment: Add aligned fast paths to f16 RHS-transposed CTA matmul variants.
 status: rejected_screen
 change:
