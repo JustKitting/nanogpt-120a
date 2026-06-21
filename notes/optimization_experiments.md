@@ -7517,3 +7517,37 @@ decision:
   validation loss and higher completed step count under the same 900-second
   budget.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Skip final Aurora Polar FP16 CTA post-MMA barrier.
+status: rejected_900s
+change:
+  Reused the FP16 CTA sync-before-next-K pattern inside the fused Aurora Polar
+  Express compute loop so the final K tile skipped the post-MMA thread-block
+  barrier. The Aurora iteration count and optimizer math were unchanged.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/aurora_polar_sync_before_next_l4_b8_20_20260621T134356Z.run.log
+    val_loss=8.506022, train_elapsed_s=3.470, completed_steps=20.
+  100-step SYNTH screen:
+    target/aurora_polar_sync_before_next_l4_b8_100_20260621T134424Z.log
+    val_loss=6.544118, train_elapsed_s=17.384, completed_steps=100.
+  900-second held-out gate:
+    target/aurora_polar_sync_before_next_l4_b8_900_20260621T134454Z.log
+    val_loss=4.009439, train_elapsed_s=900.150, completed_steps=5033.
+measured_effect:
+  Against the accepted direct-residual-gradient baseline
+  target/direct_residual_grad_l4_b8_900_20260621T131534Z.log,
+  completed steps increased from 5028 to 5033, but held-out validation loss
+  worsened from 3.954098 to 4.009439, about +1.4%.
+decision:
+  Reject and revert the code. The extra completed steps do not compensate for
+  validation loss moving outside the +/-1% no-meaningful-change band.
+```
