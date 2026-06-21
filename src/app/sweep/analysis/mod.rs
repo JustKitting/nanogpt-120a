@@ -21,6 +21,7 @@ pub use scoring::{CandidateScore, score_candidate};
 pub struct SweepAnalysis {
     pub models: Vec<ResponseModel>,
     pub trial_count: usize,
+    pub stability_prior: Option<BinaryPrior>,
 }
 
 #[derive(Clone, Debug)]
@@ -29,9 +30,18 @@ pub struct ResponseModel {
     pub model: regression::Model,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct BinaryPrior {
+    pub n: usize,
+    pub positive: f64,
+    pub posterior_mean: f64,
+}
+
 pub fn analyze(trials: &[Trial], config: &SweepConfig) -> SweepAnalysis {
     let observations = logs::observations(trials);
     let mut models = Vec::new();
+    let stability_rows = logs::stability_rows(&observations);
+    let stability_prior = binary_prior(&stability_rows);
     push_model(
         &mut models,
         "screen_quality",
@@ -52,15 +62,12 @@ pub fn analyze(trials: &[Trial], config: &SweepConfig) -> SweepAnalysis {
         "full_tokens_per_s",
         logs::full_speed_rows(&observations),
     );
-    push_model(
-        &mut models,
-        "stability",
-        logs::stability_rows(&observations),
-    );
+    push_model(&mut models, "stability", stability_rows);
 
     SweepAnalysis {
         models,
         trial_count: trials.len(),
+        stability_prior,
     }
 }
 
@@ -91,4 +98,21 @@ fn push_model(
     if let Some(model) = regression::fit(rows) {
         models.push(ResponseModel { name, model });
     }
+}
+
+fn binary_prior(rows: &[(super::candidate::Candidate, f64)]) -> Option<BinaryPrior> {
+    if rows.is_empty() {
+        return None;
+    }
+
+    let positive = rows
+        .iter()
+        .map(|(_, value)| value.clamp(0.0, 1.0))
+        .sum::<f64>();
+    let n = rows.len();
+    Some(BinaryPrior {
+        n,
+        positive,
+        posterior_mean: (positive + 1.0) / (n as f64 + 2.0),
+    })
 }

@@ -8042,3 +8042,35 @@ decision:
   held-out validation loss while using stability as a prior for whether a
   candidate is worth spending a full validation run on.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Add a base stability prior for sweep candidate scoring.
+status: accepted_tooling
+change:
+  Sweep analysis now records a beta-smoothed binary stability prior from all
+  non-dry-run trial outcomes. Candidate scoring uses that prior even when the
+  stability regression cannot be fit because all observed outcomes are constant
+  failures or constant successes. When a stability model is available, the
+  predicted survival value is shrunk toward the base prior according to sample
+  count and prediction uncertainty. analysis_summary.md now prints the
+  stability prior sample count, positive count, and posterior mean.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 21 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_stability_base_prior_20260621T181741Z
+measured_effect:
+  Added unit coverage for the edge case where every observed candidate failed
+  and no stability regression exists. In that case candidate scoring now gets a
+  survival_prior below 0.5 instead of silently falling back to 1.0.
+  The dry-run analysis summary reported:
+    stability_prior_n=40 stability_prior_positive=36.000
+    stability_prior_posterior_mean=0.880952.
+decision:
+  Accept as sweep infrastructure. This makes stability a real survival prior
+  rather than only a fitted response model that disappears in constant-outcome
+  histories.
+```

@@ -22,6 +22,12 @@ fn summary(analysis: &SweepAnalysis) -> String {
     let mut text = String::new();
     text.push_str("# Sweep Statistical Analysis\n\n");
     text.push_str(&format!("trial_count={}\n\n", analysis.trial_count));
+    if let Some(prior) = analysis.stability_prior {
+        text.push_str(&format!(
+            "stability_prior_n={} stability_prior_positive={:.3} stability_prior_posterior_mean={:.6}\n\n",
+            prior.n, prior.positive, prior.posterior_mean
+        ));
+    }
     for response in &analysis.models {
         response_summary(&mut text, response);
     }

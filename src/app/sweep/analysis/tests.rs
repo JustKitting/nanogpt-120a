@@ -71,6 +71,28 @@ fn stability_beliefs_do_not_create_target_direction() {
     assert!(beliefs.iter().any(|belief| belief.variance > 0.0));
 }
 
+#[test]
+fn scoring_uses_stability_prior_when_stability_model_is_constant_failure() {
+    let config = config();
+    let trials = [
+        trial_with_status(candidate(4, 4), "failed_build"),
+        trial_with_status(candidate(4, 8), "failed_build"),
+        trial_with_status(candidate(16, 4), "failed_run"),
+        trial_with_status(candidate(16, 8), "nan"),
+    ];
+    let analysis = super::analyze(&trials, &config);
+    let score = super::score_candidate(&analysis, &config, &candidate(8, 4));
+
+    assert!(
+        analysis
+            .models
+            .iter()
+            .all(|model| model.name != "stability")
+    );
+    assert!(score.survival_prior < 0.5);
+    assert!(score.expected_quality < -3.0);
+}
+
 fn trial(candidate: Candidate, val_loss: f64) -> Trial {
     Trial {
         candidate,
