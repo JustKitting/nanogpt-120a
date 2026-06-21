@@ -6709,6 +6709,46 @@ decision:
 
 ```text
 date: 2026-06-21
+commit: uncommitted
+experiment: Decouple Aurora square Polar tile from rectangular host f16 attention tile.
+status: rejected_screen
+change:
+  Added local square Aurora Polar tile/fragments and changed the shared host
+  f16 CTA tile to M128/N32, so attention-side f16 matmuls could test a
+  rectangular tile while Aurora kept its square Polar tile contract.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  20-step plain screen:
+    target/f16_attention_rect_aurora_square_l4_b8_20_20260621T115508Z.log
+    val_loss=8.506022, train_elapsed_s=3.418, completed_steps=20.
+  20-step nsys screen:
+    target/nsys/f16_attention_rect_aurora_square_l4_b8_20_20260621T115523Z.run.log
+    train_elapsed_s=3.498.
+measured_effect:
+  Against the accepted MS-EDEN source split profile
+  target/nsys/ms_eden_split_fp32_source_l4_b8_20_20260621T112900Z.run.log,
+  f16_cta_tc_matmul_f32_kernel moved from 225.104836ms to 233.306115ms,
+  f16_cta_tc_matmul_f32_a_transposed_rhs_kernel moved from 126.800414ms to
+  134.775889ms, and f16_cta_tc_matmul_f32_rhs_kernel moved from 124.911671ms
+  to 127.010860ms over 20 profiled steps. Aurora and linear projection stayed
+  roughly flat: aurora_mega_update_cooperative_kernel moved from 1.382451463s
+  to 1.381607862s, and linear_backward_projection_pair_cta_device_scale_kernel
+  moved from 651.431430ms to 650.909127ms.
+decision:
+  Reject before the 100-step and 900-second gates and revert the code. The
+  attention f16 kernels got slower, and the small Aurora/projection movement
+  did not compensate.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: F16 CTA matmul M128/N32 tile shape.
 status: rejected_correctness
