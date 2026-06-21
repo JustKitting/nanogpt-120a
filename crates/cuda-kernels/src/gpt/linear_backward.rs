@@ -255,6 +255,8 @@ impl LinearBackwardModule {
         assert_projection_cta_aligned(args.output_dim, args.input_dim, dweight_k);
         let dinput_grid = projection_cta_grid_dim(args.token_count, args.input_dim);
         let dweight_grid = projection_cta_grid_dim(args.output_dim, args.input_dim);
+        assert!(dinput_grid.0.is_power_of_two());
+        assert!(dweight_grid.0.is_power_of_two());
         let dinput_tiles = projection_cta_tile_count(args.token_count, args.input_dim);
         let dweight_tiles = projection_cta_tile_count(args.output_dim, args.input_dim);
 
@@ -273,7 +275,8 @@ impl LinearBackwardModule {
                 args.weight_t_h.scales,
                 args.weight_t_h.global_scale,
                 args.dinput,
-                dinput_grid.0,
+                dinput_grid.0 - 1,
+                dinput_grid.0.trailing_zeros(),
                 dinput_tiles,
                 args.e_t_h.bytes,
                 args.e_t_h.scales,
@@ -282,7 +285,8 @@ impl LinearBackwardModule {
                 args.input_t_h.scales,
                 args.input_t_h.global_scale,
                 args.dweight,
-                dweight_grid.0,
+                dweight_grid.0 - 1,
+                dweight_grid.0.trailing_zeros(),
                 Nvfp4ProjectionParams {
                     token_count: args.token_count,
                     input_dim: dinput_k,
@@ -637,7 +641,8 @@ mod kernels {
         dinput_weight_scales: &[u8],
         dinput_weight_global_scale: &[f32],
         mut dinput_out: DisjointSlice<f32>,
-        dinput_grid_cols: u32,
+        dinput_grid_col_mask: u32,
+        dinput_grid_col_shift: u32,
         dinput_tile_count: u32,
         dweight_input_bytes: &[u8],
         dweight_input_scales: &[u8],
@@ -646,7 +651,8 @@ mod kernels {
         dweight_weight_scales: &[u8],
         dweight_weight_global_scale: &[f32],
         mut dweight_out: DisjointSlice<f32>,
-        dweight_grid_cols: u32,
+        dweight_grid_col_mask: u32,
+        dweight_grid_col_shift: u32,
         mut dinput_params: Nvfp4ProjectionParams,
         mut dweight_params: Nvfp4ProjectionParams,
     ) {
@@ -659,8 +665,8 @@ mod kernels {
         let thread_id = thread::threadIdx_x();
 
         if tile_index < dinput_tile_count {
-            let tile_col = tile_index - (tile_index / dinput_grid_cols) * dinput_grid_cols;
-            let tile_row = tile_index / dinput_grid_cols;
+            let tile_col = tile_index & dinput_grid_col_mask;
+            let tile_row = tile_index >> dinput_grid_col_shift;
             let tile = Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row, thread_id);
 
             dinput_params.weight_global_scale = dinput_weight_global_scale[0];
@@ -680,9 +686,8 @@ mod kernels {
             );
         } else {
             let dweight_tile_index = tile_index - dinput_tile_count;
-            let tile_col =
-                dweight_tile_index - (dweight_tile_index / dweight_grid_cols) * dweight_grid_cols;
-            let tile_row = dweight_tile_index / dweight_grid_cols;
+            let tile_col = dweight_tile_index & dweight_grid_col_mask;
+            let tile_row = dweight_tile_index >> dweight_grid_col_shift;
             let tile = Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row, thread_id);
 
             dweight_params.weight_global_scale = dweight_weight_global_scale[0];

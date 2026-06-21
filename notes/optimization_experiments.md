@@ -6666,3 +6666,44 @@ decision:
   Reject before the 900-second gate. The larger pack CTA reduced block count
   but slowed the target kernels. Code was reverted.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Decode paired linear-backward CTA tile coordinates with shifts.
+status: accepted
+change:
+  The paired linear-backward CTA projection kernel no longer computes tile row
+  and column with runtime integer division/modulo on every thread. The host
+  wrapper now asserts the paired projection grid column count is a power of two
+  and passes mask/shift parameters, so the device kernel decodes tile_col with
+  bit-and and tile_row with shift.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys screen:
+    target/nsys/linear_bwd_tile_shift_l4_b8_20_20260621T090938Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.434, completed_steps=20.
+  100-step SYNTH screen:
+    target/linear_bwd_tile_shift_l4_b8_100_20260621T090957Z.log
+    val_loss=6.550270, train_elapsed_s=17.536, completed_steps=100.
+  900-second held-out gate:
+    target/linear_bwd_tile_shift_l4_b8_900_20260621T091022Z.log
+    val_loss=3.976722, train_elapsed_s=900.158, completed_steps=4993.
+measured_effect:
+  Against the accepted multi-warp MS-EDEN baseline
+  target/nsys/ms_eden_pack_warp8_current_l4_b8_20_20260621T083902Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  628.820011ms to 626.852315ms over 20 profiled steps. Profiled train time
+  moved from 3.435s to 3.434s.
+  The 900-second gate improved held-out validation loss from 4.010499 to
+  3.976722 and completed steps from 4989 to 4993.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  budget.
+```
