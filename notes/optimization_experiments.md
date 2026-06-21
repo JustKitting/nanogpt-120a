@@ -30,6 +30,33 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-21
+commit: historical uncommitted candidate, reverted before note
+experiment: Eight-row unroll for linear_bias_grad_kernel.
+status: rejected_profile
+change:
+  Increased the linear-bias gradient row unroll from 4 rows/thread to 8 rows/thread.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass after rerun with completed PTX build.
+  20-step nsys screen:
+    target/nsys/linear_bias_unroll8_l4_b8_20_20260621T054112Z.run.log
+    val_loss=8.505538, train_elapsed_s=3.591, completed_steps=20.
+measured_effect:
+  Compared with the promoted MS-EDEN barrier baseline profile
+  target/nsys/ms_eden_no_pack_barrier_l4_b8_20_20260621T045551Z.run.log,
+  linear_bias_grad_kernel moved only from 41.008457ms to 40.993777ms over
+  20 profiled steps. Total profiled train time regressed from 3.588s to
+  3.591s, and linear_backward_projection_pair_cta_device_scale_kernel also
+  regressed from 621.499531ms to 622.905559ms.
+decision:
+  Reject before the 100-step and 900-second gates. The target-kernel gain was
+  too small and the short profiled wall-clock regressed. Code was reverted.
+```
+
+```text
+date: 2026-06-21
 commit: uncommitted candidate, reverted before gate
 experiment: Early inactive return in attention_prob_ds_kernel.
 status: rejected_profile
