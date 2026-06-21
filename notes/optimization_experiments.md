@@ -8213,3 +8213,31 @@ decision:
   reducing design-space exploration source in addition to model-guided and
   random proposals.
 ```
+
+```text
+date: 2026-06-21
+commit: uncommitted
+experiment: Persist screen timing for sweep prior analysis.
+status: accepted_tooling
+change:
+  trials.tsv now appends screen_completed_steps and screen_elapsed_s columns
+  while preserving older row formats. Rejected-screen and successful full-run
+  trials both persist the screen-stage step count, elapsed time, and validation
+  loss separately from the full 900-second run fields. Promoted baselines also
+  write/read SCREEN_COMPLETED_STEPS and SCREEN_ELAPSED_S so baseline injection
+  does not erase screen-stage evidence.
+verification:
+  cargo fmt --all --check: pass.
+  cargo test --bin sweep: pass, 30 tests.
+  cargo check --all-targets: pass.
+  dry-run sweep:
+    target/sweeps/dryrun_persist_screen_timing_20260621T184027Z
+measured_effect:
+  Added unit coverage proving screen_speed_rows uses persisted screen-stage
+  timing when screen.log is unavailable. The dry-run trials.tsv emitted
+  screen_completed_steps and screen_elapsed_s header columns.
+decision:
+  Accept as sweep infrastructure. The 500-step screen gate can now inform
+  survival and speed priors without confusing screen-stage timing with full
+  900-second validation timing.
+```

@@ -15,6 +15,8 @@ pub struct Trial {
     pub log_path: PathBuf,
     pub elapsed_s: Option<f64>,
     pub screen_val_loss: Option<f64>,
+    pub screen_completed_steps: Option<usize>,
+    pub screen_elapsed_s: Option<f64>,
 }
 
 #[derive(Debug)]

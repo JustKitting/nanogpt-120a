@@ -22,6 +22,8 @@ struct Record {
     completed_steps: Option<usize>,
     elapsed_s: Option<f64>,
     screen_loss: Option<f64>,
+    screen_completed_steps: Option<usize>,
+    screen_elapsed_s: Option<f64>,
     log_path: PathBuf,
     candidate: Candidate,
 }
@@ -53,6 +55,8 @@ impl Baseline {
             completed_steps: record.completed_steps,
             elapsed_s: record.elapsed_s,
             screen_val_loss: record.screen_loss,
+            screen_completed_steps: record.screen_completed_steps,
+            screen_elapsed_s: record.screen_elapsed_s,
             log_path: record.log_path.clone(),
         })
     }
@@ -110,6 +114,12 @@ impl Baseline {
         if let Some(screen_loss) = record.screen_loss {
             writeln!(file, "SCREEN_LOSS={screen_loss:.6}")?;
         }
+        if let Some(steps) = record.screen_completed_steps {
+            writeln!(file, "SCREEN_COMPLETED_STEPS={steps}")?;
+        }
+        if let Some(elapsed_s) = record.screen_elapsed_s {
+            writeln!(file, "SCREEN_ELAPSED_S={elapsed_s:.6}")?;
+        }
         writeln!(file, "LOG_PATH={}", record.log_path.display())?;
         writeln!(file, "GPT2_SEQ_LEN={DEFAULT_SEQ_LEN}")?;
         write_env(&mut file, record.candidate.build_env())?;
@@ -136,6 +146,8 @@ fn trial_record(trial: &Trial) -> Option<Record> {
         completed_steps: trial.completed_steps,
         elapsed_s: trial.elapsed_s,
         screen_loss: trial.screen_val_loss,
+        screen_completed_steps: trial.screen_completed_steps,
+        screen_elapsed_s: trial.screen_elapsed_s,
         log_path: trial.log_path.clone(),
         candidate: trial.candidate.clone(),
     })
@@ -147,6 +159,9 @@ fn parse(text: &str) -> Option<Record> {
         completed_steps: value(text, "COMPLETED_STEPS").and_then(|value| value.parse().ok()),
         elapsed_s: value(text, "TRAIN_ELAPSED_S").and_then(|value| value.parse().ok()),
         screen_loss: value(text, "SCREEN_LOSS").and_then(|value| value.parse().ok()),
+        screen_completed_steps: value(text, "SCREEN_COMPLETED_STEPS")
+            .and_then(|value| value.parse().ok()),
+        screen_elapsed_s: value(text, "SCREEN_ELAPSED_S").and_then(|value| value.parse().ok()),
         log_path: PathBuf::from(value(text, "LOG_PATH").unwrap_or("")),
         candidate: Candidate {
             batch_size: value(text, "GPT2_BATCH_SIZE")?.parse().ok()?,

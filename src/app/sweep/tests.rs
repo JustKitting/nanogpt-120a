@@ -171,6 +171,8 @@ fn promotes_baseline_file_when_validation_improves() {
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.contains("VAL_LOSS=4.200000"));
     assert!(text.contains("SCREEN_LOSS=5.200000"));
+    assert!(text.contains("SCREEN_COMPLETED_STEPS=10"));
+    assert!(text.contains("SCREEN_ELAPSED_S=5.000000"));
     assert!(text.contains("GPT2_BATCH_SIZE=8"));
     assert!(text.contains("GPT2_N_LAYER=4"));
     assert!(text.contains("GPT2_N_EMBD=1536"));
@@ -181,6 +183,8 @@ fn promotes_baseline_file_when_validation_improves() {
         .measured_trial()
         .unwrap();
     assert_eq!(loaded.screen_val_loss, Some(5.2));
+    assert_eq!(loaded.screen_completed_steps, Some(10));
+    assert_eq!(loaded.screen_elapsed_s, Some(5.0));
     let _ = std::fs::remove_file(path);
 }
 
@@ -247,6 +251,8 @@ fn trial(status: &str, val_loss: Option<f64>, candidate: Candidate) -> Trial {
         completed_steps: Some(10),
         elapsed_s: Some(5.0),
         screen_val_loss: val_loss.map(|loss| loss + 1.0),
+        screen_completed_steps: Some(10),
+        screen_elapsed_s: Some(5.0),
         log_path: PathBuf::from("train.log"),
     }
 }
