@@ -28,6 +28,27 @@ fn scoring_uses_pairwise_interaction_signal() {
     }));
 }
 
+#[test]
+fn factor_beliefs_aggregate_direction_and_confidence() {
+    let config = config();
+    let trials = [
+        trial(candidate(4, 4), 9.0),
+        trial(candidate(4, 8), 5.0),
+        trial(candidate(16, 4), 5.0),
+        trial(candidate(16, 8), 1.0),
+    ];
+    let analysis = super::analyze(&trials, &config);
+    let beliefs = super::factor_beliefs(&analysis, &config);
+    let batch = beliefs
+        .iter()
+        .find(|belief| belief.factor == "batch_size")
+        .unwrap();
+
+    assert!(batch.direction > 0.0);
+    assert!(batch.confidence > 0.0);
+    assert!(batch.variance >= 0.0);
+}
+
 fn trial(candidate: Candidate, val_loss: f64) -> Trial {
     Trial {
         candidate,

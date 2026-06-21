@@ -47,7 +47,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             &history.trials,
         );
         let sweep_analysis = analysis::analyze(&all_trials, &config);
-        analysis::write(&sweep_dir, &sweep_analysis)?;
+        analysis::write(&sweep_dir, &sweep_analysis, &config)?;
         analysis::print_summary(&sweep_analysis);
         let seen = chain::seen_keys(&all_trials);
         let proposal = optimizer::propose(
@@ -106,7 +106,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             &history.trials,
         );
         let sweep_analysis = analysis::analyze(&all_trials, &config);
-        analysis::write(&sweep_dir, &sweep_analysis)?;
+        analysis::write(&sweep_dir, &sweep_analysis, &config)?;
     }
     Ok(())
 }

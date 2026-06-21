@@ -1,8 +1,8 @@
 use std::{fs, io, path::Path};
 
-use super::SweepAnalysis;
+use super::{super::config::SweepConfig, SweepAnalysis, beliefs};
 
-pub fn write(sweep_dir: &Path, analysis: &SweepAnalysis) -> io::Result<()> {
+pub fn write(sweep_dir: &Path, analysis: &SweepAnalysis, config: &SweepConfig) -> io::Result<()> {
     fs::write(sweep_dir.join("analysis_summary.md"), summary(analysis))?;
     fs::write(
         sweep_dir.join("analysis_effects.tsv"),
@@ -11,6 +11,10 @@ pub fn write(sweep_dir: &Path, analysis: &SweepAnalysis) -> io::Result<()> {
     fs::write(
         sweep_dir.join("analysis_interactions.tsv"),
         interactions_tsv(analysis),
+    )?;
+    fs::write(
+        sweep_dir.join("analysis_beliefs.tsv"),
+        beliefs::tsv(analysis, config),
     )
 }
 

@@ -1,3 +1,4 @@
+mod beliefs;
 mod design;
 mod factors;
 mod log_files;
@@ -12,6 +13,7 @@ mod tests;
 
 use super::{config::SweepConfig, history::Trial};
 
+pub use beliefs::factor_beliefs;
 pub use regression::Prediction;
 pub use scoring::{CandidateScore, score_candidate};
 
@@ -62,8 +64,12 @@ pub fn analyze(trials: &[Trial], config: &SweepConfig) -> SweepAnalysis {
     }
 }
 
-pub fn write(sweep_dir: &std::path::Path, analysis: &SweepAnalysis) -> std::io::Result<()> {
-    report::write(sweep_dir, analysis)
+pub fn write(
+    sweep_dir: &std::path::Path,
+    analysis: &SweepAnalysis,
+    config: &SweepConfig,
+) -> std::io::Result<()> {
+    report::write(sweep_dir, analysis, config)
 }
 
 pub fn print_summary(analysis: &SweepAnalysis) {

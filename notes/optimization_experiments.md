@@ -34,6 +34,39 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-21
 commit: uncommitted
+experiment: Add confidence-weighted factor beliefs.
+status: accepted_tooling_dry_run
+change:
+  Added analysis_beliefs.tsv as an aggregate per-factor statistical belief file.
+  Each factor records confidence-weighted direction, confidence, variance,
+  average positive probability, and evidence count. Guided proposal generation
+  now consumes these aggregate beliefs instead of summing raw coefficients
+  directly from per-response effects, so the same confidence/variance summary
+  is both reported and used for knob movement.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo test --bin sweep: pass.
+  dry-run analysis:
+    target/sweeps/dryrun_factor_beliefs_20260621T173410Z
+    generated analysis_beliefs.tsv and ranked acquisition files.
+observed_effect:
+  analysis_beliefs.tsv reported aggregate directions such as
+  ln_adam_lr_scale=0.29632548, aurora_blocks=-0.24345067,
+  ln_lr_scale=0.23559764, and n_embd=-0.17306380. The selected candidate
+  remained source=guided with score=3.95386689 and uncertainty=51.36550742.
+  A focused unit test verifies that factor_beliefs produces positive direction,
+  positive confidence, and nonnegative variance for a constructed positive
+  batch_size signal.
+decision:
+  Accept as sweep infrastructure. This makes confidence and variance explicit
+  per knob and ties guided proposal movement to that reported statistical
+  summary.
+```
+
+```text
+date: 2026-06-21
+commit: uncommitted
 experiment: Add explicit variance-directed sweep candidates.
 status: accepted_tooling_dry_run
 change:

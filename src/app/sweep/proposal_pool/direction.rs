@@ -1,4 +1,7 @@
-use super::super::{analysis::SweepAnalysis, config::SweepConfig};
+use super::super::{
+    analysis::{self, SweepAnalysis},
+    config::SweepConfig,
+};
 
 #[derive(Default)]
 pub struct Direction {
@@ -17,30 +20,10 @@ pub struct Direction {
 
 pub fn from_analysis(analysis: &SweepAnalysis, config: &SweepConfig) -> Direction {
     let mut direction = Direction::default();
-    for response in &analysis.models {
-        let weight = response_weight(response.name, config);
-        for effect in response
-            .model
-            .effects
-            .iter()
-            .filter(|effect| !effect.name.contains('*'))
-        {
-            add(&mut direction, &effect.name, effect.coefficient * weight);
-        }
+    for belief in analysis::factor_beliefs(analysis, config) {
+        add(&mut direction, &belief.factor, belief.direction);
     }
     direction
-}
-
-fn response_weight(name: &str, config: &SweepConfig) -> f64 {
-    if name.contains("quality") {
-        config.sweep_quality_weight
-    } else if name.contains("speed") {
-        config.sweep_speed_weight
-    } else if name == "stability" {
-        config.sweep_stability_weight
-    } else {
-        0.0
-    }
 }
 
 fn add(direction: &mut Direction, name: &str, value: f64) {
