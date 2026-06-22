@@ -34,6 +34,51 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-22
 commit: uncommitted candidate, reverted
+experiment: Linear-backward row-quad NVFP4 projection CTA.
+status: rejected_short_profile
+source:
+  Colfax SM12x NVFP4 blockscaled GEMM notes point at larger CTA tiling and
+  staged reuse as the right direction for SM120 NVFP4 GEMM. This candidate
+  tried the smallest local version of that idea: reuse one staged B tile across
+  four adjacent row tiles instead of two in the existing linear-backward
+  projection CTA path.
+change:
+  Added a row-quad no-bias projection accumulator and routed linear backward to
+  it only when both dinput and dweight row tile grids were divisible by four.
+  The existing row-pair kernel remained the fallback.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas sm_120a resource check:
+    linear_backward_projection_quad_cta_device_scale_kernel used 48 registers,
+    96 bytes stack, 14848 bytes shared memory, and no spill loads/stores.
+  GPU correctness:
+    rust-kernels-cuda linear_backward_projection_cta: pass.
+    rust-kernels-cuda linear_backward: pass.
+    gpt2-nvfp4 qkv_projection_backward: pass.
+    gpt2-nvfp4 block_attention_backward: pass.
+    gpt2-nvfp4 forward: pass.
+  20-step nsys:
+    target/nsys/linear_row_quad_b16_l4d1024_20_20260622T222433Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.664, completed_steps=20.
+measured_effect:
+  Compared with the accepted E_h/E_t_h pair-pack profile
+  target/nsys/linear_e_pair_pack_b16_l4d1024_20_20260622T215134Z.run.log,
+  the projection kernel moved from
+  linear_backward_projection_pair_cta_device_scale_kernel=1156.733665ms over
+  400 launches to
+  linear_backward_projection_quad_cta_device_scale_kernel=1164.827434ms over
+  400 launches. End-to-end profiled train time moved from 5.660s to 5.664s.
+decision:
+  Reject. The larger row-quad CTA increased register/shared-memory pressure and
+  made the projection path slower. Do not promote to the 100-step screen or
+  900-second held-out gate.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted
 experiment: Pair linear-backward weight_t and input_t MS-EDEN transpose packs.
 status: rejected_short_profile
 change:
