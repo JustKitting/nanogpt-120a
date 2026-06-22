@@ -1,7 +1,9 @@
 use cuda_device::{SharedArray, thread};
 
 use crate::mma::projection::Nvfp4ProjectionParams;
-use crate::mma::projection::load_bytes::{E4M3_ONE_PACKED4, load_packed8, load_scale4};
+use crate::mma::projection::load_bytes::{
+    E4M3_ONE_PACKED4, load_packed8, load_packed8_aligned, load_scale4, load_scale4_aligned,
+};
 
 use super::tile::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
@@ -170,7 +172,7 @@ fn load_a_pack_aligned(
     let pack = offset - row * NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
     let global_row = tile.row_base + row;
     let global_col = k_base + pack * 8;
-    load_packed8(bytes, (global_row * params.input_dim + global_col) as usize)
+    load_packed8_aligned(bytes, (global_row * params.input_dim + global_col) as usize)
 }
 
 #[inline(always)]
@@ -204,7 +206,7 @@ fn load_b_pack_aligned(
     let pack = offset - col * NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
     let global_col = tile.col_base + col;
     let global_k = k_base + pack * 8;
-    load_packed8(bytes, (global_col * params.input_dim + global_k) as usize)
+    load_packed8_aligned(bytes, (global_col * params.input_dim + global_k) as usize)
 }
 
 #[inline(always)]
@@ -241,7 +243,7 @@ fn load_a_scale_aligned(
     let row = offset - k_atom * NVFP4_PROJECTION_CTA_M;
     let global_row = tile.row_base + row;
     let scale_k_base = k_base + k_atom * MMA_K;
-    load_scale4(
+    load_scale4_aligned(
         scales,
         ((global_row * params.input_dim + scale_k_base) / 16) as usize,
     )
@@ -280,5 +282,5 @@ fn load_b_scale_aligned(
     let global_col = tile.col_base + col;
     let scale_k_base = k_base + k_atom * MMA_K;
     let scale_base = global_col * (params.input_dim / 16) + scale_k_base / 16;
-    load_scale4(scales, scale_base as usize)
+    load_scale4_aligned(scales, scale_base as usize)
 }

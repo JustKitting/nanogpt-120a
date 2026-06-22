@@ -33,6 +33,57 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate
+experiment: Use aligned u32 global loads for NVFP4 projection CTA staging.
+status: accepted_900s
+change:
+  Added aligned load helpers for projection CTA staging that issue one
+  `ld.global.u32` for each packed E2M1 payload word or UE4M3 scale pack.
+  The generic edge-checked load helpers remain unchanged. The aligned CTA path
+  is used only when rows, output columns, and K are exact projection tile
+  multiples, so this changes memory load codegen without changing matmul math,
+  layout, padding behavior, Quartet/MS-EDEN quantization, or optimizer math.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  Generated PTX for linear_backward_projection_pair_cta_device_scale_kernel:
+    aligned staging now emits `ld.global.u32` in the hot payload/scale load
+    path instead of assembling each pack from four `ld.global.b8` loads.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test next_latent -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_aligned_u32_load_b16_l4d1024_20_20260622T171110Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.740, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_aligned_u32_load_b16_l4d1024_100_20260622T171145Z.log
+    val_loss=6.303235, train_elapsed_s=29.240, completed_steps=100.
+  900-second held-out gate:
+    target/projection_aligned_u32_load_b16_l4d1024_900_20260622T171232Z.log
+    val_loss=3.600426, train_elapsed_s=900.171, completed_steps=3006.
+measured_effect:
+  Against the previous promoted baseline profile
+  target/nsys/aurora_workgrid_hoist_b16_l4d1024_20_20260622T164345Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1249.383509ms to 1175.625884ms over 400 calls. lm_head_kernel moved from
+  215.823790ms to 207.910274ms over 21 calls, and nextlat_projection_kernel
+  moved from 70.133304ms to 67.114355ms over 63 calls. The 20-step profiled
+  training wall moved from 5.837s to 5.740s.
+  Against the previous 900-second baseline, held-out validation moved from
+  3.580500 to 3.600426, a +0.556% change inside the active 1% noise band,
+  while completed steps increased from 2971 to 3006.
+decision:
+  Promote under the active runtime-change rule: validation loss stayed within
+  the 1% noise band and completed step count increased under the fixed
+  900-second SYNTH budget.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, accepted after gate
 experiment: Hoist Aurora WorkGrid construction in the mega slot launcher.
 status: accepted_900s
