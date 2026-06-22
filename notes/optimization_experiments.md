@@ -10393,3 +10393,39 @@ decision:
   Reject before 100-step and 900-second gates. Code was reverted to the
   accepted sqrt-based compact mapping.
 ```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted after 20-step screen
+experiment: Add aligned fast path to F16 RHS and A-transposed-RHS TC matmul staging.
+status: rejected_screen
+change:
+  Added aligned staging/store branches for
+  f16_cta_tc_matmul_f32_rhs_kernel and
+  f16_cta_tc_matmul_f32_a_transposed_rhs_kernel when m, n, and k are already
+  multiples of the CTA tile sizes. The intent was to remove bounds checks from
+  the aligned attention-backward FP16 TC matmul shapes.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/f16_rhs_aligned_b16_l4d1024_20_20260622T152402Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.928, completed_steps=20.
+measured_effect:
+  Against the accepted compact-triangle profile
+  target/nsys/current_after_compact_tri_b16_l4d1024_20_20260622T151411Z.run.log,
+  f16_cta_tc_matmul_f32_a_transposed_rhs_kernel moved from 255.595400ms to
+  262.777947ms over 160 calls. f16_cta_tc_matmul_f32_rhs_kernel moved from
+  251.316697ms to 253.286365ms over 164 calls. Profiled train time moved from
+  5.935s to 5.928s, which is within noise and contradicted by the regressed
+  target kernels.
+decision:
+  Reject before 100-step and 900-second gates. The candidate made both target
+  kernels slower in the 20-step nsys screen, so the code was reverted and only
+  this note is kept.
+```
