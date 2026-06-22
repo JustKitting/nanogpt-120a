@@ -169,6 +169,80 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, split before gate
+experiment: Route both attention and MLP forward projections through aligned
+  row-pair CTA bodies.
+status: rejected_screen
+change:
+  Temporarily routed attention qkv/c_proj and MLP up/down projections through
+  row-pair CTA grids when token/input/output dimensions were aligned.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/forward_projection_rowpair_b16_l4d1024_20_20260622T183532Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.722, completed_steps=20.
+measured_effect:
+  Against the accepted combined staging profile
+  target/nsys/projection_row_pair_full_stage_b16_l4d1024_20_20260622T181246Z.run.log,
+  attention_projection_kernel regressed from 118.705070ms to 135.697800ms
+  over 168 calls. MLP projections improved, but the attention regression made
+  the combined change a mixed candidate.
+decision:
+  Reject the attention route before 100-step and 900-second gates. Split the
+  candidate and keep only the MLP row-pair projection route for further
+  validation.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Route aligned MLP forward projections through row-pair CTA bodies.
+status: accepted_900s
+change:
+  Changed MLP up/relu2 and MLP down/residual projection launch configs to use
+  row-pair CTA grids when token/input/output dimensions are aligned. Added a
+  row-pair relu2 projection body so the MLP up path can share the same
+  row-pair staging and B-reuse pattern as affine projections. Attention
+  projection routing remains on the generic CTA body after the rejected screen.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/mlp_projection_rowpair_b16_l4d1024_20_20260622T183704Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.710, completed_steps=20.
+  100-step SYNTH screen:
+    target/mlp_projection_rowpair_b16_l4d1024_100_20260622T183721Z.log
+    val_loss=6.300791, train_elapsed_s=29.104, completed_steps=100.
+  900-second held-out gate:
+    target/mlp_projection_rowpair_b16_l4d1024_900_20260622T183803Z.log
+    val_loss=3.546096, train_elapsed_s=900.037, completed_steps=3029.
+measured_effect:
+  Against the accepted combined staging profile
+  target/nsys/projection_row_pair_full_stage_b16_l4d1024_20_20260622T181246Z.run.log,
+  mlp_projection_kernel moved from 125.105855ms to 122.048200ms over 84
+  calls, and mlp_projection_relu2_kernel moved from 125.892599ms to
+  118.992512ms over 84 calls. attention_projection_kernel stayed near the
+  baseline at 118.434875ms after the attention route was reverted. The
+  900-second held-out gate improved validation loss from 3.587049 to 3.546096
+  and completed steps from 3022 to 3029.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  SYNTH budget.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, accepted after gate
 experiment: Hoist Aurora WorkGrid construction in the mega slot launcher.
 status: accepted_900s

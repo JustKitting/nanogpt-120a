@@ -11,6 +11,7 @@ pub use body::{
     nvfp4_projection_cta_nobias_kernel_body_at_aligned,
     nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
     nvfp4_projection_cta_relu2_kernel_body,
+    nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair,
 };
 pub use tile::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
