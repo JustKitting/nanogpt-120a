@@ -1,6 +1,7 @@
 use cuda_device::SharedArray;
 
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
+use crate::optimizer::AuroraSlotDescriptor;
 
 use super::super::super::super::threads::WARPS_PER_BLOCK;
 use super::super::super::super::work_grid::WorkGrid;
@@ -10,16 +11,7 @@ use super::super::body::aurora_matrix_update_body;
 pub(super) fn launch_slot(
     slot: u32,
     scratch_slot: u32,
-    grad_ptrs: &[u64],
-    momentum_ptrs: &[u64],
-    z_master_ptrs: &[u64],
-    x_master_ptrs: &[u64],
-    byte_ptrs: &[u64],
-    scale_ptrs: &[u64],
-    global_scale_ptrs: &[u64],
-    rows: &[u32],
-    cols: &[u32],
-    learning_rate_multipliers: &[f32],
+    slots: &[AuroraSlotDescriptor],
     oriented: *mut f32,
     polar_next: *mut f32,
     polar_x: *mut f32,
@@ -38,17 +30,16 @@ pub(super) fn launch_slot(
     average_coefficient: f32,
     iterations: u32,
 ) {
-    let rows = rows[slot as usize];
-    let cols = cols[slot as usize];
-    let learning_rate = learning_rate * learning_rate_multipliers[slot as usize];
+    let desc = slots[slot as usize];
+    let learning_rate = learning_rate * desc.learning_rate_multiplier;
     aurora_matrix_update_body(
-        ptr_const(grad_ptrs, slot),
-        ptr_mut(momentum_ptrs, slot),
-        ptr_mut(z_master_ptrs, slot),
-        ptr_mut(x_master_ptrs, slot),
-        ptr_mut(byte_ptrs, slot),
-        ptr_mut(scale_ptrs, slot),
-        ptr_mut(global_scale_ptrs, slot),
+        ptr_const(desc.grad),
+        ptr_mut(desc.momentum),
+        ptr_mut(desc.z_master),
+        ptr_mut(desc.x_master),
+        ptr_mut(desc.bytes),
+        ptr_mut(desc.scales),
+        ptr_mut(desc.global_scale),
         offset_ptr(oriented, scratch_slot, max_len as usize),
         offset_ptr(polar_next, scratch_slot, max_len as usize),
         offset_ptr(polar_x, scratch_slot, max_len as usize),
@@ -63,8 +54,8 @@ pub(super) fn launch_slot(
         b_tile,
         warp_sums,
         WorkGrid::x_axis(),
-        rows,
-        cols,
+        desc.rows,
+        desc.cols,
         mu,
         learning_rate,
         weight_decay,
@@ -74,13 +65,13 @@ pub(super) fn launch_slot(
 }
 
 #[inline(always)]
-fn ptr_const<T>(ptrs: &[u64], slot: u32) -> *const T {
-    ptrs[slot as usize] as usize as *const T
+fn ptr_const<T>(ptr: u64) -> *const T {
+    ptr as usize as *const T
 }
 
 #[inline(always)]
-fn ptr_mut<T>(ptrs: &[u64], slot: u32) -> *mut T {
-    ptrs[slot as usize] as usize as *mut T
+fn ptr_mut<T>(ptr: u64) -> *mut T {
+    ptr as usize as *mut T
 }
 
 #[inline(always)]

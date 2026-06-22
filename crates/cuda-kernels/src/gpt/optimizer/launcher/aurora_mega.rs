@@ -20,16 +20,7 @@ impl OptimizerModule {
                     block_dim: (CTA_THREADS, 1, 1),
                     shared_mem_bytes: 0,
                 },
-                args.grad_ptrs,
-                args.momentum_ptrs,
-                args.z_master_ptrs,
-                args.x_master_ptrs,
-                args.byte_ptrs,
-                args.scale_ptrs,
-                args.global_scale_ptrs,
-                args.rows,
-                args.cols,
-                args.learning_rate_multipliers,
+                args.slots,
                 args.oriented,
                 args.polar_next,
                 args.polar_x,
@@ -53,16 +44,7 @@ fn assert_mega_args(args: &AuroraMegaUpdateArgs<'_>) {
     let slots = args.slot_count as usize;
     let matrix_count = args.slot_count as usize / AURORA_MATRIX_PHASES;
     assert_eq!(args.slot_count as usize % AURORA_MATRIX_PHASES, 0);
-    assert!(args.grad_ptrs.len() >= slots);
-    assert!(args.momentum_ptrs.len() >= slots);
-    assert!(args.z_master_ptrs.len() >= slots);
-    assert!(args.x_master_ptrs.len() >= slots);
-    assert!(args.byte_ptrs.len() >= slots);
-    assert!(args.scale_ptrs.len() >= slots);
-    assert!(args.global_scale_ptrs.len() >= slots);
-    assert!(args.rows.len() >= slots);
-    assert!(args.cols.len() >= slots);
-    assert!(args.learning_rate_multipliers.len() >= slots);
+    assert!(args.slots.len() >= slots);
     assert!(args.oriented.len() >= args.max_len as usize * matrix_count);
     assert!(args.polar_next.len() >= args.max_len as usize * matrix_count);
     assert!(args.polar_x.len() >= args.max_len as usize * matrix_count);

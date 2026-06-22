@@ -3,6 +3,7 @@ use cuda_device::{
 };
 
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
+use crate::optimizer::AuroraSlotDescriptor;
 
 use super::super::super::AURORA_MATRIX_PHASES;
 use super::super::super::threads::WARPS_PER_BLOCK;
@@ -17,16 +18,7 @@ pub(crate) mod module {
     #[kernel]
     #[cooperative_launch]
     pub fn aurora_mega_update_cooperative_kernel(
-        grad_ptrs: &[u64],
-        momentum_ptrs: &[u64],
-        z_master_ptrs: &[u64],
-        x_master_ptrs: &[u64],
-        byte_ptrs: &[u64],
-        scale_ptrs: &[u64],
-        global_scale_ptrs: &[u64],
-        rows: &[u32],
-        cols: &[u32],
-        learning_rate_multipliers: &[f32],
+        slots: &[AuroraSlotDescriptor],
         mut oriented: DisjointSlice<f32>,
         mut polar_next: DisjointSlice<f32>,
         mut polar_x: DisjointSlice<f32>,
@@ -57,16 +49,7 @@ pub(crate) mod module {
                     slot::launch_slot(
                         slot,
                         matrix,
-                        grad_ptrs,
-                        momentum_ptrs,
-                        z_master_ptrs,
-                        x_master_ptrs,
-                        byte_ptrs,
-                        scale_ptrs,
-                        global_scale_ptrs,
-                        rows,
-                        cols,
-                        learning_rate_multipliers,
+                        slots,
                         oriented.as_mut_ptr(),
                         polar_next.as_mut_ptr(),
                         polar_x.as_mut_ptr(),

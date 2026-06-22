@@ -1,13 +1,15 @@
 use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
-use rust_kernels_cuda::optimizer::{AURORA_MATRIX_PHASES, AuroraMegaUpdateArgs, OptimizerModule};
+use rust_kernels_cuda::optimizer::{
+    AURORA_MATRIX_PHASES, AuroraMegaUpdateArgs, AuroraSlotDescriptor, OptimizerModule,
+};
 
 use crate::{common, polar_vector};
 
 #[path = "nonconstant_buffers.rs"]
 mod nonconstant_buffers;
-use nonconstant_buffers::{Scratch, Slots, ptr_buffer};
+use nonconstant_buffers::{Scratch, Slots};
 
 const ROWS: usize = 32;
 const COLS: usize = 64;
@@ -26,22 +28,12 @@ pub fn run_wide_case() -> Result<(), Box<dyn Error>> {
     let grad = gradient();
     let mut slots = Slots::new(&stream, &grad)?;
     let mut scratch = Scratch::new(&stream)?;
-    let rows = DeviceBuffer::from_host(&stream, &[ROWS as u32; SLOT_COUNT])?;
-    let cols = DeviceBuffer::from_host(&stream, &[COLS as u32; SLOT_COUNT])?;
-    let learning_rate_multipliers = DeviceBuffer::from_host(&stream, &[1.0_f32; SLOT_COUNT])?;
+    let slot_descriptors = descriptors(&slots);
+    let slot_descriptors = DeviceBuffer::from_host(&stream, &slot_descriptors)?;
 
     module.aurora_mega_update(AuroraMegaUpdateArgs {
         stream: &stream,
-        grad_ptrs: &ptr_buffer(&stream, &slots.grads)?,
-        momentum_ptrs: &ptr_buffer(&stream, &slots.momentums)?,
-        z_master_ptrs: &ptr_buffer(&stream, &slots.z_masters)?,
-        x_master_ptrs: &ptr_buffer(&stream, &slots.x_masters)?,
-        byte_ptrs: &ptr_buffer(&stream, &slots.bytes)?,
-        scale_ptrs: &ptr_buffer(&stream, &slots.scales)?,
-        global_scale_ptrs: &ptr_buffer(&stream, &slots.global_scales)?,
-        rows: &rows,
-        cols: &cols,
-        learning_rate_multipliers: &learning_rate_multipliers,
+        slots: &slot_descriptors,
         oriented: &mut scratch.oriented,
         polar_next: &mut scratch.polar_next,
         polar_x: &mut scratch.polar_x,
@@ -71,6 +63,23 @@ pub fn run_wide_case() -> Result<(), Box<dyn Error>> {
     assert_close(&slots.x_masters.remove(0).to_host_vec(&stream)?, &expected);
     assert_close(&slots.z_masters.remove(0).to_host_vec(&stream)?, &expected);
     Ok(())
+}
+
+fn descriptors(slots: &Slots) -> Vec<AuroraSlotDescriptor> {
+    (0..SLOT_COUNT)
+        .map(|slot| AuroraSlotDescriptor {
+            grad: slots.grads[slot].cu_deviceptr(),
+            momentum: slots.momentums[slot].cu_deviceptr(),
+            z_master: slots.z_masters[slot].cu_deviceptr(),
+            x_master: slots.x_masters[slot].cu_deviceptr(),
+            bytes: slots.bytes[slot].cu_deviceptr(),
+            scales: slots.scales[slot].cu_deviceptr(),
+            global_scale: slots.global_scales[slot].cu_deviceptr(),
+            rows: ROWS as u32,
+            cols: COLS as u32,
+            learning_rate_multiplier: 1.0,
+        })
+        .collect()
 }
 
 fn gradient() -> Vec<f32> {

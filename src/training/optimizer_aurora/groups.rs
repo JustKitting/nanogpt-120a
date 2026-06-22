@@ -4,7 +4,7 @@ use super::super::optimizer_state::OptimizerStateBuffers;
 use crate::upload::UploadedModel;
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, GPT2_QKV, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
-use rust_kernels_cuda::optimizer::AURORA_MATRIX_PHASES;
+use rust_kernels_cuda::optimizer::{AURORA_MATRIX_PHASES, AuroraSlotDescriptor};
 
 mod padding;
 mod ptrs;
@@ -19,16 +19,7 @@ pub(in crate::training) struct AuroraPointerTables {
 }
 
 pub(in crate::training) struct AuroraGroupTable {
-    pub(super) grad: DeviceBuffer<u64>,
-    pub(super) momentum: DeviceBuffer<u64>,
-    pub(super) z_master: DeviceBuffer<u64>,
-    pub(super) x_master: DeviceBuffer<u64>,
-    pub(super) bytes: DeviceBuffer<u64>,
-    pub(super) scales: DeviceBuffer<u64>,
-    pub(super) global_scale: DeviceBuffer<u64>,
-    pub(super) rows: DeviceBuffer<u32>,
-    pub(super) cols: DeviceBuffer<u32>,
-    pub(super) learning_rate_multipliers: DeviceBuffer<f32>,
+    pub(super) slots: DeviceBuffer<AuroraSlotDescriptor>,
 }
 
 #[derive(Clone, Copy)]
@@ -128,6 +119,21 @@ where
 }
 
 impl HostPtrs {
+    fn descriptor(self) -> AuroraSlotDescriptor {
+        AuroraSlotDescriptor {
+            grad: self.grad,
+            momentum: self.momentum,
+            z_master: self.z_master,
+            x_master: self.x_master,
+            bytes: self.bytes,
+            scales: self.scales,
+            global_scale: self.global_scale,
+            rows: self.rows,
+            cols: self.cols,
+            learning_rate_multiplier: self.learning_rate_multiplier,
+        }
+    }
+
     fn shape(mut self, rows: usize, cols: usize) -> Self {
         self.rows = rows as u32;
         self.cols = cols as u32;

@@ -22,8 +22,8 @@ mod threads;
 mod work_grid;
 
 pub use args::{
-    AdamWUpdateArgs, AuroraMegaUpdateArgs, EmbeddingLookupGradArgs, GradientClipArgs,
-    ScheduleFreeMaterializeArgs,
+    AdamWUpdateArgs, AuroraMegaUpdateArgs, AuroraSlotDescriptor, EmbeddingLookupGradArgs,
+    GradientClipArgs, ScheduleFreeMaterializeArgs,
 };
 pub use grad_clip::GRAD_CLIP_VALUES_PER_CHUNK;
 pub use launcher::OptimizerModule;

@@ -1,17 +1,25 @@
-use cuda_core::{CudaStream, DeviceBuffer};
+use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy};
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AuroraSlotDescriptor {
+    pub grad: u64,
+    pub momentum: u64,
+    pub z_master: u64,
+    pub x_master: u64,
+    pub bytes: u64,
+    pub scales: u64,
+    pub global_scale: u64,
+    pub rows: u32,
+    pub cols: u32,
+    pub learning_rate_multiplier: f32,
+}
+
+unsafe impl DeviceCopy for AuroraSlotDescriptor {}
 
 pub struct AuroraMegaUpdateArgs<'a> {
     pub stream: &'a CudaStream,
-    pub grad_ptrs: &'a DeviceBuffer<u64>,
-    pub momentum_ptrs: &'a DeviceBuffer<u64>,
-    pub z_master_ptrs: &'a DeviceBuffer<u64>,
-    pub x_master_ptrs: &'a DeviceBuffer<u64>,
-    pub byte_ptrs: &'a DeviceBuffer<u64>,
-    pub scale_ptrs: &'a DeviceBuffer<u64>,
-    pub global_scale_ptrs: &'a DeviceBuffer<u64>,
-    pub rows: &'a DeviceBuffer<u32>,
-    pub cols: &'a DeviceBuffer<u32>,
-    pub learning_rate_multipliers: &'a DeviceBuffer<f32>,
+    pub slots: &'a DeviceBuffer<AuroraSlotDescriptor>,
     pub oriented: &'a mut DeviceBuffer<f32>,
     pub polar_next: &'a mut DeviceBuffer<f32>,
     pub polar_x: &'a mut DeviceBuffer<f32>,

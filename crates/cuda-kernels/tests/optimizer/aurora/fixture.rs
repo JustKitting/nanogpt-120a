@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
-use rust_kernels_cuda::optimizer::{AuroraMegaUpdateArgs, OptimizerModule};
+use rust_kernels_cuda::optimizer::{AuroraMegaUpdateArgs, AuroraSlotDescriptor, OptimizerModule};
 
 use crate::assertions::assert_update_matches;
 use crate::common;
@@ -9,7 +9,7 @@ use crate::polar_reference::polar_first_iteration_scalar;
 
 #[path = "fixture/buffers.rs"]
 mod buffers;
-use buffers::{Scratch, Slots, assert_quantized_slot_matches, ptr_buffer};
+use buffers::{Scratch, Slots, assert_quantized_slot_matches};
 
 const SLOT_COUNT: usize = rust_kernels_cuda::optimizer::AURORA_MATRIX_PHASES;
 
@@ -22,29 +22,12 @@ pub fn run_first_iteration_case(row_count: usize, col_count: usize) -> Result<()
     let gram_dim = row_count.min(col_count);
     let mut slots = Slots::new(&stream, len)?;
     let mut scratch = Scratch::new(&stream, len, gram_dim)?;
-    let rows = DeviceBuffer::from_host(&stream, &[row_count as u32; SLOT_COUNT])?;
-    let cols = DeviceBuffer::from_host(&stream, &[col_count as u32; SLOT_COUNT])?;
-    let learning_rate_multipliers = DeviceBuffer::from_host(&stream, &[1.0_f32; SLOT_COUNT])?;
-    let grad_ptrs = ptr_buffer(&stream, &slots.grads)?;
-    let momentum_ptrs = ptr_buffer(&stream, &slots.momentums)?;
-    let z_ptrs = ptr_buffer(&stream, &slots.z_masters)?;
-    let x_ptrs = ptr_buffer(&stream, &slots.x_masters)?;
-    let byte_ptrs = ptr_buffer(&stream, &slots.bytes)?;
-    let scale_ptrs = ptr_buffer(&stream, &slots.scales)?;
-    let global_scale_ptrs = ptr_buffer(&stream, &slots.global_scales)?;
+    let slot_descriptors = descriptors(&slots, row_count, col_count);
+    let slot_descriptors = DeviceBuffer::from_host(&stream, &slot_descriptors)?;
 
     module.aurora_mega_update(AuroraMegaUpdateArgs {
         stream: &stream,
-        grad_ptrs: &grad_ptrs,
-        momentum_ptrs: &momentum_ptrs,
-        z_master_ptrs: &z_ptrs,
-        x_master_ptrs: &x_ptrs,
-        byte_ptrs: &byte_ptrs,
-        scale_ptrs: &scale_ptrs,
-        global_scale_ptrs: &global_scale_ptrs,
-        rows: &rows,
-        cols: &cols,
-        learning_rate_multipliers: &learning_rate_multipliers,
+        slots: &slot_descriptors,
         oriented: &mut scratch.oriented,
         polar_next: &mut scratch.polar_next,
         polar_x: &mut scratch.polar_x,
@@ -70,6 +53,23 @@ pub fn run_first_iteration_case(row_count: usize, col_count: usize) -> Result<()
         expected,
     )?;
     assert_quantized_slot_matches(&stream, slots, expected)
+}
+
+fn descriptors(slots: &Slots, rows: usize, cols: usize) -> Vec<AuroraSlotDescriptor> {
+    (0..SLOT_COUNT)
+        .map(|slot| AuroraSlotDescriptor {
+            grad: slots.grads[slot].cu_deviceptr(),
+            momentum: slots.momentums[slot].cu_deviceptr(),
+            z_master: slots.z_masters[slot].cu_deviceptr(),
+            x_master: slots.x_masters[slot].cu_deviceptr(),
+            bytes: slots.bytes[slot].cu_deviceptr(),
+            scales: slots.scales[slot].cu_deviceptr(),
+            global_scale: slots.global_scales[slot].cu_deviceptr(),
+            rows: rows as u32,
+            cols: cols as u32,
+            learning_rate_multiplier: 1.0,
+        })
+        .collect()
 }
 
 const GRAD_VALUE: f32 = 0.5;

@@ -10429,3 +10429,46 @@ decision:
   kernels slower in the 20-step nsys screen, so the code was reverted and only
   this note is kept.
 ```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Pack Aurora mega slot metadata into one descriptor buffer.
+status: accepted_900s
+change:
+  Replaced the Aurora mega launch contract's split slot metadata buffers
+  (seven pointer arrays, rows, cols, and learning-rate multipliers) with one
+  AuroraSlotDescriptor buffer. Slot ordering, phase geometry, scratch layout,
+  optimizer math, model shape, and training hyperparameters were unchanged.
+  The intent was to reduce always-live pointer-array bases in the cooperative
+  Aurora entry and lower register pressure without adding a CPU round trip.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  Generated PTX: aurora_mega_update_cooperative_kernel entry parameters moved
+    from param_0..40 to param_0..22, and PTX b64 registers moved from 69 to 41.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_slot_descriptor_b16_l4d1024_20_20260622T153325Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.915, completed_steps=20.
+  100-step SYNTH screen:
+    target/aurora_slot_descriptor_b16_l4d1024_100_20260622T153354Z.log
+    val_loss=6.300856, train_elapsed_s=29.597, completed_steps=100.
+  900-second held-out gate:
+    target/aurora_slot_descriptor_b16_l4d1024_900_20260622T153447Z.log
+    val_loss=3.599322, train_elapsed_s=900.128, completed_steps=2973.
+measured_effect:
+  Against the accepted compact-triangle profile
+  target/nsys/current_after_compact_tri_b16_l4d1024_20_20260622T151411Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1753.570775ms to
+  1748.781893ms over 20 calls. The full profiled training run moved from
+  5.935s to 5.915s.
+  Against the prior promoted 900-second baseline
+  target/aurora_compact_tri_b16_l4d1024_900_20260622T145614Z.log, held-out
+  validation loss moved from 3.575694 to 3.599322 (+0.66%, inside the active
+  1% noise band) while completed steps increased from 2967 to 2973.
+decision:
+  Promote under the active runtime-change rule: validation loss stayed within
+  the 1% noise band and completed step count increased under the fixed
+  900-second SYNTH budget.
+```

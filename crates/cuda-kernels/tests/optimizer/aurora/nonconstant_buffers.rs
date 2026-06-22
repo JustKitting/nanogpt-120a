@@ -51,14 +51,6 @@ impl Scratch {
     }
 }
 
-pub fn ptr_buffer<T>(
-    stream: &CudaStream,
-    buffers: &[DeviceBuffer<T>],
-) -> Result<DeviceBuffer<u64>, Box<dyn Error>> {
-    let ptrs: Vec<u64> = buffers.iter().map(DeviceBuffer::cu_deviceptr).collect();
-    Ok(DeviceBuffer::from_host(stream, &ptrs)?)
-}
-
 fn slot_buffers(
     stream: &CudaStream,
     values: &[f32],

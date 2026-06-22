@@ -55,14 +55,6 @@ const fn grouped(len: usize) -> usize {
     len * (SLOT_COUNT / AURORA_MATRIX_PHASES)
 }
 
-pub fn ptr_buffer<T>(
-    stream: &CudaStream,
-    buffers: &[DeviceBuffer<T>],
-) -> Result<DeviceBuffer<u64>, Box<dyn Error>> {
-    let ptrs: Vec<u64> = buffers.iter().map(DeviceBuffer::cu_deviceptr).collect();
-    Ok(DeviceBuffer::from_host(stream, &ptrs)?)
-}
-
 pub fn assert_quantized_slot_matches(
     stream: &CudaStream,
     mut slots: Slots,

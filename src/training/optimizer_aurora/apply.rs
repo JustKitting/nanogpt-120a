@@ -18,16 +18,7 @@ pub(in crate::training) struct AuroraMegaArgs<'a> {
 pub(in crate::training) fn apply_aurora_mega(args: AuroraMegaArgs<'_>) -> Result<(), DriverError> {
     args.optimizer.aurora_mega_update(AuroraMegaUpdateArgs {
         stream: args.stream,
-        grad_ptrs: &args.table.grad,
-        momentum_ptrs: &args.table.momentum,
-        z_master_ptrs: &args.table.z_master,
-        x_master_ptrs: &args.table.x_master,
-        byte_ptrs: &args.table.bytes,
-        scale_ptrs: &args.table.scales,
-        global_scale_ptrs: &args.table.global_scale,
-        rows: &args.table.rows,
-        cols: &args.table.cols,
-        learning_rate_multipliers: &args.table.learning_rate_multipliers,
+        slots: &args.table.slots,
         oriented: &mut args.scratch.oriented,
         polar_next: &mut args.scratch.polar_next,
         polar_x: &mut args.scratch.polar_x,
