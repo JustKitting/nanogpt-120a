@@ -4,10 +4,10 @@ use rust_kernels_cuda::attention::CausalAttentionBackwardTcScratch;
 use super::shape::{HEAD_DIM, HEADS, TOKEN_COUNT};
 
 pub struct TcScratchBuffers {
-    q: DeviceBuffer<f32>,
-    k: DeviceBuffer<f32>,
-    v: DeviceBuffer<f32>,
-    d_out: DeviceBuffer<f32>,
+    q: DeviceBuffer<u16>,
+    k: DeviceBuffer<u16>,
+    v: DeviceBuffer<u16>,
+    d_out: DeviceBuffer<u16>,
     scores: DeviceBuffer<f32>,
     dot: DeviceBuffer<f32>,
     p: DeviceBuffer<f32>,

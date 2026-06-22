@@ -26,10 +26,10 @@ pub(super) mod module {
     pub fn gather_qkv_dout_kernel(
         qkv: &[u16],
         d_out_src: &[f32],
-        q: DisjointSlice<f32>,
-        k: DisjointSlice<f32>,
-        v: DisjointSlice<f32>,
-        d_out: DisjointSlice<f32>,
+        q: DisjointSlice<u16>,
+        k: DisjointSlice<u16>,
+        v: DisjointSlice<u16>,
+        d_out: DisjointSlice<u16>,
         params: CausalAttentionBackwardTcParams,
     ) {
         gather_body(qkv, d_out_src, q, k, v, d_out, params);

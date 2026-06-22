@@ -1,7 +1,7 @@
 use cuda_device::{DisjointSlice, thread};
 
 use super::types::CausalAttentionBackwardTcParams;
-use crate::f16_tc_matmul::convert::cvt_f32_f16;
+use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 
 pub(super) const TC_BACKWARD_THREADS_PER_BLOCK: u32 = 256;
 
@@ -9,10 +9,10 @@ pub(super) const TC_BACKWARD_THREADS_PER_BLOCK: u32 = 256;
 pub(super) fn gather_body(
     qkv: &[u16],
     d_out_src: &[f32],
-    mut q: DisjointSlice<f32>,
-    mut k: DisjointSlice<f32>,
-    mut v: DisjointSlice<f32>,
-    mut d_out: DisjointSlice<f32>,
+    mut q: DisjointSlice<u16>,
+    mut k: DisjointSlice<u16>,
+    mut v: DisjointSlice<u16>,
+    mut d_out: DisjointSlice<u16>,
     params: CausalAttentionBackwardTcParams,
 ) {
     let index = thread::blockIdx_x() * TC_BACKWARD_THREADS_PER_BLOCK + thread::threadIdx_x();
@@ -45,7 +45,7 @@ pub(super) fn gather_body(
             &params,
         );
         *d_out.get_unchecked_mut(index as usize) =
-            d_out_src[hidden_index(batch, token, head, dim, &params)];
+            cvt_rn_f16_f32(d_out_src[hidden_index(batch, token, head, dim, &params)]);
     }
 }
 
@@ -58,8 +58,8 @@ fn qkv_value(
     dim: u32,
     section_offset: u32,
     params: &CausalAttentionBackwardTcParams,
-) -> f32 {
-    cvt_f32_f16(qkv[qkv_index(batch, token, head, dim, section_offset, params)])
+) -> u16 {
+    qkv[qkv_index(batch, token, head, dim, section_offset, params)]
 }
 
 #[inline(always)]

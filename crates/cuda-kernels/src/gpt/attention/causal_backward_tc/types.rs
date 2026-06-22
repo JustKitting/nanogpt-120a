@@ -18,10 +18,10 @@ pub struct CausalAttentionBackwardTcParams {
 unsafe impl DeviceCopy for CausalAttentionBackwardTcParams {}
 
 pub struct CausalAttentionBackwardTcScratch<'a> {
-    pub q: &'a mut DeviceBuffer<f32>,
-    pub k: &'a mut DeviceBuffer<f32>,
-    pub v: &'a mut DeviceBuffer<f32>,
-    pub d_out: &'a mut DeviceBuffer<f32>,
+    pub q: &'a mut DeviceBuffer<u16>,
+    pub k: &'a mut DeviceBuffer<u16>,
+    pub v: &'a mut DeviceBuffer<u16>,
+    pub d_out: &'a mut DeviceBuffer<u16>,
     pub scores: &'a mut DeviceBuffer<f32>,
     pub dot: &'a mut DeviceBuffer<f32>,
     pub p: &'a mut DeviceBuffer<f32>,

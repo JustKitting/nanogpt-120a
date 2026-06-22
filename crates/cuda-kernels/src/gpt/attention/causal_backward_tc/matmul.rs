@@ -1,7 +1,8 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use crate::f16_tc_matmul::{
-    F16TcMatmulF32ATransposedRhsArgs, F16TcMatmulF32Args, F16TcMatmulF32RhsArgs, F16TcMatmulModule,
+    F16TcMatmulF32ATransposedHalfRhsArgs, F16TcMatmulF32HalfRhsArgs, F16TcMatmulHalfArgs,
+    F16TcMatmulModule,
 };
 
 pub(super) struct AttentionTcMatmulContext<'a> {
@@ -16,15 +17,15 @@ pub(super) struct AttentionTcMatmulContext<'a> {
 pub(super) fn run_tc_matmul(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,
-    a: &DeviceBuffer<f32>,
-    b_t: &DeviceBuffer<f32>,
+    a: &DeviceBuffer<u16>,
+    b_t: &DeviceBuffer<u16>,
     out: &mut DeviceBuffer<f32>,
     batch_count: u32,
     m: u32,
     n: u32,
     k: u32,
 ) -> Result<(), DriverError> {
-    tc_module.batched_matmul_f32_input(F16TcMatmulF32Args {
+    tc_module.batched_matmul_half_input(F16TcMatmulHalfArgs {
         stream,
         a,
         b_t,
@@ -41,14 +42,14 @@ pub(super) fn run_tc_matmul_rhs(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,
     a: &DeviceBuffer<f32>,
-    rhs: &DeviceBuffer<f32>,
+    rhs: &DeviceBuffer<u16>,
     out: &mut DeviceBuffer<f32>,
     batch_count: u32,
     m: u32,
     n: u32,
     k: u32,
 ) -> Result<(), DriverError> {
-    tc_module.batched_matmul_f32_rhs(F16TcMatmulF32RhsArgs {
+    tc_module.batched_matmul_f32_half_rhs(F16TcMatmulF32HalfRhsArgs {
         stream,
         a,
         rhs,
@@ -65,14 +66,14 @@ pub(super) fn run_tc_matmul_a_transposed_rhs(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,
     a: &DeviceBuffer<f32>,
-    rhs: &DeviceBuffer<f32>,
+    rhs: &DeviceBuffer<u16>,
     out: &mut DeviceBuffer<f32>,
     batch_count: u32,
     m: u32,
     n: u32,
     k: u32,
 ) -> Result<(), DriverError> {
-    tc_module.batched_matmul_f32_a_transposed_rhs(F16TcMatmulF32ATransposedRhsArgs {
+    tc_module.batched_matmul_f32_a_transposed_half_rhs(F16TcMatmulF32ATransposedHalfRhsArgs {
         stream,
         a,
         rhs,

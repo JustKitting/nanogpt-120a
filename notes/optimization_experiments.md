@@ -207,6 +207,59 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Route attention-backward QKV/dO scratch through half-precision TC operands.
+status: accepted_900s
+change:
+  Added direct u16-input and f32-left/u16-RHS FP16 TC matmul launcher paths.
+  The attention backward gather now keeps Q/K/V from the f16 QKV tape as u16
+  and converts dO to u16 once. The pair-score backward matmuls use direct half
+  inputs, and the dQ/dK/dV matmuls use mixed f32-left/half-RHS kernels. Scores,
+  probabilities, dS, output gradients, and forward-attention scratch remain
+  f32 where they are naturally produced.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/attention_backward_half_scratch_b16_l4d1024_20_20260622T190803Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.692, completed_steps=20.
+  100-step SYNTH screen:
+    target/attention_backward_half_scratch_b16_l4d1024_100_20260622T190826Z.log
+    val_loss=6.299939, train_elapsed_s=28.999, completed_steps=100.
+  900-second held-out gate:
+    target/attention_backward_half_scratch_b16_l4d1024_900_20260622T190905Z.log
+    val_loss=3.569456, train_elapsed_s=900.050, completed_steps=3037.
+    generated_text=target/runs/20260622_190905Z_synth_900s/generated.txt.
+measured_effect:
+  Against the accepted MLP row-pair profile
+  target/nsys/mlp_projection_rowpair_b16_l4d1024_20_20260622T183704Z.run.log,
+  20-step profiled train time moved from 5.710s to 5.692s. The f32 pair-score
+  kernel total changed from f16_cta_tc_matmul_f32_kernel=444.914226ms over 244
+  calls to f16_cta_tc_matmul_f32_kernel=147.226952ms over 84 calls plus direct
+  f16_cta_tc_matmul_kernel=307.611826ms over 160 calls. The transposed-RHS
+  path changed from f16_cta_tc_matmul_f32_a_transposed_rhs_kernel=247.865936ms
+  to f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel=236.779884ms. The RHS
+  path changed from f16_cta_tc_matmul_f32_rhs_kernel=242.660806ms over 164
+  calls to f16_cta_tc_matmul_f32_rhs_kernel=123.608845ms over 84 calls plus
+  f16_cta_tc_matmul_f32_half_rhs_kernel=112.842139ms over 80 calls. The gather
+  kernel improved from 21.756773ms to 14.699861ms over 80 calls.
+  Against notes/sweep_baseline.env before this candidate, the 900-second gate
+  moved from val_loss=3.546096 / 3029 steps to val_loss=3.569456 / 3037 steps,
+  a +0.659% validation-loss move inside the active 1% noise band with 8
+  additional completed steps.
+decision:
+  Promote under the active runtime-change rule. Validation loss stayed inside
+  the 1% noise band and completed step count increased under the fixed
+  900-second SYNTH budget.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, split before gate
 experiment: Route both attention and MLP forward projections through aligned
   row-pair CTA bodies.
