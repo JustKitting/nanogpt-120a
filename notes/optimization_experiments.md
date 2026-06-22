@@ -33,6 +33,37 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-22
 commit: uncommitted candidate, reverted before gate
+experiment: Use unchecked byte/scale loads in aligned NVFP4 projection CTA staging.
+status: rejected_screen
+change:
+  Added temporary unchecked helpers for aligned packed E2M1 and UE4M3 scale
+  loads, then routed projection_cta aligned staging through them. The guarded
+  helpers remained on edge-handling paths.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_unchecked_loads_b16_l4d1024_20_20260622T144858Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.074, completed_steps=20.
+measured_effect:
+  Against the fresh current profile
+  target/nsys/current_clean_b16_l4d1024_20_20260622T143653Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1237.737ms to 1270.698ms over 400 calls, lm_head_kernel moved from
+  210.261ms to 217.341ms over 21 calls, and profiled train time moved from
+  5.968s to 6.074s.
+decision:
+  Reject before the 100-step and 900-second gates. Removing the explicit guard
+  helpers did not reduce the hot aligned projection path; it regressed the
+  short nsys screen. Code was reverted.
+```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
 experiment: Compute cross-entropy dlogits row amax directly from target
   probability.
 status: rejected_screen
