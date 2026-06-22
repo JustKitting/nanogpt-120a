@@ -10368,3 +10368,28 @@ decision:
   Promote. This passes the active rule directly: lower held-out validation loss
   and higher completed step count under the same 900-second SYNTH budget.
 ```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before screen
+experiment: Replace compact Aurora upper-triangle sqrt mapping with integer binary search.
+status: rejected_launch
+change:
+  Replaced the compact upper-triangle tile inverse-sqrt mapping with a small
+  integer binary search over row starts. The tile domain and math were intended
+  to remain unchanged.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass when run serially after PTX build.
+  20-step nsys launch:
+    target/nsys/aurora_compact_tri_intmap_b16_l4d1024_20_20260622T151702Z.run.log
+    failed before step 0 with DriverError(720, "too many blocks in cooperative launch").
+measured_effect:
+  No kernel timing. The extra integer control flow likely increased register
+  pressure or otherwise reduced cooperative launch residency below the required
+  grid shape.
+decision:
+  Reject before 100-step and 900-second gates. Code was reverted to the
+  accepted sqrt-based compact mapping.
+```
