@@ -206,6 +206,29 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         let element_count = args.row_count * args.dst_row_len;
         let chunk_count = ms_eden_chunk_count(element_count);
+        if pack_grid_is_exact(chunk_count) {
+            return self
+                .ms_eden
+                .fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
+                    args.stream,
+                    LaunchConfig {
+                        grid_dim: (pack_grid_dim(chunk_count), 1, 1),
+                        block_dim: (THREADS_PER_BLOCK, 1, 1),
+                        shared_mem_bytes: 0,
+                    },
+                    args.x,
+                    args.out_fp4,
+                    args.out_scales,
+                    args.out_global_scales,
+                    args.global_scale,
+                    args.src_row_len,
+                    args.dst_row_len,
+                    args.scale_override,
+                    args.sign_seed,
+                    args.scale_seed,
+                );
+        }
+
         self.ms_eden
             .fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
@@ -264,6 +287,30 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         let element_count = args.source_cols * args.dst_row_len;
         let chunk_count = ms_eden_chunk_count(element_count);
+        if pack_grid_is_exact(chunk_count) {
+            return self
+                .ms_eden
+                .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
+                    args.stream,
+                    LaunchConfig {
+                        grid_dim: (pack_grid_dim(chunk_count), 1, 1),
+                        block_dim: (THREADS_PER_BLOCK, 1, 1),
+                        shared_mem_bytes: 0,
+                    },
+                    args.x,
+                    args.out_fp4,
+                    args.out_scales,
+                    args.out_global_scales,
+                    args.global_scale,
+                    args.source_rows,
+                    args.source_cols,
+                    args.dst_row_len,
+                    args.scale_override,
+                    args.sign_seed,
+                    args.scale_seed,
+                );
+        }
+
         self.ms_eden
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
@@ -373,6 +420,32 @@ impl Nvfp4QuantModule {
 
         let element_count = args.source_cols * args.dst_row_len;
         let pack_chunk_count = ms_eden_chunk_count(element_count);
+        if pack_grid_is_exact(pack_chunk_count) {
+            return self
+                .ms_eden
+                .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
+                    args.stream,
+                    LaunchConfig {
+                        grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
+                        block_dim: (THREADS_PER_BLOCK, 1, 1),
+                        shared_mem_bytes: 0,
+                    },
+                    args.input.bytes,
+                    args.input.scales,
+                    args.input.global_scales,
+                    args.out_fp4,
+                    args.out_scales,
+                    args.out_global_scales,
+                    &*args.out_global_scale,
+                    args.source_rows,
+                    args.source_cols,
+                    args.dst_row_len,
+                    QUARTET_MS_EDEN_SCALE_OVERRIDE,
+                    args.sign_seed,
+                    args.scale_seed,
+                );
+        }
+
         self.ms_eden
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
@@ -482,6 +555,32 @@ impl Nvfp4QuantModule {
 
         let element_count = args.source_cols * args.dst_row_len;
         let pack_chunk_count = ms_eden_chunk_count(element_count);
+        if pack_grid_is_exact(pack_chunk_count) {
+            return self
+                .ms_eden
+                .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
+                    args.stream,
+                    LaunchConfig {
+                        grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
+                        block_dim: (THREADS_PER_BLOCK, 1, 1),
+                        shared_mem_bytes: 0,
+                    },
+                    args.input.bytes,
+                    args.input.scales,
+                    args.input.global_scale,
+                    args.out_fp4,
+                    args.out_scales,
+                    args.out_global_scales,
+                    &*args.out_global_scale,
+                    args.source_rows,
+                    args.source_cols,
+                    args.dst_row_len,
+                    QUARTET_MS_EDEN_SCALE_OVERRIDE,
+                    args.sign_seed,
+                    args.scale_seed,
+                );
+        }
+
         self.ms_eden
             .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
@@ -684,4 +783,9 @@ fn ms_eden_chunk_count(element_count: u32) -> u32 {
 #[inline]
 fn pack_grid_dim(chunk_count: u32) -> u32 {
     chunk_count.div_ceil(WARPS_PER_BLOCK)
+}
+
+#[inline]
+fn pack_grid_is_exact(chunk_count: u32) -> bool {
+    chunk_count % WARPS_PER_BLOCK == 0
 }

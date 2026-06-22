@@ -242,6 +242,56 @@ decision:
 ```text
 date: 2026-06-22
 commit: uncommitted candidate, accepted after gate
+experiment: Route exact-grid no-chunk MS-EDEN packs through unguarded entry points.
+status: accepted_900s
+change:
+  Added exact-grid no-chunk MS-EDEN pack entry points for fp32, fp32 transpose,
+  NVFP4 transpose, and rowwise-NVFP4 transpose operands. The host launcher uses
+  these only when chunk_count is an exact multiple of WARPS_PER_BLOCK, so the
+  device entry can skip the chunk >= chunk_count guard. Non-exact pack grids
+  continue to use the guarded kernels. Quantization math, RHT/sign seeds,
+  scale seeds, global-scale inputs, output FP4 bytes, output FP8 scales, and
+  row global-scale writes are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/ms_eden_exact_pack_b16_l4d1024_20_20260622T205929Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.667, completed_steps=20.
+  100-step SYNTH screen:
+    target/ms_eden_exact_pack_b16_l4d1024_100_20260622T205947Z.log
+    val_loss=6.295354, train_elapsed_s=28.887, completed_steps=100.
+  900-second held-out gate:
+    target/ms_eden_exact_pack_b16_l4d1024_900_20260622T210032Z.log
+    val_loss=3.561855, train_elapsed_s=900.031, completed_steps=3050.
+  generated sample:
+    target/runs/20260622_210032Z_synth_900s/generated.txt
+measured_effect:
+  Against the accepted exact-grid four/six profile
+  target/nsys/four_six_pow2_exact_grid_b16_l4d1024_20_20260622T203817Z.run.log,
+  fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax moved from 139.675506ms
+  to fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel
+  137.933215ms over 400 calls. fp32_transpose_to_nvfp4_ms_eden moved from
+  242.196413ms to 242.064051ms, rowwise_nvfp4_transpose_to_nvfp4_ms_eden
+  moved from 154.760282ms to 154.663689ms, and nvfp4_transpose_to_nvfp4_ms_eden
+  moved from 21.330820ms to 21.318030ms. The 20-step screen moved from
+  5.670s to 5.667s, and the 100-step screen moved from
+  val_loss=6.304937 / 28.896s to val_loss=6.295354 / 28.887s.
+  The 900-second held-out gate moved from val_loss=3.566833 / 3051 steps to
+  val_loss=3.561855 / 3050 steps, a -0.140% validation-loss improvement with
+  1 fewer completed step.
+decision:
+  Promote by the primary fixed-wall objective: lower held-out validation loss
+  under the same 900-second SYNTH budget. This is not a completed-step win.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
 experiment: Route rowwise four/six quantization through a power-of-two row kernel.
 status: accepted_900s
 change:
