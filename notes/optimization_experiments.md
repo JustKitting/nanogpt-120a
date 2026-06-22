@@ -33,6 +33,49 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-22
+commit: rejected uncommitted candidate, code reverted
+experiment: Remove fixed CTA entry guards from f16 and NVFP4 projection bodies.
+status: rejected_screen
+change:
+  Temporarily removed unreachable `threadIdx.x >= CTA_THREADS` style guards
+  from fixed-size f16 CTA matmul bodies and generic NVFP4 projection CTA
+  bodies. For f16 matmuls, also removed the `blockIdx.z >= batch_count` guard
+  because the host launcher sets grid.z exactly to batch_count. Launch geometry,
+  tile shape, staging, MMA instructions, stores, and training math were
+  otherwise unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/fixed_cta_guard_removed_b16_l4d1024_20_20260622T174037Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.753, completed_steps=20.
+measured_effect:
+  Against the accepted aligned-u32 projection profile
+  target/nsys/projection_aligned_u32_load_b16_l4d1024_20_20260622T171110Z.run.log,
+  f16_cta_tc_matmul_f32_kernel regressed from 444.860998ms to
+  452.036737ms over 244 calls. f16_cta_tc_matmul_f32_a_transposed_rhs_kernel
+  regressed from 247.622661ms to 248.248694ms, and
+  f16_cta_tc_matmul_f32_rhs_kernel regressed from 242.777402ms to
+  242.956920ms. The shared projection body also moved the paired projection
+  kernel from 1175.625884ms to 1177.480137ms and lm_head_kernel from
+  207.910274ms to 208.199463ms. Profiled train elapsed moved from 5.740s to
+  5.753s.
+decision:
+  Reject before the 100-step and 900-second gates. The code was reverted.
+  Fixed CTA guard removal increased schedule/register pressure or otherwise
+  produced worse codegen than leaving the guards in place.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate
 experiment: Use aligned u32 global loads for NVFP4 projection CTA staging.
 status: accepted_900s
