@@ -5,6 +5,7 @@ use gpt2_nvfp4::{
 
 use super::grad_clip::GradientClipBuffers;
 use super::grads::BackwardBuffers;
+use super::next_latent::{NextLatBuffers, NextLatGradBuffers, NextLatScratchBuffers};
 use super::optimizer::OptimizerScratch;
 use super::optimizer_aurora::AuroraPointerTables;
 use super::optimizer_state::OptimizerStateBuffers;
@@ -31,6 +32,9 @@ pub struct TrainBuffers {
     pub qkv: DeviceBuffer<f32>,
     pub log_sum_exp: DeviceBuffer<f32>,
     pub logits: DeviceBuffer<f32>,
+    pub next_latent: NextLatBuffers,
+    pub next_latent_grads: NextLatGradBuffers,
+    pub next_latent_scratch: NextLatScratchBuffers,
     pub tape: ForwardTapeBuffers,
     pub backward: BackwardBuffers,
     pub scratch: BackwardScratchBuffers,
@@ -48,10 +52,16 @@ impl TrainBuffers {
         uploaded: &UploadedModel,
     ) -> Result<Self, DriverError> {
         let backward = BackwardBuffers::new(stream)?;
+        let next_latent_grads = NextLatGradBuffers::new(stream)?;
         let optimizer_state = OptimizerStateBuffers::new(stream, &runtime.decode, uploaded)?;
-        let aurora_tables =
-            AuroraPointerTables::new(stream, uploaded, &backward, &optimizer_state)?;
-        let grad_clip = GradientClipBuffers::new(stream, &backward)?;
+        let aurora_tables = AuroraPointerTables::new(
+            stream,
+            uploaded,
+            &backward,
+            &next_latent_grads,
+            &optimizer_state,
+        )?;
+        let grad_clip = GradientClipBuffers::new(stream, &backward, &next_latent_grads)?;
 
         Ok(Self {
             residual: zero(stream, HiddenState::LEN)?,
@@ -70,6 +80,9 @@ impl TrainBuffers {
             qkv: zero(stream, QkvActivation::LEN)?,
             log_sum_exp: zero(stream, AttentionLogSumExp::LEN)?,
             logits: zero(stream, Logits::LEN)?,
+            next_latent: NextLatBuffers::new(stream)?,
+            next_latent_grads,
+            next_latent_scratch: NextLatScratchBuffers::new(stream)?,
             tape: ForwardTapeBuffers::new(stream)?,
             backward,
             scratch: BackwardScratchBuffers::new(stream)?,

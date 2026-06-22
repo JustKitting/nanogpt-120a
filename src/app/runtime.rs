@@ -15,6 +15,7 @@ use rust_kernels_cuda::lm_head::LmHeadModule;
 use rust_kernels_cuda::logits::LogitsModule;
 use rust_kernels_cuda::loss::LossModule;
 use rust_kernels_cuda::mlp::MlpModule;
+use rust_kernels_cuda::next_latent::NextLatModule;
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::optimizer::OptimizerModule;
@@ -33,12 +34,13 @@ pub struct Runtime {
     pub mlp: MlpModule,
     pub lm_head: LmHeadModule,
     pub logits: LogitsModule,
+    pub next_latent: NextLatModule,
     pub loss: LossModule,
     pub transpose: TransposeModule,
     pub decode: Nvfp4DecodeModule,
-    linear: LinearBackwardModule,
-    layer_norm_backward: LayerNormBackwardModule,
-    residual: ResidualBackwardModule,
+    pub linear: LinearBackwardModule,
+    pub layer_norm_backward: LayerNormBackwardModule,
+    pub residual: ResidualBackwardModule,
     pub optimizer: OptimizerModule,
 }
 
@@ -57,6 +59,7 @@ impl Runtime {
             mlp: MlpModule::from_module(ptx.clone())?,
             lm_head: LmHeadModule::from_module(ptx.clone())?,
             logits: LogitsModule::from_module(ptx.clone())?,
+            next_latent: NextLatModule::from_module(ptx.clone())?,
             loss: LossModule::from_module(ptx.clone())?,
             transpose: TransposeModule::from_module(ptx.clone())?,
             decode: Nvfp4DecodeModule::from_module(ptx.clone())?,
@@ -75,6 +78,7 @@ impl Runtime {
             quant: &self.quant,
         };
         Gpt2BackwardModules {
+            residual: &self.residual,
             final_head: FinalHeadBackwardModules {
                 loss: &self.loss,
                 transpose: &self.transpose,

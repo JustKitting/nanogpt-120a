@@ -3,7 +3,7 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use crate::AppResult;
 
 const MAGIC: &[u8] = b"GPT2_NVFP4_CHECKPOINT\n";
-const VERSION: u32 = 1;
+const VERSION: u32 = 2;
 
 pub struct CheckpointWriter<W: Write> {
     writer: BufWriter<W>,

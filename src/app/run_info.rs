@@ -47,6 +47,7 @@ fn push_run_env(info: &mut String) {
         "TRAIN_SEED",
         "TRAIN_LR_SCALE",
         "TRAIN_ADAM_LR_SCALE",
+        "TRAIN_NEXTLAT_LR_SCALE",
         "TRAIN_LR_WARMUP_STEPS",
         "TRAIN_LR_START_RATIO",
         "TRAIN_AMUSE_BETA1",

@@ -15,8 +15,13 @@ impl Trainer {
         let stream = self.runtime.stream.as_ref();
         let uploaded = load_uploaded_model(stream, path)?;
         let optimizer_state = OptimizerStateBuffers::new(stream, &self.runtime.decode, &uploaded)?;
-        let aurora_tables =
-            AuroraPointerTables::new(stream, &uploaded, &self.buffers.backward, &optimizer_state)?;
+        let aurora_tables = AuroraPointerTables::new(
+            stream,
+            &uploaded,
+            &self.buffers.backward,
+            &self.buffers.next_latent_grads,
+            &optimizer_state,
+        )?;
         self.buffers.optimizer_state = optimizer_state;
         self.buffers.aurora_tables = aurora_tables;
         self.uploaded = uploaded;

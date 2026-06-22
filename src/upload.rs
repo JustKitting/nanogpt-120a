@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer};
 use gpt2_nvfp4::{
-    Gpt2BlockWeights, Gpt2Weights, LayerNormTensors, LayerNormWeights, LinearWeights, Nvfp4Shape,
-    Nvfp4Tensor,
+    Gpt2BlockWeights, Gpt2Weights, LayerNormTensors, LayerNormWeights, LinearWeights,
+    NextLatWeights, Nvfp4Shape, Nvfp4Tensor,
 };
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
@@ -12,6 +12,7 @@ pub struct UploadedModel {
     pub token_embedding: UploadedNvfp4,
     pub blocks: Vec<UploadedBlock>,
     pub ln_f: UploadedLayerNorm,
+    pub next_latent: UploadedNextLat,
 }
 
 impl UploadedModel {
@@ -24,6 +25,28 @@ impl UploadedModel {
                 .map(|block| UploadedBlock::new(stream, block))
                 .collect::<AppResult<_>>()?,
             ln_f: UploadedLayerNorm::new(stream, &weights.ln_f)?,
+            next_latent: UploadedNextLat::new(stream, &weights.next_latent)?,
+        })
+    }
+}
+
+pub struct UploadedNextLat {
+    pub norm: UploadedLayerNorm,
+    pub input_projection: UploadedLinear,
+    pub transition: UploadedLinear,
+    pub output_projection: UploadedLinear,
+}
+
+impl UploadedNextLat {
+    fn new(stream: &CudaStream, weights: &NextLatWeights) -> AppResult<Self> {
+        Ok(Self {
+            norm: UploadedLayerNorm {
+                weight: upload_nvfp4(stream, &weights.norm_weight)?,
+                bias: upload_nvfp4(stream, &weights.norm_bias)?,
+            },
+            input_projection: upload_linear(stream, &weights.input_projection)?,
+            transition: upload_linear(stream, &weights.transition)?,
+            output_projection: upload_linear(stream, &weights.output_projection)?,
         })
     }
 }

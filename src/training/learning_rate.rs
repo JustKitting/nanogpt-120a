@@ -2,12 +2,14 @@ use std::{fs, path::PathBuf, sync::OnceLock};
 
 const TRAIN_LR_SCALE_ENV: &str = "TRAIN_LR_SCALE";
 const TRAIN_ADAM_LR_SCALE_ENV: &str = "TRAIN_ADAM_LR_SCALE";
+const TRAIN_NEXTLAT_LR_SCALE_ENV: &str = "TRAIN_NEXTLAT_LR_SCALE";
 const TRAIN_LR_WARMUP_STEPS_ENV: &str = "TRAIN_LR_WARMUP_STEPS";
 const TRAIN_LR_START_RATIO_ENV: &str = "TRAIN_LR_START_RATIO";
 const TRAIN_AMUSE_BETA1_ENV: &str = "TRAIN_AMUSE_BETA1";
 const TRAIN_AMUSE_RHO_ENV: &str = "TRAIN_AMUSE_RHO";
 const DEFAULT_LR_SCALE: f32 = 1.014_040;
 const DEFAULT_ADAM_LR_SCALE: f32 = 1.980_467;
+const DEFAULT_NEXTLAT_LR_SCALE: f32 = 1.0;
 const DEFAULT_LR_WARMUP_STEPS: u32 = 5;
 const DEFAULT_LR_START_RATIO: f32 = 0.05;
 const DEFAULT_AMUSE_BETA1: f32 = 0.2;
@@ -27,8 +29,18 @@ pub(super) fn adam_scale() -> f32 {
         .unwrap_or(DEFAULT_ADAM_LR_SCALE)
 }
 
+pub(super) fn next_latent_scale() -> f32 {
+    scale_from(TRAIN_NEXTLAT_LR_SCALE_ENV)
+        .or_else(|| baseline().f32(TRAIN_NEXTLAT_LR_SCALE_ENV))
+        .unwrap_or(DEFAULT_NEXTLAT_LR_SCALE)
+}
+
 pub(super) fn adam_multiplier(step: u32) -> f32 {
     adam_scale() * warmup_only(step)
+}
+
+pub(super) fn next_latent_adam_multiplier(step: u32) -> f32 {
+    adam_multiplier(step) * next_latent_scale()
 }
 
 pub(super) fn aurora_multiplier(step: u32) -> f32 {

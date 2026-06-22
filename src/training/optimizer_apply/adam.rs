@@ -27,6 +27,10 @@ pub(super) fn adam_learning_rate(step: u32) -> f32 {
     ADAM_LR * super::super::learning_rate::adam_multiplier(step)
 }
 
+pub(super) fn next_latent_adam_learning_rate(step: u32) -> f32 {
+    ADAM_LR * super::super::learning_rate::next_latent_adam_multiplier(step)
+}
+
 pub(crate) fn adam_debug_config(step: u32) -> AdamDebugConfig {
     AdamDebugConfig {
         learning_rate: adam_learning_rate(step),
@@ -49,6 +53,30 @@ pub(super) fn update_adam_tensor(
     step: u32,
     average_coefficient: f32,
 ) -> Result<(), DriverError> {
+    update_adam_tensor_with_learning_rate(
+        stream,
+        optimizer,
+        tensor,
+        grad,
+        scratch,
+        state,
+        step,
+        average_coefficient,
+        adam_learning_rate(step),
+    )
+}
+
+pub(super) fn update_adam_tensor_with_learning_rate(
+    stream: &CudaStream,
+    optimizer: &OptimizerModule,
+    tensor: &mut UploadedNvfp4,
+    grad: &DeviceBuffer<f32>,
+    scratch: &mut OptimizerScratch,
+    state: &mut AdamState,
+    step: u32,
+    average_coefficient: f32,
+    learning_rate: f32,
+) -> Result<(), DriverError> {
     optimizer.apply_adamw_update(AdamWUpdateArgs {
         stream,
         bytes: &mut tensor.bytes,
@@ -62,7 +90,7 @@ pub(super) fn update_adam_tensor(
         amax: &mut scratch.amax,
         chunk_amax: &mut scratch.chunk_amax,
         len: tensor.len as u32,
-        learning_rate: adam_learning_rate(step),
+        learning_rate,
         weight_decay: ADAM_WEIGHT_DECAY,
         beta1: ADAM_BETA1,
         beta2: ADAM_BETA2,

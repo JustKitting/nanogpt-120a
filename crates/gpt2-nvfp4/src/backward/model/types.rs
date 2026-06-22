@@ -1,5 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
+use rust_kernels_cuda::residual::ResidualBackwardModule;
 
 use crate::backward::{
     BlockAttentionBackwardModules, BlockAttentionBackwardScratch, BlockAttentionBackwardSeeds,
@@ -14,6 +15,7 @@ use crate::{GPT2_N_LAYER, Gpt2Rng};
 
 #[derive(Clone, Copy)]
 pub struct Gpt2BackwardModules<'a> {
+    pub residual: &'a ResidualBackwardModule,
     pub final_head: FinalHeadBackwardModules<'a>,
     pub final_norm: &'a rust_kernels_cuda::layer_norm_backward::LayerNormBackwardModule,
     pub attention: BlockAttentionBackwardModules<'a>,
@@ -60,6 +62,7 @@ pub struct Gpt2BackwardArgs<'a, 'scratch, 'out> {
     pub weights: Gpt2BackwardWeights<'a>,
     pub targets: &'a DeviceBuffer<u32>,
     pub losses: &'out mut DeviceBuffer<f32>,
+    pub extra_final_normalized_grad: Option<&'a DeviceBuffer<f32>>,
     pub d_lm_head_weight: &'out mut DeviceBuffer<f32>,
     pub grads: Gpt2BackwardGrads<'out>,
     pub scratch: Gpt2BackwardScratch<'scratch>,

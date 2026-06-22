@@ -12,6 +12,7 @@ mod grad_clip;
 mod grads;
 mod learning_rate;
 mod linear_scratch;
+mod next_latent;
 mod operand_scratch;
 mod optimizer;
 mod optimizer_apply;

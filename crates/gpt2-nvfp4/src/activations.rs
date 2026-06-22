@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::{GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, GPT2_TOKEN_ROWS, GPT2_VOCAB_SIZE};
+use crate::{
+    GPT2_MLP, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, GPT2_TOKEN_ROWS, GPT2_VOCAB_SIZE, NEXTLAT_HIDDEN,
+    NEXTLAT_INPUT,
+};
 
 pub trait BufferShape {
     const LEN: usize;
@@ -30,10 +33,17 @@ buffer_shape!(HiddenStateShape, GPT2_TOKEN_ROWS * GPT2_N_EMBD);
 buffer_shape!(QkvActivationShape, GPT2_TOKEN_ROWS * GPT2_QKV);
 buffer_shape!(AttentionLogSumExpShape, GPT2_TOKEN_ROWS * GPT2_N_HEAD);
 buffer_shape!(MlpActivationShape, GPT2_TOKEN_ROWS * GPT2_MLP);
+buffer_shape!(NextLatInputActivationShape, GPT2_TOKEN_ROWS * NEXTLAT_INPUT);
+buffer_shape!(
+    NextLatHiddenActivationShape,
+    GPT2_TOKEN_ROWS * NEXTLAT_HIDDEN
+);
 buffer_shape!(LogitsShape, GPT2_TOKEN_ROWS * GPT2_VOCAB_SIZE);
 
 pub type HiddenState = F32Buffer<HiddenStateShape>;
 pub type QkvActivation = F32Buffer<QkvActivationShape>;
 pub type AttentionLogSumExp = F32Buffer<AttentionLogSumExpShape>;
 pub type MlpActivation = F32Buffer<MlpActivationShape>;
+pub type NextLatInputActivation = F32Buffer<NextLatInputActivationShape>;
+pub type NextLatHiddenActivation = F32Buffer<NextLatHiddenActivationShape>;
 pub type Logits = F32Buffer<LogitsShape>;

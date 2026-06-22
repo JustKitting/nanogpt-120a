@@ -1,8 +1,9 @@
 use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy, DriverError};
-use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE};
+use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
 use rust_kernels_cuda::optimizer::{GRAD_CLIP_VALUES_PER_CHUNK, GradientClipArgs, OptimizerModule};
 
 use super::grads::BackwardBuffers;
+use super::next_latent::NextLatGradBuffers;
 
 const GLOBAL_GRAD_CLIP_NORM: f32 = 1.0;
 
@@ -24,8 +25,12 @@ struct HostGradPtr {
 }
 
 impl GradientClipBuffers {
-    pub(super) fn new(stream: &CudaStream, grads: &BackwardBuffers) -> Result<Self, DriverError> {
-        let rows = parameter_gradients(grads);
+    pub(super) fn new(
+        stream: &CudaStream,
+        grads: &BackwardBuffers,
+        next_latent: &NextLatGradBuffers,
+    ) -> Result<Self, DriverError> {
+        let rows = parameter_gradients(grads, next_latent);
         let chunk_count = rows
             .last()
             .map(|row| row.chunk_offset + chunks(row.len))
@@ -74,7 +79,10 @@ where
     DeviceBuffer::from_host(stream, &values)
 }
 
-fn parameter_gradients(grads: &BackwardBuffers) -> Vec<HostGradPtr> {
+fn parameter_gradients(
+    grads: &BackwardBuffers,
+    next_latent: &NextLatGradBuffers,
+) -> Vec<HostGradPtr> {
     let mut rows = Vec::new();
     push(
         &mut rows,
@@ -103,6 +111,34 @@ fn parameter_gradients(grads: &BackwardBuffers) -> Vec<HostGradPtr> {
         );
         push(&mut rows, &block.d_mlp_c_proj_bias, GPT2_N_EMBD);
     }
+    push(&mut rows, &next_latent.d_norm_weight, NEXTLAT_INPUT);
+    push(&mut rows, &next_latent.d_norm_bias, NEXTLAT_INPUT);
+    push(
+        &mut rows,
+        &next_latent.d_input_projection_weight,
+        NEXTLAT_INPUT * NEXTLAT_HIDDEN,
+    );
+    push(
+        &mut rows,
+        &next_latent.d_input_projection_bias,
+        NEXTLAT_HIDDEN,
+    );
+    push(
+        &mut rows,
+        &next_latent.d_transition_weight,
+        NEXTLAT_HIDDEN * NEXTLAT_HIDDEN,
+    );
+    push(&mut rows, &next_latent.d_transition_bias, NEXTLAT_HIDDEN);
+    push(
+        &mut rows,
+        &next_latent.d_output_projection_weight,
+        NEXTLAT_HIDDEN * GPT2_N_EMBD,
+    );
+    push(
+        &mut rows,
+        &next_latent.d_output_projection_bias,
+        GPT2_N_EMBD,
+    );
 
     rows
 }

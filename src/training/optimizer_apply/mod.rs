@@ -1,10 +1,12 @@
 mod adam;
 mod apply;
 mod aurora;
+mod base;
 mod block;
 mod embedding;
 mod layer_norm;
 mod mlp;
+mod next_latent;
 mod qkv;
 mod result;
 mod utils;

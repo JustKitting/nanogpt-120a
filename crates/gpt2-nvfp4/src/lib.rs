@@ -5,7 +5,10 @@ mod random;
 mod tensor;
 mod types;
 
-pub use activations::{AttentionLogSumExp, HiddenState, Logits, MlpActivation, QkvActivation};
+pub use activations::{
+    AttentionLogSumExp, HiddenState, Logits, MlpActivation, NextLatHiddenActivation,
+    NextLatInputActivation, QkvActivation,
+};
 
 pub use backward::{
     AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,

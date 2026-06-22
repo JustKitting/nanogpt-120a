@@ -3,6 +3,7 @@ use gpt2_nvfp4::{
     MlpUpTensors, TokenEmbeddingArgs,
 };
 
+use super::next_latent::{NextLatForwardArgs, forward as next_latent_forward};
 use super::{OptimizerTrace, TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
 
@@ -12,7 +13,7 @@ impl Trainer {
         let buffers = &mut self.buffers;
         let uploaded = &self.uploaded;
 
-        self.model.forward(Gpt2ForwardArgs {
+        let hidden = self.model.forward(Gpt2ForwardArgs {
             embeddings: TokenEmbeddingArgs {
                 module: &self.runtime.embedding,
                 stream,
@@ -73,6 +74,23 @@ impl Trainer {
             mlp_activation: &mut buffers.mlp_act,
             logits: &mut buffers.logits,
             tape: Some(buffers.tape.tape()),
+        })?;
+
+        next_latent_forward(NextLatForwardArgs {
+            stream,
+            embedding: &self.runtime.embedding,
+            layer_norm: &self.runtime.layer_norm,
+            quant: &self.runtime.quant,
+            next_latent: &self.runtime.next_latent,
+            token_embedding: uploaded.token_embedding.device(),
+            weights: &uploaded.next_latent,
+            targets: &batch.targets,
+            current_states: hidden.normalized,
+            buffers: &mut buffers.next_latent,
+            batch_size: batch.batch_size as u32,
+            seq_len: batch.seq_len as u32,
+            row_count: batch.token_count as u32,
+            lambda: 1.0,
         })?;
 
         Ok(TrainStats {

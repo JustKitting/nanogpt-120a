@@ -1,15 +1,16 @@
 use super::super::grad_clip::GradientClipBuffers;
 use super::super::grads::BackwardBuffers;
+use super::super::next_latent::NextLatGradBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_aurora::{AuroraPointerTables, aurora_learning_rate};
 use super::super::optimizer_state::OptimizerStateBuffers;
 use super::super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::super::{OptimizerTrace, TokenBatch};
-use super::adam::{adam_learning_rate, update_adam_tensor};
+use super::adam::adam_learning_rate;
 use super::aurora::update_aurora_groups;
+use super::base::{BaseAdamUpdateArgs, update_base_adam};
 use super::block::update_block;
 use super::embedding::add_embedding_lookup_grad;
-use super::layer_norm::update_layer_norm;
 use super::result::WeightUpdateResult;
 use super::utils::elapsed_ms;
 use crate::AppResult;
@@ -23,6 +24,7 @@ pub fn apply_weight_updates(
     batch: &TokenBatch,
     uploaded: &mut UploadedModel,
     grads: &mut BackwardBuffers,
+    next_latent_grads: &NextLatGradBuffers,
     scratch: &mut OptimizerScratch,
     state: &mut OptimizerStateBuffers,
     aurora: &mut AuroraScratchBuffers,
@@ -36,7 +38,7 @@ pub fn apply_weight_updates(
     trace.adam_lr = adam_learning_rate(step);
     trace.aurora_lr = aurora_learning_rate(step);
     let start = Instant::now();
-    add_embedding_lookup_grad(stream, optimizer, batch, grads)?;
+    add_embedding_lookup_grad(stream, optimizer, batch, grads, next_latent_grads)?;
     trace.embedding_lookup_ms = elapsed_ms(start);
 
     grad_clip.clip(stream, optimizer)?;
@@ -56,33 +58,20 @@ pub fn apply_weight_updates(
         None
     };
 
-    let start = Instant::now();
-    update_adam_tensor(
+    let base_trace = update_base_adam(BaseAdamUpdateArgs {
         stream,
         optimizer,
-        &mut uploaded.token_embedding,
-        &grads.d_lm_head_weight,
+        uploaded,
+        grads,
+        next_latent_grads,
         scratch,
-        &mut state.token_embedding,
+        state,
         step,
         average_coefficient,
-    )?;
-    trace.token_embedding_ms = elapsed_ms(start);
-    trace.adam_ms += trace.token_embedding_ms;
-
-    let start = Instant::now();
-    update_layer_norm(
-        stream,
-        optimizer,
-        &mut uploaded.ln_f,
-        &grads.final_norm,
-        scratch,
-        &mut state.ln_f,
-        step,
-        average_coefficient,
-    )?;
-    trace.final_norm_ms = elapsed_ms(start);
-    trace.adam_ms += trace.final_norm_ms;
+    })?;
+    trace.token_embedding_ms = base_trace.token_embedding_ms;
+    trace.final_norm_ms = base_trace.final_norm_ms;
+    trace.adam_ms += base_trace.adam_ms;
 
     let start = Instant::now();
     for ((block, grad), state) in uploaded

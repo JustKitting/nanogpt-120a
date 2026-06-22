@@ -3,9 +3,10 @@ use cuda_core::DriverError;
 use super::blocks::run_blocks;
 use super::final_head::run_final_head;
 use super::types::Gpt2BackwardArgs;
-use crate::GPT2_N_LAYER;
 use crate::backward::{Gpt2LayerNormBackwardArgs, layer_norm_backward};
 use crate::types::{Gpt2BackwardGrads, LayerNormGrads};
+use crate::{GPT2_N_EMBD, GPT2_N_LAYER};
+use rust_kernels_cuda::residual::ResidualGradAccumulateArgs;
 
 pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
     let Gpt2BackwardArgs {
@@ -15,6 +16,7 @@ pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         weights,
         targets,
         losses,
+        extra_final_normalized_grad,
         d_lm_head_weight,
         grads,
         scratch,
@@ -48,6 +50,16 @@ pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         scratch.final_head,
         seeds.final_head,
     )?;
+    if let Some(extra) = extra_final_normalized_grad {
+        modules
+            .residual
+            .grad_accumulate(ResidualGradAccumulateArgs {
+                stream,
+                branch: extra,
+                out: d_final_normalized,
+                len: saved.row_count * GPT2_N_EMBD as u32,
+            })?;
+    }
     layer_norm_backward(Gpt2LayerNormBackwardArgs {
         stream,
         module: modules.final_norm,

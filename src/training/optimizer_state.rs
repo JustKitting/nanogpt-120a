@@ -3,7 +3,7 @@ use gpt2_nvfp4::GPT2_N_LAYER;
 use rust_kernels_cuda::nvfp4::{Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4DeviceTensor};
 
 use crate::upload::{
-    UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNvfp4,
+    UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4,
 };
 
 pub struct OptimizerStateBuffers {
@@ -11,6 +11,7 @@ pub struct OptimizerStateBuffers {
     schedule_free_weight_sum: f32,
     pub(super) token_embedding: AdamState,
     pub(super) ln_f: LayerNormState,
+    pub(super) next_latent: NextLatState,
     pub(super) blocks: [BlockState; GPT2_N_LAYER],
 }
 
@@ -21,6 +22,13 @@ pub(super) struct BlockState {
     pub(super) ln_2: LayerNormState,
     pub(super) mlp_up: LinearState,
     pub(super) mlp_down: LinearState,
+}
+
+pub(super) struct NextLatState {
+    pub(super) norm: LayerNormState,
+    pub(super) input_projection: LinearState,
+    pub(super) transition: LinearState,
+    pub(super) output_projection: LinearState,
 }
 
 pub(super) struct LayerNormState {
@@ -57,6 +65,7 @@ impl OptimizerStateBuffers {
             schedule_free_weight_sum: 0.0,
             token_embedding: AdamState::new(stream, decode, &uploaded.token_embedding)?,
             ln_f: LayerNormState::new(stream, decode, &uploaded.ln_f)?,
+            next_latent: NextLatState::new(stream, decode, &uploaded.next_latent)?,
             blocks: block_array(|i| BlockState::new(stream, decode, &uploaded.blocks[i]))?,
         })
     }
@@ -91,6 +100,21 @@ impl BlockState {
             ln_2: LayerNormState::new(stream, decode, &block.ln_2)?,
             mlp_up: LinearState::new(stream, decode, &block.mlp_up)?,
             mlp_down: LinearState::new(stream, decode, &block.mlp_down)?,
+        })
+    }
+}
+
+impl NextLatState {
+    fn new(
+        stream: &CudaStream,
+        decode: &Nvfp4DecodeModule,
+        next_latent: &UploadedNextLat,
+    ) -> Result<Self, DriverError> {
+        Ok(Self {
+            norm: LayerNormState::new(stream, decode, &next_latent.norm)?,
+            input_projection: LinearState::new(stream, decode, &next_latent.input_projection)?,
+            transition: LinearState::new(stream, decode, &next_latent.transition)?,
+            output_projection: LinearState::new(stream, decode, &next_latent.output_projection)?,
         })
     }
 }
