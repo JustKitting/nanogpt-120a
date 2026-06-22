@@ -46,7 +46,8 @@ impl Nvfp4QuantModule {
         &self,
         args: Nvfp4QuantRowwiseArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        if args.row_len.is_power_of_two() {
+        let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
+        if args.row_len.is_power_of_two() && args.group_count % groups_per_block == 0 {
             return self.launch_fp32_to_nvfp4_four_six_rowwise_pow2(args);
         }
 

@@ -199,6 +199,49 @@ decision:
 ```text
 date: 2026-06-22
 commit: uncommitted candidate, accepted after gate
+experiment: Remove exact-grid guard from rowwise power-of-two four/six encoder.
+status: accepted_900s
+change:
+  Restricted the rowwise power-of-two four/six path to group counts that are an
+  exact multiple of groups_per_block, then removed the per-group
+  group < out_scales.len() guard from that kernel. The quantization math,
+  scale override, 4/6 grid decision, and output layout are unchanged. Non-exact
+  rowwise shapes still use the generic guarded encoder.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/four_six_pow2_exact_grid_b16_l4d1024_20_20260622T203817Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.670, completed_steps=20.
+  100-step SYNTH screen:
+    target/four_six_pow2_exact_grid_b16_l4d1024_100_20260622T203833Z.log
+    val_loss=6.304937, train_elapsed_s=28.896, completed_steps=100.
+  900-second held-out gate:
+    target/four_six_pow2_exact_grid_b16_l4d1024_900_20260622T203912Z.log
+    val_loss=3.566833, train_elapsed_s=900.177, completed_steps=3051.
+  generated sample:
+    target/runs/20260622_203913Z_synth_900s/generated.txt
+measured_effect:
+  Against the accepted rowwise power-of-two profile
+  target/nsys/four_six_rowwise_pow2_b16_l4d1024_20_20260622T201353Z.run.log,
+  fp32_to_nvfp4_four_six_rowwise_pow2_kernel moved from 66.274555ms to
+  65.867625ms over 420 calls. The 20-step screen moved from 5.672s to
+  5.670s. The 100-step screen moved from val_loss=6.302158 / 28.914s to
+  val_loss=6.304937 / 28.896s.
+  The 900-second held-out gate moved from val_loss=3.578318 / 3054 steps to
+  val_loss=3.566833 / 3051 steps, a -0.321% validation-loss improvement with
+  3 fewer completed steps.
+decision:
+  Promote by the primary fixed-wall objective: lower held-out validation loss
+  under the same 900-second SYNTH budget. This is not a completed-step win.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
 experiment: Route rowwise four/six quantization through a power-of-two row kernel.
 status: accepted_900s
 change:
