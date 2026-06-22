@@ -32,6 +32,7 @@ pub(super) fn launch_slot(
 ) {
     let desc = slots[slot as usize];
     let learning_rate = learning_rate * desc.learning_rate_multiplier;
+    let work = WorkGrid::x_axis();
     aurora_matrix_update_body(
         ptr_const(desc.grad),
         ptr_mut(desc.momentum),
@@ -45,15 +46,11 @@ pub(super) fn launch_slot(
         offset_ptr(polar_x, scratch_slot, max_len as usize),
         offset_ptr(polar_gram, scratch_slot, (max_dim * max_dim) as usize),
         offset_ptr(polar_ax, scratch_slot, max_ax_len as usize),
-        offset_ptr(
-            polar_chunks,
-            scratch_slot,
-            WorkGrid::x_axis().blocks() as usize,
-        ),
+        offset_ptr(polar_chunks, scratch_slot, work.blocks() as usize),
         a_tile,
         b_tile,
         warp_sums,
-        WorkGrid::x_axis(),
+        work,
         desc.rows,
         desc.cols,
         mu,

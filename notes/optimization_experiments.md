@@ -33,6 +33,47 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Hoist Aurora WorkGrid construction in the mega slot launcher.
+status: accepted_900s
+change:
+  Construct WorkGrid::x_axis() once per Aurora mega slot and reuse it for both
+  the polar chunk scratch offset and aurora_matrix_update_body. Slot ordering,
+  phase geometry, optimizer math, scratch layout, model shape, and
+  hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  Generated PTX: aurora_mega_update_cooperative_kernel kept the same b64
+    declaration, %rd<41>; this was not a register-count win.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_workgrid_hoist_b16_l4d1024_20_20260622T164345Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.837, completed_steps=20.
+  100-step SYNTH screen:
+    target/aurora_workgrid_hoist_b16_l4d1024_100_20260622T164412Z.log
+    val_loss=6.297485, train_elapsed_s=29.719, completed_steps=100.
+  900-second held-out gate:
+    target/aurora_workgrid_hoist_b16_l4d1024_900_20260622T164458Z.log
+    val_loss=3.580500, train_elapsed_s=900.120, completed_steps=2971.
+measured_effect:
+  Against the accepted descriptor profile
+  target/nsys/aurora_slot_descriptor_b16_l4d1024_20_20260622T153325Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1748.781893ms to
+  1728.014901ms over 20 calls. The full 20-step profile moved from 5.915s to
+  5.837s. The 100-step screen was slightly slower at fixed step count, 29.719s
+  versus 29.597s, so the full gate was required.
+  Against the previous promoted 900-second baseline, held-out validation
+  improved from 3.599322 to 3.580500 while completed steps moved from 2973 to
+  2971.
+decision:
+  Promote. The fixed-wall objective improved directly because held-out
+  validation loss is lower under the same 900-second SYNTH budget.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, reverted after gate
 experiment: Trust nonzero device global scale inside MS-EDEN payload packing.
 status: rejected_900s
