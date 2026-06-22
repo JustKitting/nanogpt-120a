@@ -169,6 +169,35 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, reverted after 20-step screen
+experiment: Hoist Aurora momentum/update transposed branches out of element loops.
+status: rejected_screen
+change:
+  Split Aurora momentum-orient and master-update helpers into contiguous and
+  transposed variants so square/non-transposed slots avoid row/column division
+  and per-element transposed selection. The optimizer math and memory layout
+  were intended to remain unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_branch_hoist_b16_l4d1024_20_20260622T203610Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.674, completed_steps=20.
+measured_effect:
+  Against the accepted rowwise four/six profile
+  target/nsys/four_six_rowwise_pow2_b16_l4d1024_20_20260622T201353Z.run.log,
+  aurora_mega_update_cooperative_kernel regressed from 1722.195349ms to
+  1723.126494ms over 20 calls. Profiled train time moved from 5.672s to
+  5.674s.
+decision:
+  Reject before the 100-step and 900-second gates. The target kernel regressed
+  in the 20-step profile, so the code was reverted and only this note remains.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, accepted after gate
 experiment: Route rowwise four/six quantization through a power-of-two row kernel.
 status: accepted_900s
