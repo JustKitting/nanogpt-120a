@@ -7216,6 +7216,45 @@ decision:
 ```
 
 ```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Use scalar MS-EDEN device global scale in linear-backward projection
+  stores.
+status: rejected_reverted
+change:
+  Added a temporary MS-EDEN-only variant of the paired CTA linear-backward
+  projection kernel that read scalar device global scales instead of row-global
+  scale arrays at the final accumulator store.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass after fixing the transposed error scalar to reuse e_h.global_scale.
+  20-step nsys:
+    target/nsys/linear_bwd_scalar_input_scale_b16_l4d1024_20_20260622T135504Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.072, completed_steps=20.
+  100-step SYNTH screen:
+    target/linear_bwd_scalar_input_scale_b16_l4d1024_100_20260622T135546Z.log
+    val_loss=6.300044, train_elapsed_s=30.387, completed_steps=100.
+  900-second held-out gate:
+    target/linear_bwd_scalar_input_scale_b16_l4d1024_900_20260622T135632Z.log
+    val_loss=3.609159, train_elapsed_s=900.175, completed_steps=2892.
+measured_effect:
+  Against the accepted baseline
+  target/nsys/ms_eden_no_chunk_amax_b16_l4d1024_20_20260622T131123Z.sqlite,
+  the projection kernel moved from 1272.332052ms to 1268.428120ms over
+  400 calls. The 100-step screen was slightly better than baseline
+  val_loss=6.305133 / 30.416s, but the 900-second gate regressed from
+  val_loss=3.603050 / 2894 completed steps to val_loss=3.609159 / 2892
+  completed steps.
+decision:
+  Reject and revert. The final gate did not meet the active promotion rule:
+  validation was within the 1% noise band but completed step count decreased.
+```
+
+```text
 date: 2026-06-21
 commit: uncommitted
 experiment: Write residual-chain gradients directly to the next backward
