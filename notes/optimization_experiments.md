@@ -33,6 +33,47 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-22
+commit: this commit
+experiment: Exact no-padding rowwise NVFP4 transpose MS-EDEN pack.
+status: accepted
+change:
+  Added a no-padding exact rowwise transpose pack route for the hot
+  linear-backward input_t MS-EDEN operand when the launcher can prove
+  source_rows == dst_row_len, dst_row_len is divisible by 32, and chunks per
+  row is a power of two. The specialized kernel removes the per-lane source row
+  padding check and uses shift/mask row indexing for the current B16/L4/d1024
+  shape. The existing exact and generic kernels remain the fallback for other
+  layouts.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  cargo build --release: pass.
+  gpt2-nvfp4 forward GPU test: pass.
+  20-step nsys:
+    target/nsys/rowwise_no_pad_b16_l4d1024_20_20260622T223032Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.662, completed_steps=20.
+  100-step SYNTH screen:
+    target/rowwise_no_pad_b16_l4d1024_100_20260622T223058Z.log
+    val_loss=6.296959, train_elapsed_s=28.844, completed_steps=100.
+  900-second held-out gate:
+    target/rowwise_no_pad_b16_l4d1024_900_20260622T225305Z.log
+    val_loss=3.570220, train_elapsed_s=900.011, completed_steps=3188.
+measured_effect:
+  Compared with the accepted E_h/E_t_h pair-pack profile
+  target/nsys/linear_e_pair_pack_b16_l4d1024_20_20260622T215134Z.run.log,
+  rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact
+  moved from 154.192993ms over 400 launches to the no-padding variant at
+  153.185548ms over 400 launches. End-to-end 20-step profiled train time was
+  effectively flat at 5.662s versus 5.660s.
+decision:
+  Promote under the active noise-band rule. The 900-second gate increased
+  completed steps from 3054 to 3188 while validation loss moved from 3.563282
+  to 3.570220, a +0.195% change inside the +/-1% noise band.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, reverted
 experiment: Linear-backward row-quad NVFP4 projection CTA.
 status: rejected_short_profile

@@ -515,6 +515,31 @@ impl Nvfp4QuantModule {
         let element_count = args.source_cols * args.dst_row_len;
         let pack_chunk_count = ms_eden_chunk_count(element_count);
         if pack_grid_is_exact(pack_chunk_count) {
+            if rowwise_transpose_has_no_padding(args.source_rows, args.dst_row_len) {
+                return self
+                    .ms_eden
+                    .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
+                        args.stream,
+                        LaunchConfig {
+                            grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
+                            block_dim: (THREADS_PER_BLOCK, 1, 1),
+                            shared_mem_bytes: 0,
+                        },
+                        args.input.bytes,
+                        args.input.scales,
+                        args.input.global_scales,
+                        args.out_fp4,
+                        args.out_scales,
+                        args.out_global_scales,
+                        &*args.out_global_scale,
+                        args.source_cols,
+                        (args.dst_row_len / 32).trailing_zeros(),
+                        QUARTET_MS_EDEN_SCALE_OVERRIDE,
+                        args.sign_seed,
+                        args.scale_seed,
+                    );
+            }
+
             return self
                 .ms_eden
                 .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
@@ -882,4 +907,13 @@ fn pack_grid_dim(chunk_count: u32) -> u32 {
 #[inline]
 fn pack_grid_is_exact(chunk_count: u32) -> bool {
     chunk_count % WARPS_PER_BLOCK == 0
+}
+
+#[inline]
+fn rowwise_transpose_has_no_padding(source_rows: u32, dst_row_len: u32) -> bool {
+    let chunks_per_row = dst_row_len / 32;
+    source_rows == dst_row_len
+        && dst_row_len % 32 == 0
+        && chunks_per_row != 0
+        && chunks_per_row.is_power_of_two()
 }
