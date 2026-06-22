@@ -41,6 +41,34 @@ pub mod module {
     }
 
     #[kernel]
+    pub fn nextlat_concat_backward_kernel(
+        d_concat: &[f32],
+        d_predicted: &[f32],
+        mut d_next_token_embeddings: DisjointSlice<f32>,
+        mut d_current_states: DisjointSlice<f32>,
+        shape: NextLatShape,
+    ) {
+        let row = thread::blockIdx_x();
+        let thread = thread::threadIdx_x();
+        if row < shape.row_count {
+            let row_base = row as usize * shape.embedding_dim as usize;
+            let concat_base = row as usize * (shape.embedding_dim as usize * 2);
+            let mut col = thread;
+            while col < shape.embedding_dim {
+                let col_index = col as usize;
+                unsafe {
+                    *d_next_token_embeddings.get_unchecked_mut(row_base + col_index) =
+                        d_concat[concat_base + col_index];
+                    *d_current_states.get_unchecked_mut(row_base + col_index) = d_concat
+                        [concat_base + shape.embedding_dim as usize + col_index]
+                        + d_predicted[row_base + col_index];
+                }
+                col += THREADS_PER_BLOCK;
+            }
+        }
+    }
+
+    #[kernel]
     pub fn nextlat_smooth_l1_kernel(
         predicted_next_states: &[f32],
         target_states: &[f32],
@@ -101,8 +129,7 @@ pub mod module {
         };
         if warp_in_block == 0 && lane == 0 {
             unsafe {
-                let slot = losses.get_unchecked_mut(row as usize);
-                *slot += row_loss;
+                *losses.get_unchecked_mut(row as usize) = row_loss;
             }
         }
     }

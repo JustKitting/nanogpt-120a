@@ -18,7 +18,7 @@ pub fn concat(next_token_embeddings: &[f32], current_states: &[f32]) -> Vec<f32>
 }
 
 pub fn smooth_l1(predicted: &[f32], target: &[f32]) -> (Vec<f32>, Vec<f32>) {
-    let mut losses = vec![1.0_f32; ROW_COUNT];
+    let mut losses = vec![0.0_f32; ROW_COUNT];
     let mut grad = vec![0.0_f32; ROW_COUNT * EMBED];
     let grad_scale = LAMBDA / ((BATCH_SIZE * (SEQ_LEN - 1) * EMBED) as f32);
 
@@ -40,7 +40,7 @@ pub fn smooth_l1(predicted: &[f32], target: &[f32]) -> (Vec<f32>, Vec<f32>) {
                 };
                 grad[offset] = d * grad_scale;
             }
-            losses[row] += LAMBDA * local / EMBED as f32;
+            losses[row] = LAMBDA * local / EMBED as f32;
         }
     }
 

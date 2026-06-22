@@ -8,7 +8,7 @@ mod launcher;
 mod projection_kernels;
 
 pub use args::{
-    NextLatConcatArgs, NextLatGeluArgs, NextLatGeluBackwardArgs, NextLatProjectionArgs,
-    NextLatResidualAddArgs, NextLatSmoothL1Args,
+    NextLatConcatArgs, NextLatConcatBackwardArgs, NextLatGeluArgs, NextLatGeluBackwardArgs,
+    NextLatProjectionArgs, NextLatResidualAddArgs, NextLatSmoothL1Args,
 };
 pub use launcher::NextLatModule;

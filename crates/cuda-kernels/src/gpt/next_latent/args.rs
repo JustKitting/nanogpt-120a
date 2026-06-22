@@ -24,6 +24,16 @@ pub struct NextLatConcatArgs<'a, 'out> {
     pub embedding_dim: u32,
 }
 
+pub struct NextLatConcatBackwardArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub d_concat: &'a DeviceBuffer<f32>,
+    pub d_predicted: &'a DeviceBuffer<f32>,
+    pub d_next_token_embeddings: &'out mut DeviceBuffer<f32>,
+    pub d_current_states: &'out mut DeviceBuffer<f32>,
+    pub row_count: u32,
+    pub embedding_dim: u32,
+}
+
 pub struct NextLatSmoothL1Args<'a, 'out> {
     pub stream: &'a CudaStream,
     pub predicted_next_states: &'a DeviceBuffer<f32>,
