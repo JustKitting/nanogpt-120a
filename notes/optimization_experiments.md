@@ -169,6 +169,44 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, reverted after 20-step screen
+experiment: Explicitly unroll row-pair projection K atoms.
+status: rejected_screen
+change:
+  Replaced the fixed two-atom K loop in projection_accumulator_aligned_row_pair
+  with explicit atom 0 and atom 1 code blocks. The tile shape, shared-memory
+  staging, MMA instruction sequence, scale layout, and output math were
+  unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_rowpair_k_unroll_b16_l4d1024_20_20260622T185519Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.727, completed_steps=20.
+measured_effect:
+  Against the accepted MLP row-pair projection profile
+  target/nsys/mlp_projection_rowpair_b16_l4d1024_20_20260622T183704Z.run.log,
+  train_elapsed_s regressed from 5.710s to 5.727s. The main row-pair consumer,
+  linear_backward_projection_pair_cta_device_scale_kernel, regressed from
+  1157.752653ms to 1167.690342ms over 400 calls. aurora_mega_update_cooperative_kernel
+  moved from 1723.837857ms to 1729.511045ms, f16_cta_tc_matmul_f32_kernel moved
+  from 444.914226ms to 446.968278ms, and lm_head_kernel moved from
+  204.955081ms to 205.836538ms. nextlat_projection_kernel improved from
+  66.738975ms to 63.991768ms, but the dominant kernels and wall time regressed.
+decision:
+  Reject before the 100-step and 900-second gates. The compiler/device path is
+  better with the original loop form for the dominant row-pair consumers. Code
+  was reverted; keep this note to avoid repeating this unroll.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, split before gate
 experiment: Route both attention and MLP forward projections through aligned
   row-pair CTA bodies.
