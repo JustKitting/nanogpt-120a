@@ -10328,3 +10328,43 @@ decision:
   argument/control pressure did not beat the accepted paired projection path.
   Code was reverted; the note is kept to avoid repeating this final-head split.
 ```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Compact Aurora symmetric Gram tile scheduling.
+status: accepted
+change:
+  Changed the Aurora Polar Express symmetric Gram stage from iterating the full
+  square tile domain and skipping lower-triangle tiles to iterating a compact
+  upper-triangle tile domain. The cooperative launch shape is unchanged; only
+  the in-kernel tile index mapping changed.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1:
+    harness failed before exercising kernels with DriverError(301, "file not found").
+    The generated PTX exists at the common test harness path; release runtime
+    checks below are the acceptance evidence for this candidate.
+  20-step nsys:
+    target/nsys/aurora_compact_tri_b16_l4d1024_20_20260622T145452Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.923, completed_steps=20.
+  100-step SYNTH screen:
+    target/aurora_compact_tri_b16_l4d1024_100_20260622T145530Z.log
+    val_loss=6.298866, train_elapsed_s=29.640, completed_steps=100.
+  900-second held-out gate:
+    target/aurora_compact_tri_b16_l4d1024_900_20260622T145614Z.log
+    val_loss=3.575694, train_elapsed_s=900.209, completed_steps=2967.
+measured_effect:
+  Against the fresh current profile
+  target/nsys/current_clean_b16_l4d1024_20_20260622T143653Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 1914.892ms to 1750.067ms
+  over 20 calls, and profiled train time moved from 5.968s to 5.923s.
+  Against the promoted 900-second baseline
+  target/ms_eden_no_chunk_amax_b16_l4d1024_900_20260622T131306Z.log,
+  held-out validation loss improved from 3.603050 to 3.575694 and completed
+  steps increased from 2894 to 2967.
+decision:
+  Promote. This passes the active rule directly: lower held-out validation loss
+  and higher completed step count under the same 900-second SYNTH budget.
+```

@@ -1,6 +1,7 @@
 use cuda_device::{SharedArray, thread};
 
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_M, CtaTile};
+use crate::float_ptx::sqrt_f32;
 
 use super::super::super::super::super::work_grid::WorkGrid;
 use super::super::store::{store_plain, store_plain_transposed};
@@ -17,17 +18,23 @@ pub(crate) fn run_symmetric_tiles(
     k: u32,
 ) {
     let tile_dim = dim.div_ceil(CTA_M);
-    let tile_count = tile_dim * tile_dim;
+    let tile_count = tile_dim * (tile_dim + 1) / 2;
     let mut tile_index = work.block();
 
     while tile_index < tile_count {
-        let tile_row = tile_index / tile_dim;
-        let tile_col = tile_index - tile_row * tile_dim;
-        if tile_col >= tile_row {
-            run_tile(source, out, a_tile, b_tile, dim, k, tile_row, tile_col);
-        }
+        let (tile_row, tile_col) = upper_triangle_tile(tile_index, tile_dim);
+        run_tile(source, out, a_tile, b_tile, dim, k, tile_row, tile_col);
         tile_index += work.blocks();
     }
+}
+
+#[inline(always)]
+fn upper_triangle_tile(index: u32, tile_dim: u32) -> (u32, u32) {
+    let n = (2 * tile_dim + 1) as f32;
+    let row = ((n - sqrt_f32(n * n - 8.0 * index as f32)) * 0.5) as u32;
+    let row_start = row * (2 * tile_dim - row + 1) / 2;
+    let col = row + (index - row_start);
+    (row, col)
 }
 
 #[allow(clippy::too_many_arguments)]
