@@ -33,6 +33,49 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, reverted after gate
+experiment: Trust nonzero device global scale inside MS-EDEN payload packing.
+status: rejected_900s
+change:
+  Removed the per-lane `global_scale == 0.0 ? 1.0 : global_scale` guard from
+  ms_eden_pack_payload, relying on the Quartet/MS-EDEN global-scale producer to
+  publish 1.0 for zero-amax tensors. RHT seeds, local scale correction, FP4
+  payload conversion, launch geometry, and consumers were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/ms_eden_trust_global_scale_b16_l4d1024_20_20260622T162433Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.815, completed_steps=20.
+  100-step SYNTH screen:
+    target/ms_eden_trust_global_scale_b16_l4d1024_100_20260622T162508Z.log
+    val_loss=6.298337, train_elapsed_s=29.644, completed_steps=100.
+  900-second held-out gate:
+    target/ms_eden_trust_global_scale_b16_l4d1024_900_20260622T162609Z.log
+    val_loss=3.603106, train_elapsed_s=900.115, completed_steps=2968.
+measured_effect:
+  Against the accepted descriptor profile
+  target/nsys/aurora_slot_descriptor_b16_l4d1024_20_20260622T153325Z.run.log,
+  fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel moved from
+  242.927216ms to 241.988191ms over 400 calls; rowwise transpose pack moved
+  from 157.018899ms to 154.712077ms; fp32 pack regressed from 136.879196ms to
+  139.122812ms. Short-profile train time moved from 5.915s to 5.815s, but most
+  of that came from unrelated Aurora/projection/LM-head movement.
+  The fixed-wall gate failed the active runtime-change rule: held-out
+  validation moved from 3.599322 to 3.603106, inside the 1% noise band, but
+  completed steps dropped from 2973 to 2968.
+decision:
+  Reject and revert. The candidate did not lower validation loss and did not
+  increase completed steps under the 900-second SYNTH gate.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, reverted after 20-step screen
 experiment: Attention-only FP16 CTA matmul tile M128/N32/K16.
 status: rejected_screen
