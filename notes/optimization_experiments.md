@@ -10202,3 +10202,40 @@ decision:
   validation loss and higher completed step count under the same 900-second
   budget.
 ```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Split dweight-dominant final-head linear-backward projection launch.
+status: rejected_screen
+change:
+  Added a temporary single-projection row-pair device-scale CTA kernel and
+  routed linear backward through two leaner launches only when dweight tile
+  count exceeded dinput tile count. In the current B16/L4/d1024 Llama2-vocab
+  run this isolated the final LM-head backward projection, whose combined grid
+  was 12096 tiles: 4096 dinput tiles plus 8000 dweight tiles.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/final_head_split_projection_b16_l4d1024_20_20260622T142614Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.981, completed_steps=20.
+measured_effect:
+  Against the fresh current profile
+  target/nsys/current_b16_l4d1024_20_20260622T142037Z.run.log, the combined
+  projection kernel had 400 calls / 1238.082617ms total. The split candidate
+  had paired projection 380 calls / 834.898054ms plus single projection
+  40 calls / 411.756732ms, for 1246.654786ms total. The final-head work split
+  into 4096-tile and 8000-tile single-projection launches around 10.2-10.3ms
+  each, which was slower than the original combined 12096-tile call at about
+  20.2ms.
+decision:
+  Reject before the 100-step and 900-second gates. The extra launch and lower
+  argument/control pressure did not beat the accepted paired projection path.
+  Code was reverted; the note is kept to avoid repeating this final-head split.
+```
