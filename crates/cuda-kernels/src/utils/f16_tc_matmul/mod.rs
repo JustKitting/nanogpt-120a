@@ -21,7 +21,7 @@ mod pad;
 mod prepare;
 
 pub use args::{
-    F16TcMatmulAddArgs, F16TcMatmulAddRhsTransposeBaseArgs, F16TcMatmulArgs,
+    F16ConvertArgs, F16TcMatmulAddArgs, F16TcMatmulAddRhsTransposeBaseArgs, F16TcMatmulArgs,
     F16TcMatmulF32ATransposedRhsArgs, F16TcMatmulF32Args, F16TcMatmulF32RhsArgs,
     F16TcMatmulScratch, f16_tc_matmul_elements, f16_tc_matmul_padded_k,
 };

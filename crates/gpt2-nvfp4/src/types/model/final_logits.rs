@@ -28,7 +28,16 @@ pub(super) fn finish_forward<'a>(
     let hidden_nvfp4 = args.hidden_nvfp4;
     let mut tape = args.tape;
     let ln_f = LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_f, args.hidden);
-    let hidden = args.ln_f_weights.forward(ln_f)?;
+    let hidden = if let Some(tape) = tape.as_mut() {
+        let hidden = args
+            .ln_f_weights
+            .forward_save_residual_f16(ln_f, &mut *tape.final_norm.residual)?;
+        tape.final_norm
+            .save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
+        hidden
+    } else {
+        args.ln_f_weights.forward(ln_f)?
+    };
 
     let HiddenStateDevice {
         stream,
@@ -41,11 +50,6 @@ pub(super) fn finish_forward<'a>(
         mean,
         inv_std,
     } = hidden;
-
-    if let Some(tape) = tape.as_mut() {
-        tape.final_norm
-            .save(stream, residual, normalized, mean, inv_std)?;
-    }
 
     args.quant_module
         .fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {

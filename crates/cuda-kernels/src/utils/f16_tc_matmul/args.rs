@@ -9,6 +9,13 @@ pub struct F16TcMatmulScratch<'a> {
     pub b_t_halves: &'a mut DeviceBuffer<u16>,
 }
 
+pub struct F16ConvertArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub src: &'a DeviceBuffer<f32>,
+    pub dst: &'out mut DeviceBuffer<u16>,
+    pub element_count: u32,
+}
+
 pub struct F16TcMatmulArgs<'a, 'scratch, 'out> {
     pub stream: &'a CudaStream,
     pub a: &'a DeviceBuffer<f32>,

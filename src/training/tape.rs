@@ -2,10 +2,9 @@ use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{GPT2_N_LAYER, GPT2_TOKEN_ROWS, Gpt2ForwardSaved, Gpt2ForwardTape, HiddenState};
 
 use super::tape_block::BlockTapeBuffers;
-use super::tape_leaf::{LayerNormTapeBuffers, RowwiseTapeBuffers, zero};
+use super::tape_leaf::{LayerNormTapeBuffers, RowwiseTapeBuffers};
 
 pub struct ForwardTapeBuffers {
-    embedding_residual: DeviceBuffer<f32>,
     blocks: [BlockTapeBuffers; GPT2_N_LAYER],
     final_norm: LayerNormTapeBuffers,
     lm_head_input: RowwiseTapeBuffers,
@@ -14,7 +13,6 @@ pub struct ForwardTapeBuffers {
 impl ForwardTapeBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            embedding_residual: zero(stream, HiddenState::LEN)?,
             blocks: block_array(|| BlockTapeBuffers::new(stream))?,
             final_norm: LayerNormTapeBuffers::new(stream)?,
             lm_head_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
@@ -34,7 +32,6 @@ impl ForwardTapeBuffers {
             batch_size,
             seq_len,
             row_count,
-            embedding_residual: &self.embedding_residual,
             blocks: std::array::from_fn(|i| self.blocks[i].saved(batch_size, seq_len, row_count)),
             final_norm: self.final_norm.saved(row_count),
             lm_head_input_nvfp4: self.lm_head_input.saved(),
@@ -45,7 +42,6 @@ impl ForwardTapeBuffers {
     pub fn tape(&mut self) -> Gpt2ForwardTape<'_> {
         let blocks = self.blocks.as_mut_ptr();
         Gpt2ForwardTape {
-            embedding_residual: &mut self.embedding_residual,
             blocks: std::array::from_fn(|i| unsafe { (&mut *blocks.add(i)).tape() }),
             final_norm: self.final_norm.tape(),
             lm_head_input_nvfp4: self.lm_head_input.tape(),

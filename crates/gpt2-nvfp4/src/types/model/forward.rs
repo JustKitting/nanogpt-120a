@@ -45,9 +45,6 @@ pub(super) fn forward<'a>(
     };
 
     let mut hidden = weights.embeddings.forward(embeddings)?;
-    if let Some(tape) = tape.as_mut() {
-        tape.save_embedding(hidden.stream, hidden.residual)?;
-    }
 
     for (block_index, block) in weights.h.iter().enumerate() {
         hidden = block.forward(BlockForwardArgs {

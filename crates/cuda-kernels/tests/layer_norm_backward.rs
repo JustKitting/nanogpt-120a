@@ -1,7 +1,9 @@
 use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
-use rust_kernels_cuda::layer_norm_backward::{LayerNormBackwardInputArgs, LayerNormBackwardModule};
+use rust_kernels_cuda::layer_norm_backward::{
+    LayerNormBackwardInputF32Args, LayerNormBackwardModule,
+};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 mod common;
@@ -36,7 +38,7 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let weight_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut dx_dev = DeviceBuffer::<f32>::zeroed(&stream, ROWS * COLS)?;
 
-    module.backward_input(LayerNormBackwardInputArgs {
+    module.backward_input_f32(LayerNormBackwardInputF32Args {
         stream: &stream,
         residual: &x_dev,
         d_normalized: &grad_dev,

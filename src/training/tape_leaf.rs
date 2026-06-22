@@ -3,8 +3,7 @@ use gpt2_nvfp4::{GPT2_TOKEN_ROWS, HiddenState, LayerNormSaved, LayerNormTape, Ro
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 pub struct LayerNormTapeBuffers {
-    residual: DeviceBuffer<f32>,
-    normalized: DeviceBuffer<f32>,
+    residual: DeviceBuffer<u16>,
     mean: DeviceBuffer<f32>,
     inv_std: DeviceBuffer<f32>,
 }
@@ -12,8 +11,7 @@ pub struct LayerNormTapeBuffers {
 impl LayerNormTapeBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            residual: zero(stream, HiddenState::LEN)?,
-            normalized: zero(stream, HiddenState::LEN)?,
+            residual: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
             mean: zero(stream, GPT2_TOKEN_ROWS)?,
             inv_std: zero(stream, GPT2_TOKEN_ROWS)?,
         })
@@ -22,7 +20,6 @@ impl LayerNormTapeBuffers {
     pub fn tape(&mut self) -> LayerNormTape<'_> {
         LayerNormTape {
             residual: &mut self.residual,
-            normalized: &mut self.normalized,
             mean: &mut self.mean,
             inv_std: &mut self.inv_std,
         }
@@ -32,7 +29,6 @@ impl LayerNormTapeBuffers {
         LayerNormSaved {
             row_count,
             residual: &self.residual,
-            normalized: &self.normalized,
             mean: &self.mean,
             inv_std: &self.inv_std,
         }

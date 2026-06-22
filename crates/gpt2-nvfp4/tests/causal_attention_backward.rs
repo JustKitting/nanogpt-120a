@@ -24,11 +24,12 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
     let module = AttentionModule::from_module(ptx.clone())?;
     let tc_module = F16TcMatmulModule::from_module(ptx)?;
 
-    let qkv = DeviceBuffer::from_host(&stream, &vec![0.0_f32; QkvActivation::LEN])?;
-    let attention_out = DeviceBuffer::from_host(&stream, &vec![0.0_f32; HiddenState::LEN])?;
+    let qkv = DeviceBuffer::from_host(&stream, &vec![0_u16; QkvActivation::LEN])?;
+    let attention_out = DeviceBuffer::from_host(&stream, &vec![0_u16; HiddenState::LEN])?;
     let d_out = DeviceBuffer::from_host(&stream, &data::d_out_values())?;
     let log_sum_exp = DeviceBuffer::from_host(&stream, &data::log_sum_exp_values())?;
     let dummy = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let dummy_u16 = DeviceBuffer::<u16>::zeroed(&stream, 1)?;
     let dummy_bytes = DeviceBuffer::<u8>::zeroed(&stream, 1)?;
     let dummy_scales = DeviceBuffer::<u8>::zeroed(&stream, 1)?;
     let dummy_global_scales = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
@@ -37,6 +38,7 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
         &attention_out,
         &log_sum_exp,
         &dummy,
+        &dummy_u16,
         &dummy_bytes,
         &dummy_scales,
         &dummy_global_scales,

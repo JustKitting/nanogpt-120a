@@ -37,6 +37,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
     let one_scales = DeviceBuffer::from_host(&stream, &data::one_scales())?;
     let d_qkv = DeviceBuffer::from_host(&stream, &data::d_qkv_values())?;
     let dummy_f32 = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let dummy_u16 = DeviceBuffer::<u16>::zeroed(&stream, 1)?;
     let global_scale = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
 
     let saved = data::saved_block(
@@ -44,6 +45,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
         &qkv_input_scales,
         &qkv_input_globals,
         &dummy_f32,
+        &dummy_u16,
     );
     let projections = AttentionProjectionTensors {
         qkv_weight: Nvfp4FourSixMmaWeightTensor {

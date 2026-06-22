@@ -49,7 +49,7 @@ impl AttentionModule {
         };
         let mut scratch = scratch;
 
-        self.causal_attention_backward_tc.softmax_d_kernel(
+        self.causal_attention_backward_tc.softmax_d_f16_kernel(
             stream,
             attention_config(seq_len, head_count, batch_size),
             attention_out,

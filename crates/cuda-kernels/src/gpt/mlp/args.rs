@@ -33,3 +33,11 @@ pub struct Relu2BackwardArgs<'a, 'out> {
     pub d_pre_activation: &'out mut DeviceBuffer<f32>,
     pub len: u32,
 }
+
+pub struct Relu2BackwardF16Args<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub pre_activation: &'a DeviceBuffer<u16>,
+    pub d_out: &'a DeviceBuffer<f32>,
+    pub d_pre_activation: &'out mut DeviceBuffer<f32>,
+    pub len: u32,
+}

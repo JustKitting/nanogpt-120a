@@ -3,7 +3,7 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel};
 use super::gather::gather_body;
 use super::probs::prob_ds_body;
 use super::scatter::scatter_body;
-use super::softmax_d::softmax_d_body;
+use super::softmax_d::softmax_d_f16_body;
 use super::types::CausalAttentionBackwardTcParams;
 
 #[allow(static_mut_refs)]
@@ -12,19 +12,19 @@ pub(super) mod module {
     use super::*;
 
     #[kernel]
-    pub fn softmax_d_kernel(
-        out: &[f32],
+    pub fn softmax_d_f16_kernel(
+        out: &[u16],
         d_out: &[f32],
         softmax_d: DisjointSlice<f32>,
         params: CausalAttentionBackwardTcParams,
     ) {
         static mut REDUCE: SharedArray<f32, 2> = SharedArray::UNINIT;
-        softmax_d_body(out, d_out, softmax_d, params, unsafe { &mut REDUCE });
+        softmax_d_f16_body(out, d_out, softmax_d, params, unsafe { &mut REDUCE });
     }
 
     #[kernel]
     pub fn gather_qkv_dout_kernel(
-        qkv: &[f32],
+        qkv: &[u16],
         d_out_src: &[f32],
         q: DisjointSlice<f32>,
         k: DisjointSlice<f32>,

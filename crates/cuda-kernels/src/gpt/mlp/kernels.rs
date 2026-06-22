@@ -1,5 +1,6 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
+use crate::f16_tc_matmul::convert::cvt_f32_f16;
 use crate::float_ptx::max_f32;
 use crate::mma::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
@@ -112,6 +113,24 @@ mod module {
         let index = thread::blockIdx_x() * super::RELU2_THREADS_PER_BLOCK + thread::threadIdx_x();
         if index < len {
             let relu = max_f32(pre_activation[index as usize], 0.0);
+            unsafe {
+                *d_pre_activation.get_unchecked_mut(index as usize) =
+                    d_out[index as usize] * 2.0 * relu;
+            }
+        }
+    }
+
+    #[kernel]
+    pub fn relu2_backward_f16_kernel(
+        pre_activation: &[u16],
+        d_out: &[f32],
+        mut d_pre_activation: DisjointSlice<f32>,
+        len: u32,
+    ) {
+        let index = thread::blockIdx_x() * super::RELU2_THREADS_PER_BLOCK + thread::threadIdx_x();
+        if index < len {
+            let pre = cvt_f32_f16(pre_activation[index as usize]);
+            let relu = max_f32(pre, 0.0);
             unsafe {
                 *d_pre_activation.get_unchecked_mut(index as usize) =
                     d_out[index as usize] * 2.0 * relu;

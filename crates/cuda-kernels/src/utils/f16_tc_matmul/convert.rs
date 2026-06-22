@@ -24,3 +24,17 @@ pub(crate) fn cvt_rn_f16_f32(value: f32) -> u16 {
     }
     half
 }
+
+#[inline(always)]
+pub(crate) fn cvt_f32_f16(bits: u16) -> f32 {
+    let value: f32;
+    unsafe {
+        ptx_asm!(
+            "cvt.f32.f16 %0, %1;",
+            out("=f") value,
+            in("h") bits,
+            options(register_only),
+        );
+    }
+    value
+}

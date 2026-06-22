@@ -1,42 +1,8 @@
 use cuda_device::{DisjointSlice, SharedArray, thread, warp};
 
 use super::types::CausalAttentionBackwardTcParams;
+use crate::f16_tc_matmul::convert::cvt_f32_f16;
 use crate::warp_reduce::warp_sum_f32;
-
-pub(super) fn softmax_d_body(
-    out: &[f32],
-    d_out: &[f32],
-    mut softmax_d: DisjointSlice<f32>,
-    params: CausalAttentionBackwardTcParams,
-    reduce: &mut SharedArray<f32, 2>,
-) {
-    let token = thread::blockIdx_x();
-    let head = thread::blockIdx_y();
-    let batch = thread::blockIdx_z();
-    let dim = thread::threadIdx_x();
-    let lane = warp::lane_id();
-    let row = batch * params.seq_len + token;
-    if token >= params.seq_len || head >= params.head_count || row >= params.row_count {
-        return;
-    }
-
-    let local = if dim < params.head_dim {
-        value(out, batch, token, head, dim, &params)
-            * value(d_out, batch, token, head, dim, &params)
-    } else {
-        0.0
-    };
-    let sum = reduce_head(local, lane, dim / 32, reduce);
-
-    if dim == 0 {
-        let index = (batch as usize * params.head_count as usize + head as usize)
-            * params.seq_len as usize
-            + token as usize;
-        unsafe {
-            *softmax_d.get_unchecked_mut(index) = sum;
-        }
-    }
-}
 
 #[inline(always)]
 fn value(
@@ -66,4 +32,56 @@ fn reduce_head(local: f32, lane: u32, warp_in_head: u32, shared: &mut SharedArra
     }
     thread::sync_threads();
     shared[0]
+}
+
+pub(super) fn softmax_d_f16_body(
+    out: &[u16],
+    d_out: &[f32],
+    mut softmax_d: DisjointSlice<f32>,
+    params: CausalAttentionBackwardTcParams,
+    reduce: &mut SharedArray<f32, 2>,
+) {
+    let token = thread::blockIdx_x();
+    let head = thread::blockIdx_y();
+    let batch = thread::blockIdx_z();
+    let dim = thread::threadIdx_x();
+    let lane = warp::lane_id();
+    let row = batch * params.seq_len + token;
+    if token >= params.seq_len || head >= params.head_count || row >= params.row_count {
+        return;
+    }
+
+    let local = if dim < params.head_dim {
+        value_f16(out, batch, token, head, dim, &params)
+            * value(d_out, batch, token, head, dim, &params)
+    } else {
+        0.0
+    };
+    let sum = reduce_head(local, lane, dim / 32, reduce);
+
+    if dim == 0 {
+        let index = (batch as usize * params.head_count as usize + head as usize)
+            * params.seq_len as usize
+            + token as usize;
+        unsafe {
+            *softmax_d.get_unchecked_mut(index) = sum;
+        }
+    }
+}
+
+#[inline(always)]
+fn value_f16(
+    values: &[u16],
+    batch: u32,
+    token: u32,
+    head: u32,
+    dim: u32,
+    params: &CausalAttentionBackwardTcParams,
+) -> f32 {
+    cvt_f32_f16(
+        values[(batch as usize * params.seq_len as usize + token as usize)
+            * params.embedding_dim as usize
+            + head as usize * params.head_dim as usize
+            + dim as usize],
+    )
 }

@@ -1,6 +1,5 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError};
+use cuda_core::DeviceBuffer;
 
-use super::device_copy::copy_device;
 use super::types::{BlockForwardTape, Gpt2ForwardTape};
 use crate::types::Gpt2ForwardSaved;
 
@@ -18,7 +17,6 @@ impl<'a> Gpt2ForwardTape<'a> {
             batch_size,
             seq_len,
             row_count,
-            embedding_residual: &*self.embedding_residual,
             blocks: std::array::from_fn(|index| {
                 self.blocks[index].saved(batch_size, seq_len, row_count)
             }),
@@ -30,13 +28,5 @@ impl<'a> Gpt2ForwardTape<'a> {
 
     pub(crate) fn block(&mut self, index: usize) -> BlockForwardTape<'_> {
         self.blocks[index].reborrow()
-    }
-
-    pub(crate) fn save_embedding(
-        &mut self,
-        stream: &CudaStream,
-        residual: &DeviceBuffer<f32>,
-    ) -> Result<(), DriverError> {
-        copy_device(stream, residual, self.embedding_residual)
     }
 }

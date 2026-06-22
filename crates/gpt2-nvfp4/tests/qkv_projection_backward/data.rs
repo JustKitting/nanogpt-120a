@@ -13,6 +13,7 @@ pub fn saved_block<'a>(
     qkv_input_scales: &'a DeviceBuffer<u8>,
     qkv_input_globals: &'a DeviceBuffer<f32>,
     dummy: &'a DeviceBuffer<f32>,
+    dummy_u16: &'a DeviceBuffer<u16>,
 ) -> BlockForwardSaved<'a> {
     let rowwise = Nvfp4RowwiseDeviceTensor {
         bytes: qkv_input_bytes,
@@ -21,8 +22,7 @@ pub fn saved_block<'a>(
     };
     let layer_norm = LayerNormSaved {
         row_count: GPT2_TOKEN_ROWS as u32,
-        residual: dummy,
-        normalized: dummy,
+        residual: dummy_u16,
         mean: dummy,
         inv_std: dummy,
     };
@@ -31,20 +31,16 @@ pub fn saved_block<'a>(
         batch_size: GPT2_BATCH_SIZE as u32,
         seq_len: GPT2_SEQ_LEN as u32,
         row_count: GPT2_TOKEN_ROWS as u32,
-        residual_in: dummy,
         ln_1: layer_norm,
         qkv_input_nvfp4: rowwise,
-        qkv: dummy,
-        attention_out: dummy,
+        qkv: dummy_u16,
+        attention_out: dummy_u16,
         attention_log_sum_exp: dummy,
         c_proj_input_nvfp4: rowwise,
-        residual_after_attention: dummy,
         ln_2: layer_norm,
         mlp_up_input_nvfp4: rowwise,
-        mlp_up: dummy,
-        mlp_relu2: dummy,
+        mlp_up: dummy_u16,
         mlp_down_input_nvfp4: rowwise,
-        residual_out: dummy,
     }
 }
 

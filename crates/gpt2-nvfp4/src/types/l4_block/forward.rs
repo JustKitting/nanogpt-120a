@@ -22,17 +22,16 @@ impl Gpt2BlockWeights {
 
         let ln_1 =
             LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_1, args.hidden);
-        let hidden = self.ln_1.forward(ln_1)?;
-
-        if let Some(tape) = tape.as_mut() {
-            tape.ln_1.save(
-                hidden.stream,
-                args.attention_tc_module,
-                hidden.residual,
-                hidden.mean,
-                hidden.inv_std,
-            )?;
-        }
+        let hidden = if let Some(tape) = tape.as_mut() {
+            let hidden = self
+                .ln_1
+                .forward_save_residual_f16(ln_1, &mut *tape.ln_1.residual)?;
+            tape.ln_1
+                .save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
+            hidden
+        } else {
+            self.ln_1.forward(ln_1)?
+        };
 
         let attention_tape = tape.as_mut().map(|tape| AttentionForwardTape {
             qkv_input_nvfp4: tape.qkv_input_nvfp4.reborrow(),
@@ -63,17 +62,16 @@ impl Gpt2BlockWeights {
         }
 
         let ln_2 = LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_2, hidden);
-        let hidden = self.ln_2.forward(ln_2)?;
-
-        if let Some(tape) = tape.as_mut() {
-            tape.ln_2.save(
-                hidden.stream,
-                args.attention_tc_module,
-                hidden.residual,
-                hidden.mean,
-                hidden.inv_std,
-            )?;
-        }
+        let hidden = if let Some(tape) = tape.as_mut() {
+            let hidden = self
+                .ln_2
+                .forward_save_residual_f16(ln_2, &mut *tape.ln_2.residual)?;
+            tape.ln_2
+                .save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
+            hidden
+        } else {
+            self.ln_2.forward(ln_2)?
+        };
 
         let mlp_tape = tape.as_mut().map(|tape| crate::types::MlpForwardTape {
             up_input_nvfp4: tape.mlp_up_input_nvfp4.reborrow(),

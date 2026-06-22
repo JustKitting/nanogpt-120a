@@ -1,5 +1,5 @@
 use cuda_core::DriverError;
-use rust_kernels_cuda::mlp::Relu2BackwardArgs;
+use rust_kernels_cuda::mlp::Relu2BackwardF16Args;
 
 use super::args::{MlpBackwardArgs, MlpBackwardGrads, MlpBackwardScratch};
 use super::pass::{LinearPass, run_linear_pass};
@@ -50,7 +50,7 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         },
     )?;
 
-    modules.mlp.relu2_backward(Relu2BackwardArgs {
+    modules.mlp.relu2_backward_f16(Relu2BackwardF16Args {
         stream,
         pre_activation: saved.mlp_up,
         d_out: d_mlp_relu2,

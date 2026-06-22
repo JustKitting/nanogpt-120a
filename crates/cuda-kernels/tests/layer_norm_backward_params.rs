@@ -1,7 +1,9 @@
 use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
-use rust_kernels_cuda::layer_norm_backward::{LayerNormBackwardModule, LayerNormBackwardParamArgs};
+use rust_kernels_cuda::layer_norm_backward::{
+    LayerNormBackwardModule, LayerNormBackwardParamF32Args,
+};
 
 mod common;
 
@@ -29,7 +31,7 @@ fn layer_norm_backward_params_match_reference() -> Result<(), Box<dyn Error>> {
     let mut d_weight_dev = DeviceBuffer::<f32>::zeroed(&stream, COLS)?;
     let mut d_bias_dev = DeviceBuffer::<f32>::zeroed(&stream, COLS)?;
 
-    module.backward_params(LayerNormBackwardParamArgs {
+    module.backward_params_f32(LayerNormBackwardParamF32Args {
         stream: &stream,
         residual: &x_dev,
         d_normalized: &dy_dev,

@@ -1,12 +1,13 @@
 use cuda_device::{DisjointSlice, thread};
 
 use super::types::CausalAttentionBackwardTcParams;
+use crate::f16_tc_matmul::convert::cvt_f32_f16;
 
 pub(super) const TC_BACKWARD_THREADS_PER_BLOCK: u32 = 256;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn gather_body(
-    qkv: &[f32],
+    qkv: &[u16],
     d_out_src: &[f32],
     mut q: DisjointSlice<f32>,
     mut k: DisjointSlice<f32>,
@@ -31,14 +32,34 @@ pub(super) fn gather_body(
     }
 
     unsafe {
-        *q.get_unchecked_mut(index as usize) = qkv[qkv_index(batch, token, head, dim, 0, &params)];
+        *q.get_unchecked_mut(index as usize) = qkv_value(qkv, batch, token, head, dim, 0, &params);
         *k.get_unchecked_mut(index as usize) =
-            qkv[qkv_index(batch, token, head, dim, params.embedding_dim, &params)];
-        *v.get_unchecked_mut(index as usize) =
-            qkv[qkv_index(batch, token, head, dim, params.embedding_dim * 2, &params)];
+            qkv_value(qkv, batch, token, head, dim, params.embedding_dim, &params);
+        *v.get_unchecked_mut(index as usize) = qkv_value(
+            qkv,
+            batch,
+            token,
+            head,
+            dim,
+            params.embedding_dim * 2,
+            &params,
+        );
         *d_out.get_unchecked_mut(index as usize) =
             d_out_src[hidden_index(batch, token, head, dim, &params)];
     }
+}
+
+#[inline(always)]
+fn qkv_value(
+    qkv: &[u16],
+    batch: u32,
+    token: u32,
+    head: u32,
+    dim: u32,
+    section_offset: u32,
+    params: &CausalAttentionBackwardTcParams,
+) -> f32 {
+    cvt_f32_f16(qkv[qkv_index(batch, token, head, dim, section_offset, params)])
 }
 
 #[inline(always)]

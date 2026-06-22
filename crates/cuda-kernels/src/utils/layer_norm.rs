@@ -1,5 +1,6 @@
 use cuda_device::DisjointSlice;
 
+use crate::f16_tc_matmul::convert::{cvt_f32_f16, cvt_rn_f16_f32};
 use crate::float_ptx::{abs_f32, fma_f32, max_f32};
 use crate::nvfp4::nvfp4_value;
 
@@ -70,10 +71,25 @@ macro_rules! layer_norm_store3 {
     }};
 }
 
+macro_rules! layer_norm_store_f16_3 {
+    ($values:expr, $row_base:expr, $cols:expr, $row_len:expr, $source:expr) => {{
+        $crate::layer_norm_utils::store_f16_column(
+            $values, $row_base, $cols[0], $row_len, $source[0],
+        );
+        $crate::layer_norm_utils::store_f16_column(
+            $values, $row_base, $cols[1], $row_len, $source[1],
+        );
+        $crate::layer_norm_utils::store_f16_column(
+            $values, $row_base, $cols[2], $row_len, $source[2],
+        );
+    }};
+}
+
 pub(crate) use layer_norm_columns3;
 pub(crate) use layer_norm_map3;
 pub(crate) use layer_norm_map3_indexed;
 pub(crate) use layer_norm_square_sum3;
+pub(crate) use layer_norm_store_f16_3;
 pub(crate) use layer_norm_store3;
 pub(crate) use layer_norm_sum3;
 
@@ -81,6 +97,15 @@ pub(crate) use layer_norm_sum3;
 pub fn f32_column(values: &[f32], row_base: usize, col: u32, row_len: u32) -> f32 {
     if col < row_len {
         values[row_base + col as usize]
+    } else {
+        0.0
+    }
+}
+
+#[inline(always)]
+pub fn f16_column(values: &[u16], row_base: usize, col: u32, row_len: u32) -> f32 {
+    if col < row_len {
+        cvt_f32_f16(values[row_base + col as usize])
     } else {
         0.0
     }
@@ -146,6 +171,21 @@ pub fn store_column(
     if col < row_len {
         unsafe {
             *values.get_unchecked_mut(row_base + col as usize) = value;
+        }
+    }
+}
+
+#[inline(always)]
+pub fn store_f16_column(
+    values: &mut DisjointSlice<'_, u16>,
+    row_base: usize,
+    col: u32,
+    row_len: u32,
+    value: f32,
+) {
+    if col < row_len {
+        unsafe {
+            *values.get_unchecked_mut(row_base + col as usize) = cvt_rn_f16_f32(value);
         }
     }
 }
