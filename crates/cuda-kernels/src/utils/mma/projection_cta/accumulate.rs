@@ -4,9 +4,7 @@ use crate::mma::mma_m16n8k64_scale4x_ue4m3;
 use crate::mma::projection::Nvfp4ProjectionParams;
 
 use super::load::{load_a_fragments, load_a_scale4, load_b_fragments, load_b_scale4};
-use super::stage::{
-    stage_a_pair_tiles_aligned, stage_b_tiles_aligned, stage_tiles, stage_tiles_aligned,
-};
+use super::stage::{stage_row_pair_tiles_aligned, stage_tiles, stage_tiles_aligned};
 use super::tile::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
     NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_K_ATOMS,
@@ -132,26 +130,21 @@ pub fn projection_accumulator_aligned_row_pair(
     let mut k_base = 0;
 
     while k_base < params.input_dim {
-        stage_b_tiles_aligned(
-            weight_bytes,
-            weight_scales,
-            tile0,
-            k_base,
-            params,
-            b_packs,
-            b_scales,
-        );
-        stage_a_pair_tiles_aligned(
+        stage_row_pair_tiles_aligned(
             input_bytes,
             input_scales,
+            weight_bytes,
+            weight_scales,
             tile0,
             tile1,
             k_base,
             params,
             a_packs,
             a1_packs,
+            b_packs,
             a_scales,
             a1_scales,
+            b_scales,
         );
         thread::sync_threads();
 

@@ -10809,3 +10809,50 @@ decision:
   validation loss and higher completed step count under the same 900-second
   SYNTH budget.
 ```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Collapse row-pair B and A staging into one NVFP4 projection helper.
+status: accepted_900s
+change:
+  Replaced the separate row-pair B staging helper and row-pair A staging
+  helper with one row-pair staging helper. The pack loop loads B for both
+  passes and loads A0/A1 on the first pass; the scale loop similarly fills B
+  scales and A0/A1 scales. The tile shape, row-pair B reuse, MMA instruction
+  sequence, scale layout, and output math are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test next_latent -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_row_pair_full_stage_b16_l4d1024_20_20260622T181246Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.726, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_row_pair_full_stage_b16_l4d1024_100_20260622T181319Z.log
+    val_loss=6.300237, train_elapsed_s=29.160, completed_steps=100.
+  900-second held-out gate:
+    target/projection_row_pair_full_stage_b16_l4d1024_900_20260622T181401Z.log
+    val_loss=3.587049, train_elapsed_s=900.025, completed_steps=3022.
+measured_effect:
+  Against the accepted A-pair staging profile
+  target/nsys/projection_a_pair_stage_b16_l4d1024_20_20260622T175247Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1175.480012ms to 1160.416315ms over 400 calls. lm_head_kernel moved from
+  207.423786ms to 205.470934ms, and nextlat_projection_kernel moved from
+  67.079121ms to 66.891829ms. The 100-step screen moved from
+  val_loss=6.300175 / 29.222s to val_loss=6.300237 / 29.160s.
+  The 900-second held-out gate moved from val_loss=3.580127 / 3014 steps to
+  val_loss=3.587049 / 3022 steps, a +0.193% validation-loss move inside the
+  active 1% noise band with 8 additional completed steps.
+decision:
+  Promote under the active runtime-change rule: validation loss stayed within
+  the 1% noise band and completed step count increased under the fixed
+  900-second SYNTH budget.
+```
