@@ -29,6 +29,7 @@ impl OptimizerModule {
                 args.global_scale_ptrs,
                 args.rows,
                 args.cols,
+                args.learning_rate_multipliers,
                 args.oriented,
                 args.polar_next,
                 args.polar_x,
@@ -61,6 +62,7 @@ fn assert_mega_args(args: &AuroraMegaUpdateArgs<'_>) {
     assert!(args.global_scale_ptrs.len() >= slots);
     assert!(args.rows.len() >= slots);
     assert!(args.cols.len() >= slots);
+    assert!(args.learning_rate_multipliers.len() >= slots);
     assert!(args.oriented.len() >= args.max_len as usize * matrix_count);
     assert!(args.polar_next.len() >= args.max_len as usize * matrix_count);
     assert!(args.polar_x.len() >= args.max_len as usize * matrix_count);

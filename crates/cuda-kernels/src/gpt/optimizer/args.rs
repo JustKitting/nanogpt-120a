@@ -11,6 +11,7 @@ pub struct AuroraMegaUpdateArgs<'a> {
     pub global_scale_ptrs: &'a DeviceBuffer<u64>,
     pub rows: &'a DeviceBuffer<u32>,
     pub cols: &'a DeviceBuffer<u32>,
+    pub learning_rate_multipliers: &'a DeviceBuffer<f32>,
     pub oriented: &'a mut DeviceBuffer<f32>,
     pub polar_next: &'a mut DeviceBuffer<f32>,
     pub polar_x: &'a mut DeviceBuffer<f32>,

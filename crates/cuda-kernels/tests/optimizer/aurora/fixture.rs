@@ -24,6 +24,7 @@ pub fn run_first_iteration_case(row_count: usize, col_count: usize) -> Result<()
     let mut scratch = Scratch::new(&stream, len, gram_dim)?;
     let rows = DeviceBuffer::from_host(&stream, &[row_count as u32; SLOT_COUNT])?;
     let cols = DeviceBuffer::from_host(&stream, &[col_count as u32; SLOT_COUNT])?;
+    let learning_rate_multipliers = DeviceBuffer::from_host(&stream, &[1.0_f32; SLOT_COUNT])?;
     let grad_ptrs = ptr_buffer(&stream, &slots.grads)?;
     let momentum_ptrs = ptr_buffer(&stream, &slots.momentums)?;
     let z_ptrs = ptr_buffer(&stream, &slots.z_masters)?;
@@ -43,6 +44,7 @@ pub fn run_first_iteration_case(row_count: usize, col_count: usize) -> Result<()
         global_scale_ptrs: &global_scale_ptrs,
         rows: &rows,
         cols: &cols,
+        learning_rate_multipliers: &learning_rate_multipliers,
         oriented: &mut scratch.oriented,
         polar_next: &mut scratch.polar_next,
         polar_x: &mut scratch.polar_x,

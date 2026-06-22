@@ -28,6 +28,7 @@ pub fn run_wide_case() -> Result<(), Box<dyn Error>> {
     let mut scratch = Scratch::new(&stream)?;
     let rows = DeviceBuffer::from_host(&stream, &[ROWS as u32; SLOT_COUNT])?;
     let cols = DeviceBuffer::from_host(&stream, &[COLS as u32; SLOT_COUNT])?;
+    let learning_rate_multipliers = DeviceBuffer::from_host(&stream, &[1.0_f32; SLOT_COUNT])?;
 
     module.aurora_mega_update(AuroraMegaUpdateArgs {
         stream: &stream,
@@ -40,6 +41,7 @@ pub fn run_wide_case() -> Result<(), Box<dyn Error>> {
         global_scale_ptrs: &ptr_buffer(&stream, &slots.global_scales)?,
         rows: &rows,
         cols: &cols,
+        learning_rate_multipliers: &learning_rate_multipliers,
         oriented: &mut scratch.oriented,
         polar_next: &mut scratch.polar_next,
         polar_x: &mut scratch.polar_x,

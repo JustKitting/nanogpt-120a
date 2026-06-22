@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DriverError};
-use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD};
+use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
 use rust_kernels_cuda::optimizer::{AuroraMegaUpdateArgs, OptimizerModule};
 
 use super::{AURORA_WEIGHT_DECAY, AuroraGroupTable, MU, POLAR_ITERATIONS, aurora_learning_rate};
@@ -27,6 +27,7 @@ pub(in crate::training) fn apply_aurora_mega(args: AuroraMegaArgs<'_>) -> Result
         global_scale_ptrs: &args.table.global_scale,
         rows: &args.table.rows,
         cols: &args.table.cols,
+        learning_rate_multipliers: &args.table.learning_rate_multipliers,
         oriented: &mut args.scratch.oriented,
         polar_next: &mut args.scratch.polar_next,
         polar_x: &mut args.scratch.polar_x,
@@ -46,13 +47,17 @@ pub(in crate::training) fn apply_aurora_mega(args: AuroraMegaArgs<'_>) -> Result
 }
 
 const fn max_matrix_len() -> usize {
-    GPT2_MLP * GPT2_N_EMBD
+    max2(GPT2_MLP * GPT2_N_EMBD, NEXTLAT_INPUT * NEXTLAT_HIDDEN)
 }
 
 const fn max_polar_ax_len() -> usize {
-    GPT2_N_EMBD * GPT2_N_EMBD
+    max2(GPT2_N_EMBD * GPT2_N_EMBD, NEXTLAT_HIDDEN * NEXTLAT_HIDDEN)
 }
 
 const fn max_matrix_dim() -> usize {
-    GPT2_N_EMBD
+    max2(GPT2_N_EMBD, NEXTLAT_HIDDEN)
+}
+
+const fn max2(a: usize, b: usize) -> usize {
+    if a > b { a } else { b }
 }

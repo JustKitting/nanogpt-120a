@@ -19,6 +19,7 @@ pub(super) fn launch_slot(
     global_scale_ptrs: &[u64],
     rows: &[u32],
     cols: &[u32],
+    learning_rate_multipliers: &[f32],
     oriented: *mut f32,
     polar_next: *mut f32,
     polar_x: *mut f32,
@@ -39,6 +40,7 @@ pub(super) fn launch_slot(
 ) {
     let rows = rows[slot as usize];
     let cols = cols[slot as usize];
+    let learning_rate = learning_rate * learning_rate_multipliers[slot as usize];
     aurora_matrix_update_body(
         ptr_const(grad_ptrs, slot),
         ptr_mut(momentum_ptrs, slot),
