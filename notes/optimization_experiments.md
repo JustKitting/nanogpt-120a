@@ -169,6 +169,46 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: rejected uncommitted candidate, code reverted
+experiment: Pack four/six NVFP4 output bytes with warp shuffles.
+status: rejected_profiler_screen
+change:
+  Tested replacing the second per-pair FP32 reload in generic four/six
+  quantization, schedule-free materialization, and Aurora writeback encoding
+  with half-warp shuffle reads of the value already loaded by each lane. The
+  first version incorrectly placed the shuffle inside the half-warp store
+  branch and timed out in the Aurora optimizer GPU test; the tested version
+  moved the shuffle before the branch so all lanes named in the sync mask
+  executed it.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test nvfp4_quant -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/four_six_shuffle_pack_b16_l4d1024_20_20260622T214531Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.700, completed_steps=20.
+measured_effect:
+  Against the accepted exact-pack baseline profile
+  target/nsys/ms_eden_exact_pack_b16_l4d1024_20_20260622T205929Z.run.log,
+  fp32_to_nvfp4_four_six_rowwise_pow2_kernel moved from 65.843478ms to
+  65.498158ms, schedule_free_four_six_kernel moved from 10.989931ms to
+  10.701071ms, and fp32_to_nvfp4_four_six_kernel moved from 5.675826ms to
+  5.681188ms. The whole profiled 20-step run regressed from 5.667s to 5.700s,
+  with aurora_mega_update_cooperative_kernel and
+  linear_backward_projection_pair_cta_device_scale_kernel both slightly slower.
+decision:
+  Reject and revert code before the 100-step or 900-second gates. The local
+  memory-read reduction was too small to offset the shuffle overhead/noise and
+  did not improve the short profiled runtime.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, code reverted
 experiment: Fuse Adam update with chunk amax for four-six requantization.
 status: rejected_pre_gate
