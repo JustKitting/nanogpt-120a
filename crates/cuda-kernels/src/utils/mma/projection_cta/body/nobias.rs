@@ -118,8 +118,10 @@ pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
     out: &mut DisjointSlice<'_, f32>,
     params: Nvfp4ProjectionParams,
     a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
+    a1_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
     b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
     a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
+    a1_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
     b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
     tile0: Nvfp4ProjectionCtaTile,
     tile1: Nvfp4ProjectionCtaTile,
@@ -133,8 +135,10 @@ pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
         tile1,
         &params,
         a_packs,
+        a1_packs,
         b_packs,
         a_scales,
+        a1_scales,
         b_scales,
     );
 

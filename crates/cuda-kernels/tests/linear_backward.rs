@@ -231,7 +231,8 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
         assert_close(dbias[col], expected);
     }
     assert!(e_quant.iter().any(|byte| *byte != 0));
-    assert!(e_amax.iter().all(|amax| *amax > 0.0 && amax.is_finite()));
+    assert!(e_amax.iter().all(|amax| amax.is_finite()));
+    assert!(e_amax.iter().any(|amax| *amax > 0.0));
     assert!(
         generated_scales
             .iter()

@@ -9,9 +9,10 @@ use crate::mma::{
     NVFP4_PROJECTION_CTA_M, NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_THREADS,
     NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4DeviceScaleMmaWeightTensor,
     Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
-    nvfp4_projection_cta_nobias_kernel_body, nvfp4_projection_cta_nobias_kernel_body_at_aligned,
-    nvfp4_projection_nobias_kernel_body, projection_cta_grid_dim, projection_cta_tile_count,
-    projection_grid_dim,
+    nvfp4_projection_cta_nobias_kernel_body,
+    nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
+    nvfp4_projection_nobias_kernel_body, projection_cta_grid_dim,
+    projection_cta_row_pair_tile_count, projection_grid_dim,
 };
 use crate::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 use crate::nvfp4_quant::{
@@ -255,8 +256,8 @@ impl LinearBackwardModule {
         let dweight_grid = projection_cta_grid_dim(args.output_dim, args.input_dim);
         assert!(dinput_grid.0.is_power_of_two());
         assert!(dweight_grid.0.is_power_of_two());
-        let dinput_tiles = projection_cta_tile_count(args.token_count, args.input_dim);
-        let dweight_tiles = projection_cta_tile_count(args.output_dim, args.input_dim);
+        let dinput_tiles = projection_cta_row_pair_tile_count(args.token_count, args.input_dim);
+        let dweight_tiles = projection_cta_row_pair_tile_count(args.output_dim, args.input_dim);
 
         self.module
             .linear_backward_projection_pair_cta_device_scale_kernel(
@@ -370,7 +371,7 @@ impl LinearBackwardModule {
             }
             LinearBackwardWeightTranspose::Nvfp4(weight) => {
                 args.quant_module
-                    .nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale(
+                    .nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
                         Nvfp4TransposeMsEdenDeviceScaleQuantArgs {
                             stream: args.stream,
                             input: weight,
@@ -428,7 +429,7 @@ impl LinearBackwardModule {
             }
             LinearBackwardInputTranspose::RowwiseNvfp4(input_t) => {
                 args.quant_module
-                    .rowwise_nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale(
+                    .rowwise_nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
                         RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs {
                             stream: args.stream,
                             input: input_t,
@@ -510,7 +511,7 @@ fn quantize_operand(
             chunk_count,
         )?;
 
-        return module.fp32_to_nvfp4_ms_eden_device_scale(
+        return module.fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax(
             crate::nvfp4_quant::MsEdenDeviceScaleQuantArgs {
                 stream: args.stream,
                 x: args.x,
@@ -529,7 +530,7 @@ fn quantize_operand(
         );
     }
 
-    module.fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
+    module.fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
         QuartetBackwardMsEdenDeviceScaleQuantArgs {
             stream: args.stream,
             x: args.x,
@@ -552,21 +553,23 @@ fn quantize_transposed_operand_with_device_scale(
     args: QuantizeTransposeOperandArgs<'_, '_>,
     global_scale: &DeviceBuffer<f32>,
 ) -> Result<(), DriverError> {
-    module.fp32_transpose_to_nvfp4_ms_eden_device_scale(MsEdenTransposeDeviceScaleQuantArgs {
-        stream: args.stream,
-        x: args.x,
-        out_fp4: args.scratch,
-        out_scales: args.scales,
-        out_global_scales: args.global_scales,
-        out_chunk_amax: args.chunk_amax,
-        global_scale,
-        source_rows: args.source_rows,
-        source_cols: args.source_cols,
-        dst_row_len: args.dst_row_len,
-        scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
-        sign_seed: args.sign_seed,
-        scale_seed: args.scale_seed,
-    })
+    module.fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax(
+        MsEdenTransposeDeviceScaleQuantArgs {
+            stream: args.stream,
+            x: args.x,
+            out_fp4: args.scratch,
+            out_scales: args.scales,
+            out_global_scales: args.global_scales,
+            out_chunk_amax: args.chunk_amax,
+            global_scale,
+            source_rows: args.source_rows,
+            source_cols: args.source_cols,
+            dst_row_len: args.dst_row_len,
+            scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
+            sign_seed: args.sign_seed,
+            scale_seed: args.scale_seed,
+        },
+    )
 }
 
 #[allow(static_mut_refs)]
@@ -655,8 +658,10 @@ mod kernels {
         mut dweight_params: Nvfp4ProjectionParams,
     ) {
         static mut A_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
+        static mut A1_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
         static mut B_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS> = SharedArray::UNINIT;
         static mut A_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
+        static mut A1_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
         static mut B_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES> = SharedArray::UNINIT;
 
         let tile_index = thread::blockIdx_x();
@@ -664,11 +669,14 @@ mod kernels {
 
         if tile_index < dinput_tile_count {
             let tile_col = tile_index & dinput_grid_col_mask;
-            let tile_row = tile_index >> dinput_grid_col_shift;
-            let tile = Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row, thread_id);
+            let tile_row_pair = tile_index >> dinput_grid_col_shift;
+            let tile0 =
+                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2, thread_id);
+            let tile1 =
+                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id);
 
             dinput_params.weight_global_scale = dinput_weight_global_scale[0];
-            nvfp4_projection_cta_nobias_kernel_body_at_aligned(
+            nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
                 dinput_input_bytes,
                 dinput_input_scales,
                 dinput_input_global_scales,
@@ -677,19 +685,25 @@ mod kernels {
                 &mut dinput_out,
                 dinput_params,
                 unsafe { &mut A_PACKS },
+                unsafe { &mut A1_PACKS },
                 unsafe { &mut B_PACKS },
                 unsafe { &mut A_SCALES },
+                unsafe { &mut A1_SCALES },
                 unsafe { &mut B_SCALES },
-                tile,
+                tile0,
+                tile1,
             );
         } else {
             let dweight_tile_index = tile_index - dinput_tile_count;
             let tile_col = dweight_tile_index & dweight_grid_col_mask;
-            let tile_row = dweight_tile_index >> dweight_grid_col_shift;
-            let tile = Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row, thread_id);
+            let tile_row_pair = dweight_tile_index >> dweight_grid_col_shift;
+            let tile0 =
+                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2, thread_id);
+            let tile1 =
+                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id);
 
             dweight_params.weight_global_scale = dweight_weight_global_scale[0];
-            nvfp4_projection_cta_nobias_kernel_body_at_aligned(
+            nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
                 dweight_input_bytes,
                 dweight_input_scales,
                 dweight_input_global_scales,
@@ -698,10 +712,13 @@ mod kernels {
                 &mut dweight_out,
                 dweight_params,
                 unsafe { &mut A_PACKS },
+                unsafe { &mut A1_PACKS },
                 unsafe { &mut B_PACKS },
                 unsafe { &mut A_SCALES },
+                unsafe { &mut A1_SCALES },
                 unsafe { &mut B_SCALES },
-                tile,
+                tile0,
+                tile1,
             );
         }
     }

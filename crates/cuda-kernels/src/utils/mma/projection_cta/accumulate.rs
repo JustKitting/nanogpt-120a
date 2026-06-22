@@ -121,8 +121,10 @@ pub fn projection_accumulator_aligned_row_pair(
     tile1: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
     a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
+    a1_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
     b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
     a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
+    a1_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
     b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
 ) -> ([f32; 4], [f32; 4]) {
     let mut acc0 = [0.0_f32; 4];
@@ -148,6 +150,15 @@ pub fn projection_accumulator_aligned_row_pair(
             a_packs,
             a_scales,
         );
+        stage_a_tiles_aligned(
+            input_bytes,
+            input_scales,
+            tile1,
+            k_base,
+            params,
+            a1_packs,
+            a1_scales,
+        );
         thread::sync_threads();
 
         let mut k_atom = 0;
@@ -161,30 +172,11 @@ pub fn projection_accumulator_aligned_row_pair(
                 load_a_scale4(a_scales, tile0, k_atom),
                 scale_b,
             );
-            k_atom += 1;
-        }
-
-        thread::sync_threads();
-        stage_a_tiles_aligned(
-            input_bytes,
-            input_scales,
-            tile1,
-            k_base,
-            params,
-            a_packs,
-            a_scales,
-        );
-        thread::sync_threads();
-
-        let mut k_atom = 0;
-        while k_atom < NVFP4_PROJECTION_CTA_K_ATOMS {
-            let b = load_b_fragments(b_packs, tile1, k_atom);
-            let scale_b = load_b_scale4(b_scales, tile1, k_atom);
             mma_m16n8k64_scale4x_ue4m3(
-                load_a_fragments(a_packs, tile1, k_atom),
+                load_a_fragments(a1_packs, tile1, k_atom),
                 b,
                 &mut acc1,
-                load_a_scale4(a_scales, tile1, k_atom),
+                load_a_scale4(a1_scales, tile1, k_atom),
                 scale_b,
             );
             k_atom += 1;

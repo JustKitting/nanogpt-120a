@@ -195,6 +195,34 @@ impl Nvfp4QuantModule {
         )
     }
 
+    pub fn fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax(
+        &self,
+        args: MsEdenDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let element_count = args.row_count * args.dst_row_len;
+        let chunk_count = ms_eden_chunk_count(element_count);
+        self.ms_eden
+            .fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: (pack_grid_dim(chunk_count), 1, 1),
+                    block_dim: (THREADS_PER_BLOCK, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                args.x,
+                args.out_fp4,
+                args.out_scales,
+                args.out_global_scales,
+                args.global_scale,
+                chunk_count,
+                args.src_row_len,
+                args.dst_row_len,
+                args.scale_override,
+                args.sign_seed,
+                args.scale_seed,
+            )
+    }
+
     pub fn fp32_transpose_to_nvfp4_ms_eden_device_scale(
         &self,
         args: MsEdenTransposeDeviceScaleQuantArgs<'_, '_>,
@@ -214,6 +242,35 @@ impl Nvfp4QuantModule {
                 args.out_scales,
                 args.out_global_scales,
                 args.out_chunk_amax,
+                args.global_scale,
+                chunk_count,
+                args.source_rows,
+                args.source_cols,
+                args.dst_row_len,
+                args.scale_override,
+                args.sign_seed,
+                args.scale_seed,
+            )
+    }
+
+    pub fn fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax(
+        &self,
+        args: MsEdenTransposeDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let element_count = args.source_cols * args.dst_row_len;
+        let chunk_count = ms_eden_chunk_count(element_count);
+        self.ms_eden
+            .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: (pack_grid_dim(chunk_count), 1, 1),
+                    block_dim: (THREADS_PER_BLOCK, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                args.x,
+                args.out_fp4,
+                args.out_scales,
+                args.out_global_scales,
                 args.global_scale,
                 chunk_count,
                 args.source_rows,
@@ -281,6 +338,61 @@ impl Nvfp4QuantModule {
             )
     }
 
+    pub fn rowwise_nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
+        &self,
+        args: RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let element_count = args.source_rows * args.source_cols;
+        let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
+        self.ms_eden.rowwise_nvfp4_chunk_amax_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (chunk_count, 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.input.bytes,
+            args.input.scales,
+            args.input.global_scales,
+            args.out_chunk_amax,
+            args.source_rows,
+            args.source_cols,
+        )?;
+
+        self.quartet_backward_ms_eden_global_scale_from_chunks(
+            args.stream,
+            &*args.out_chunk_amax,
+            &mut *args.out_global_scale,
+            chunk_count,
+        )?;
+
+        let element_count = args.source_cols * args.dst_row_len;
+        let pack_chunk_count = ms_eden_chunk_count(element_count);
+        self.ms_eden
+            .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
+                    block_dim: (THREADS_PER_BLOCK, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                args.input.bytes,
+                args.input.scales,
+                args.input.global_scales,
+                args.out_fp4,
+                args.out_scales,
+                args.out_global_scales,
+                &*args.out_global_scale,
+                pack_chunk_count,
+                args.source_rows,
+                args.source_cols,
+                args.dst_row_len,
+                QUARTET_MS_EDEN_SCALE_OVERRIDE,
+                args.sign_seed,
+                args.scale_seed,
+            )
+    }
+
     pub fn nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale(
         &self,
         args: Nvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
@@ -336,6 +448,60 @@ impl Nvfp4QuantModule {
             )
     }
 
+    pub fn nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
+        &self,
+        args: Nvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let element_count = args.source_rows * args.source_cols;
+        let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
+        self.ms_eden.nvfp4_chunk_amax_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (chunk_count, 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.input.bytes,
+            args.input.scales,
+            args.input.global_scale,
+            args.out_chunk_amax,
+            element_count,
+        )?;
+
+        self.quartet_backward_ms_eden_global_scale_from_chunks(
+            args.stream,
+            &*args.out_chunk_amax,
+            &mut *args.out_global_scale,
+            chunk_count,
+        )?;
+
+        let element_count = args.source_cols * args.dst_row_len;
+        let pack_chunk_count = ms_eden_chunk_count(element_count);
+        self.ms_eden
+            .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
+                args.stream,
+                LaunchConfig {
+                    grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
+                    block_dim: (THREADS_PER_BLOCK, 1, 1),
+                    shared_mem_bytes: 0,
+                },
+                args.input.bytes,
+                args.input.scales,
+                args.input.global_scale,
+                args.out_fp4,
+                args.out_scales,
+                args.out_global_scales,
+                &*args.out_global_scale,
+                pack_chunk_count,
+                args.source_rows,
+                args.source_cols,
+                args.dst_row_len,
+                QUARTET_MS_EDEN_SCALE_OVERRIDE,
+                args.sign_seed,
+                args.scale_seed,
+            )
+    }
+
     pub fn fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
         &self,
         args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
@@ -357,6 +523,43 @@ impl Nvfp4QuantModule {
         )?;
 
         self.fp32_to_nvfp4_ms_eden_device_scale(MsEdenDeviceScaleQuantArgs {
+            stream: args.stream,
+            x: args.x,
+            out_fp4: args.out_fp4,
+            out_scales: args.out_scales,
+            out_global_scales: args.out_global_scales,
+            out_chunk_amax: args.out_chunk_amax,
+            global_scale: &*args.out_global_scale,
+            row_count: args.row_count,
+            src_row_len: args.src_row_len,
+            dst_row_len: args.dst_row_len,
+            scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
+            sign_seed: args.sign_seed,
+            scale_seed: args.scale_seed,
+        })
+    }
+
+    pub fn fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
+        &self,
+        args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let args = args;
+        let element_count = args.row_count * args.src_row_len;
+        let chunk_count = self.tensor_chunk_amax_f32(
+            args.stream,
+            args.x,
+            &mut *args.out_chunk_amax,
+            element_count,
+        )?;
+
+        self.quartet_backward_ms_eden_global_scale_from_chunks(
+            args.stream,
+            &*args.out_chunk_amax,
+            &mut *args.out_global_scale,
+            chunk_count,
+        )?;
+
+        self.fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax(MsEdenDeviceScaleQuantArgs {
             stream: args.stream,
             x: args.x,
             out_fp4: args.out_fp4,

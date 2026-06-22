@@ -9392,3 +9392,774 @@ decision:
   Promote under the runtime-change acceptance rule. Validation loss stayed
   inside the active noise band and completed step count increased.
 ```
+
+```text
+date: 2026-06-22
+commit: rejected uncommitted candidate, code reverted
+experiment: Fuse MLP up pre-activation f16 tape save into the MLP up projection store.
+status: rejected_900s
+change:
+  Tested a training-only mlp_projection_relu2_save_f16_kernel that wrote the
+  f16 MLP pre-activation tape value while the FP32 pre-activation was live in
+  the MLP up projection store. This removed the separate save_mlp_up_f16
+  fp32_to_f16 launch for that tape buffer.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/mlp_up_f16_fused_b16_l4d1024_20_20260622T090923Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.121, completed_steps=20.
+  100-step SYNTH screen:
+    target/mlp_up_f16_fused_b16_l4d1024_100_20260622T090957Z.log
+    val_loss=6.340821, train_elapsed_s=31.200, completed_steps=100.
+  900-second held-out gate:
+    target/mlp_up_f16_fused_b16_l4d1024_900_20260622T091045Z.log
+    val_loss=3.652935, train_elapsed_s=900.243, completed_steps=2819.
+measured_effect:
+  Against the accepted RoPE/QKV f16 fusion profile
+  target/nsys/rope_qkv_f16_fused_b16_l4d1024_20_20260622T084442Z.run.log,
+  fp32_to_f16_kernel moved from 36.069541ms over 357 calls to 13.408325ms over
+  273 calls, but the fused MLP up projection took 134.617849ms versus the prior
+  mlp_projection_relu2_kernel at 120.749054ms. The full 20-step profiled train
+  time was effectively flat, 6.122s to 6.121s.
+decision:
+  Reject and revert code. The 900-second gate stayed inside the active +/-1%
+  noise band but did not increase completed steps, so it does not satisfy the
+  runtime-change acceptance rule.
+```
+
+```text
+date: 2026-06-22
+commit: rejected uncommitted candidate, code reverted
+experiment: Stage both A row tiles before MMA in paired linear-backward CTA projection.
+status: rejected_900s
+change:
+  Tested a dual-A shared-memory path for the existing two-row paired
+  linear_backward_projection_pair_cta_device_scale_kernel. The candidate kept
+  B operand reuse and the same math, but staged A0 and A1 into separate shared
+  buffers before the MMA phase to remove the middle A-restage barrier.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/linear_dual_a_rowpair_b16_l4d1024_20_20260622T093239Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.121, completed_steps=20.
+  100-step SYNTH screen:
+    target/linear_dual_a_rowpair_b16_l4d1024_100_20260622T093303Z.log
+    val_loss=6.342345, train_elapsed_s=31.236, completed_steps=100.
+  900-second held-out gate:
+    target/linear_dual_a_rowpair_b16_l4d1024_900_20260622T093344Z.log
+    val_loss=3.649023, train_elapsed_s=900.032, completed_steps=2819.
+measured_effect:
+  Against the accepted RoPE/QKV f16 fusion profile
+  target/nsys/rope_qkv_f16_fused_b16_l4d1024_20_20260622T084442Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1.265443216s to 1.255295497s over 20 profiled steps. The full 20-step
+  profiled train time stayed effectively flat at 6.121s versus 6.122s.
+decision:
+  Reject and revert code. The 900-second gate stayed inside the active +/-1%
+  noise band but did not increase completed steps, so it does not satisfy the
+  runtime-change acceptance rule.
+```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Widen projection CTA tile from N64 to N128.
+status: rejected_screen
+change:
+  Temporarily changed the shared NVFP4 projection CTA geometry from
+  M=32/N=64/K=128 with 512 threads to M=32/N=128/K=128 with 1024 threads.
+  The intent was to reuse each staged A tile across twice as many output
+  columns and reduce the L2/cache pressure reported by NCU for
+  linear_backward_projection_pair_cta_device_scale_kernel.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_n128_b16_l4d1024_20_20260622T095621Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.222, completed_steps=20.
+measured_effect:
+  Against the current accepted profile
+  target/nsys/rope_qkv_f16_fused_b16_l4d1024_20_20260622T084442Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1.265443216s to 1.338326443s over 20 profiled steps. Full profiled train
+  time regressed from 6.122s to 6.222s.
+decision:
+  Reject before the 900-second gate. Wider N reduced CTA count but made the
+  target kernel and short wall-clock slower. Code was reverted to the accepted
+  N64/512-thread projection CTA geometry.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate
+experiment: Sort Aurora mega optimizer slots by estimated Polar Express cost.
+status: accepted_900s
+change:
+  Before padding the Aurora pointer table, sort real optimizer slots by a
+  simple Polar Express work proxy: min(rows, cols)^2 * max(rows, cols). The
+  mega kernel runs three slots per phase and grid-syncs after each phase, so
+  packing high-cost matrices into the same phase lanes reduces phase idle time.
+  The per-weight optimizer math, learning-rate multipliers, and buffers are
+  unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_slot_sort_b16_l4d1024_20_20260622T100114Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.035, completed_steps=20.
+  100-step SYNTH screen:
+    target/aurora_slot_sort_b16_l4d1024_100_20260622T100135Z.log
+    val_loss=6.347749, train_elapsed_s=30.798, completed_steps=100.
+  900-second held-out gate:
+    target/aurora_slot_sort_b16_l4d1024_900_20260622T100219Z.log
+    val_loss=3.632965, train_elapsed_s=900.232, completed_steps=2858.
+measured_effect:
+  Against the current accepted profile
+  target/nsys/rope_qkv_f16_fused_b16_l4d1024_20_20260622T084442Z.run.log,
+  aurora_mega_update_cooperative_kernel moved from 2.022238524s to
+  1.914045610s over 20 profiled steps. Full profiled train time moved from
+  6.122s to 6.035s.
+  Against notes/sweep_baseline.env, held-out validation improved from
+  3.642559 to 3.632965 and completed steps increased from 2819 to 2858 under
+  the fixed 900-second SYNTH budget.
+decision:
+  Promote. This improves the primary fixed-wall held-out objective and also
+  completes more steps.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted build-only candidate, reverted by rebuild
+experiment: Reduce Aurora matrix phases from 8 to 7 after slot sorting.
+status: rejected_screen
+change:
+  Rebuilt the accepted slot-sorted Aurora path with AURORA_MATRIX_PHASES=7.
+  Source code, model shape, dataset, optimizer math, and training
+  hyperparameters were unchanged. The intent was to remove the padded dummy
+  phase now that optimizer slots are sorted by estimated Polar Express cost.
+verification:
+  AURORA_MATRIX_PHASES=7 cargo oxide build --arch sm_120a: pass.
+  20-step nsys:
+    target/nsys/aurora_slot_sort_phase7_b16_l4d1024_20_20260622T102046Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.046, completed_steps=20.
+measured_effect:
+  Against the accepted slot-sort profile
+  target/nsys/aurora_slot_sort_b16_l4d1024_20_20260622T100114Z.run.log,
+  aurora_mega_update_cooperative_kernel regressed from 1.914045610s to
+  1.915806901s over 20 profiled steps. Full profiled train time regressed from
+  6.035s to 6.046s.
+decision:
+  Reject before the 900-second gate. The phase-count change made the target
+  kernel and short wall-clock slightly slower, so it is not a useful runtime
+  candidate.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Sync-only path for padded Aurora mega slots.
+status: rejected_screen
+change:
+  Added a zero-length slot branch in the Aurora mega body that executed only
+  the cooperative grid barriers needed to match real slots, skipping dummy
+  momentum, Polar, update, and requant work. The real optimizer slots and math
+  were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_dummy_sync_b16_l4d1024_20_20260622T103013Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.143, completed_steps=20.
+measured_effect:
+  Against the accepted slot-sort profile
+  target/nsys/aurora_slot_sort_b16_l4d1024_20_20260622T100114Z.run.log,
+  aurora_mega_update_cooperative_kernel regressed from 1.914045610s to
+  1.940239652s over 20 profiled steps. Full profiled train time regressed from
+  6.035s to 6.143s.
+decision:
+  Reject before the 100-step and 900-second gates. The branch reduced dummy
+  slot arithmetic but worsened the real cooperative kernel path, likely from
+  added control flow/register pressure. Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Power-of-two row decode hint for MS-EDEN packing.
+status: rejected_screen
+change:
+  Passed a host-computed destination-row shift hint into MS-EDEN pack kernels
+  and used shift/mask row decoding when the destination row length was a power
+  of two. The intent was to reduce per-lane division in the hot FP32/NVFP4
+  transpose pack paths without changing RHT seeds, scaling, correction, or
+  layout.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/ms_eden_pow2_row_decode_b16_l4d1024_20_20260622T104512Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.143, completed_steps=20.
+measured_effect:
+  Against the accepted slot-sort profile
+  target/nsys/aurora_slot_sort_b16_l4d1024_20_20260622T100114Z.run.log,
+  the largest fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel call moved
+  from 124.613ms to 124.672ms over 20 profiled steps. Full profiled train time
+  regressed from 6.035s to 6.143s.
+decision:
+  Reject before the 100-step and 900-second gates. The target hot pack kernel
+  did not improve, and short wall-clock regressed. Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Alias paired projection second-row B loads to tile0.
+status: rejected_screen
+change:
+  In projection_accumulator_aligned_row_pair, changed the second-row MMA loop
+  to load B fragments/scales through tile0 instead of tile1. The two tiles have
+  the same column base and warp/thread column mapping, so this was intended as
+  a hot-loop address simplification with unchanged math.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_b_alias_b16_l4d1024_20_20260622T105607Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.146, completed_steps=20.
+measured_effect:
+  Against the accepted slot-sort profile
+  target/nsys/aurora_slot_sort_b16_l4d1024_20_20260622T100114Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1.268096s to 1.305495s over 20 profiled steps. Full profiled train time
+  regressed from 6.035s to 6.146s.
+decision:
+  Reject before the 100-step and 900-second gates. The compiler/current
+  instruction schedule favored the original tile1 expression. Code was
+  reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Register-reuse B fragments across paired projection row tiles.
+status: rejected_screen
+change:
+  In projection_accumulator_aligned_row_pair, explicitly loaded the two B
+  fragments and B scale packs for K=0/1 into registers before computing the
+  first row tile, then reused those register values for the second row tile
+  after staging A1. The intent was to reduce shared-memory/L1 traffic in the
+  row-pair MMA loop without changing math or tile geometry.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_b_register_reuse_b16_l4d1024_20_20260622T105820Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.120, completed_steps=20.
+measured_effect:
+  Against the accepted slot-sort profile
+  target/nsys/aurora_slot_sort_b16_l4d1024_20_20260622T100114Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1.268096s to 1.280178s over 20 profiled steps. Full profiled train time
+  regressed from 6.035s to 6.120s.
+decision:
+  Reject before the 100-step and 900-second gates. The saved shared-memory B
+  reloads did not offset the added register pressure/schedule change. Code was
+  reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate
+experiment: Fuse layer-norm residual f16 tape save into layer-norm forward.
+status: accepted_900s
+change:
+  Added a gpt_layer_norm_save_residual_f16_kernel variant that writes the
+  layer-norm residual tape as f16 while the forward layer-norm kernel already
+  has the residual values loaded. Block ln_1, block ln_2, and final ln_f now
+  use that fused path when forward tape is present, then copy only mean and
+  inv_std through the tape stats path. The no-tape forward path still uses the
+  original gpt_layer_norm_kernel.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test layer_norm_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test layer_norm_backward_params -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/layer_norm_residual_f16_fused_b16_l4d1024_20_20260622T110521Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.130, completed_steps=20.
+  100-step SYNTH screen:
+    target/layer_norm_residual_f16_fused_b16_l4d1024_100_20260622T110558Z.log
+    val_loss=6.305291, train_elapsed_s=30.696, completed_steps=100.
+  900-second held-out gate:
+    target/layer_norm_residual_f16_fused_b16_l4d1024_900_20260622T110658Z.log
+    val_loss=3.611782, train_elapsed_s=900.244, completed_steps=2869.
+measured_effect:
+  Against the accepted slot-sort profile
+  target/nsys/aurora_slot_sort_b16_l4d1024_20_20260622T100114Z.run.log,
+  fp32_to_f16_kernel dropped from 357 calls / 36.026ms to 168 calls /
+  25.204ms over 20 profiled steps. The fused layer-norm save kernel added
+  189 calls / 13.033ms, so the local conversion-plus-layer-norm region moved
+  from 46.541ms to 39.235ms. The short full-profile wall time was noisy and
+  moved from 6.035s to 6.130s, so the candidate was sent through the fixed-wall
+  gate rather than promoted from profiler data.
+  Against the previous promoted baseline
+  target/aurora_slot_sort_b16_l4d1024_900_20260622T100219Z.log, held-out
+  validation improved from 3.632965 to 3.611782 and completed steps increased
+  from 2858 to 2869.
+decision:
+  Promote. The candidate satisfies the fixed 900-second objective directly:
+  lower held-out validation loss and higher completed step count.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Derive cross-entropy dlogits row amax from target probability.
+status: rejected_screen
+change:
+  Replaced the post-dlogits row amax reduction in cross_entropy_kernel with the
+  exact identity max(abs(dlogits[row])) = (1 - p_target) / token_count, using
+  the target probability already available from the row max and softmax
+  denominator. Loss and dlogits math were otherwise unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/cross_entropy_exact_amax_b16_l4d1024_20_20260622T112908Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.136, completed_steps=20.
+measured_effect:
+  Against the accepted layer-norm residual f16 profile
+  target/nsys/layer_norm_residual_f16_fused_b16_l4d1024_20_20260622T110521Z.run.log,
+  cross_entropy_kernel was unchanged in practice: 58.182917ms baseline versus
+  58.188720ms candidate over 21 calls. The main hot kernels were also
+  unchanged or slightly slower within noise.
+decision:
+  Reject before the 100-step and 900-second gates. The exact simplification was
+  correct but did not produce a measurable runtime win in the profiled kernel.
+  Code was reverted to the measured baseline path.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Double-stage A operands for aligned row-pair NVFP4 projection CTAs.
+status: accepted_900s
+change:
+  Added separate shared storage for the second row tile's A packs/scales in the
+  aligned row-pair projection helper. The row-pair path now stages B, A0, and
+  A1 before the compute section, then computes both row tiles before the final
+  synchronization. This keeps the same tile geometry and Quartet/NVFP4 MMA
+  math while reducing the middle restage/sync sequence in row-pair projection
+  kernels.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test next_latent -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_pair_double_a_stage_b16_l4d1024_20_20260622T113442Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.117, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_pair_double_a_stage_b16_l4d1024_100_20260622T113523Z.log
+    val_loss=6.304021, train_elapsed_s=30.612, completed_steps=100.
+  900-second held-out gate:
+    target/projection_pair_double_a_stage_b16_l4d1024_900_20260622T113607Z.log
+    val_loss=3.614733, train_elapsed_s=900.254, completed_steps=2872.
+measured_effect:
+  Against the accepted layer-norm residual f16 profile
+  target/nsys/layer_norm_residual_f16_fused_b16_l4d1024_20_20260622T110521Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1303.588048ms to 1289.235967ms over 400 calls. lm_head_kernel moved from
+  220.756825ms to 218.412010ms over 21 calls, and nextlat_projection_kernel
+  moved from 71.176803ms to 70.927641ms over 63 calls. The 100-step screen
+  improved from val_loss=6.305291 / 30.696s to val_loss=6.304021 / 30.612s.
+  The 900-second held-out gate completed 2872 steps versus the previous 2869,
+  while validation moved from 3.611782 to 3.614733, a +0.082% change inside
+  the active 1% noise band.
+decision:
+  Promote under the active fixed-wall rule: validation stayed within the 1%
+  noise band and completed step count increased.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Row-wise lower-triangle scheduling for attention probability/dS.
+status: rejected_screen
+change:
+  Replaced the flat full-square attention_prob_ds launch with one block per
+  causal row. Threads walked only key <= query while preserving the same dense
+  scratch layout for p and ds.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/attention_prob_ds_rowwise_b16_l4d1024_20_20260622T124713Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.099, completed_steps=20.
+measured_effect:
+  Against the accepted B-reuse projection profile
+  target/nsys/projection_pair_b_reuse_b16_l4d1024_20_20260622T120319Z.run.log,
+  attention_prob_ds_kernel regressed from 125.634467ms to 127.512996ms over
+  80 calls. Other top kernels moved slightly faster in the same run, consistent
+  with profiler noise, but the targeted kernel was worse.
+decision:
+  Reject before the 100-step and 900-second gates. Reducing masked work did not
+  pay for the row-wise loop and launch geometry change. Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Reuse one staged projection B tile across four row tiles.
+status: rejected_screen
+change:
+  Added a row-quad linear-backward projection CTA path for fully aligned row
+  groups. The candidate staged B once, computed two row tiles, restaged only A,
+  then computed two more row tiles. The intent was to reduce repeated B-tile
+  L2/shared staging in the memory/L2-limited projection kernel.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_row_quad_b16_l4d1024_20_20260622T125436Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.173, completed_steps=20.
+measured_effect:
+  Against the accepted B-reuse projection profile
+  target/nsys/projection_pair_b_reuse_b16_l4d1024_20_20260622T120319Z.run.log,
+  the projection kernel regressed from
+  linear_backward_projection_pair_cta_device_scale_kernel 1274.205747ms to
+  linear_backward_projection_quad_cta_device_scale_kernel 1350.659734ms over
+  400 calls. Full profiled train time moved from 6.103s to 6.173s.
+decision:
+  Reject before the 100-step and 900-second gates. B-tile reuse across four row
+  tiles did not offset the extra accumulator pressure and additional A restage
+  synchronization. Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before profile
+experiment: Force Aurora mega slot dispatcher out of line.
+status: rejected_codegen
+change:
+  Added #[inline(never)] to aurora/fused/mega/slot.rs launch_slot to test
+  whether keeping slot-table pointer decoding outside the cooperative entry
+  would reduce register pressure in aurora_mega_update_cooperative_kernel.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  PTX inspection after build:
+    rust_kernels_cuda.ptx still had aurora_mega_update_cooperative_kernel
+    calling aurora_matrix_update_body directly, not launch_slot.
+measured_effect:
+  No runtime profile was taken because the intended call-boundary change did
+  not materialize in generated PTX.
+decision:
+  Reject as a codegen no-op for the intended optimization. Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Increase NVFP4 projection CTA K tile from 128 to 256.
+status: rejected_screen
+change:
+  Doubled NVFP4_PROJECTION_CTA_K so each projection CTA would stage a deeper K
+  tile and perform more MMA work per staging/sync iteration. Projection math,
+  M/N tile shape, row-pair scheduling, and Quartet/NVFP4 instructions were
+  unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test next_latent -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_cta_k256_b16_l4d1024_20_20260622T122956Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.230, completed_steps=20.
+measured_effect:
+  Against the accepted B-reuse projection profile
+  target/nsys/projection_pair_b_reuse_b16_l4d1024_20_20260622T120319Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1274.205747ms to 1354.755238ms over 400 calls. Projection users also
+  regressed: lm_head_kernel moved from 217.835379ms to 221.227757ms,
+  nextlat_projection_kernel moved from 70.815732ms to 74.149479ms,
+  mlp_projection_kernel moved from 126.827987ms to 141.803886ms, and
+  attention_projection_kernel moved from 120.025257ms to 136.344658ms.
+decision:
+  Reject before the 100-step and 900-second gates. The deeper K tile increased
+  shared-memory/register/scheduling pressure enough to dominate the reduced
+  stage/sync count. Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Add aligned fast paths for FP16 RHS TC matmul variants.
+status: rejected_screen
+change:
+  Mirrored the existing aligned f16_cta_tc_matmul_f32_kernel path in the
+  row-major RHS and A-transposed/RHS variants, using unguarded staging and
+  aligned stores when m, n, and k are CTA-aligned. Matmul math and launch
+  geometry were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/f16_rhs_aligned_b16_l4d1024_20_20260622T123355Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.114, completed_steps=20.
+measured_effect:
+  Against the accepted B-reuse projection profile
+  target/nsys/projection_pair_b_reuse_b16_l4d1024_20_20260622T120319Z.run.log,
+  f16_cta_tc_matmul_f32_a_transposed_rhs_kernel regressed from 254.775616ms
+  to 263.069520ms over 160 calls, and f16_cta_tc_matmul_f32_rhs_kernel
+  regressed from 247.851231ms to 251.097628ms over 164 calls.
+decision:
+  Reject before the 100-step and 900-second gates. The extra aligned branch
+  and duplicated staging code increased code/register/schedule pressure more
+  than the removed per-element guards helped. Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Reuse RoPE sin/cos inside attention scatter_dqkv_kernel.
+status: rejected_screen
+change:
+  Computed the RoPE sine/cosine pair once per scatter thread and reused it for
+  both d_q and d_k raw-gradient rotation instead of recomputing the same angle
+  in each helper call. Scatter math and output layout were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/scatter_rope_sincos_reuse_b16_l4d1024_20_20260622T123854Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.101, completed_steps=20.
+  100-step SYNTH screen:
+    target/scatter_rope_sincos_reuse_b16_l4d1024_100_20260622T123939Z.log
+    val_loss=6.298502, train_elapsed_s=30.553, completed_steps=100.
+measured_effect:
+  Against the accepted B-reuse projection profile
+  target/nsys/projection_pair_b_reuse_b16_l4d1024_20_20260622T120319Z.run.log,
+  scatter_dqkv_kernel moved from 18.399166ms to 18.348118ms over 80 calls.
+  The 100-step screen had effectively unchanged validation loss but slightly
+  slower elapsed time, moving from 6.298800 / 30.533s to 6.298502 / 30.553s.
+decision:
+  Reject before the 900-second gate. The local kernel win was too small to
+  improve the fixed-step screen and did not justify a full fixed-wall gate.
+  Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Skip all-padding Aurora mega phases with a separate active slot count.
+status: rejected_screen
+change:
+  Passed active Aurora matrix slot count separately from padded slot count, then
+  skipped only phases where every matrix lane mapped to padding. Partial padding
+  phases still executed the zero-sized body to preserve the cooperative
+  grid-sync sequence.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_active_slot_skip_b16_l4d1024_20_20260622T122519Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.109, completed_steps=20.
+measured_effect:
+  Against the accepted B-reuse projection profile
+  target/nsys/projection_pair_b_reuse_b16_l4d1024_20_20260622T120319Z.run.log,
+  aurora_mega_update_cooperative_kernel regressed from 1942.311211ms to
+  1943.581891ms over 20 calls. The projection and FP16 TC kernels also moved
+  slightly slower within the same screen.
+decision:
+  Reject before the 100-step and 900-second gates. Skipping the final
+  all-padding phase did not reduce runtime; any saved empty-body sync work was
+  outweighed by added control/signature pressure or profiler noise. Code was
+  reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Hoist Aurora transpose branches out of momentum/update element loops.
+status: rejected_screen
+change:
+  Split momentum orientation and master update element paths into
+  direct/transposed variants so transposed indexing would be selected once per
+  matrix instead of inside each element update.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_transpose_branch_hoist_b16_l4d1024_20_20260622T115640Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.120, completed_steps=20.
+measured_effect:
+  Against the accepted double-A projection profile
+  target/nsys/projection_pair_double_a_stage_b16_l4d1024_20_20260622T113442Z.run.log,
+  aurora_mega_update_cooperative_kernel regressed from 1941.656078ms to
+  1942.165400ms over 20 calls, and
+  linear_backward_projection_pair_cta_device_scale_kernel also moved from
+  1289.235967ms to 1290.500232ms over 400 calls.
+decision:
+  Reject before the 100-step and 900-second gates. The branch hoist increased
+  code/register/schedule pressure enough to lose the small per-element branch
+  removal. Code was reverted.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Reuse staged B fragments across both row tiles in row-pair projection.
+status: accepted_900s
+change:
+  Combined the two row-pair accumulator k-atom loops so the staged B fragment
+  and B scale are loaded once from shared memory and consumed by both row
+  accumulators. The tile shape, row-pair scheduling, Quartet/NVFP4 MMA
+  instruction, and output math are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test next_latent -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_pair_b_reuse_b16_l4d1024_20_20260622T120319Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.103, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_pair_b_reuse_b16_l4d1024_100_20260622T120426Z.log
+    val_loss=6.298800, train_elapsed_s=30.533, completed_steps=100.
+  900-second held-out gate:
+    target/projection_pair_b_reuse_b16_l4d1024_900_20260622T120514Z.log
+    val_loss=3.621134, train_elapsed_s=900.116, completed_steps=2880.
+measured_effect:
+  Against the accepted double-A projection profile
+  target/nsys/projection_pair_double_a_stage_b16_l4d1024_20_20260622T113442Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1289.235967ms to 1274.205747ms over 400 calls. lm_head_kernel moved from
+  218.412010ms to 217.835379ms over 21 calls, and nextlat_projection_kernel
+  moved from 70.927641ms to 70.815732ms over 63 calls. The 100-step screen
+  improved from val_loss=6.304021 / 30.612s to val_loss=6.298800 / 30.533s.
+  The 900-second held-out gate completed 2880 steps versus the previous 2872,
+  while validation moved from 3.614733 to 3.621134, a +0.177% change inside
+  the active 1% noise band.
+decision:
+  Promote under the active fixed-wall rule: validation stayed within the 1%
+  noise band and completed step count increased.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Skip transformed chunk-amax writes in internal MS-EDEN device-scale
+  linear-backward pack paths.
+status: accepted_900s
+change:
+  Added internal no-chunk-amax MS-EDEN device-scale pack kernels and routed
+  linear backward operand quantization through them. The existing public
+  device-scale APIs keep their chunk-amax side effect for comparison tests.
+  The fast path is used only after the amax buffer has already been consumed
+  to derive the device global scale, so packed FP4 bytes, FP8 scales, row
+  global scales, seeds, RHT, and MMA consumers are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/ms_eden_no_chunk_amax_b16_l4d1024_20_20260622T131123Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.076, completed_steps=20.
+  100-step SYNTH screen:
+    target/ms_eden_no_chunk_amax_b16_l4d1024_100_20260622T131212Z.log
+    val_loss=6.305133, train_elapsed_s=30.416, completed_steps=100.
+  900-second held-out gate:
+    target/ms_eden_no_chunk_amax_b16_l4d1024_900_20260622T131306Z.log
+    val_loss=3.603050, train_elapsed_s=900.088, completed_steps=2894.
+measured_effect:
+  Against the accepted row-pair B-reuse profile
+  target/nsys/projection_pair_b_reuse_b16_l4d1024_20_20260622T120319Z.run.log,
+  fp32_transpose_to_nvfp4_ms_eden_device_scale moved from 250.567290ms to
+  242.841270ms over 400 calls, fp32_to_nvfp4_ms_eden_device_scale moved from
+  147.024446ms to 135.792200ms, rowwise_nvfp4_transpose_to_nvfp4_ms_eden moved
+  from 160.446773ms to 156.856497ms, and nvfp4_transpose_to_nvfp4_ms_eden
+  moved from 22.074919ms to 21.435099ms. Profiled 20-step wall moved from
+  6.103s to 6.076s with identical 20-step validation loss. The 900-second gate
+  improved held-out validation loss from 3.621134 to 3.603050 and completed
+  steps from 2880 to 2894.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  budget.
+```
