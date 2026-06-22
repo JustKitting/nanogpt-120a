@@ -43,6 +43,39 @@ pub(super) fn stage_tiles(
     }
 }
 
+pub(super) fn stage_tiles_aligned(
+    a: &[u16],
+    b_t: &[u16],
+    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    tile: CtaTile,
+    m: u32,
+    n: u32,
+    k: u32,
+    k_base: u32,
+) {
+    let thread_id = thread::threadIdx_x();
+    let mut offset = thread_id;
+    while offset < CTA_A_ELEMS as u32 {
+        let row = offset / CTA_K;
+        let col = offset - row * CTA_K;
+        let global_row = tile.row_base + row;
+        let global_col = k_base + col;
+        a_tile[offset as usize] = a[((tile.batch * m + global_row) * k + global_col) as usize];
+        offset += CTA_THREADS;
+    }
+
+    let mut offset = thread_id;
+    while offset < CTA_B_ELEMS as u32 {
+        let row = offset / CTA_K;
+        let col = offset - row * CTA_K;
+        let global_row = tile.col_base + row;
+        let global_col = k_base + col;
+        b_tile[offset as usize] = b_t[((tile.batch * n + global_row) * k + global_col) as usize];
+        offset += CTA_THREADS;
+    }
+}
+
 #[inline(always)]
 pub(crate) fn load_a_fragments(a_tile: &SharedArray<u16, CTA_A_ELEMS>, tile: CtaTile) -> [u32; 4] {
     [

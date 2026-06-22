@@ -169,6 +169,48 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Add aligned staging and stores for direct half-input TC matmul.
+status: accepted_900s
+change:
+  Added an aligned path to the direct f16 CTA TC matmul body. When m, n, and k
+  are exact CTA multiples, the kernel stages half input tiles and stores output
+  tiles without per-element edge checks. The generic bounded path remains for
+  non-aligned shapes. Math, tile shape, accumulation type, and launch contract
+  are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/f16_half_aligned_b16_l4d1024_20_20260622T192806Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.674, completed_steps=20.
+  100-step SYNTH screen:
+    target/f16_half_aligned_b16_l4d1024_100_20260622T192823Z.log
+    val_loss=6.304914, train_elapsed_s=28.915, completed_steps=100.
+  900-second held-out gate:
+    target/f16_half_aligned_b16_l4d1024_900_20260622T192901Z.log
+    val_loss=3.558484, train_elapsed_s=900.233, completed_steps=3048.
+  generated sample:
+    target/runs/20260622_192901Z_synth_900s/generated.txt
+measured_effect:
+  Against the accepted half-scratch attention-backward profile
+  target/nsys/attention_backward_half_scratch_b16_l4d1024_20_20260622T190803Z.run.log,
+  f16_cta_tc_matmul_kernel moved from 307.611826ms to 285.905429ms
+  over 160 calls. The 20-step training screen moved from 5.692s to 5.674s.
+  The 100-step screen moved from val_loss=6.299939 / 28.999s to
+  val_loss=6.304914 / 28.915s. The 900-second held-out gate improved from
+  val_loss=3.569456 / 3037 steps to val_loss=3.558484 / 3048 steps.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  SYNTH budget.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, reverted after 20-step screen
 experiment: Explicitly unroll row-pair projection K atoms.
 status: rejected_screen
