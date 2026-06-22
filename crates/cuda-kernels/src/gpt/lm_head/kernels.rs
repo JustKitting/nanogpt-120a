@@ -5,7 +5,8 @@ use crate::mma::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
     NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_M,
     NVFP4_PROJECTION_CTA_N, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
-    nvfp4_projection_cta_nobias_kernel_body, nvfp4_projection_cta_nobias_kernel_body_at_aligned,
+    nvfp4_projection_cta_nobias_kernel_body,
+    nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
 };
 
 #[allow(static_mut_refs)]
@@ -40,8 +41,15 @@ pub(super) mod module {
         };
 
         if lm_head_is_cta_aligned(params) {
-            let tile = Nvfp4ProjectionCtaTile::new(thread::threadIdx_x());
-            nvfp4_projection_cta_nobias_kernel_body_at_aligned(
+            let tile_col = thread::blockIdx_x();
+            let tile_row_pair = thread::blockIdx_y();
+            let thread_id = thread::threadIdx_x();
+            let tile0 =
+                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2, thread_id);
+            let tile1 =
+                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id);
+
+            nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
                 input_bytes,
                 input_scales,
                 input_global_scales,
@@ -53,7 +61,8 @@ pub(super) mod module {
                 unsafe { &mut B_PACKS },
                 unsafe { &mut A_SCALES },
                 unsafe { &mut B_SCALES },
-                tile,
+                tile0,
+                tile1,
             );
         } else {
             nvfp4_projection_cta_nobias_kernel_body(

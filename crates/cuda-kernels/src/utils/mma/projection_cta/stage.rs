@@ -91,6 +91,54 @@ pub fn stage_tiles_aligned(
     }
 }
 
+pub fn stage_a_tiles_aligned(
+    input_bytes: &[u8],
+    input_scales: &[u8],
+    tile: Nvfp4ProjectionCtaTile,
+    k_base: u32,
+    params: &Nvfp4ProjectionParams,
+    a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
+    a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
+) {
+    let thread_id = thread::threadIdx_x();
+    let mut offset = thread_id;
+    while offset < NVFP4_PROJECTION_CTA_A_PACKS as u32 {
+        a_packs[offset as usize] = load_a_pack_aligned(input_bytes, tile, offset, k_base, params);
+        offset += NVFP4_PROJECTION_CTA_THREADS;
+    }
+
+    let mut offset = thread_id;
+    while offset < NVFP4_PROJECTION_CTA_A_SCALES as u32 {
+        a_scales[offset as usize] =
+            load_a_scale_aligned(input_scales, tile, offset, k_base, params);
+        offset += NVFP4_PROJECTION_CTA_THREADS;
+    }
+}
+
+pub fn stage_b_tiles_aligned(
+    weight_bytes: &[u8],
+    weight_scales: &[u8],
+    tile: Nvfp4ProjectionCtaTile,
+    k_base: u32,
+    params: &Nvfp4ProjectionParams,
+    b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
+    b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+) {
+    let thread_id = thread::threadIdx_x();
+    let mut offset = thread_id;
+    while offset < NVFP4_PROJECTION_CTA_B_PACKS as u32 {
+        b_packs[offset as usize] = load_b_pack_aligned(weight_bytes, tile, offset, k_base, params);
+        offset += NVFP4_PROJECTION_CTA_THREADS;
+    }
+
+    let mut offset = thread_id;
+    while offset < NVFP4_PROJECTION_CTA_B_SCALES as u32 {
+        b_scales[offset as usize] =
+            load_b_scale_aligned(weight_scales, tile, offset, k_base, params);
+        offset += NVFP4_PROJECTION_CTA_THREADS;
+    }
+}
+
 #[inline(always)]
 fn load_a_pack(
     bytes: &[u8],

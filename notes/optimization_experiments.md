@@ -32,6 +32,262 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
 ```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Save layer-norm residual tape as f16.
+status: accepted_current_nextlat
+change:
+  Changed saved layer-norm residual tape storage from FP32 to f16 for GPT block
+  and final layer-norm saved activations. The saved mean and inv_std remain
+  FP32. GPT layer-norm backward widens the saved f16 residual when computing
+  xhat. NextLat backward keeps using explicit FP32 layer-norm backward wrappers
+  for its live concat buffer, so this change targets the GPT training tape only.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test layer_norm_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test layer_norm_backward_params -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_synth_ln_residual_f16_tape_20_20260622T032048Z.run.log
+    val_loss=9.152641, train_elapsed_s=6.296, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_ln_residual_f16_tape_synth_100_20260622T032135Z.log
+    val_loss=6.534838, train_elapsed_s=31.508, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_ln_residual_f16_tape_synth_900_20260622T032223Z.log
+    val_loss=3.801502, train_elapsed_s=900.034, completed_steps=2789.
+measured_effect:
+  Against the prior residual_after_attention tape-removal profile, total D2D
+  copy traffic over 20 profiled steps moved from 1781 copies / 18.962ms to
+  1592 copies / 4.052ms. The shared fp32_to_f16_kernel moved from 40.892ms to
+  51.740ms over the same 20-step profile because it now also saves layer-norm
+  residual tape. Profiled 20-step train time moved from 6.333s to 6.296s.
+  Against the active NextLat baseline, validation loss moved from 3.795963 to
+  3.801502 (+0.146%) and completed steps moved from 2785 to 2789.
+decision:
+  Accept for the active NextLat branch under the kernel/runtime noise-band rule:
+  validation stayed within +/-1% and completed step count increased. Update
+  notes/sweep_baseline.env to this active-NextLat baseline.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Remove unused saved residual_after_attention tape.
+status: accepted_current_nextlat
+change:
+  Removed the saved FP32 residual_after_attention forward-tape tensor from the
+  block tape. Backward already uses ln_2.saved.residual for layer-norm backward
+  and d_residual_after_attention as a gradient buffer; the saved forward copy
+  was not consumed.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_synth_no_residual_after_attention_tape_20_20260622T025126Z.run.log
+    val_loss=9.154136, train_elapsed_s=6.333, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_no_residual_after_attention_tape_synth_100_20260622T025426Z.log
+    val_loss=6.538291, train_elapsed_s=31.553, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_no_residual_after_attention_tape_synth_900_20260622T025511Z.log
+    val_loss=3.795963, train_elapsed_s=900.001, completed_steps=2785.
+measured_effect:
+  Against the prior qkv-f16-tape profile, total D2D copy traffic over 20
+  profiled steps moved from 1865 copies / 26.198ms to 1781 copies / 18.962ms.
+  The 64MiB D2D copy bucket moved from 273 copies to 189 copies, matching one
+  removed hidden-state tape copy per block. Against the prior active NextLat
+  baseline, validation loss moved from 3.792330 to 3.795963 (+0.096%) and
+  completed steps moved from 2775 to 2785.
+decision:
+  Accept for the active NextLat branch under the kernel/runtime noise-band rule:
+  validation stayed within +/-1% and completed step count increased. Update
+  notes/sweep_baseline.env to this active-NextLat baseline; pre-NextLat
+  validation results are not protected baselines for this branch.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Save QKV activation tape as f16.
+status: accepted_current_nextlat
+change:
+  Changed the saved block qkv tape from FP32 to f16. The live forward QKV
+  scratch remains FP32 for the forward attention path; only the saved backward
+  tape is f16. Attention backward gather now widens saved f16 Q/K/V values into
+  the existing FP32 scratch buffers before the TC-backed attention-backward
+  matmuls.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_synth_qkv_f16_tape_20_20260622T023144Z.run.log
+    val_loss=9.154136, train_elapsed_s=6.341, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_qkv_f16_tape_synth_100_20260622T023216Z.log
+    val_loss=6.535542, train_elapsed_s=31.746, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_qkv_f16_tape_synth_900_20260622T023301Z.log
+    val_loss=3.792330, train_elapsed_s=900.102, completed_steps=2775.
+measured_effect:
+  Against the prior attention_out-f16-tape profile, the 201326592-byte D2D
+  copy bucket was removed. Total D2D copy traffic over 20 profiled steps moved
+  from 1949 copies / 47.050ms to 1865 copies / 26.198ms. The shared
+  fp32_to_f16_kernel now covers qkv, attention_out, and mlp_up tape saves and
+  moved from 26.366ms to 40.903ms over 20 steps. gather_qkv_dout_kernel moved
+  from 26.751ms to 22.092ms despite widening f16 qkv values. Against the prior
+  900-second attention_out-f16-tape gate, validation loss moved from 3.811845
+  to 3.792330 and completed steps moved from 2770 to 2775.
+decision:
+  Promote for the current NextLat branch. Held-out validation loss improved
+  and completed step count increased under the fixed 900-second SYNTH budget.
+  This is an accepted active-NextLat baseline candidate; pre-NextLat validation
+  results are not protected baselines for this branch.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Save attention output tape as f16.
+status: accepted_current_nextlat
+change:
+  Changed the saved block attention_out tape from FP32 to f16. Attention
+  backward only uses this saved tensor in the softmax-d dot product, so the
+  upstream d_out and the rest of the attention backward path remain FP32.
+  Added softmax_d_f16_kernel, removed the unused FP32 softmax_d_kernel, and
+  exposed the existing generic fp32_to_f16 utility through F16TcMatmulModule so
+  both attention_out and mlp_up tape saves use the same converter.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_synth_attention_out_f16_tape_20_20260622T021132Z.run.log
+    val_loss=9.154136, train_elapsed_s=6.343, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_attention_out_f16_tape_synth_100_20260622T021204Z.log
+    val_loss=6.534555, train_elapsed_s=31.752, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_attention_out_f16_tape_synth_900_20260622T021253Z.log
+    val_loss=3.811845, train_elapsed_s=900.189, completed_steps=2770.
+measured_effect:
+  Against the prior mlp_up-f16-tape profile, 64MiB D2D copies moved from 357
+  to 273 over 20 profiled steps. Total D2D copy traffic moved from 2033
+  copies / 55.030ms to 1949 copies / 47.050ms. The generic fp32_to_f16_kernel
+  now covers both f16 tape saves and took 26.366ms over 20 steps. The new
+  softmax_d_f16_kernel took 9.372ms over 20 steps. Against the prior
+  900-second mlp_up-f16-tape gate, validation loss moved from 3.813107 to
+  3.811845 while completed steps moved from 2773 to 2770.
+decision:
+  Promote for the current NextLat branch because held-out validation loss
+  improved under the same fixed 900-second SYNTH budget. This is an accepted
+  active-NextLat baseline candidate; pre-NextLat validation results are not
+  protected baselines for this branch.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Save MLP relu^2 pre-activation tape as f16.
+status: accepted_current_nextlat
+change:
+  Changed the saved block mlp_up pre-activation tape from FP32 to f16. The
+  live forward scratch remains FP32; only the saved tape used by relu^2
+  backward is stored as f16. Added an f16 save kernel and a relu2 backward
+  variant that widens f16 to FP32 before applying d_pre = d_out * 2 * relu(x).
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_synth_mlp_up_f16_tape_20_20260622T014751Z.run.log
+    val_loss=9.149878, train_elapsed_s=6.338, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_mlp_up_f16_tape_synth_100_20260622T014823Z.log
+    val_loss=6.538740, train_elapsed_s=31.727, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_mlp_up_f16_tape_synth_900_20260622T014923Z.log
+    val_loss=3.813107, train_elapsed_s=900.293, completed_steps=2773.
+measured_effect:
+  Against the prior no-mlp-relu2-tape profile, the 268MiB D2D copy bucket was
+  removed. Total D2D copy traffic over 20 profiled steps moved from 2117
+  copies / 83.979ms to 2033 copies / 55.030ms. New f16 save work appeared as
+  save_pre_activation_f16_kernel at 20.587ms over 20 steps. relu2 backward
+  moved from the FP32 relu2_backward_kernel at 40.397ms to
+  relu2_backward_f16_kernel at 33.824ms. Against the prior 900-second
+  no-mlp-relu2-tape gate, validation loss moved from 3.818655 to 3.813107 and
+  completed steps moved from 2770 to 2773.
+decision:
+  Promote for the current NextLat branch. Held-out validation improved against
+  the immediate predecessor and completed step count increased. This is an
+  accepted active-NextLat baseline candidate; pre-NextLat validation results are
+  not protected baselines for this branch.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Remove unused saved MLP relu2 FP32 tape.
+status: accepted_current_nextlat
+change:
+  Removed the saved FP32 mlp_relu2 forward-tape tensor. MLP backward uses the
+  saved mlp_up pre-activation for the relu^2 derivative and the saved
+  mlp_down_input_nvfp4 tensor for the down-projection backward pass, so the
+  separate post-activation FP32 tape copy was not consumed.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_synth_no_mlp_relu2_tape_20_20260622T012359Z.run.log
+    val_loss=9.155092, train_elapsed_s=6.357, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_no_mlp_relu2_tape_synth_100_20260622T012605Z.log
+    val_loss=6.528619, train_elapsed_s=31.737, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_no_mlp_relu2_tape_synth_900_20260622T012650Z.log
+    val_loss=3.818655, train_elapsed_s=900.297, completed_steps=2770.
+measured_effect:
+  Against the prior tape-min profile, 268MiB D2D copies moved from 168 to 84
+  over 20 profiled steps. Total D2D copy time moved from 114.530ms to
+  83.979ms, while top kernel timings were essentially unchanged. Against the
+  prior 900-second tape-min gate, validation loss moved from 3.810689 to
+  3.818655 (+0.209%) and completed steps moved from 2757 to 2770.
+decision:
+  Promote for the current NextLat branch under the active +/-1% noise-band
+  rule: validation loss stayed inside the noise band and completed step count
+  increased. This is an accepted active-NextLat baseline candidate; pre-NextLat
+  validation results are not protected baselines for this branch.
+```
+
+```text
 date: 2026-06-21
 commit: uncommitted
 experiment: Add confidence-weighted factor beliefs.
@@ -8619,4 +8875,452 @@ measured_effect:
 decision:
   Promote. The change improved held-out validation loss and completed more
   steps under the fixed 900-second budget.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Increase cross-entropy row worker count on the current NextLat
+  SYNTH path.
+status: accepted_current_nextlat
+change:
+  Increased CROSS_ENTROPY_THREADS_PER_BLOCK from 256 to 1024. This keeps the
+  same dense softmax/loss/dlogits math and only changes the per-row parallel
+  scan width for the 32k-vocab loss kernel.
+rejected_side_checks:
+  Zero-sized Aurora padding slots were correct but negligible:
+    target/nsys/nextlat_synth_zero_padding_20_20260622T000633Z.run.log
+    aurora_mega_update_cooperative_kernel moved from 102.041ms/step to
+    101.970ms/step.
+  AURORA_MATRIX_PHASES=7 removed the all-dummy phase but did not improve:
+    target/nsys/nextlat_synth_phase7_20_20260622T000803Z.run.log
+    aurora_mega_update_cooperative_kernel stayed at 102.012ms/step.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  20-step nsys baseline:
+    target/nsys/nextlat_synth_current_20_20260622T000101Z.run.log
+    val_loss=9.154721, train_elapsed_s=6.449, completed_steps=20.
+  20-step nsys CE-512:
+    target/nsys/nextlat_synth_ce512_20_20260622T001257Z.run.log
+    cross_entropy_kernel moved from 5.458ms/step to 4.343ms/step.
+  20-step nsys CE-1024:
+    target/nsys/nextlat_synth_ce1024_20_20260622T001333Z.run.log
+    val_loss=9.155092, train_elapsed_s=6.412, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_ce1024_synth_100_20260622T001356Z.log
+    val_loss=6.531735, train_elapsed_s=32.061, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_ce1024_synth_900_20260622T001447Z.log
+    val_loss=3.811654, train_elapsed_s=900.324, completed_steps=2745.
+measured_effect:
+  Cross entropy moved from 109.152ms over 20 profiled steps to 58.188ms,
+  or 5.458ms/step to 2.771ms/step. Against the current NextLat SYNTH 900s
+  baseline target/nextlat_synth_default_900s_20260621T234043Z.log, held-out
+  validation loss moved from 3.816722 to 3.811654 and completed steps moved
+  from 2726 to 2745.
+decision:
+  Promote for the current NextLat branch. Held-out validation loss improved and
+  completed step count increased under the same fixed 900-second SYNTH budget.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Remove unused saved residual_out tape copy.
+status: measured_not_promoted
+change:
+  Removed the forward-tape residual_out field and the D2D copy at the end of
+  each transformer block. The saved forward tensor was not read by backward;
+  the similarly named d_residual_out gradient buffer remains in use.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_synth_no_residual_out_tape_20_20260622T003939Z.run.log
+    val_loss=9.155092, train_elapsed_s=6.404, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_no_residual_out_tape_synth_100_20260622T004018Z.log
+    val_loss=6.529115, train_elapsed_s=32.047, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_no_residual_out_tape_synth_900_20260622T004101Z.log
+    val_loss=3.815764, train_elapsed_s=900.281, completed_steps=2745.
+measured_effect:
+  D2D copies in the 20-step profile moved from 2579 copies / 147.761ms to
+  2495 copies / 140.330ms. 64MiB copies moved from 735 to 651, matching one
+  removed hidden-state tape copy per block. The 900-second gate stayed inside
+  the +/-1% noise band versus the current CE1024 baseline, but did not gain
+  completed steps.
+decision:
+  Do not promote on its own. The cleanup is correct and reduces measured D2D
+  traffic, but it did not improve the fixed-wall validation target or completed
+  step count at the 900-second endpoint.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: Minimize unused forward-tape FP32 saves on the current NextLat
+  SYNTH path.
+status: accepted_current_nextlat
+change:
+  Removed unused saved forward tensors from the training tape:
+    - block residual_out from the prior cleanup,
+    - block residual_in,
+    - embedding_residual,
+    - saved layer-norm normalized outputs.
+  The remaining layer-norm tape keeps residual, mean, and inv_std, which are
+  the values consumed by layer-norm backward. Gradient buffers such as
+  d_residual_out and d_normalized are unchanged.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_synth_tape_min_20_20260622T010327Z.run.log
+    val_loss=9.155092, train_elapsed_s=6.380, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_tape_min_synth_100_20260622T010353Z.log
+    val_loss=6.528718, train_elapsed_s=31.946, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_tape_min_synth_900_20260622T010439Z.log
+    val_loss=3.810689, train_elapsed_s=900.294, completed_steps=2757.
+measured_effect:
+  Against the CE1024 current NextLat baseline
+  target/nextlat_ce1024_synth_900_20260622T001447Z.log, held-out validation
+  loss moved from 3.811654 to 3.810689 and completed steps moved from 2745 to
+  2757. In the 20-step nsys profile, D2D copies moved from 2579 copies /
+  147.761ms to 2201 copies / 114.530ms.
+decision:
+  Promote for the current NextLat branch. Held-out validation loss improved and
+  completed step count increased under the same fixed 900-second SYNTH budget.
+  This is an accepted active-NextLat baseline candidate; pre-NextLat validation
+  results are not protected baselines for this branch.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: NextLat LR sweep with widened batch candidates through B32.
+status: measured_no_promotion
+change:
+  Added batch candidates 12, 20, 24, 28, and 32 to the sweep search space while
+  keeping the current NextLat SYNTH objective and 500-step/180-second screen.
+result:
+  Current promoted baseline remains trial_0024:
+    val_loss=3.656983, completed_steps=2785, screen_loss=5.057242,
+    B16/L4/d1024/h16,
+    log=target/sweeps/nextlat_lr_20260622T035322Z/trial_0024/train.log.
+  Newly measured widened-batch screens:
+    trial_0029 B12/L4/d1024: screen_loss=5.285259, completed_steps=500.
+    trial_0031 B20/L4/d1024: screen_loss=5.639343, completed_steps=469.
+    trial_0033 B32/L4/d1024: screen_loss=5.258968, completed_steps=331.
+    trial_0030 B32/L8/d2048: rejected before steps with
+      DriverError(2, "out of memory").
+decision:
+  Do not promote any widened-batch candidate from these measurements. The B32
+  domain is enabled and can remain in the sweep, but the current evidence still
+  favors the B16/L4/d1024 baseline for fixed-wall validation. The next useful
+  work is profiling/optimizing the promoted B16 shape, not continuing blind
+  high-batch screens.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted
+experiment: NCU SOL/register profile for promoted NextLat B16/L4/d1024 shape.
+status: measured
+profile:
+  target/ncu/promoted_b16_top_kernels_20260622T060914Z.txt
+result:
+  linear_backward_projection_pair_cta_device_scale_kernel:
+    no local/shared memory spilling reported.
+    registers/thread=40, theoretical occupancy=100%.
+    The largest profiled instance was grid=(24192,1,1)x(512,1,1),
+    duration=22.33ms, memory throughput=88.04%, compute throughput=53.74%,
+    achieved occupancy=99.51%, L2 hit rate=99.39%.
+    This points at memory/L2 traffic and layout/reuse, not register spilling.
+  aurora_mega_update_cooperative_kernel:
+    no local/shared memory spilling reported.
+    launch=(180,3,1)x(256,1,1), duration=107.51ms.
+    registers/thread=80, theoretical occupancy=50%, achieved occupancy=47.87%,
+    memory throughput=63.29%, compute throughput=27.79%, L2 hit rate=99.10%.
+    NCU reports occupancy limited by registers.
+decision:
+  Use this as the next optimization guide. Do not chase register spills; none
+  were measured. Linear backward needs memory/layout/reuse work. Aurora needs
+  either lower register pressure or a differently staged update path.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted after gate
+experiment: Replace projection CTA staging loops with explicit per-thread slots.
+status: rejected_900s
+change:
+  Replaced the constant-bounded shared-memory staging loops in
+  projection_cta/stage.rs with explicit per-thread A-pack, B-pack, A-scale, and
+  B-scale stores. The tile shape, shared-memory layout, native NVFP4 MMA path,
+  and math were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/projection_stage_explicit_b16_l4d1024_20_20260622T062219Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.341, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_stage_explicit_b16_l4d1024_100_20260622T062250Z.log
+    val_loss=6.348930, train_elapsed_s=31.754, completed_steps=100.
+  900-second held-out gate:
+    target/projection_stage_explicit_b16_l4d1024_900_20260622T062341Z.log
+    val_loss=3.658568, train_elapsed_s=900.036, completed_steps=2773.
+measured_effect:
+  Short-profile target kernel improved:
+    linear_backward_projection_pair_cta_device_scale_kernel moved from
+    1.407983884s to 1.384849441s over 20 profiled steps.
+  The fixed-wall objective did not improve:
+    promoted baseline trial_0024 has val_loss=3.656983 and completed_steps=2785.
+    this candidate had val_loss=3.658568 and completed_steps=2773.
+decision:
+  Reject and revert. The short nsys improvement did not translate into the
+  900-second held-out objective, and completed step count dropped.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate
+experiment: Reuse B operand staging across adjacent dW projection CTA row tiles.
+status: accepted_900s
+change:
+  The paired linear-backward CTA kernel now maps the dW half to row-pair CTAs.
+  For each K chunk it stages the B-side NVFP4 operand/scales once, stages and
+  multiplies the first A row tile, then stages and multiplies the adjacent A row
+  tile before advancing K. The dX half and training math are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/projection_dweight_rowpair_b16_l4d1024_20_20260622T064813Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.325, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_dweight_rowpair_b16_l4d1024_100_20260622T064845Z.log
+    val_loss=6.341741, train_elapsed_s=31.657, completed_steps=100.
+  900-second held-out gate:
+    target/projection_dweight_rowpair_b16_l4d1024_900_20260622T064932Z.log
+    val_loss=3.642029, train_elapsed_s=900.306, completed_steps=2779.
+measured_effect:
+  Against promoted baseline
+  target/nsys/nextlat_promoted_b16_l4d1024_20_20260622T060358Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1.407983884s to 1.360383029s over 20 profiled steps. The full 20-step
+  training profile moved from 6.368s to 6.325s.
+  Against baseline trial_0024, held-out validation loss improved from
+  3.656983 to 3.642029 under the fixed 900-second SYNTH budget.
+decision:
+  Promote. This directly improves the fixed-wall held-out objective; lower
+  validation loss wins even though completed steps moved from 2785 to 2779.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate
+experiment: Reuse B operand staging across adjacent dX and dW projection CTA row tiles.
+status: accepted_900s
+change:
+  Extended the row-pair CTA mapping from only the dW half of the paired
+  linear-backward projection kernel to both halves. The dX half now also stages
+  the B-side NVFP4 operand/scales once per K chunk and computes two adjacent row
+  tiles before advancing K. The GEMM math, Quartet/MS-EDEN operands, and output
+  layout are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/projection_both_rowpair_b16_l4d1024_20_20260622T071103Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.277, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_both_rowpair_b16_l4d1024_100_20260622T071131Z.log
+    val_loss=6.344444, train_elapsed_s=31.415, completed_steps=100.
+  900-second held-out gate:
+    target/projection_both_rowpair_b16_l4d1024_900_20260622T071216Z.log
+    val_loss=3.664893, train_elapsed_s=900.011, completed_steps=2803.
+measured_effect:
+  Against the accepted dW-only row-pair profile
+  target/nsys/projection_dweight_rowpair_b16_l4d1024_20_20260622T064813Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1.360383029s to 1.311057025s over 20 profiled steps. The full 20-step
+  training profile moved from 6.325s to 6.277s.
+  Against the accepted dW-only 900-second baseline, held-out validation moved
+  from 3.642029 to 3.664893, a +0.628% change, while completed steps increased
+  from 2779 to 2803.
+decision:
+  Promote under the active noise-band rule. Validation loss stayed within the
+  +/-1% band and completed step count increased.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before screen
+experiment: Four-row CTA reuse for paired linear-backward projection.
+status: rejected_pre_gate
+change:
+  Tested grouping four adjacent row tiles per CTA for both dX and dW halves of
+  linear_backward_projection_pair_cta_device_scale_kernel. The candidate staged
+  the B-side NVFP4 operand/scales once and then computed four A row tiles before
+  advancing K. Math and output layout were unchanged.
+verification:
+  cargo fmt --all --check: pass before profiling.
+  cargo check --all-targets: pass before profiling.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/projection_rowquad_b16_l4d1024_20_20260622T073307Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.667, completed_steps=20.
+measured_effect:
+  Against the accepted both-row-pair profile
+  target/nsys/projection_both_rowpair_b16_l4d1024_20_20260622T071103Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1.311057025s to 1.717597668s over 20 profiled steps. Full 20-step training
+  time regressed from 6.277s to 6.667s.
+decision:
+  Reject before 100-step and 900-second gates. Code was reverted to the accepted
+  both-row-pair projection path.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate
+experiment: Reuse B operand staging across adjacent LM-head row tiles.
+status: accepted_900s
+change:
+  The aligned LM-head CTA path now launches with row-pair grid scheduling and
+  calls the existing aligned no-bias row-pair projection body. Each CTA stages
+  the vocab-side B operand/scales once per K chunk, computes one token-row tile,
+  then computes the adjacent token-row tile before advancing K. The generic
+  non-aligned LM-head path is unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/lm_head_rowpair_b16_l4d1024_20_20260622T074337Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.142, completed_steps=20.
+  100-step SYNTH screen:
+    target/lm_head_rowpair_b16_l4d1024_100_20260622T074404Z.log
+    val_loss=6.342079, train_elapsed_s=31.334, completed_steps=100.
+  900-second held-out gate:
+    target/lm_head_rowpair_b16_l4d1024_900_20260622T074454Z.log
+    val_loss=3.626539, train_elapsed_s=900.213, completed_steps=2808.
+measured_effect:
+  Against the accepted both-row-pair projection profile
+  target/nsys/projection_both_rowpair_b16_l4d1024_20_20260622T071103Z.run.log,
+  lm_head_kernel moved from 231.831103ms to 213.578780ms over 21 profiled
+  calls. The 20-step profiled training time moved from 6.277s to 6.142s.
+  Against the previous 900-second baseline, held-out validation improved from
+  3.664893 to 3.626539 and completed steps increased from 2803 to 2808.
+decision:
+  Promote. The change directly improves the fixed-wall held-out objective with
+  lower validation loss and higher completed step count.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before screen
+experiment: Reuse B operand staging across adjacent forward projection row tiles.
+status: rejected_pre_gate
+change:
+  Temporarily added aligned row-pair projection bodies for affine and relu2 CTA
+  projections, then routed attention QKV/c_proj, MLP up/down, and NextLat
+  projection launches through row-pair grid scheduling when shapes were CTA
+  aligned. Math and output layouts were unchanged.
+verification:
+  cargo fmt --all --check: pass after revert.
+  cargo check --all-targets: pass after revert.
+  cargo oxide build --arch sm_120a: pass before profiling.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test next_latent_concat_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/forward_projection_rowpair_b16_l4d1024_20_20260622T080918Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.170, completed_steps=20.
+measured_effect:
+  Against the accepted LM-head row-pair profile
+  target/nsys/lm_head_rowpair_b16_l4d1024_20_20260622T074337Z.run.log,
+  the full 20-step profiled training time regressed from 6.142s to 6.170s.
+  attention_projection_kernel moved from 114.244753ms to 139.069133ms,
+  mlp_projection_kernel moved from 120.210061ms to 129.817442ms, and
+  mlp_projection_relu2_kernel moved from 120.764964ms to 123.191866ms.
+  nextlat_projection_kernel improved from 76.575046ms to 69.161765ms, but this
+  was too small to offset the broader forward projection regressions.
+decision:
+  Reject before 100-step and 900-second gates. Code was reverted to the accepted
+  LM-head row-pair baseline.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate
+experiment: Reuse B operand staging across adjacent NextLat projection row tiles.
+status: accepted_900s
+change:
+  The aligned NextLat projection CTA path now launches with row-pair grid
+  scheduling and uses an affine row-pair projection body. The path stages the B
+  operand/scales once per K chunk, computes one token-row tile, then computes
+  the adjacent token-row tile before advancing K. Attention and MLP projection
+  paths remain on the prior accepted scheduling after the broader row-pair
+  experiment regressed.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test next_latent_concat_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/nextlat_projection_rowpair_b16_l4d1024_20_20260622T081805Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.135, completed_steps=20.
+  100-step SYNTH screen:
+    target/nextlat_projection_rowpair_b16_l4d1024_100_20260622T081823Z.log
+    val_loss=6.346216, train_elapsed_s=31.298, completed_steps=100.
+  900-second held-out gate:
+    target/nextlat_projection_rowpair_b16_l4d1024_900_20260622T081906Z.log
+    val_loss=3.628989, train_elapsed_s=900.120, completed_steps=2811.
+measured_effect:
+  Against the accepted LM-head row-pair profile
+  target/nsys/lm_head_rowpair_b16_l4d1024_20_20260622T074337Z.run.log,
+  nextlat_projection_kernel moved from 76.575046ms to 69.238443ms over 20
+  profiled steps. The full 20-step profiled training time moved from 6.142s to
+  6.135s.
+  Against the previous 900-second baseline, held-out validation moved from
+  3.626539 to 3.628989, a +0.0675% change inside the active +/-1% noise band,
+  while completed steps increased from 2808 to 2811.
+decision:
+  Promote under the runtime-change acceptance rule. Validation loss stayed well
+  inside the active noise band and completed step count increased.
 ```
