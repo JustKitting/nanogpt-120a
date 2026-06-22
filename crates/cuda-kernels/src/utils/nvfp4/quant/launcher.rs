@@ -46,6 +46,10 @@ impl Nvfp4QuantModule {
         &self,
         args: Nvfp4QuantRowwiseArgs<'_, '_>,
     ) -> Result<(), DriverError> {
+        if args.row_len.is_power_of_two() {
+            return self.launch_fp32_to_nvfp4_four_six_rowwise_pow2(args);
+        }
+
         self.launch_fp32_to_nvfp4_four_six(
             args.stream,
             args.x,
@@ -643,6 +647,29 @@ impl Nvfp4QuantModule {
             out_scales,
             out_global_scale,
             row_len,
+            SCALE_OVERRIDE,
+        )
+    }
+
+    fn launch_fp32_to_nvfp4_four_six_rowwise_pow2(
+        &self,
+        args: Nvfp4QuantRowwiseArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
+        self.four_six.fp32_to_nvfp4_four_six_rowwise_pow2_kernel(
+            args.stream,
+            LaunchConfig {
+                grid_dim: (args.group_count.div_ceil(groups_per_block), 1, 1),
+                block_dim: (THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            },
+            args.x,
+            args.amax,
+            args.out_fp4,
+            args.out_scales,
+            args.out_global_scale,
+            args.row_len.trailing_zeros(),
+            args.row_len - 1,
             SCALE_OVERRIDE,
         )
     }

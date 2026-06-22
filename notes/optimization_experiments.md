@@ -170,6 +170,54 @@ decision:
 ```text
 date: 2026-06-22
 commit: uncommitted candidate, accepted after gate
+experiment: Route rowwise four/six quantization through a power-of-two row kernel.
+status: accepted_900s
+change:
+  Added a dedicated rowwise power-of-two four/six NVFP4 encoder and routed
+  fp32_to_nvfp4_four_six_rowwise through it when row_len is a power of two.
+  The quantization math, scale override, 4/6 grid decision, and output layout
+  are unchanged. The row calculation replaces the generic division path with a
+  shift and row mask for the current power-of-two row lengths.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test l2_attention -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/four_six_rowwise_pow2_b16_l4d1024_20_20260622T201353Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.672, completed_steps=20.
+  100-step SYNTH screen:
+    target/four_six_rowwise_pow2_b16_l4d1024_100_20260622T201410Z.log
+    val_loss=6.302158, train_elapsed_s=28.914, completed_steps=100.
+  900-second held-out gate:
+    target/four_six_rowwise_pow2_b16_l4d1024_900_20260622T201657Z.log
+    val_loss=3.578318, train_elapsed_s=900.274, completed_steps=3054.
+  generated sample:
+    target/runs/20260622_201657Z_synth_900s/generated.txt
+measured_effect:
+  Against the accepted baseline
+  target/nsys/f16_half_aligned_b16_l4d1024_20_20260622T192806Z.run.log,
+  the rowwise four/six work split from fp32_to_nvfp4_four_six_kernel
+  76.635915ms over 1220 calls into fp32_to_nvfp4_four_six_rowwise_pow2_kernel
+  66.274555ms over 420 calls plus fp32_to_nvfp4_four_six_kernel 5.670803ms
+  over 800 calls. Total four/six encode time moved to 71.945358ms. The
+  20-step screen moved from 5.674s to 5.672s, and the 100-step screen moved
+  from val_loss=6.304914 / 28.915s to val_loss=6.302158 / 28.914s.
+  The 900-second held-out gate moved from val_loss=3.558484 / 3048 steps to
+  val_loss=3.578318 / 3054 steps, a +0.557% validation-loss move inside the
+  active 1% noise band with 6 additional completed steps.
+decision:
+  Promote under the active runtime-change rule: validation loss stayed within
+  the 1% noise band and completed step count increased under the fixed
+  900-second SYNTH budget.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
 experiment: Add aligned staging and stores for direct half-input TC matmul.
 status: accepted_900s
 change:
