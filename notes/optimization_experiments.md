@@ -10472,3 +10472,37 @@ decision:
   the 1% noise band and completed step count increased under the fixed
   900-second SYNTH budget.
 ```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted after 20-step screen
+experiment: Remove unreachable Aurora mega slot-count guard from device entry.
+status: rejected_screen
+change:
+  Removed the aurora_mega_update_cooperative_kernel slot_count parameter and
+  the in-kernel `slot < slot_count` guard. The host launch already asserts
+  slot_count is an exact multiple of AURORA_MATRIX_PHASES and launches
+  gridDim.y = slot_count / AURORA_MATRIX_PHASES, so the guard is unreachable
+  in the accepted launch contract.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  Generated PTX: aurora_mega_update_cooperative_kernel entry parameters moved
+    from param_0..22 to param_0..21, but PTX b64 registers stayed at 41.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_slot_guard_removed_b16_l4d1024_20_20260622T155619Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.923, completed_steps=20.
+measured_effect:
+  Against the accepted descriptor profile
+  target/nsys/aurora_slot_descriptor_b16_l4d1024_20_20260622T153325Z.run.log,
+  aurora_mega_update_cooperative_kernel regressed from 1748.781893ms to
+  1751.096652ms over 20 calls. Profiled train time moved from 5.915s to
+  5.923s.
+decision:
+  Reject before the 100-step and 900-second gates. The candidate trimmed one
+  entry parameter but did not reduce b64 register count and made the target
+  kernel slower. Code was reverted; keep this note to avoid repeating this
+  cleanup.
+```
