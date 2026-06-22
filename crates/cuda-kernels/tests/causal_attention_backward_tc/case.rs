@@ -1,4 +1,3 @@
-use super::reference;
 use super::shape;
 
 pub struct Case {
@@ -6,7 +5,6 @@ pub struct Case {
     pub d_out: Vec<f32>,
     pub out: Vec<f32>,
     pub log_sum_exp: Vec<f32>,
-    pub expected: Vec<f32>,
 }
 
 pub fn simple_case() -> Case {
@@ -16,13 +14,11 @@ pub fn simple_case() -> Case {
     fill_d_out(&mut d_out);
     let out = causal_uniform_out(&qkv);
     let log_sum_exp = causal_zero_score_lse();
-    let expected = reference::backward(&qkv, &out, &d_out, &log_sum_exp);
     Case {
         qkv,
         d_out,
         out,
         log_sum_exp,
-        expected,
     }
 }
 

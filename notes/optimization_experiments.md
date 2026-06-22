@@ -30,6 +30,44 @@ Primary optimization target:
 ```text
 heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted after 20-step screen
+experiment: Attention-only FP16 CTA matmul tile M128/N32/K16.
+status: rejected_screen
+change:
+  Routed only causal-attention-backward FP32-to-FP16 TC matmuls through a
+  separate CTA tile with M=128, N=32, K=16. Aurora and other square FP16 TC
+  callers stayed on the existing M64/N64 tile.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/attention_m128n32_b16_l4d1024_20_20260622T161719Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.874, completed_steps=20.
+measured_effect:
+  Against the accepted descriptor profile
+  target/nsys/aurora_slot_descriptor_b16_l4d1024_20_20260622T153325Z.run.log,
+  total profiled train time moved from 5.915s to 5.874s, but the intended
+  attention matmul target regressed. Estimated attention matmul time moved from
+  about 690.0ms to 720.8ms over 20 steps:
+    f32_input: 308.7ms estimated old attention share -> 334.3ms new.
+    a_transposed_rhs: 254.4ms old -> 265.8ms new.
+    rhs: 127.0ms estimated old attention share -> 120.7ms new.
+  The total run improvement came from unrelated profiler variance in Aurora,
+  projection, and LM-head kernels, not from the candidate attention tile.
+decision:
+  Reject before the 100-step and 900-second gates. The attention-specific
+  M128/N32 tile made the target matmul path slower overall, so the code was
+  reverted and only this note is kept.
+```
 ```text
 date: 2026-06-22
 commit: uncommitted candidate, reverted before gate
