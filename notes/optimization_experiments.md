@@ -211,6 +211,42 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Add aligned fast paths for mixed f32/half-RHS TC matmul variants.
+status: rejected_screen
+change:
+  Added aligned staging and aligned stores to the two newer half-RHS attention
+  backward TC bodies:
+  f16_cta_tc_matmul_f32_half_rhs_kernel and
+  f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel. The generic bounded
+  paths remained for non-aligned shapes. Math, launch geometry, tile shape,
+  and inputs were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/f16_half_rhs_aligned_b16_l4d1024_20_20260622T195004Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.687, completed_steps=20.
+measured_effect:
+  Against the accepted direct-half aligned profile
+  target/nsys/f16_half_aligned_b16_l4d1024_20_20260622T192806Z.run.log,
+  f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel regressed from
+  236.965849ms to 246.852708ms over 160 calls, and
+  f16_cta_tc_matmul_f32_half_rhs_kernel regressed from 112.922151ms to
+  115.611287ms over 80 calls. The 20-step training screen moved from
+  5.674s to 5.687s.
+decision:
+  Reject before the 100-step and 900-second gates. The target kernels and
+  short wall-clock got slower. Code was reverted; this note is kept to avoid
+  repeating the half-RHS aligned variant.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, reverted after 20-step screen
 experiment: Explicitly unroll row-pair projection K atoms.
 status: rejected_screen
