@@ -33,6 +33,33 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, reverted
+experiment: Pair linear-backward weight_t and input_t MS-EDEN transpose packs.
+status: rejected_short_profile
+change:
+  Added a combined exact-grid kernel for the linear-backward weight_t NVFP4
+  transpose pack and input_t rowwise-NVFP4 transpose pack after their separate
+  amax/global-scale reductions. The fallback path preserved the separate
+  existing kernels.
+verification:
+  20-step nsys:
+    target/nsys/linear_operand_pair_pack_b16_l4d1024_20_20260622T221444Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.663, completed_steps=20.
+measured_effect:
+  Compared with the accepted E_h/E_t_h pair-pack profile
+  target/nsys/linear_e_pair_pack_b16_l4d1024_20_20260622T215134Z.run.log,
+  cuLaunchKernel count moved from 14819 to 14419. The new paired kernel took
+  175.130091ms over 400 calls; the two separate baseline kernels it replaced
+  took 154.192993ms plus 21.545283ms, or 175.738276ms. End-to-end profiled
+  train time moved from 5.660s to 5.663s.
+decision:
+  Reject. The launch count dropped, but the fixed short-profile runtime did
+  not improve. This candidate was reverted and should not be promoted to the
+  100-step screen or 900-second held-out gate.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, accepted after gate
 experiment: Combine linear-backward E rowwise and transposed MS-EDEN packs.
 status: accepted_900s
