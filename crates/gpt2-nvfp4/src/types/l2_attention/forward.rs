@@ -61,6 +61,7 @@ pub(super) fn forward<'a, 'scratch>(
     args.module.apply_rope(ApplyRopeArgs {
         stream,
         qkv: args.qkv,
+        qkv_f16: tape.as_mut().map(|tape| &mut *tape.qkv_f16),
         row_count,
         seq_len,
         batch_size,

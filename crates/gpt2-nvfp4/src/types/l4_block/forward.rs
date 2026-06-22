@@ -1,4 +1,5 @@
 use cuda_core::{DeviceBuffer, DriverError};
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 
 use super::args::BlockForwardArgs;
 use super::weights::Gpt2BlockWeights;
@@ -19,10 +20,6 @@ impl Gpt2BlockWeights {
         let mut hidden_nvfp4 = args.hidden_nvfp4;
         let mut tape = args.tape;
 
-        if let Some(tape) = tape.as_mut() {
-            tape.save_residual_in(args.hidden.stream, args.hidden.residual)?;
-        }
-
         let ln_1 =
             LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_1, args.hidden);
         let hidden = self.ln_1.forward(ln_1)?;
@@ -30,8 +27,8 @@ impl Gpt2BlockWeights {
         if let Some(tape) = tape.as_mut() {
             tape.ln_1.save(
                 hidden.stream,
+                args.attention_tc_module,
                 hidden.residual,
-                hidden.normalized,
                 hidden.mean,
                 hidden.inv_std,
             )?;
@@ -39,6 +36,7 @@ impl Gpt2BlockWeights {
 
         let attention_tape = tape.as_mut().map(|tape| AttentionForwardTape {
             qkv_input_nvfp4: tape.qkv_input_nvfp4.reborrow(),
+            qkv_f16: &mut *tape.qkv,
             c_proj_input_nvfp4: tape.c_proj_input_nvfp4.reborrow(),
         });
 
@@ -56,10 +54,12 @@ impl Gpt2BlockWeights {
         ))?;
 
         if let Some(tape) = tape.as_mut() {
-            tape.save_qkv(hidden.stream, qkv)?;
-            tape.save_attention_out(hidden.stream, hidden.normalized)?;
+            tape.save_attention_out_f16(
+                hidden.stream,
+                args.attention_tc_module,
+                hidden.normalized,
+            )?;
             tape.save_attention_log_sum_exp(hidden.stream, attention_log_sum_exp)?;
-            tape.save_residual_after_attention(hidden.stream, hidden.residual)?;
         }
 
         let ln_2 = LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_2, hidden);
@@ -68,8 +68,8 @@ impl Gpt2BlockWeights {
         if let Some(tape) = tape.as_mut() {
             tape.ln_2.save(
                 hidden.stream,
+                args.attention_tc_module,
                 hidden.residual,
-                hidden.normalized,
                 hidden.mean,
                 hidden.inv_std,
             )?;
@@ -97,20 +97,23 @@ impl Gpt2BlockWeights {
             mlp_tape,
         ))?;
 
-        save_mlp_tape(tape.as_mut(), mlp_pre_activation, mlp_activation, hidden)
+        save_mlp_tape(
+            tape.as_mut(),
+            args.attention_tc_module,
+            mlp_pre_activation,
+            hidden,
+        )
     }
 }
 
 fn save_mlp_tape<'a>(
     tape: Option<&mut crate::types::BlockForwardTape<'_>>,
+    f16_module: &F16TcMatmulModule,
     mlp_pre_activation: &DeviceBuffer<f32>,
-    mlp_activation: &DeviceBuffer<f32>,
     hidden: HiddenStateDevice<'a>,
 ) -> Result<HiddenStateDevice<'a>, DriverError> {
     if let Some(tape) = tape {
-        tape.save_mlp_up(hidden.stream, mlp_pre_activation)?;
-        tape.save_mlp_relu2(hidden.stream, mlp_activation)?;
-        tape.save_residual_out(hidden.stream, hidden.residual)?;
+        tape.save_mlp_up_f16(hidden.stream, f16_module, mlp_pre_activation)?;
     }
 
     Ok(hidden)

@@ -2,6 +2,7 @@ use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig}
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
 use super::AttentionModule;
+use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 use crate::float_ptx::{exp_f32, fma_f32, sincos_f32};
 
 const THREADS_PER_BLOCK: u32 = 256;
@@ -23,6 +24,7 @@ unsafe impl DeviceCopy for ApplyRopeParams {}
 pub struct ApplyRopeArgs<'a, 'out> {
     pub stream: &'a CudaStream,
     pub qkv: &'out mut DeviceBuffer<f32>,
+    pub qkv_f16: Option<&'out mut DeviceBuffer<u16>>,
     pub row_count: u32,
     pub seq_len: u32,
     pub batch_size: u32,
@@ -35,24 +37,33 @@ pub struct ApplyRopeArgs<'a, 'out> {
 impl AttentionModule {
     pub fn apply_rope(&self, args: ApplyRopeArgs<'_, '_>) -> Result<(), DriverError> {
         let pair_count = args.batch_size * args.seq_len * args.head_count * (args.head_dim / 2);
-        self.rope.apply_rope_kernel(
-            args.stream,
-            LaunchConfig {
-                grid_dim: (pair_count.div_ceil(THREADS_PER_BLOCK), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
-            args.qkv,
-            ApplyRopeParams {
-                row_count: args.row_count,
-                seq_len: args.seq_len,
-                batch_size: args.batch_size,
-                embedding_dim: args.embedding_dim,
-                qkv_dim: args.qkv_dim,
-                head_count: args.head_count,
-                head_dim: args.head_dim,
-            },
-        )
+        let config = LaunchConfig {
+            grid_dim: (pair_count.div_ceil(THREADS_PER_BLOCK), 1, 1),
+            block_dim: (THREADS_PER_BLOCK, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        let params = ApplyRopeParams {
+            row_count: args.row_count,
+            seq_len: args.seq_len,
+            batch_size: args.batch_size,
+            embedding_dim: args.embedding_dim,
+            qkv_dim: args.qkv_dim,
+            head_count: args.head_count,
+            head_dim: args.head_dim,
+        };
+
+        if let Some(qkv_f16) = args.qkv_f16 {
+            return self.rope.apply_rope_save_f16_kernel(
+                args.stream,
+                config,
+                args.qkv,
+                qkv_f16,
+                params,
+            );
+        }
+
+        self.rope
+            .apply_rope_kernel(args.stream, config, args.qkv, params)
     }
 }
 
@@ -91,6 +102,54 @@ pub mod kernels {
         );
     }
 
+    #[kernel]
+    pub fn apply_rope_save_f16_kernel(
+        mut qkv: DisjointSlice<f32>,
+        mut qkv_f16: DisjointSlice<u16>,
+        params: ApplyRopeParams,
+    ) {
+        let half_head_dim = params.head_dim / 2;
+        let index = thread::blockIdx_x() * THREADS_PER_BLOCK + thread::threadIdx_x();
+        let total = params.batch_size * params.seq_len * params.head_count * half_head_dim;
+        if index >= total {
+            return;
+        }
+
+        let pair = index % half_head_dim;
+        let head = (index / half_head_dim) % params.head_count;
+        let token = (index / (half_head_dim * params.head_count)) % params.seq_len;
+        let batch = index / (half_head_dim * params.head_count * params.seq_len);
+        let row = batch * params.seq_len + token;
+        if row >= params.row_count {
+            return;
+        }
+
+        let dim = pair * 2;
+        let q = rotate_section(&mut qkv, batch, token, head, dim, 0, &params);
+        let k = rotate_section(
+            &mut qkv,
+            batch,
+            token,
+            head,
+            dim,
+            params.embedding_dim,
+            &params,
+        );
+        let v = read_pair(
+            &mut qkv,
+            batch,
+            token,
+            head,
+            dim,
+            params.embedding_dim * 2,
+            &params,
+        );
+
+        store_pair_f16(&mut qkv_f16, q);
+        store_pair_f16(&mut qkv_f16, k);
+        store_pair_f16(&mut qkv_f16, v);
+    }
+
     #[inline(always)]
     fn rotate_section(
         qkv: &mut DisjointSlice<f32>,
@@ -100,18 +159,65 @@ pub mod kernels {
         dim: u32,
         section_offset: u32,
         params: &ApplyRopeParams,
-    ) {
+    ) -> QkvPair {
         let even_index = qkv_index(batch, token, head, dim, section_offset, params);
         let odd_index = qkv_index(batch, token, head, dim + 1, section_offset, params);
         let ptr = qkv.as_mut_ptr();
         let even = unsafe { *ptr.add(even_index) };
         let odd = unsafe { *ptr.add(odd_index) };
         let (sin, cos) = sincos_f32(token as f32 * rope_inv_freq(dim, params.head_dim));
+        let rotated_even = fma_f32(-odd, sin, even * cos);
+        let rotated_odd = fma_f32(odd, cos, even * sin);
 
         unsafe {
-            *ptr.add(even_index) = fma_f32(-odd, sin, even * cos);
-            *ptr.add(odd_index) = fma_f32(odd, cos, even * sin);
+            *ptr.add(even_index) = rotated_even;
+            *ptr.add(odd_index) = rotated_odd;
         }
+
+        QkvPair {
+            even_index,
+            even: rotated_even,
+            odd_index,
+            odd: rotated_odd,
+        }
+    }
+
+    #[inline(always)]
+    fn read_pair(
+        qkv: &mut DisjointSlice<f32>,
+        batch: u32,
+        token: u32,
+        head: u32,
+        dim: u32,
+        section_offset: u32,
+        params: &ApplyRopeParams,
+    ) -> QkvPair {
+        let even_index = qkv_index(batch, token, head, dim, section_offset, params);
+        let odd_index = qkv_index(batch, token, head, dim + 1, section_offset, params);
+        let ptr = qkv.as_mut_ptr();
+
+        QkvPair {
+            even_index,
+            even: unsafe { *ptr.add(even_index) },
+            odd_index,
+            odd: unsafe { *ptr.add(odd_index) },
+        }
+    }
+
+    #[inline(always)]
+    fn store_pair_f16(qkv_f16: &mut DisjointSlice<u16>, pair: QkvPair) {
+        unsafe {
+            *qkv_f16.get_unchecked_mut(pair.even_index) = cvt_rn_f16_f32(pair.even);
+            *qkv_f16.get_unchecked_mut(pair.odd_index) = cvt_rn_f16_f32(pair.odd);
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct QkvPair {
+        even_index: usize,
+        even: f32,
+        odd_index: usize,
+        odd: f32,
     }
 
     #[inline(always)]

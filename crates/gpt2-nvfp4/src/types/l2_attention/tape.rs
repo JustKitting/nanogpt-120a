@@ -1,10 +1,11 @@
-use cuda_core::{CudaStream, DriverError};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use crate::types::RowwiseNvfp4Tape;
 
 pub struct AttentionForwardTape<'scratch> {
     pub qkv_input_nvfp4: RowwiseNvfp4Tape<'scratch>,
+    pub qkv_f16: &'scratch mut DeviceBuffer<u16>,
     pub c_proj_input_nvfp4: RowwiseNvfp4Tape<'scratch>,
 }
 

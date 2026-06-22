@@ -9324,3 +9324,71 @@ decision:
   Promote under the runtime-change acceptance rule. Validation loss stayed well
   inside the active noise band and completed step count increased.
 ```
+
+```text
+date: 2026-06-22
+commit: temporary build-only candidate, reverted before screen
+experiment: Increase Aurora cooperative block count from 180 to 188.
+status: rejected_pre_gate
+change:
+  Built the current B16/L4/d1024 baseline with AURORA_COOPERATIVE_BLOCKS=188
+  instead of the promoted 180. The hypothesis was that 188 blocks across the X
+  dimension and matrix_count=3 would exactly fill the observed register-limited
+  cooperative-launch ceiling of roughly 3 blocks per 188 SMs. Optimizer math and
+  training settings were unchanged.
+verification:
+  AURORA_COOPERATIVE_BLOCKS=188 cargo oxide build --arch sm_120a: pass.
+  20-step nsys:
+    target/nsys/aurora_blocks188_b16_l4d1024_20_20260622T084021Z.run.log
+    val_loss=9.067668, train_elapsed_s=6.182, completed_steps=20.
+measured_effect:
+  Against the accepted NextLat row-pair profile
+  target/nsys/nextlat_projection_rowpair_b16_l4d1024_20_20260622T081805Z.run.log,
+  the full 20-step profiled training time regressed from 6.135s to 6.182s.
+  aurora_mega_update_cooperative_kernel moved from 2.022918141s to
+  2.078683438s over 20 profiled calls.
+decision:
+  Reject before 100-step and 900-second gates. Filling the apparent cooperative
+  block ceiling did not improve the runtime path, so keep AURORA_COOPERATIVE_BLOCKS=180.
+```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate
+experiment: Fuse post-RoPE QKV f16 tape save into RoPE kernel.
+status: accepted_900s
+change:
+  Added an apply_rope_save_f16_kernel training path that rotates Q/K in place
+  and writes the post-RoPE Q/K/V f16 tape values while the QKV values are live.
+  Removed the standalone block-level save_qkv_f16 conversion call. The no-tape
+  inference path still uses the original apply_rope_kernel.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture: pass.
+  20-step nsys:
+    target/nsys/rope_qkv_f16_fused_b16_l4d1024_20_20260622T084442Z.run.log
+    val_loss=9.069621, train_elapsed_s=6.122, completed_steps=20.
+  100-step SYNTH screen:
+    target/rope_qkv_f16_fused_b16_l4d1024_100_20260622T084500Z.log
+    val_loss=6.345064, train_elapsed_s=31.239, completed_steps=100.
+  900-second held-out gate:
+    target/rope_qkv_f16_fused_b16_l4d1024_900_20260622T084543Z.log
+    val_loss=3.642559, train_elapsed_s=900.292, completed_steps=2819.
+measured_effect:
+  Against the accepted NextLat row-pair profile
+  target/nsys/nextlat_projection_rowpair_b16_l4d1024_20_20260622T081805Z.run.log,
+  fp32_to_f16_kernel moved from 51.755272ms over 441 calls to 36.069541ms over
+  357 calls. The original apply_rope_kernel entry was replaced by
+  apply_rope_save_f16_kernel, which took 22.568906ms over 84 calls. Full
+  20-step profiled training time moved from 6.135s to 6.122s.
+  Against the previous 900-second baseline, held-out validation moved from
+  3.628989 to 3.642559, a +0.3740% change inside the active +/-1% noise band,
+  while completed steps increased from 2811 to 2819.
+decision:
+  Promote under the runtime-change acceptance rule. Validation loss stayed
+  inside the active noise band and completed step count increased.
+```
