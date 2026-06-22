@@ -195,6 +195,7 @@ fn candidate(batch_size: usize, n_layer: usize) -> Candidate {
         aurora_blocks: 80,
         lr_scale: 1.0,
         adam_lr_scale: 1.0,
+        nextlat_lr_scale: 1.0,
         warmup_steps: 20,
         start_ratio: 0.1,
         amuse_beta1: 0.4,

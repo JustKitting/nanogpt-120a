@@ -41,6 +41,7 @@ fn starts_fresh_sweep_from_best_measured_baseline() {
     assert_eq!(baseline.aurora_blocks, 80);
     assert_eq!(baseline.lr_scale, 1.014_040);
     assert_eq!(baseline.adam_lr_scale, 1.980_467);
+    assert_eq!(baseline.nextlat_lr_scale, 1.0);
     assert_eq!(baseline.warmup_steps, 5);
     assert_eq!(baseline.start_ratio, 0.05);
     assert_eq!(baseline.amuse_beta1, 0.2);
@@ -273,6 +274,7 @@ fn candidate(batch_size: usize, n_layer: usize, lr_scale: f64) -> Candidate {
         aurora_blocks: 180,
         lr_scale,
         adam_lr_scale: 1.0,
+        nextlat_lr_scale: 1.0,
         warmup_steps: 5,
         start_ratio: 0.0,
         amuse_beta1: 0.4,
@@ -314,6 +316,7 @@ fn measured_candidate() -> Candidate {
         aurora_blocks: 80,
         lr_scale: 1.014_040,
         adam_lr_scale: 1.980_467,
+        nextlat_lr_scale: 1.0,
         warmup_steps: 5,
         start_ratio: 0.05,
         amuse_beta1: 0.2,

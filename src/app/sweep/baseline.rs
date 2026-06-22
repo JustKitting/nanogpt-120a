@@ -63,14 +63,6 @@ impl Baseline {
         })
     }
 
-    pub fn promote_best(&mut self, trials: &[Trial], dry_run: bool) -> io::Result<bool> {
-        let mut promoted = false;
-        for trial in trials {
-            promoted |= self.promote_trial(trial, dry_run)?;
-        }
-        Ok(promoted)
-    }
-
     pub fn promote_trial(&mut self, trial: &Trial, dry_run: bool) -> io::Result<bool> {
         if dry_run {
             return Ok(false);
@@ -179,6 +171,9 @@ fn parse(text: &str) -> Option<Record> {
             aurora_blocks: value(text, "AURORA_COOPERATIVE_BLOCKS")?.parse().ok()?,
             lr_scale: value(text, "TRAIN_LR_SCALE")?.parse().ok()?,
             adam_lr_scale: value(text, "TRAIN_ADAM_LR_SCALE")?.parse().ok()?,
+            nextlat_lr_scale: value(text, "TRAIN_NEXTLAT_LR_SCALE")
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(1.0),
             warmup_steps: value(text, "TRAIN_LR_WARMUP_STEPS")?.parse().ok()?,
             start_ratio: value(text, "TRAIN_LR_START_RATIO")?.parse().ok()?,
             amuse_beta1: value(text, "TRAIN_AMUSE_BETA1")?.parse().ok()?,

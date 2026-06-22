@@ -1,6 +1,6 @@
 use super::super::candidate::Candidate;
 
-pub const FEATURE_COUNT: usize = 11;
+pub const FEATURE_COUNT: usize = 12;
 
 pub const FEATURE_NAMES: [&str; FEATURE_COUNT] = [
     "batch_size",
@@ -10,6 +10,7 @@ pub const FEATURE_NAMES: [&str; FEATURE_COUNT] = [
     "aurora_blocks",
     "ln_lr_scale",
     "ln_adam_lr_scale",
+    "ln_nextlat_lr_scale",
     "ln_warmup_steps",
     "start_ratio",
     "amuse_beta1",
@@ -25,6 +26,7 @@ pub fn candidate_features(candidate: &Candidate) -> [f64; FEATURE_COUNT] {
         candidate.aurora_blocks as f64 / 80.0,
         candidate.lr_scale.ln(),
         candidate.adam_lr_scale.ln(),
+        candidate.nextlat_lr_scale.ln(),
         (candidate.warmup_steps as f64).ln(),
         candidate.start_ratio,
         candidate.amuse_beta1,

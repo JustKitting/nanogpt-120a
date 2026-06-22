@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::super::{candidate::Candidate, candidate_space, config::SweepConfig, rng::SweepRng};
 
-const FEATURE_COUNT: usize = 11;
+const FEATURE_COUNT: usize = 12;
 
 pub fn candidates(
     used: &HashSet<String>,
@@ -78,13 +78,14 @@ fn distance2(left: &[f64; FEATURE_COUNT], right: &[f64; FEATURE_COUNT]) -> f64 {
 
 fn features(candidate: &Candidate) -> [f64; FEATURE_COUNT] {
     [
-        range(candidate.batch_size as f64, 4.0, 16.0),
+        range(candidate.batch_size as f64, 4.0, 32.0),
         range(candidate.n_layer as f64, 4.0, 8.0),
         range(candidate.n_embd as f64, 1024.0, 2048.0),
         range(candidate.aurora_phases as f64, 2.0, 16.0),
         range(candidate.aurora_blocks as f64, 80.0, 180.0),
         log_range(candidate.lr_scale, candidate_space::LR_SCALE_RANGE),
         log_range(candidate.adam_lr_scale, candidate_space::LR_SCALE_RANGE),
+        log_range(candidate.nextlat_lr_scale, candidate_space::LR_SCALE_RANGE),
         log_range(candidate.warmup_steps as f64, (5.0, 100.0)),
         range(
             candidate.start_ratio,
@@ -148,6 +149,7 @@ mod tests {
             aurora_blocks: if batch_size > 4 { 180 } else { 80 },
             lr_scale,
             adam_lr_scale,
+            nextlat_lr_scale: 1.0,
             warmup_steps,
             start_ratio,
             amuse_beta1,

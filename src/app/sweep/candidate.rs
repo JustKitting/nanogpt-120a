@@ -13,6 +13,7 @@ pub struct Candidate {
     pub aurora_blocks: usize,
     pub lr_scale: f64,
     pub adam_lr_scale: f64,
+    pub nextlat_lr_scale: f64,
     pub warmup_steps: usize,
     pub start_ratio: f64,
     pub amuse_beta1: f64,
@@ -46,7 +47,7 @@ impl Candidate {
 
     pub fn key(&self) -> String {
         format!(
-            "b{}_l{}_d{}_h{}_p{}_c{}_lr{:.4}_alr{:.4}_w{}_s{:.2}_b{:.2}_r{:.2}",
+            "b{}_l{}_d{}_h{}_p{}_c{}_lr{:.4}_alr{:.4}_nlr{:.4}_w{}_s{:.2}_b{:.2}_r{:.2}",
             self.batch_size,
             self.n_layer,
             self.n_embd,
@@ -55,6 +56,7 @@ impl Candidate {
             self.aurora_blocks,
             self.lr_scale,
             self.adam_lr_scale,
+            self.nextlat_lr_scale,
             self.warmup_steps,
             self.start_ratio,
             self.amuse_beta1,
@@ -77,6 +79,10 @@ impl Candidate {
         vec![
             ("TRAIN_LR_SCALE", format!("{:.6}", self.lr_scale)),
             ("TRAIN_ADAM_LR_SCALE", format!("{:.6}", self.adam_lr_scale)),
+            (
+                "TRAIN_NEXTLAT_LR_SCALE",
+                format!("{:.6}", self.nextlat_lr_scale),
+            ),
             ("TRAIN_LR_WARMUP_STEPS", self.warmup_steps.to_string()),
             ("TRAIN_LR_START_RATIO", format!("{:.6}", self.start_ratio)),
             ("TRAIN_AMUSE_BETA1", format!("{:.6}", self.amuse_beta1)),

@@ -22,6 +22,7 @@ pub(super) fn sync_shared_history(
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn all_trials(shared_trials: &[Trial], local_trials: &[Trial]) -> Vec<Trial> {
     all_trials_with_baseline(None, shared_trials, local_trials)
 }

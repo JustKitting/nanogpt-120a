@@ -3,7 +3,7 @@ use super::{
     rng::SweepRng,
 };
 
-pub const BATCH_SIZE: [usize; 3] = [4, 8, 16];
+pub const BATCH_SIZE: [usize; 8] = [4, 8, 12, 16, 20, 24, 28, 32];
 pub const N_LAYER: [usize; 2] = [MIN_N_LAYER, 8];
 pub const N_EMBD: [(usize, usize); 2] = [(1024, 16), (2048, 16)];
 pub const AURORA_BLOCKS: [usize; 5] = [80, 90, 120, 160, 180];
@@ -12,7 +12,7 @@ pub const WARMUP_STEPS_RANGE: (usize, usize) = (5, 100);
 pub const START_RATIO_RANGE: (f64, f64) = (0.0, 0.2);
 pub const AMUSE_BETA1_RANGE: (f64, f64) = (0.2, 0.6);
 pub const AMUSE_RHO_RANGE: (f64, f64) = (0.5, 1.0);
-pub const FACTOR_COUNT: usize = 11;
+pub const FACTOR_COUNT: usize = 12;
 
 const AURORA_PHASES: [usize; 4] = [2, 4, 8, 16];
 
@@ -30,6 +30,7 @@ pub fn random(rng: &mut SweepRng) -> Candidate {
         aurora_blocks,
         lr_scale: rng.log_uniform(LR_SCALE_RANGE.0, LR_SCALE_RANGE.1),
         adam_lr_scale: rng.log_uniform(LR_SCALE_RANGE.0, LR_SCALE_RANGE.1),
+        nextlat_lr_scale: rng.log_uniform(LR_SCALE_RANGE.0, LR_SCALE_RANGE.1),
         warmup_steps: random_usize_range(rng, WARMUP_STEPS_RANGE),
         start_ratio: random_f64_range(rng, START_RATIO_RANGE),
         amuse_beta1: random_f64_range(rng, AMUSE_BETA1_RANGE),
@@ -51,10 +52,11 @@ pub fn from_unit(unit: [f64; FACTOR_COUNT]) -> Candidate {
         aurora_blocks,
         lr_scale: log_lerp(LR_SCALE_RANGE, unit[5]),
         adam_lr_scale: log_lerp(LR_SCALE_RANGE, unit[6]),
-        warmup_steps: range_usize(WARMUP_STEPS_RANGE, unit[7]),
-        start_ratio: range_f64(START_RATIO_RANGE, unit[8]),
-        amuse_beta1: range_f64(AMUSE_BETA1_RANGE, unit[9]),
-        amuse_rho: range_f64(AMUSE_RHO_RANGE, unit[10]),
+        nextlat_lr_scale: log_lerp(LR_SCALE_RANGE, unit[7]),
+        warmup_steps: range_usize(WARMUP_STEPS_RANGE, unit[8]),
+        start_ratio: range_f64(START_RATIO_RANGE, unit[9]),
+        amuse_beta1: range_f64(AMUSE_BETA1_RANGE, unit[10]),
+        amuse_rho: range_f64(AMUSE_RHO_RANGE, unit[11]),
     }
 }
 
@@ -109,7 +111,7 @@ mod tests {
         assert_eq!(low.batch_size, 4);
         assert_eq!(low.n_layer, 4);
         assert_eq!(low.n_embd, 1024);
-        assert_eq!(high.batch_size, 16);
+        assert_eq!(high.batch_size, 32);
         assert_eq!(high.n_layer, 8);
         assert_eq!(high.n_embd, 2048);
         assert!(

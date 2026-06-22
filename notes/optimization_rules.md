@@ -35,6 +35,15 @@ completed step count inside the band can be a valid long-run improvement.
 This rule is for math-preserving kernel/runtime changes. It does not apply to
 hyperparameter sweep promotion.
 
+## Active Baseline
+
+NextLat is part of the active model path. Do not protect or compare against
+pre-NextLat validation results when evaluating current NextLat work.
+
+`notes/sweep_baseline.env` is the mutable baseline for the active model lineage.
+For current work, that means the best accepted NextLat 900-second SYNTH result,
+not the best historical result from an older architecture.
+
 ## Sweep Rule
 
 Do not run a new hyperparameter sweep for same-math kernel/runtime edits. Use

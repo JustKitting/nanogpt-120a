@@ -8,7 +8,8 @@ use super::super::{
     rng::SweepRng,
 };
 
-const HALTON_BASES: [u32; candidate_space::FACTOR_COUNT] = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31];
+const HALTON_BASES: [u32; candidate_space::FACTOR_COUNT] =
+    [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37];
 
 pub fn candidates(
     used: &HashSet<String>,
@@ -174,6 +175,7 @@ mod tests {
             aurora_blocks: 80,
             lr_scale: 1.0,
             adam_lr_scale: 1.0,
+            nextlat_lr_scale: 1.0,
             warmup_steps: 20,
             start_ratio: 0.1,
             amuse_beta1: 0.4,

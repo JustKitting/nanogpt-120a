@@ -24,18 +24,6 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
     let mut shared_history = History::load(config.seed_history.clone())?;
     chain::sync_shared_history(&mut shared_history, &history.trials, config.dry_run)?;
     let mut baseline = Baseline::load(config.baseline.clone())?;
-    let initial_trials = chain::all_trials(&shared_history.trials, &history.trials);
-    if baseline.promote_best(&initial_trials, config.dry_run)? {
-        println!(
-            "sweep_baseline_promoted val_loss={:.6} key={} path={}",
-            baseline.val_loss().unwrap_or(f64::NAN),
-            baseline
-                .candidate()
-                .map(|candidate| candidate.key())
-                .unwrap_or_default(),
-            config.baseline.display()
-        );
-    }
     let mut baseline_screen_loss = screen_baseline(&baseline, &config, &sweep_dir)?;
     let mut rng = chain::sweep_rng(config.seed, history.trials.len());
 
@@ -431,6 +419,7 @@ mod tests {
             aurora_blocks: 80,
             lr_scale: 1.0,
             adam_lr_scale: 1.0,
+            nextlat_lr_scale: 1.0,
             warmup_steps: 20,
             start_ratio: 0.1,
             amuse_beta1: 0.4,

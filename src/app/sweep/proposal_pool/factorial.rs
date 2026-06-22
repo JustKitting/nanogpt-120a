@@ -68,6 +68,9 @@ fn set_factor(candidate: &mut Candidate, name: &str, high: bool) {
         "ln_adam_lr_scale" => {
             candidate.adam_lr_scale = range_f64(candidate_space::LR_SCALE_RANGE, high, true);
         }
+        "ln_nextlat_lr_scale" => {
+            candidate.nextlat_lr_scale = range_f64(candidate_space::LR_SCALE_RANGE, high, true);
+        }
         "ln_warmup_steps" => {
             candidate.warmup_steps = range_usize(candidate_space::WARMUP_STEPS_RANGE, high);
         }

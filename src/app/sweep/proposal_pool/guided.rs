@@ -42,6 +42,13 @@ pub fn candidate(rng: &mut SweepRng, direction: &Direction, jitter: bool) -> Can
             jitter,
             true,
         ),
+        nextlat_lr_scale: pick_f64(
+            candidate_space::LR_SCALE_RANGE,
+            direction.nextlat_lr_scale,
+            rng,
+            jitter,
+            true,
+        ),
         warmup_steps: pick_usize(
             candidate_space::WARMUP_STEPS_RANGE,
             direction.warmup_steps,

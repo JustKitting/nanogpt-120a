@@ -27,7 +27,7 @@ fn guided_pool_uses_main_effect_direction() {
     );
 
     assert_eq!(pool[0].source, "guided");
-    assert_eq!(pool[0].candidate.batch_size, 16);
+    assert_eq!(pool[0].candidate.batch_size, 32);
     assert_eq!(pool[0].candidate.n_layer, 8);
     assert!(pool.iter().any(|candidate| candidate.source == "factorial"));
     assert!(pool.iter().any(|candidate| candidate.source == "variance"));
@@ -120,6 +120,7 @@ fn candidate(batch_size: usize, n_layer: usize) -> Candidate {
         aurora_blocks: 80,
         lr_scale: 1.0,
         adam_lr_scale: 1.0,
+        nextlat_lr_scale: 1.0,
         warmup_steps: 20,
         start_ratio: 0.1,
         amuse_beta1: 0.4,
@@ -135,6 +136,7 @@ fn changed_factors(left: &Candidate, right: &Candidate) -> usize {
         + usize::from(left.aurora_blocks != right.aurora_blocks)
         + usize::from(left.lr_scale != right.lr_scale)
         + usize::from(left.adam_lr_scale != right.adam_lr_scale)
+        + usize::from(left.nextlat_lr_scale != right.nextlat_lr_scale)
         + usize::from(left.warmup_steps != right.warmup_steps)
         + usize::from(left.start_ratio != right.start_ratio)
         + usize::from(left.amuse_beta1 != right.amuse_beta1)
@@ -143,7 +145,7 @@ fn changed_factors(left: &Candidate, right: &Candidate) -> usize {
 
 fn wide_candidate(i: usize) -> Candidate {
     Candidate {
-        batch_size: [4, 8, 16][i % 3],
+        batch_size: [4, 8, 12, 16, 20, 24, 28, 32][i % 8],
         n_layer: [4, 8][(i / 3) % 2],
         n_embd: [1024, 2048][(i / 5) % 2],
         n_head: 16,
@@ -151,6 +153,7 @@ fn wide_candidate(i: usize) -> Candidate {
         aurora_blocks: [80, 90, 120, 160, 180][(i / 11) % 5],
         lr_scale: 0.5 + (i % 11) as f64 * 0.18,
         adam_lr_scale: 0.5 + (i % 13) as f64 * 0.15,
+        nextlat_lr_scale: 0.5 + (i % 17) as f64 * 0.12,
         warmup_steps: 5 + (i * 7) % 96,
         start_ratio: (i % 9) as f64 * 0.025,
         amuse_beta1: 0.2 + (i % 7) as f64 * 0.06,
