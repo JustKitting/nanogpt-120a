@@ -34,6 +34,48 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-22
 commit: rejected uncommitted candidate, code reverted
+experiment: Mask non-contributing NVFP4 MMA scale lanes in projection CTA.
+status: rejected_screen
+source:
+  Colfax SM12x NVFP4 blockscaled GEMM notes describe scale-factor source lanes
+  as a constrained per-quad layout. The candidate tested whether our CTA MMA
+  scale helpers could avoid duplicate shared-memory scale loads in lanes that
+  should not be consumed by the mxf4nvf4 MMA scale source selectors.
+change:
+  Temporarily returned zero from projection_cta/load.rs load_a_scale4 for
+  thread_in_group >= 2 and from load_b_scale4 for thread_in_group != 0.
+  This left staging, MMA instruction shape, tile geometry, and math unchanged
+  for the lanes expected to provide SFA/SFB.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass after serial rerun.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass after serial rerun.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test next_latent -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_scale_lane_mask_b16_l4d1024_20_20260622T174557Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.748, completed_steps=20.
+measured_effect:
+  Against the accepted aligned-u32 projection profile
+  target/nsys/projection_aligned_u32_load_b16_l4d1024_20_20260622T171110Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1175.625884ms to 1181.361816ms over 400 calls. lm_head_kernel moved from
+  207.910274ms to 207.984213ms, nextlat_projection_kernel moved from
+  67.114355ms to 67.245446ms, and profiled train elapsed moved from 5.740s
+  to 5.748s.
+decision:
+  Reject before the 100-step and 900-second gates. The code was reverted.
+  Reducing duplicate scale helper loads did not reduce the hot projection CTA
+  cost; the extra lane predicates appear to outweigh the removed shared loads.
+```
+
+```text
+date: 2026-06-22
+commit: rejected uncommitted candidate, code reverted
 experiment: Remove fixed CTA entry guards from f16 and NVFP4 projection bodies.
 status: rejected_screen
 change:
