@@ -93,26 +93,33 @@ pub fn stage_tiles_aligned(
     }
 }
 
-pub fn stage_a_tiles_aligned(
+#[allow(clippy::too_many_arguments)]
+pub fn stage_a_pair_tiles_aligned(
     input_bytes: &[u8],
     input_scales: &[u8],
-    tile: Nvfp4ProjectionCtaTile,
+    tile0: Nvfp4ProjectionCtaTile,
+    tile1: Nvfp4ProjectionCtaTile,
     k_base: u32,
     params: &Nvfp4ProjectionParams,
-    a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
+    a0_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
+    a1_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
+    a0_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
+    a1_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
 ) {
     let thread_id = thread::threadIdx_x();
     let mut offset = thread_id;
     while offset < NVFP4_PROJECTION_CTA_A_PACKS as u32 {
-        a_packs[offset as usize] = load_a_pack_aligned(input_bytes, tile, offset, k_base, params);
+        a0_packs[offset as usize] = load_a_pack_aligned(input_bytes, tile0, offset, k_base, params);
+        a1_packs[offset as usize] = load_a_pack_aligned(input_bytes, tile1, offset, k_base, params);
         offset += NVFP4_PROJECTION_CTA_THREADS;
     }
 
     let mut offset = thread_id;
     while offset < NVFP4_PROJECTION_CTA_A_SCALES as u32 {
-        a_scales[offset as usize] =
-            load_a_scale_aligned(input_scales, tile, offset, k_base, params);
+        a0_scales[offset as usize] =
+            load_a_scale_aligned(input_scales, tile0, offset, k_base, params);
+        a1_scales[offset as usize] =
+            load_a_scale_aligned(input_scales, tile1, offset, k_base, params);
         offset += NVFP4_PROJECTION_CTA_THREADS;
     }
 }

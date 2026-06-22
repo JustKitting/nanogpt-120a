@@ -10764,3 +10764,48 @@ decision:
   kernel slower. Code was reverted; keep this note to avoid repeating this
   cleanup.
 ```
+
+```text
+date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Collapse row-pair A staging loops in NVFP4 projection CTA.
+status: accepted_900s
+change:
+  Replaced the two separate aligned A-staging helper calls in the row-pair
+  projection accumulator with one helper that stages both row tiles' A payloads
+  and scales in the same loops. The tile shape, row-pair B reuse, MMA
+  instruction sequence, scale layout, and output math are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test next_latent -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/projection_a_pair_stage_b16_l4d1024_20_20260622T175247Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.739, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_a_pair_stage_b16_l4d1024_100_20260622T175318Z.log
+    val_loss=6.300175, train_elapsed_s=29.222, completed_steps=100.
+  900-second held-out gate:
+    target/projection_a_pair_stage_b16_l4d1024_900_20260622T175403Z.log
+    val_loss=3.580127, train_elapsed_s=900.206, completed_steps=3014.
+measured_effect:
+  Against the accepted aligned-u32 projection profile
+  target/nsys/projection_aligned_u32_load_b16_l4d1024_20_20260622T171110Z.run.log,
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1175.625884ms to 1175.480012ms over 400 calls. lm_head_kernel moved from
+  207.910274ms to 207.423786ms, and nextlat_projection_kernel moved from
+  67.114355ms to 67.079121ms. The 100-step screen improved from
+  val_loss=6.303235 / 29.240s to val_loss=6.300175 / 29.222s.
+  The 900-second held-out gate improved held-out validation loss from
+  3.600426 to 3.580127 and completed steps from 3006 to 3014.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  SYNTH budget.
+```
