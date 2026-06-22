@@ -247,6 +247,51 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, reverted after gate
+experiment: Single-block schedule-free materialization for <=1024-element tensors.
+status: rejected_900s
+change:
+  Added schedule_free_small_four_six_kernel and routed schedule-free
+  materialization through it when len <= 1024. The small path computed the
+  tensor amax and packed 4/6 NVFP4 output in one block, collapsing the normal
+  schedule_free_chunk_amax -> tensor_amax_from_chunks -> schedule_free_four_six
+  sequence into one launch for small vectors. Larger tensors stayed on the
+  existing path.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/schedule_free_small_materialize_b16_l4d1024_20_20260622T195327Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.670, completed_steps=20.
+  100-step SYNTH screen:
+    target/schedule_free_small_materialize_b16_l4d1024_100_20260622T195346Z.log
+    val_loss=6.300053, train_elapsed_s=28.889, completed_steps=100.
+  900-second held-out gate:
+    target/schedule_free_small_materialize_b16_l4d1024_900_20260622T195427Z.log
+    val_loss=3.573767, train_elapsed_s=900.288, completed_steps=3048.
+measured_effect:
+  Against the promoted direct-half aligned profile
+  target/nsys/f16_half_aligned_b16_l4d1024_20_20260622T192806Z.run.log,
+  cuLaunchKernel calls moved from 15219 to 14139 over 20 profiled steps.
+  schedule_free_chunk_amax_kernel and schedule_free_four_six_kernel each moved
+  from 1180 calls to 640 calls, with 540 calls handled by
+  schedule_free_small_four_six_kernel. The 20-step screen moved from
+  5.674s to 5.670s, and the 100-step screen moved from
+  val_loss=6.304914 / 28.915s to val_loss=6.300053 / 28.889s.
+  The full 900-second held-out gate failed the promotion rule: validation loss
+  moved from 3.558484 to 3.573767, while completed steps stayed equal at 3048.
+decision:
+  Reject after the 900-second gate. The short screens improved, but the fixed
+  wall-clock objective did not: same completed step count and worse held-out
+  validation loss. Code was reverted.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, reverted after 20-step screen
 experiment: Explicitly unroll row-pair projection K atoms.
 status: rejected_screen
