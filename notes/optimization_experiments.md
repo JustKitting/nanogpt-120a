@@ -33,6 +33,35 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-22
 commit: uncommitted candidate, reverted before gate
+experiment: Compute cross-entropy dlogits row amax directly from target
+  probability.
+status: rejected_screen
+change:
+  Replaced the third per-row max-reduction in cross_entropy_kernel with the
+  identity max_i |p_i - y_i| = 1 - p_target. The dense dlogits write and loss
+  computation were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test loss -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/loss_direct_amax_b16_l4d1024_20_20260622T144158Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.972, completed_steps=20.
+measured_effect:
+  Against the clean profile
+  target/nsys/current_clean_b16_l4d1024_20_20260622T143653Z.run.log,
+  cross_entropy_kernel moved from 58.225311ms to 58.241029ms over 21 calls.
+  Full profiled training time moved from 5.968s to 5.972s with identical
+  20-step validation loss.
+decision:
+  Reject before the 100-step and 900-second gates. Although the identity is
+  correct, removing the reduction did not improve the generated kernel in the
+  current profile. Code was reverted.
+```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
 experiment: Force Aurora cooperative kernel launch bounds to 256 threads and
   4 blocks per SM.
 status: rejected_screen
