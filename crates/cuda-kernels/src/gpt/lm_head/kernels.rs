@@ -26,8 +26,10 @@ pub(super) mod module {
         params: LmHeadParams,
     ) {
         static mut A_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
+        static mut A1_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
         static mut B_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS> = SharedArray::UNINIT;
         static mut A_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
+        static mut A1_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
         static mut B_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES> = SharedArray::UNINIT;
 
         let projection = Nvfp4ProjectionParams {
@@ -58,8 +60,10 @@ pub(super) mod module {
                 &mut logits,
                 projection,
                 unsafe { &mut A_PACKS },
+                unsafe { &mut A1_PACKS },
                 unsafe { &mut B_PACKS },
                 unsafe { &mut A_SCALES },
+                unsafe { &mut A1_SCALES },
                 unsafe { &mut B_SCALES },
                 tile0,
                 tile1,
