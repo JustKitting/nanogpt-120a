@@ -30,6 +30,35 @@ Primary optimization target:
 ```text
 heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
+```text
+date: 2026-06-22
+commit: uncommitted candidate, reverted before gate
+experiment: Force Aurora cooperative kernel launch bounds to 256 threads and
+  4 blocks per SM.
+status: rejected_screen
+change:
+  Added cuda-oxide #[launch_bounds(256, 4)] to
+  aurora_mega_update_cooperative_kernel. The generated PTX contained
+  .maxntid 256, 1, 1 and .minnctapersm 4, so the compiler hint did land.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  20-step nsys:
+    target/nsys/aurora_launch_bounds_256x4_b16_l4d1024_20_20260622T143827Z.run.log
+    val_loss=9.063751, train_elapsed_s=6.021, completed_steps=20.
+measured_effect:
+  Against the fresh clean profile
+  target/nsys/current_clean_b16_l4d1024_20_20260622T143653Z.run.log, Aurora
+  regressed from 1914.892196ms to 1958.861395ms over 20 calls. Full profiled
+  training time moved from 5.968s to 6.021s with identical 20-step validation
+  loss. Linear backward projection also moved slightly worse, from
+  1237.737052ms to 1240.959636ms.
+decision:
+  Reject before the 100-step and 900-second gates. Forcing the occupancy hint
+  did not improve useful work and made the dominant Aurora kernel slower.
+  Code was reverted.
+```
 
 ```text
 date: 2026-06-22
