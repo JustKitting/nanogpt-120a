@@ -3,10 +3,11 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
 
 use super::args::{
-    MsEdenDeviceScaleQuantArgs, MsEdenQuantArgs, MsEdenTransposeDeviceScaleQuantArgs,
-    Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs, Nvfp4TransposeMsEdenDeviceScaleQuantArgs,
-    QuartetBackwardMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenQuantArgs, RowAmaxArgs,
-    RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs, TensorAmaxArgs,
+    MsEdenDeviceScaleQuantArgs, MsEdenPairDeviceScaleQuantArgs, MsEdenQuantArgs,
+    MsEdenTransposeDeviceScaleQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs,
+    Nvfp4TransposeMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenDeviceScaleQuantArgs,
+    QuartetBackwardMsEdenQuantArgs, RowAmaxArgs, RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
+    TensorAmaxArgs,
 };
 use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 use super::kernels;
@@ -332,6 +333,99 @@ impl Nvfp4QuantModule {
                 args.sign_seed,
                 args.scale_seed,
             )
+    }
+
+    pub fn fp32_pair_to_nvfp4_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
+        &self,
+        args: MsEdenPairDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let element_count = args.row_count * args.src_row_len;
+        let chunk_count = if let Some(chunk_count) = args.precomputed_chunk_count {
+            chunk_count
+        } else {
+            self.tensor_chunk_amax_f32(
+                args.stream,
+                args.x,
+                &mut *args.out_chunk_amax,
+                element_count,
+            )?
+        };
+
+        self.quartet_backward_ms_eden_global_scale_from_chunks(
+            args.stream,
+            &*args.out_chunk_amax,
+            &mut *args.out_global_scale,
+            chunk_count,
+        )?;
+
+        let row_chunk_count = ms_eden_chunk_count(args.row_count * args.dst_row_len);
+        let transpose_chunk_count =
+            ms_eden_chunk_count(args.src_row_len * args.transpose_dst_row_len);
+        if pack_grid_is_exact(row_chunk_count) && pack_grid_is_exact(transpose_chunk_count) {
+            let row_grid_dim = pack_grid_dim(row_chunk_count);
+            let transpose_grid_dim = pack_grid_dim(transpose_chunk_count);
+            return self
+                .ms_eden
+                .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
+                    args.stream,
+                    LaunchConfig {
+                        grid_dim: (row_grid_dim + transpose_grid_dim, 1, 1),
+                        block_dim: (THREADS_PER_BLOCK, 1, 1),
+                        shared_mem_bytes: 0,
+                    },
+                    args.x,
+                    args.out_fp4,
+                    args.out_scales,
+                    args.out_global_scales,
+                    args.transpose_out_fp4,
+                    args.transpose_out_scales,
+                    args.transpose_out_global_scales,
+                    &*args.out_global_scale,
+                    row_grid_dim,
+                    args.row_count,
+                    args.src_row_len,
+                    args.dst_row_len,
+                    args.transpose_dst_row_len,
+                    args.scale_override,
+                    args.sign_seed,
+                    args.scale_seed,
+                    args.transpose_scale_seed,
+                );
+        }
+
+        self.fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax(MsEdenDeviceScaleQuantArgs {
+            stream: args.stream,
+            x: args.x,
+            out_fp4: args.out_fp4,
+            out_scales: args.out_scales,
+            out_global_scales: args.out_global_scales,
+            out_chunk_amax: args.out_chunk_amax,
+            global_scale: &*args.out_global_scale,
+            row_count: args.row_count,
+            src_row_len: args.src_row_len,
+            dst_row_len: args.dst_row_len,
+            scale_override: args.scale_override,
+            sign_seed: args.sign_seed,
+            scale_seed: args.scale_seed,
+        })?;
+
+        self.fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax(
+            MsEdenTransposeDeviceScaleQuantArgs {
+                stream: args.stream,
+                x: args.x,
+                out_fp4: args.transpose_out_fp4,
+                out_scales: args.transpose_out_scales,
+                out_global_scales: args.transpose_out_global_scales,
+                out_chunk_amax: args.out_chunk_amax,
+                global_scale: &*args.out_global_scale,
+                source_rows: args.row_count,
+                source_cols: args.src_row_len,
+                dst_row_len: args.transpose_dst_row_len,
+                scale_override: args.scale_override,
+                sign_seed: args.sign_seed,
+                scale_seed: args.transpose_scale_seed,
+            },
+        )
     }
 
     pub fn rowwise_nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale(

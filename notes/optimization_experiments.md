@@ -33,6 +33,56 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, accepted after gate
+experiment: Combine linear-backward E rowwise and transposed MS-EDEN packs.
+status: accepted_900s
+change:
+  Added an exact-grid MS-EDEN pack kernel that packs the same FP32 error tensor
+  into both rowwise E_h and transposed E_t_h outputs in one launch after the
+  shared Quartet/MS-EDEN global scale has been derived. Linear backward now
+  uses that combined pack for the E operand and falls back to the old two-pack
+  route when either pack grid is not exact. RHT seeds, scale override, global
+  scale derivation, output layouts, and downstream MMA consumers are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/linear_e_pair_pack_b16_l4d1024_20_20260622T215134Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.660, completed_steps=20.
+  100-step SYNTH screen:
+    target/linear_e_pair_pack_b16_l4d1024_100_20260622T215151Z.log
+    val_loss=6.303898, train_elapsed_s=28.840, completed_steps=100.
+  900-second held-out gate:
+    target/linear_e_pair_pack_b16_l4d1024_900_20260622T215230Z.log
+    val_loss=3.563282, train_elapsed_s=900.188, completed_steps=3054.
+measured_effect:
+  Against the promoted exact-pack baseline
+  target/nsys/ms_eden_exact_pack_b16_l4d1024_20_20260622T205929Z.run.log,
+  cuLaunchKernel calls dropped from 15219 to 14819 over 20 profiled steps.
+  The two E pack kernels were replaced by
+  fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel at
+  379.133507ms over 400 calls; the prior separate fp32 and transpose pack
+  entries were 137.933215ms and 242.064051ms, about 379.997266ms combined.
+  Short profiled train time moved from 5.667s to 5.660s, and the 100-step
+  screen moved from 28.887s to 28.840s.
+  The fixed-wall gate moved from val_loss=3.561855 / 3050 steps to
+  val_loss=3.563282 / 3054 steps, a +0.040% validation-loss move inside the
+  active 1% noise band with 4 more completed steps.
+decision:
+  Promote under the active runtime-change rule: validation loss stayed within
+  the 1% noise band and completed step count increased under the fixed
+  900-second SYNTH budget.
+```
+
+```text
+date: 2026-06-22
 commit: rejected uncommitted candidate, code reverted
 experiment: Mask non-contributing NVFP4 MMA scale lanes in projection CTA.
 status: rejected_screen

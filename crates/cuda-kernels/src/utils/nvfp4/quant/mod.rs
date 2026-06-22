@@ -4,10 +4,11 @@ pub(crate) mod kernels;
 mod launcher;
 
 pub use args::{
-    MsEdenDeviceScaleQuantArgs, MsEdenQuantArgs, MsEdenTransposeDeviceScaleQuantArgs,
-    Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs, Nvfp4TransposeMsEdenDeviceScaleQuantArgs,
-    QuartetBackwardMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenQuantArgs, RowAmaxArgs,
-    RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs, TensorAmaxArgs,
+    MsEdenDeviceScaleQuantArgs, MsEdenPairDeviceScaleQuantArgs, MsEdenQuantArgs,
+    MsEdenTransposeDeviceScaleQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs,
+    Nvfp4TransposeMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenDeviceScaleQuantArgs,
+    QuartetBackwardMsEdenQuantArgs, RowAmaxArgs, RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
+    TensorAmaxArgs,
 };
 pub use launcher::Nvfp4QuantModule;
 
