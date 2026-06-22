@@ -169,6 +169,50 @@ decision:
 
 ```text
 date: 2026-06-22
+commit: uncommitted candidate, code reverted
+experiment: Fuse Adam update with chunk amax for four-six requantization.
+status: rejected_pre_gate
+change:
+  Added a candidate fp32_adamw_update_chunk_amax_kernel that updated z/x master,
+  moments, and schedule-free average exactly as the existing Adam update path,
+  then reduced abs(x_master_after_update) into the chunk_amax buffer in the
+  same kernel. The existing tensor_amax_from_chunks_f32 and four-six
+  quantization stages were left unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step plain SYNTH run:
+    target/runs/20260622_212850Z_synth_900s
+    val_loss=9.063751, train_elapsed_s=5.725, completed_steps=20.
+  20-step nsys:
+    target/nsys/adam_update_chunk_amax_b16_l4d1024_20_20260622T212904Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.673, completed_steps=20.
+  100-step SYNTH screen:
+    target/adam_update_chunk_amax_b16_l4d1024_100_20260622T212926Z.log
+    val_loss=6.306319, train_elapsed_s=28.890, completed_steps=100.
+measured_effect:
+  Against the current accepted profile
+  target/nsys/ms_eden_exact_pack_b16_l4d1024_20_20260622T205929Z.run.log,
+  cuLaunchKernel calls fell from 15219 to 14419 over 20 profiled steps. The
+  Adam-side tensor_chunk_amax_f32_kernel calls dropped from 1180 to 380, but
+  fp32_adamw_update_kernel 17.171181ms became
+  fp32_adamw_update_chunk_amax_kernel 19.421829ms, and
+  tensor_chunk_amax_f32_kernel only moved from 28.045071ms to 25.740706ms.
+  Full profiled train time moved from 5.667s to 5.673s.
+  Against the current 100-step screen baseline in notes/sweep_baseline.env,
+  val_loss moved from 6.295354 to 6.306319 and elapsed time moved from
+  28.887s to 28.890s with the same 100 completed steps.
+decision:
+  Reject before the 900-second gate. The launch count reduction did not produce
+  a useful runtime improvement, and the 100-step screen was slightly worse on
+  both held-out validation and elapsed time. Code was reverted; keep the note
+  to avoid repeating this Adam update/chunk-amax fusion shape.
+```
+
+```text
+date: 2026-06-22
 commit: uncommitted candidate, reverted after 20-step screen
 experiment: Hoist Aurora momentum/update transposed branches out of element loops.
 status: rejected_screen
