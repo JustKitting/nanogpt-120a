@@ -6,7 +6,7 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 use crate::float_ptx::{abs_f32, exp_f32, ln_f32, max_f32};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
-const CROSS_ENTROPY_THREADS_PER_BLOCK: u32 = 256;
+const CROSS_ENTROPY_THREADS_PER_BLOCK: u32 = 1024;
 const WARP_SIZE: u32 = 32;
 const CROSS_ENTROPY_WARPS_PER_BLOCK: u32 = CROSS_ENTROPY_THREADS_PER_BLOCK / WARP_SIZE;
 
