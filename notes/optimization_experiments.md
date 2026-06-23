@@ -12137,3 +12137,41 @@ decision:
   ptxas resource profile and optimizer tests, but the target nsys run got
   slower. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Add aligned staging/store fast paths for f16 RHS TC matmul variants.
+status: rejected_screen
+change:
+  Added aligned staging and store branches to f16_cta_tc_matmul_f32_rhs_kernel,
+  f16_cta_tc_matmul_f32_half_rhs_kernel, and
+  f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel. The target shapes in the
+  attention forward/backward TC path are tile-aligned, so the candidate tried
+  to remove guarded shared-memory staging and guarded output stores.
+verification:
+  cargo fmt --all --check: pass after formatting.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas --gpu-name=sm_120a --verbose:
+    target/ptxas_f16_rhs_aligned.log
+    no spills; f16_cta_tc_matmul_f32_rhs_kernel increased from the previous
+    39 registers/thread to 40 registers/thread, while the half-RHS kernels
+    stayed at 40 registers/thread.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/f16_rhs_aligned_b16_l4d1024_20_gpu0_20260623T034541Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.667, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5763.023ms over 20 steps.
+  The directly targeted buckets all regressed:
+  f16_cta_tc_matmul_f32_rhs_kernel 121.575ms -> 127.322ms,
+  f16_cta_tc_matmul_f32_half_rhs_kernel 111.540ms -> 116.605ms, and
+  f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel 233.496ms -> 249.324ms.
+decision:
+  Reject before the 100-step and 900-second gates. The aligned variants passed
+  correctness checks, but the target profile got slower. Code was reverted.
+```
