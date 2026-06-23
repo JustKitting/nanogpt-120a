@@ -11697,3 +11697,72 @@ decision:
   the 1% noise band and completed step count increased under the fixed
   900-second SYNTH budget.
 ```
+
+```text
+date: 2026-06-23
+commit: uncommitted candidate, rejected before gate
+experiment: Add aligned Aurora Polar tile staging/stores.
+status: rejected_screen
+change:
+  Added load/store fast paths for tile-aligned Aurora Polar matrices and routed
+  plain, next, and symmetric Polar tiles through them when dimensions matched
+  the 64x64x16 FP16 CTA tile shape.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys screen:
+    target/nsys/aurora_aligned_polar_b16_l4d1024_20_powercap_20260623T014048Z.run.log
+    failed before the optimizer update with DriverError(720, "too many blocks
+    in cooperative launch").
+measured_effect:
+  The aligned path increased the cooperative kernel resource footprint enough
+  that the accepted AURORA_COOPERATIVE_BLOCKS=180 launch could not run.
+decision:
+  Reject and revert. Lowering cooperative blocks to rescue this candidate would
+  change the runtime schedule and needs separate evidence.
+```
+
+```text
+date: 2026-06-23
+commit: uncommitted candidate, accepted after gate
+experiment: Share row global scale loads in aligned no-bias projection stores.
+status: accepted_900s
+change:
+  Replaced four per-element global-scale loads in
+  store_accumulator_aligned with two row-scale loads and four adjacent stores.
+  This applies to the aligned no-bias projection path used by the paired linear
+  backward projection kernel. Math, tile shape, and launch shape are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_sm120a_verbose_store_pair_candidate.txt
+    linear_backward_projection_pair_cta_device_scale_kernel uses 39 registers,
+    9216 bytes smem, and has 0 spill stores / 0 spill loads.
+  20-step nsys:
+    target/nsys/projection_store_pair_scale_b16_l4d1024_20_powercap_20260623T014401Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.596, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_store_pair_scale_b16_l4d1024_100_powercap_20260623T014419Z.log
+    val_loss=6.300003, train_elapsed_s=28.512, completed_steps=100.
+  900-second held-out gate:
+    target/projection_store_pair_scale_b16_l4d1024_900_powercap_20260623T014507Z.log
+    val_loss=3.560585, train_elapsed_s=900.108, completed_steps=3091.
+measured_effect:
+  Against the previous promoted baseline
+  target/fp32_pair_no_pad_general_b16_l4d1024_900_powercap_20260623T001534Z.log,
+  held-out validation loss improved from 3.564260 to 3.560585 and completed
+  steps increased from 3088 to 3091. The 20-step profile moved
+  linear_backward_projection_pair_cta_device_scale_kernel from 1143.281972ms
+  to 1138.517716ms over 400 calls.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  SYNTH budget.
+```
