@@ -12175,3 +12175,41 @@ decision:
   Reject before the 100-step and 900-second gates. The aligned variants passed
   correctness checks, but the target profile got slower. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Schedule attention probability/dS backward by query/head/batch row.
+status: rejected_screen
+change:
+  Replaced the full-square 1D attention_prob_ds_kernel launch with a
+  row-scheduled launch over (query, head, batch). Each block looped only over
+  key <= query and wrote the same square p/ds indices. The intent was to avoid
+  launching upper-triangle work while preserving the existing lower-triangle
+  output contract.
+verification:
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_prob_ds_lower_triangle_candidate.log
+    attention_prob_ds_kernel used 30 registers, 0 stack, and 0 spill
+    stores/loads.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/attention_prob_ds_rowgrid_b16_l4d1024_20_gpu0_20260623T035521Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.654, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5749.757ms over 20 steps.
+  attention_prob_ds_kernel regressed from 125.872ms to 127.710ms over 80
+  calls. aurora_mega_update_cooperative_kernel and
+  linear_backward_projection_pair_cta_device_scale_kernel also drifted slower,
+  from 1710.614ms to 1730.606ms and 1137.312ms to 1167.872ms respectively.
+decision:
+  Reject before the 100-step and 900-second gates. The lower-triangle row
+  schedule preserved correctness checks, but the actual target profile got
+  slower. Code was reverted.
+```
