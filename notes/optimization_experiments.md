@@ -12062,3 +12062,42 @@ decision:
   register pressure and worsened the actual target-kernel profile. Code was
   reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Add mixed row-divide / transpose-power-of-two MS-EDEN pair packer.
+status: rejected_screen
+change:
+  Added a specialized
+  fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_row_div_transpose_pow2_kernel
+  for pair quantization shapes where the row-side output chunks are not a
+  power of two but the transposed token-side chunks are. The intent was to keep
+  the existing general indexing on the row half while using shift/mask indexing
+  for the transpose half of the hot final-head and QKV-shaped calls.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas --gpu-name=sm_120a --verbose:
+    target/ptxas_row_div_transpose_pow2.log
+    new mixed kernel used 27 registers/thread, 0 spill stores, 0 spill loads,
+    matching the old general and full-power-of-two pair kernels.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test ms_eden_transpose -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/ms_eden_row_div_transpose_pow2_b16_l4d1024_20_gpu0_20260623T032812Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.658, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5754.137ms over 20 steps.
+  The targeted general no-pad pair quantizer calls were routed to the new mixed
+  kernel, but that bucket only moved from 241.040ms to 240.609ms over 100 calls,
+  which is too small to offset run-level noise and unrelated slowdowns.
+decision:
+  Reject before the 100-step and 900-second gates. The specialization compiled
+  cleanly and preserved correctness tests, but it did not produce a meaningful
+  profile win. Code was reverted.
+```
