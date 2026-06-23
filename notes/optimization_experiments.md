@@ -12101,3 +12101,39 @@ decision:
   cleanly and preserved correctness tests, but it did not produce a meaningful
   profile win. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Split Aurora fused update into plain and transposed update paths.
+status: rejected_screen
+change:
+  Split the Aurora mega-update writeback helper so non-transposed updates could
+  read u[index] directly without computing row/col/update_index. The transposed
+  path kept the original row/col remap. The intent was to remove unnecessary
+  integer division/remap work from plain update chunks inside
+  aurora_mega_update_cooperative_kernel.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas --gpu-name=sm_120a --verbose:
+    target/ptxas_aurora_update_split.log
+    aurora_mega_update_cooperative_kernel stayed at 80 registers/thread,
+    128 bytes stack frame, 4128 bytes smem, and 0 spill stores / 0 spill loads.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_update_plain_transposed_split_b16_l4d1024_20_gpu0_20260623T033406Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.652, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5747.978ms over 20 steps.
+  aurora_mega_update_cooperative_kernel regressed from 1710.614ms to
+  1731.913ms over 20 calls. linear_backward_projection_pair_cta_device_scale_kernel
+  also regressed from 1137.312ms to 1167.164ms over 400 calls.
+decision:
+  Reject before the 100-step and 900-second gates. The split preserved the
+  ptxas resource profile and optimizer tests, but the target nsys run got
+  slower. Code was reverted.
+```
