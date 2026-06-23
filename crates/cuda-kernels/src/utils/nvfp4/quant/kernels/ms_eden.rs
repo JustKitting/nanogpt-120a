@@ -384,6 +384,61 @@ pub(crate) mod module {
     }
 
     #[kernel]
+    #[allow(clippy::too_many_arguments)]
+    pub fn fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
+        x: &[f32],
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        mut transpose_out_fp4: DisjointSlice<u8>,
+        mut transpose_out_scales: DisjointSlice<u8>,
+        mut transpose_out_global_scales: DisjointSlice<f32>,
+        global_scale: &[f32],
+        row_grid_dim: u32,
+        source_cols: u32,
+        row_chunks_per_row: u32,
+        transpose_chunks_per_row: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+        transpose_scale_seed: u32,
+    ) {
+        let block = thread::blockIdx_x();
+        let warp_in_block = thread::threadIdx_x() / 32;
+        if block < row_grid_dim {
+            let chunk = block * AMAX_WARPS_PER_BLOCK + warp_in_block;
+            fp32_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
+                x,
+                &mut out_fp4,
+                &mut out_scales,
+                &mut out_global_scales,
+                chunk,
+                source_cols,
+                row_chunks_per_row,
+                global_scale[0],
+                scale_override,
+                sign_seed,
+                scale_seed,
+            );
+        } else {
+            let chunk = (block - row_grid_dim) * AMAX_WARPS_PER_BLOCK + warp_in_block;
+            fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
+                x,
+                &mut transpose_out_fp4,
+                &mut transpose_out_scales,
+                &mut transpose_out_global_scales,
+                chunk,
+                source_cols,
+                transpose_chunks_per_row,
+                global_scale[0],
+                scale_override,
+                sign_seed,
+                transpose_scale_seed,
+            );
+        }
+    }
+
+    #[kernel]
     pub fn rowwise_nvfp4_chunk_amax_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -1128,6 +1183,76 @@ pub(crate) mod module {
 
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
+    fn fp32_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
+        x: &[f32],
+        out_fp4: &mut DisjointSlice<'_, u8>,
+        out_scales: &mut DisjointSlice<'_, u8>,
+        out_global_scales: &mut DisjointSlice<'_, f32>,
+        chunk: u32,
+        src_row_len: u32,
+        chunks_per_row: u32,
+        global_scale: f32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        let lane = warp::lane_id();
+        let (input, row, first_chunk_in_row) =
+            hadamard_input_no_pad(x, chunk, lane, src_row_len, chunks_per_row, sign_seed);
+        ms_eden_pack_chunk_no_chunk_amax_row(
+            input,
+            out_fp4,
+            out_scales,
+            out_global_scales,
+            chunk,
+            row,
+            first_chunk_in_row,
+            global_scale,
+            scale_override,
+            scale_seed,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
+        x: &[f32],
+        out_fp4: &mut DisjointSlice<'_, u8>,
+        out_scales: &mut DisjointSlice<'_, u8>,
+        out_global_scales: &mut DisjointSlice<'_, f32>,
+        chunk: u32,
+        source_cols: u32,
+        chunks_per_row: u32,
+        global_scale: f32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        let lane = warp::lane_id();
+        let (input, row, first_chunk_in_row) = transposed_hadamard_input_no_pad(
+            x,
+            chunk,
+            lane,
+            source_cols,
+            chunks_per_row,
+            sign_seed,
+        );
+        ms_eden_pack_chunk_no_chunk_amax_row(
+            input,
+            out_fp4,
+            out_scales,
+            out_global_scales,
+            chunk,
+            row,
+            first_chunk_in_row,
+            global_scale,
+            scale_override,
+            scale_seed,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
     fn ms_eden_pack_chunk(
         input: f32,
         out_fp4: &mut DisjointSlice<'_, u8>,
@@ -1502,6 +1627,46 @@ pub(crate) mod module {
         let chunk_in_row_mask = (1u32 << chunks_per_row_shift) - 1;
         let row = chunk >> chunks_per_row_shift;
         let chunk_in_row = (chunk & chunk_in_row_mask) * HADAMARD_DIM;
+        let input_col = chunk_in_row + lane;
+        let index = input_col * source_cols + row;
+        (
+            x[index as usize] * random_sign(seed, input_col),
+            row,
+            chunk_in_row == 0,
+        )
+    }
+
+    #[inline(always)]
+    fn hadamard_input_no_pad(
+        x: &[f32],
+        chunk: u32,
+        lane: u32,
+        src_row_len: u32,
+        chunks_per_row: u32,
+        seed: u32,
+    ) -> (f32, u32, bool) {
+        let row = chunk / chunks_per_row;
+        let chunk_in_row = (chunk - row * chunks_per_row) * HADAMARD_DIM;
+        let input_col = chunk_in_row + lane;
+        let index = row * src_row_len + input_col;
+        (
+            x[index as usize] * random_sign(seed, input_col),
+            row,
+            chunk_in_row == 0,
+        )
+    }
+
+    #[inline(always)]
+    fn transposed_hadamard_input_no_pad(
+        x: &[f32],
+        chunk: u32,
+        lane: u32,
+        source_cols: u32,
+        chunks_per_row: u32,
+        seed: u32,
+    ) -> (f32, u32, bool) {
+        let row = chunk / chunks_per_row;
+        let chunk_in_row = (chunk - row * chunks_per_row) * HADAMARD_DIM;
         let input_col = chunk_in_row + lane;
         let index = input_col * source_cols + row;
         (

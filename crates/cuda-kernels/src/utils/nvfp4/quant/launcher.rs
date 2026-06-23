@@ -397,6 +397,39 @@ impl Nvfp4QuantModule {
                         args.transpose_scale_seed,
                     );
             }
+            if fp32_pair_has_no_padding(
+                args.row_count,
+                args.src_row_len,
+                args.dst_row_len,
+                args.transpose_dst_row_len,
+            ) {
+                return self
+                    .ms_eden
+                    .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
+                        args.stream,
+                        LaunchConfig {
+                            grid_dim: (row_grid_dim + transpose_grid_dim, 1, 1),
+                            block_dim: (THREADS_PER_BLOCK, 1, 1),
+                            shared_mem_bytes: 0,
+                        },
+                        args.x,
+                        args.out_fp4,
+                        args.out_scales,
+                        args.out_global_scales,
+                        args.transpose_out_fp4,
+                        args.transpose_out_scales,
+                        args.transpose_out_global_scales,
+                        &*args.out_global_scale,
+                        row_grid_dim,
+                        args.src_row_len,
+                        args.dst_row_len / 32,
+                        args.transpose_dst_row_len / 32,
+                        args.scale_override,
+                        args.sign_seed,
+                        args.scale_seed,
+                        args.transpose_scale_seed,
+                    );
+            }
 
             return self
                 .ms_eden
@@ -969,4 +1002,17 @@ fn fp32_pair_has_no_padding_pow2(
         && transpose_chunks_per_row != 0
         && row_chunks_per_row.is_power_of_two()
         && transpose_chunks_per_row.is_power_of_two()
+}
+
+#[inline]
+fn fp32_pair_has_no_padding(
+    row_count: u32,
+    src_row_len: u32,
+    dst_row_len: u32,
+    transpose_dst_row_len: u32,
+) -> bool {
+    src_row_len == dst_row_len
+        && row_count == transpose_dst_row_len
+        && dst_row_len % 32 == 0
+        && transpose_dst_row_len % 32 == 0
 }

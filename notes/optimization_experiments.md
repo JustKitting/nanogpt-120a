@@ -245,6 +245,48 @@ decision:
 ```
 
 ```text
+date: 2026-06-23
+commit: uncommitted
+experiment: General no-padding FP32 pair MS-EDEN pack route.
+status: accepted
+change:
+  Added a no-padding non-power-of-two pair pack route after the power-of-two
+  fast path and before the original padded-safe fallback. The new route keeps
+  the exact source/destination row-length contract, requires 32-column scale
+  alignment, and removes padded chunk handling for no-padding layouts.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  cargo build --release: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  ptxas resource check:
+    fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel:
+    27 registers, no stack/shared/local/spill.
+  20-step nsys:
+    target/nsys/fp32_pair_no_pad_general_b16_l4d1024_20_powercap_20260623T001214Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.604, completed_steps=20.
+  100-step SYNTH screen:
+    target/fp32_pair_no_pad_general_b16_l4d1024_100_powercap_20260623T001235Z.log
+    val_loss=6.301290, train_elapsed_s=28.556, completed_steps=100.
+  900-second held-out gate:
+    target/fp32_pair_no_pad_general_b16_l4d1024_900_powercap_20260623T001534Z.log
+    val_loss=3.564260, train_elapsed_s=900.125, completed_steps=3088.
+measured_effect:
+  Against the current 520W power-capped baseline
+  target/fp32_pair_no_pad_pow2_b16_l4d1024_900_powercap_20260622T233451Z.log,
+  the held-out gate moved from val_loss=3.574514 / 3084 completed steps to
+  val_loss=3.564260 / 3088 completed steps. In the 20-step nsys comparison,
+  the remaining exact FP32 pair fallback moved from 243.920678ms to
+  241.174310ms over 100 calls.
+decision:
+  Promote. The 900-second held-out validation loss improved and completed step
+  count increased under the same 520W power cap.
+```
+
+```text
 date: 2026-06-22
 commit: rejected uncommitted candidate, code reverted
 experiment: Mask non-contributing NVFP4 MMA scale lanes in projection CTA.
