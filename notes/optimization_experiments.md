@@ -11814,3 +11814,39 @@ decision:
   validation loss and higher completed step count under the same 900-second
   SYNTH budget.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Pair Aurora Polar plain and next stores by accumulator row.
+status: rejected_screen
+change:
+  Replaced four per-accumulator Polar store helper calls with two row-pair
+  helper calls in store_plain, store_plain_transposed, and store_next. The
+  intent was to reduce repeated row/column/bounds math in the Aurora Polar
+  store epilogues without changing optimizer math or launch geometry.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_sm120a_verbose_aurora_pair_store_candidate.txt
+    aurora_mega_update_cooperative_kernel used 80 registers, 4128 bytes smem,
+    and had 0 spill stores / 0 spill loads.
+  20-step nsys:
+    target/nsys/aurora_polar_pair_store_b16_l4d1024_20_powercap_20260623T023246Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.657, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total profiled train time regressed from 5.563s to 5.657s.
+  aurora_mega_update_cooperative_kernel moved from 1710.614ms to 1728.153ms
+  over 20 calls, and linear_backward_projection_pair_cta_device_scale_kernel
+  moved from 1137.312ms to 1170.313ms over 400 calls.
+decision:
+  Reject before the 100-step and 900-second gates. The pair-store helper shape
+  reduced source duplication but worsened the actual profile, likely due to
+  different scheduling/control pressure in the cooperative kernel and compile
+  effects outside Aurora. Code was reverted.
+```
