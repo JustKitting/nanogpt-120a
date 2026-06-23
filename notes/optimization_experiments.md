@@ -32,6 +32,50 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
 ```text
+date: 2026-06-23
+commit: uncommitted candidate, reverted after gate
+experiment: Fuse AdamW update with Adam tensor chunk-amax.
+status: rejected_900s
+change:
+  Changed the Adam-managed tensor update kernel to process one 1024-value
+  NVFP4 amax chunk per block, updating z/x/Adam moments and writing the
+  updated x_master chunk amax directly. This removed the separate
+  tensor_chunk_amax_f32 launch from the Adam requantization path while leaving
+  the AdamW update, schedule-free averaging, global-scale reduction, and
+  4/6 NVFP4 encode math unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/adam_update_chunk_amax_fused_b16_l4d1024_20_powercap_20260623T003716Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.596, completed_steps=20.
+  100-step SYNTH screen:
+    target/adam_update_chunk_amax_fused_b16_l4d1024_100_powercap_20260623T003736Z.log
+    val_loss=6.297645, train_elapsed_s=28.521, completed_steps=100.
+  900-second held-out gate:
+    target/adam_update_chunk_amax_fused_b16_l4d1024_900_powercap_20260623T003821Z.log
+    val_loss=3.573522, train_elapsed_s=900.272, completed_steps=3088.
+measured_effect:
+  Against the current 520W baseline profile
+  target/nsys/fp32_pair_no_pad_general_b16_l4d1024_20_powercap_20260623T001214Z.run.log,
+  CUDA kernel launches dropped from 14819 to 14019 over 20 profiled steps, and
+  tensor_chunk_amax_f32_kernel calls dropped from 1180 to 380. Profiled
+  20-step train time moved from 5.604s to 5.596s. The 100-step screen also
+  moved favorably from val_loss=6.301290 / 28.556s to val_loss=6.297645 /
+  28.521s.
+  The full 900-second gate did not pass promotion: baseline
+  target/fp32_pair_no_pad_general_b16_l4d1024_900_powercap_20260623T001534Z.log
+  had val_loss=3.564260 / 3088 steps, while this candidate had
+  val_loss=3.573522 / 3088 steps.
+decision:
+  Reject and revert. The validation loss stayed inside the active 1% noise
+  band, but completed step count did not increase, so the candidate did not
+  satisfy the runtime-change promotion rule.
+```
+
+```text
 date: 2026-06-22
 commit: this commit
 experiment: Exact no-padding power-of-two FP32 pair MS-EDEN pack.
