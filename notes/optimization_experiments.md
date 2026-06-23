@@ -11924,3 +11924,39 @@ decision:
   descriptors are currently required so every matrix group participates in the
   same internal grid sync sequence for each phase. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Add aligned fast paths to f16 TC RHS staging variants.
+status: rejected_screen
+change:
+  Added aligned staging/store paths for f16_cta_tc_matmul_f32_rhs_kernel,
+  f16_cta_tc_matmul_f32_half_rhs_kernel, and
+  f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel, gated on M/N/K being
+  exact CTA multiples. The intent was to remove per-element edge checks from
+  the attention backward f16 TC matmul variants without changing math or launch
+  geometry.
+verification:
+  CUDA_DEVICE_INDEX=1 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=1 timeout 300 cargo test -p rust-kernels-cuda --test f16_tc_matmul_tiled -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=1 timeout 300 cargo test -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=1 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=1 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  cargo oxide build --arch sm_120a: pass.
+  20-step nsys:
+    target/nsys/f16_rhs_aligned_b16_l4d1024_20_powercap_20260623T030001Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.656, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5750.944ms over 20 steps.
+  The touched f16 RHS kernels all regressed:
+    f16_cta_tc_matmul_f32_rhs_kernel: 121.575ms -> 132.997ms.
+    f16_cta_tc_matmul_f32_half_rhs_kernel: 111.540ms -> 118.480ms.
+    f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel: 233.496ms -> 252.486ms.
+decision:
+  Reject before the 100-step and 900-second gates. Removing edge checks via
+  separate aligned paths increased the profiled runtime of the target kernels
+  and total kernel profile. Code was reverted.
+```
