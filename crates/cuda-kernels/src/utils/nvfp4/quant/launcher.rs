@@ -364,6 +364,40 @@ impl Nvfp4QuantModule {
         if pack_grid_is_exact(row_chunk_count) && pack_grid_is_exact(transpose_chunk_count) {
             let row_grid_dim = pack_grid_dim(row_chunk_count);
             let transpose_grid_dim = pack_grid_dim(transpose_chunk_count);
+            if fp32_pair_has_no_padding_pow2(
+                args.row_count,
+                args.src_row_len,
+                args.dst_row_len,
+                args.transpose_dst_row_len,
+            ) {
+                return self
+                    .ms_eden
+                    .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel(
+                        args.stream,
+                        LaunchConfig {
+                            grid_dim: (row_grid_dim + transpose_grid_dim, 1, 1),
+                            block_dim: (THREADS_PER_BLOCK, 1, 1),
+                            shared_mem_bytes: 0,
+                        },
+                        args.x,
+                        args.out_fp4,
+                        args.out_scales,
+                        args.out_global_scales,
+                        args.transpose_out_fp4,
+                        args.transpose_out_scales,
+                        args.transpose_out_global_scales,
+                        &*args.out_global_scale,
+                        row_grid_dim,
+                        args.src_row_len,
+                        (args.dst_row_len / 32).trailing_zeros(),
+                        (args.transpose_dst_row_len / 32).trailing_zeros(),
+                        args.scale_override,
+                        args.sign_seed,
+                        args.scale_seed,
+                        args.transpose_scale_seed,
+                    );
+            }
+
             return self
                 .ms_eden
                 .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
@@ -916,4 +950,23 @@ fn rowwise_transpose_has_no_padding(source_rows: u32, dst_row_len: u32) -> bool 
         && dst_row_len % 32 == 0
         && chunks_per_row != 0
         && chunks_per_row.is_power_of_two()
+}
+
+#[inline]
+fn fp32_pair_has_no_padding_pow2(
+    row_count: u32,
+    src_row_len: u32,
+    dst_row_len: u32,
+    transpose_dst_row_len: u32,
+) -> bool {
+    let row_chunks_per_row = dst_row_len / 32;
+    let transpose_chunks_per_row = transpose_dst_row_len / 32;
+    src_row_len == dst_row_len
+        && row_count == transpose_dst_row_len
+        && dst_row_len % 32 == 0
+        && transpose_dst_row_len % 32 == 0
+        && row_chunks_per_row != 0
+        && transpose_chunks_per_row != 0
+        && row_chunks_per_row.is_power_of_two()
+        && transpose_chunks_per_row.is_power_of_two()
 }

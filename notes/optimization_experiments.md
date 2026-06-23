@@ -34,6 +34,56 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-06-22
 commit: this commit
+experiment: Exact no-padding power-of-two FP32 pair MS-EDEN pack.
+status: accepted
+change:
+  Added a guarded exact no-padding power-of-two fast path for the paired FP32
+  MS-EDEN pack used by linear backward for E and E^T. The fast path removes
+  per-lane source padding checks and row division/modulo when src_row_len equals
+  dst_row_len, row_count equals transpose_dst_row_len, both row lengths are
+  divisible by 32, and both chunks-per-row counts are powers of two. The
+  existing pair kernel remains the fallback for non-power-of-two layouts.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  cargo build --release: pass.
+  GPU correctness:
+    rust-kernels-cuda linear_backward: pass.
+    gpt2-nvfp4 qkv_projection_backward: pass.
+    gpt2-nvfp4 block_attention_backward: pass.
+  ptxas sm_120a resource check:
+    fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel
+    used 27 registers, 0 stack, 0 shared, and no local/spill storage.
+  20-step nsys:
+    target/nsys/fp32_pair_no_pad_pow2_b16_l4d1024_20_20260622T232155Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.426, completed_steps=20.
+  100-step SYNTH screen:
+    target/fp32_pair_no_pad_pow2_b16_l4d1024_100_20260622T232212Z.log
+    val_loss=6.300263, train_elapsed_s=27.588, completed_steps=100.
+  900-second held-out gate at 520W:
+    target/fp32_pair_no_pad_pow2_b16_l4d1024_900_powercap_20260622T233451Z.log
+    val_loss=3.574514, train_elapsed_s=900.108, completed_steps=3084.
+  Comparable accepted-baseline rerun at 520W:
+    target/rowwise_no_pad_baseline_b16_l4d1024_900_powercap_20260622T235138Z.log
+    val_loss=3.580442, train_elapsed_s=900.089, completed_steps=3081.
+measured_effect:
+  The short nsys screen split pair-pack launches between the fallback kernel
+  for non-power-of-two shapes and the new no-padding power-of-two kernel:
+    fallback: 237.058918ms over 100 launches.
+    new fast path: 122.079967ms over 300 launches.
+  Total pair-pack time was 359.138885ms over 400 launches, versus
+  379.343371ms over 400 launches in the previous accepted short profile.
+  20-step profiled train time moved from 5.662s to 5.426s.
+decision:
+  Promote. Under the 520W power cap, the candidate beat the comparable
+  accepted-baseline rerun on both held-out validation loss and completed steps:
+  3.574514/3084 versus 3.580442/3081.
+```
+
+```text
+date: 2026-06-22
+commit: this commit
 experiment: Exact no-padding rowwise NVFP4 transpose MS-EDEN pack.
 status: accepted
 change:
