@@ -19,15 +19,10 @@ pub struct Decision {
 pub fn decide(
     result: &RunResult,
     baseline_loss: Option<f64>,
-    screen_steps: usize,
     score: Option<&CandidateScore>,
 ) -> Decision {
-    let completed_steps = result.completed_steps;
     if result.saw_nan {
         return decision(false, "nan", result, baseline_loss, score);
-    }
-    if completed_steps.unwrap_or(0) < screen_steps {
-        return decision(false, "incomplete", result, baseline_loss, score);
     }
     let Some(screen_loss) = result.val_loss else {
         return decision(false, "missing_val_loss", result, baseline_loss, score);
@@ -37,15 +32,6 @@ pub fn decide(
     }
     if baseline_loss.is_some_and(|baseline| screen_loss <= baseline) {
         return decision(true, "screen_loss_improved", result, baseline_loss, score);
-    }
-    if score.is_some_and(model_allows_full_run) {
-        return decision(
-            true,
-            "model_expected_improvement",
-            result,
-            baseline_loss,
-            score,
-        );
     }
     decision(false, "screen_loss_worse", result, baseline_loss, score)
 }
@@ -85,10 +71,6 @@ fn decision(
         survival_prior: score.map(|score| score.survival_prior),
         completed_steps: result.completed_steps,
     }
-}
-
-fn model_allows_full_run(score: &CandidateScore) -> bool {
-    score.expected_quality > 0.0 && score.survival_prior >= 0.5
 }
 
 fn fmt_f64(value: Option<f64>) -> String {

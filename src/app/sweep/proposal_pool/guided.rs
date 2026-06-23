@@ -83,13 +83,7 @@ fn pick<T: Copy>(values: &[T], direction: f64, rng: &mut SweepRng, jitter: bool)
     if jitter && rng.f64() < 0.25 {
         return rng.choose(values);
     }
-    let index = if direction > 0.02 {
-        values.len() - 1
-    } else if direction < -0.02 {
-        0
-    } else {
-        values.len() / 2
-    };
+    let index = (directed_unit(direction) * values.len() as f64).floor() as usize;
     values[index]
 }
 
@@ -119,15 +113,13 @@ fn pick_unit(direction: f64, rng: &mut SweepRng, jitter: bool) -> f64 {
         return rng.f64();
     }
 
-    let center = if direction > 0.02 {
-        0.875
-    } else if direction < -0.02 {
-        0.125
-    } else {
-        0.5
-    };
+    let center = directed_unit(direction);
     if jitter {
         return (center + (rng.f64() - 0.5) * 0.25).clamp(0.0, 1.0);
     }
     center
+}
+
+fn directed_unit(direction: f64) -> f64 {
+    (0.5 + direction.tanh() * 0.35).clamp(0.0, 1.0 - f64::EPSILON)
 }

@@ -27,12 +27,55 @@ fn guided_pool_uses_main_effect_direction() {
     );
 
     assert_eq!(pool[0].source, "guided");
-    assert_eq!(pool[0].candidate.batch_size, 32);
+    assert!(pool[0].candidate.batch_size > center.batch_size);
+    assert!(pool[0].candidate.batch_size < 32);
     assert_eq!(pool[0].candidate.n_layer, 8);
     assert!(pool.iter().any(|candidate| candidate.source == "factorial"));
+    assert!(pool.iter().any(|candidate| candidate.source == "local"));
     assert!(pool.iter().any(|candidate| candidate.source == "variance"));
     assert!(pool.iter().any(|candidate| candidate.source == "coverage"));
     assert!(pool.iter().any(|candidate| candidate.source == "random"));
+}
+
+#[test]
+fn local_pool_refines_near_center_hyperparameters() {
+    let config = config();
+    let trials = (0..32)
+        .map(|i| trial(wide_candidate(i), 32.0 - i as f64))
+        .collect::<Vec<_>>();
+    let analysis = analysis::analyze(&trials, &config);
+    let mut center = candidate(16, 4);
+    center.lr_scale = 2.309_529;
+    center.adam_lr_scale = 1.626_648;
+    center.nextlat_lr_scale = 1.245_083;
+    center.warmup_steps = 87;
+    center.start_ratio = 0.183_570;
+    center.amuse_beta1 = 0.443_495;
+    center.amuse_rho = 0.768_398;
+    let observed = trials
+        .iter()
+        .map(|trial| trial.candidate.clone())
+        .collect::<Vec<_>>();
+    let pool = super::sample(
+        &HashSet::new(),
+        &mut super::super::rng::SweepRng::new(0x9933),
+        &config,
+        &analysis,
+        Some(&center),
+        &observed,
+    );
+    let locals = pool
+        .iter()
+        .filter(|candidate| candidate.source == "local")
+        .collect::<Vec<_>>();
+
+    assert!(!locals.is_empty());
+    assert!(locals.iter().any(|local| {
+        local.candidate.build_key() == center.build_key()
+            && local.candidate.lr_scale != center.lr_scale
+            && local.candidate.adam_lr_scale != center.adam_lr_scale
+    }));
+    assert!(locals.iter().all(|local| local.candidate.batch_size <= 20));
 }
 
 #[test]
@@ -70,11 +113,17 @@ fn source_budget_keeps_guided_off_without_response_model() {
     let budget = super::source_budget(40, &analysis, &config);
 
     assert_eq!(budget.guided, 0);
+    assert_eq!(budget.local, 0);
     assert!(budget.variance > 0);
     assert!(budget.coverage > 0);
     assert!(budget.random > 0);
     assert_eq!(
-        budget.guided + budget.factorial + budget.variance + budget.coverage + budget.random,
+        budget.guided
+            + budget.local
+            + budget.factorial
+            + budget.variance
+            + budget.coverage
+            + budget.random,
         40
     );
 }
@@ -92,6 +141,7 @@ fn source_budget_moves_toward_guided_when_model_matures() {
     let mature_budget = super::source_budget(40, &mature, &config);
 
     assert!(mature_budget.guided > empty_budget.guided);
+    assert!(mature_budget.local > empty_budget.local);
     assert!(mature_budget.guided >= mature_budget.coverage);
 }
 
@@ -101,10 +151,10 @@ fn trial(candidate: Candidate, val_loss: f64) -> Trial {
         status: "success".to_string(),
         val_loss: Some(val_loss),
         completed_steps: Some(10),
-        elapsed_s: Some(5.0),
+        elapsed_s: Some(900.0),
         screen_val_loss: Some(val_loss + 1.0),
         screen_completed_steps: Some(10),
-        screen_elapsed_s: Some(5.0),
+        screen_elapsed_s: Some(30.0),
         screen_reason: Some("screen_loss_improved".to_string()),
         log_path: PathBuf::from("train.log"),
     }
@@ -167,10 +217,8 @@ fn config() -> SweepConfig {
         random_trials: 0,
         candidate_samples: 8,
         max_seconds: 900.0,
-        screen_steps: 500,
-        screen_max_seconds: 180.0,
+        screen_max_seconds: 30.0,
         sweep_quality_weight: 1.0,
-        sweep_speed_weight: 0.0,
         sweep_stability_weight: 0.0,
         sweep_exploration_weight: 0.0,
         log_interval: 500,

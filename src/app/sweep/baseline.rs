@@ -43,10 +43,6 @@ impl Baseline {
         self.record.as_ref().map(|record| record.val_loss)
     }
 
-    pub fn screen_loss(&self) -> Option<f64> {
-        self.record.as_ref().and_then(|record| record.screen_loss)
-    }
-
     pub fn measured_trial(&self) -> Option<Trial> {
         let record = self.record.as_ref()?;
         Some(Trial {

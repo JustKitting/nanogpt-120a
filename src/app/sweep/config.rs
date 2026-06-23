@@ -13,14 +13,10 @@ pub struct SweepConfig {
     pub candidate_samples: usize,
     #[arg(long, default_value_t = 900.0)]
     pub max_seconds: f64,
-    #[arg(long, default_value_t = 500)]
-    pub screen_steps: usize,
-    #[arg(long, default_value_t = 180.0)]
+    #[arg(long, default_value_t = 30.0)]
     pub screen_max_seconds: f64,
     #[arg(long, default_value_t = 1.0)]
     pub sweep_quality_weight: f64,
-    #[arg(long, default_value_t = 0.0)]
-    pub sweep_speed_weight: f64,
     #[arg(long, default_value_t = 0.75)]
     pub sweep_stability_weight: f64,
     #[arg(long, default_value_t = 0.35)]

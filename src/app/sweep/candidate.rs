@@ -64,6 +64,18 @@ impl Candidate {
         )
     }
 
+    pub fn build_key(&self) -> String {
+        format!(
+            "b{}_l{}_d{}_h{}_p{}_c{}",
+            self.batch_size,
+            self.n_layer,
+            self.n_embd,
+            self.n_head,
+            self.aurora_phases,
+            self.aurora_blocks,
+        )
+    }
+
     pub fn build_env(&self) -> Vec<(&'static str, String)> {
         vec![
             ("GPT2_BATCH_SIZE", self.batch_size.to_string()),

@@ -95,9 +95,6 @@ fn run_candidate_stage(
     );
     command.env("TRAIN_LOG_INTERVAL", config.log_interval.to_string());
     command.env("TRAIN_RUN_DIR", trial_dir.join(stage.run_dir_name()));
-    if matches!(stage, Stage::Screen) {
-        command.env("TRAIN_STEPS", config.screen_steps.to_string());
-    }
     if let Some(device) = &config.cuda_device {
         command.env("CUDA_DEVICE_INDEX", device);
     }

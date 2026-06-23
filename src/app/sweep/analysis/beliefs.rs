@@ -92,8 +92,6 @@ fn average(value: f64, count: usize) -> f64 {
 fn direction_weight(name: &str, config: &SweepConfig) -> f64 {
     if name.contains("quality") {
         config.sweep_quality_weight
-    } else if name.contains("tokens_per_s") {
-        config.sweep_speed_weight
     } else {
         0.0
     }
@@ -102,8 +100,6 @@ fn direction_weight(name: &str, config: &SweepConfig) -> f64 {
 fn uncertainty_weight(name: &str, config: &SweepConfig) -> f64 {
     if name.contains("quality") {
         config.sweep_quality_weight
-    } else if name.contains("tokens_per_s") {
-        config.sweep_speed_weight
     } else if name == "stability" {
         config.sweep_stability_weight
     } else {

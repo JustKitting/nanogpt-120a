@@ -45,22 +45,12 @@ pub fn analyze(trials: &[Trial], config: &SweepConfig) -> SweepAnalysis {
     push_model(
         &mut models,
         "screen_quality",
-        logs::screen_quality_rows(&observations, config.screen_steps),
-    );
-    push_model(
-        &mut models,
-        "screen_tokens_per_s",
-        logs::screen_speed_rows(&observations),
+        logs::screen_quality_rows(&observations, config.screen_max_seconds),
     );
     push_model(
         &mut models,
         "full_quality",
-        logs::full_quality_rows(&observations),
-    );
-    push_model(
-        &mut models,
-        "full_tokens_per_s",
-        logs::full_speed_rows(&observations),
+        logs::full_quality_rows(&observations, config.max_seconds),
     );
     push_model(&mut models, "stability", stability_rows);
 

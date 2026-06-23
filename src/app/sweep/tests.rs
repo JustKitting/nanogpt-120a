@@ -139,7 +139,12 @@ fn model_proposal_records_sorted_ranked_candidates() {
 
     assert_eq!(proposal.reason, "model");
     assert_eq!(proposal.ranked.len(), config.candidate_samples);
-    assert_eq!(proposal.candidate.key(), proposal.ranked[0].candidate.key());
+    assert!(
+        proposal
+            .ranked
+            .iter()
+            .any(|ranked| ranked.candidate.key() == proposal.candidate.key())
+    );
     assert!(
         proposal
             .ranked
@@ -173,7 +178,7 @@ fn promotes_baseline_file_when_validation_improves() {
     assert!(text.contains("VAL_LOSS=4.200000"));
     assert!(text.contains("SCREEN_LOSS=5.200000"));
     assert!(text.contains("SCREEN_COMPLETED_STEPS=10"));
-    assert!(text.contains("SCREEN_ELAPSED_S=5.000000"));
+    assert!(text.contains("SCREEN_ELAPSED_S=30.000000"));
     assert!(text.contains("SCREEN_REASON=screen_loss_improved"));
     assert!(text.contains("GPT2_BATCH_SIZE=8"));
     assert!(text.contains("GPT2_N_LAYER=4"));
@@ -186,7 +191,7 @@ fn promotes_baseline_file_when_validation_improves() {
         .unwrap();
     assert_eq!(loaded.screen_val_loss, Some(5.2));
     assert_eq!(loaded.screen_completed_steps, Some(10));
-    assert_eq!(loaded.screen_elapsed_s, Some(5.0));
+    assert_eq!(loaded.screen_elapsed_s, Some(30.0));
     assert_eq!(
         loaded.screen_reason.as_deref(),
         Some("screen_loss_improved")
@@ -255,10 +260,10 @@ fn trial(status: &str, val_loss: Option<f64>, candidate: Candidate) -> Trial {
         status: status.to_string(),
         val_loss,
         completed_steps: Some(10),
-        elapsed_s: Some(5.0),
+        elapsed_s: Some(900.0),
         screen_val_loss: val_loss.map(|loss| loss + 1.0),
         screen_completed_steps: Some(10),
-        screen_elapsed_s: Some(5.0),
+        screen_elapsed_s: Some(30.0),
         screen_reason: Some("screen_loss_improved".to_string()),
         log_path: PathBuf::from("train.log"),
     }
@@ -288,10 +293,8 @@ fn config(random_trials: usize, candidate_samples: usize) -> SweepConfig {
         random_trials,
         candidate_samples,
         max_seconds: 900.0,
-        screen_steps: 500,
-        screen_max_seconds: 180.0,
+        screen_max_seconds: 30.0,
         sweep_quality_weight: 1.0,
-        sweep_speed_weight: 0.25,
         sweep_stability_weight: 0.75,
         sweep_exploration_weight: 0.35,
         log_interval: 500,

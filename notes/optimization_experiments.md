@@ -12249,3 +12249,356 @@ measured_effect:
 decision:
   Reject before the 100-step and 900-second gates. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Partial AX column-pair reuse inside existing Aurora Polar schedule.
+status: rejected_partial_screen
+change:
+  Replaced the middle Polar Express AX stage, AX = G @ X, with a two-column-tile
+  grouped CTA path. The candidate staged the G tile once, computed one C tile,
+  then reused the same staged G fragments while staging the adjacent X RHS tile.
+  The materialized Gram path was left intact because the following G @ AX stage
+  still consumes G. This was a local test inside the existing scratch-sync
+  schedule, not the full producer-consumer refactor.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_aurora_col_pair_ax.log
+    aurora_mega_update_cooperative_kernel moved from 80 to 79 registers/thread,
+    with the same 128-byte stack frame, 4128 bytes smem, and 0 spill stores/loads.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_ax_col_pair_b16_l4d1024_20_gpu0_20260623T043233Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.716, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5812.511ms over 20 steps.
+  aurora_mega_update_cooperative_kernel regressed from 1710.614ms to
+  1739.771ms over 20 calls. linear_backward_projection_pair_cta_device_scale_kernel
+  also moved from 1137.312ms to 1185.474ms in the same screen.
+decision:
+  Reject only this partial column-pair implementation before the 100-step and
+  900-second gates. The result is not evidence against the full producer-consumer
+  schedule; it shows that a small local change inside the old materialized-G
+  schedule is not sufficient. Code was reverted.
+```
+
+```text
+date: 2026-06-23
+commit: uncommitted micro-probe
+experiment: Aurora Polar producer-consumer Gram-to-AX one-tile probe.
+status: probe_passed_not_promoted
+change:
+  Added a focused ignored GPU test and probe kernel for the 64x64 square case.
+  The baseline runs the current two-launch materialized schedule:
+  G = X @ X^T, then AX = G @ X. The probe computes the same one-tile Gram,
+  stores G in shared f16, then immediately consumes it into AX without a global
+  G write/read between the two products.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer gram_ax_producer_consumer_probe_matches_materialized_baseline -- --ignored --nocapture --test-threads=1: pass.
+measured_effect:
+  polar_producer_consumer_probe materialized_ms=13.323872
+  fused_ms=12.571744 speedup=1.059827 max_abs_error=0.00000000e0
+decision:
+  Keep as path-finding evidence only. This does not touch training behavior and
+  is not a promoted optimizer change. The one-tile result is enough to justify
+  designing a real Aurora producer-consumer scheduler, but not enough to claim
+  that the production Aurora path is faster.
+```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Cluster-owned Aurora Polar generated-Gram fanout.
+status: implementation_failed_not_dead_end
+change:
+  Replaced the materialized polar_gram stage with a generated-Gram schedule
+  where a 4-block cluster owned a row/C-supergroup dependency node. Rank 0
+  computed G[I,J] into distributed shared memory and the cluster consumed that
+  memo tile across 16 C tiles using rank-local accumulators. Stores were
+  output-owned; the candidate did not use global atomics.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+measured_effect:
+  With the promoted AURORA_COOPERATIVE_BLOCKS=180 default, the training binary
+  failed immediately with DriverError(720, "too many blocks in cooperative launch").
+  Rebuilding the same candidate with AURORA_COOPERATIVE_BLOCKS=80 launched, but
+  the 20-step SYNTH screen took 35.129s:
+    target/aurora_cluster_memo_b80_b16_l4d1024_20_20260623T054008Z.log
+    val_loss=9.067531, train_elapsed_s=35.129, completed_steps=20.
+decision:
+  Reject and revert this implementation before the 100-step and 900-second
+  gates. This is an implementation failure, not a dead end for the
+  dependency-graph/memoization approach. The local cluster-memo state made the
+  cooperative launch occupancy too small at the promoted block count and was
+  far slower at a runnable lower block count. The result only rules out this
+  bounded in-cluster state schedule, not a fuller memo-table or dependency-DAG
+  scheduler. Do not use this result as evidence that generated-Gram
+  memoization itself is a dead end. Any future decision on this direction needs
+  a proper dependency-graph/memo-table implementation, not this failed cluster
+  scheduling attempt.
+```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Two-column-per-lane-group linear bias-gradient reduction.
+status: rejected_profile_gate
+change:
+  Tested widening linear_bias_grad_kernel from 32 output columns per CTA to
+  64 output columns per CTA. Each lane accumulated two bias columns and the
+  shared reduction buffer was doubled so the final warp could write both
+  columns. The math and optimizer route were unchanged.
+verification:
+  cargo build --release: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_STEPS=20 TRAIN_LOG_INTERVAL=20
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/bias_64cols_b16_l4d1024_20_20260623T055154Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.791, completed_steps=20.
+measured_effect:
+  Against the promoted profile:
+    target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log
+  total kernel time regressed from 5656.514ms to 5888.763ms over 20 steps.
+  linear_bias_grad_kernel regressed from 69.621ms to 72.537ms over 380 calls.
+  linear_backward_projection_pair_cta_device_scale_kernel also moved from
+  1137.312ms to 1201.215ms in the same screen.
+decision:
+  Reject before the 100-step and 900-second gates. The target kernel got slower
+  and total profiled kernel time regressed. Code was reverted.
+```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Unroll fixed two-atom projection CTA K loop.
+status: rejected_profile_gate
+change:
+  Replaced the inner while loop over NVFP4_PROJECTION_CTA_K_ATOMS with explicit
+  calls for k_atom 0 and 1 in projection_accumulator, projection_accumulator_aligned,
+  and projection_accumulator_aligned_row_pair. The tile shape, MMA instruction,
+  scale layout, and math were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test l3_mlp -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_STEPS=20 TRAIN_LOG_INTERVAL=20
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/projection_cta_unroll_katom_b16_l4d1024_20_20260623T055723Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.742, completed_steps=20.
+measured_effect:
+  Against the promoted profile:
+    target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log
+  total kernel time regressed from 5656.514ms to 5839.052ms over 20 steps.
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1137.312ms to 1190.670ms over 400 calls. LM-head and MLP projection kernels
+  also regressed in the same profile:
+    lm_head_kernel: 200.123ms -> 210.039ms
+    mlp_projection_relu2_kernel: 109.873ms -> 122.261ms
+    mlp_projection_kernel: 100.929ms -> 115.308ms
+decision:
+  Reject before the 100-step and 900-second gates. The hot projection users got
+  slower, so the compiler's original fixed loop form is better here. Code was
+  reverted.
+```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Four-row-tile linear-backward projection CTA.
+status: rejected_profile_gate
+change:
+  Added a separate linear_backward_projection_quad_cta_device_scale_kernel for
+  aligned no-bias linear-backward projections. One CTA owned four adjacent
+  32x64 row tiles for the same output-column tile, staged B once, staged four A
+  tiles, and reused B fragments/scales across four MMA row tiles. The existing
+  pair path stayed as the fallback for unsupported row counts.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_projection_row_quad.log
+    linear_backward_projection_quad_cta_device_scale_kernel used 48 registers,
+    13824 bytes smem, and had 0 spill stores/loads.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_STEPS=20 TRAIN_LOG_INTERVAL=20
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/projection_row_quad_b16_l4d1024_20_20260623T060337Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.706, completed_steps=20.
+measured_effect:
+  Against the promoted profile:
+    target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log
+  total kernel time regressed from 5656.514ms to 5803.067ms over 20 steps.
+  The target projection route regressed from
+  linear_backward_projection_pair_cta_device_scale_kernel=1137.312ms to
+  linear_backward_projection_quad_cta_device_scale_kernel=1173.966ms over
+  400 calls.
+decision:
+  Reject before the 100-step and 900-second gates. The additional A staging,
+  accumulator state, and lower CTA count did not pay for themselves in this
+  implementation. Code was reverted.
+```
+
+```text
+date: 2026-06-23
+note: SM12x NVFP4 projection rewrite direction.
+source:
+  https://research.colfax-intl.com/cutlass-tutorial-nvfp4-blockscaled-gemm-on-nvidia-rtx-pro-blackwell-gpus-sm12x/
+context:
+  The current local NVFP4 projection CTA is a synchronous warp-level mma.sync
+  design with 32x64 CTA tiles and a row-pair reuse path for no-bias backward
+  projections. Small edits inside this structure have repeatedly regressed the
+  promoted B16/L4/d1024 profile.
+relevant_source_points:
+  SM12x NVFP4 uses warp-level mma.sync, not SM10x tcgen05/TMEM. The hardware
+  NVFP4 atom is fixed at m16n8k64 with scale_vec::4X and UE4M3 scale factors.
+  Colfax's CuTe discussion points toward larger CTA tiles, scale-factor SMEM
+  layouts, TMA staging, and producer-consumer pipelining to overlap GMEM->SMEM
+  loads with tensor-core work.
+decision:
+  Do not treat the rejected two-column bias, fixed-K unroll, or four-row-tile
+  projection attempts as evidence against a larger projection rewrite. The next
+  serious linear_backward_projection target should be a new pipelined CTA
+  design, not another small local change to the current row-pair CTA.
+```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Attention projection row-pair CTA routing.
+status: rejected_screen_gate
+change:
+  Routed attention_projection_kernel through the existing aligned row-pair CTA
+  body used by MLP and LM head. QKV and c_proj launch configs used
+  projection_cta_row_pair_grid_dim when token_count, input_dim, and output_dim
+  were aligned to the 32x64x128 projection CTA contract.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test l2_attention -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_attention_projection_row_pair.log
+    attention_projection_kernel used 40 registers, 9216 bytes smem, and had 0
+    spill stores/loads.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_STEPS=20 TRAIN_LOG_INTERVAL=20
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/attention_projection_row_pair_b16_l4d1024_20_20260623T061328Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.707, completed_steps=20.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_STEPS=100 TRAIN_LOG_INTERVAL=100:
+    target/attention_projection_row_pair_b16_l4d1024_100_20260623T061421Z.log
+    val_loss=6.300128, train_elapsed_s=28.549, completed_steps=100.
+measured_effect:
+  Against the promoted profile:
+    target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log
+  attention_projection_kernel improved locally from 116.434ms to 108.783ms
+  over 168 calls. Total kernel time regressed from 5656.514ms to 5803.891ms
+  over the same 20-step profile, and the 20-step training elapsed time moved
+  from 5.563s to 5.707s.
+  Against the promoted 100-step screen in notes/sweep_baseline.env, validation
+  loss was effectively unchanged but elapsed time regressed:
+    val_loss: 6.301966 -> 6.300128
+    train_elapsed_s: 28.355 -> 28.549
+decision:
+  Reject before the 900-second gate. The local attention projection speedup did
+  not convert into better wall-clock throughput, and the fixed-step screen got
+  slower. Code was reverted and the sm_120a PTX/release binary were rebuilt back
+  to baseline.
+```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Aurora momentum pass precomputes Polar input norm chunks.
+status: implementation_failed_current_launch_contract
+change:
+  Added a momentum_orient_sumsq candidate that accumulated the Frobenius
+  norm chunks while updating momentum and writing the oriented matrix. Polar
+  normalization then consumed the precomputed chunks and skipped its first full
+  source scan. The intent was to remove one global read pass per Aurora matrix
+  without changing the mathematical norm.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_aurora_momentum_norm_chunks.log
+    aurora_mega_update_cooperative_kernel used 91 registers, 4128 bytes smem,
+    and had 0 spill stores/loads. The promoted baseline uses 80 registers.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_STEPS=20 TRAIN_LOG_INTERVAL=20
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/aurora_momentum_norm_chunks_b16_l4d1024_20_20260623T062043Z.run.log
+    failed before step 0 with DriverError(720, "too many blocks in cooperative launch").
+measured_effect:
+  No training profile is valid for this candidate because the cooperative
+  Aurora launch fails under the current AURORA_COOPERATIVE_BLOCKS=180 contract.
+  The failure is caused by the register increase reducing cooperative-launch
+  residency, not by a numerical validation issue.
+decision:
+  Reject and revert. The idea of precomputing the Polar norm during momentum is
+  not disproven, but this implementation is incompatible with the current
+  cooperative launch shape. A future attempt would need to preserve the 80-reg
+  occupancy envelope or deliberately redesign the cooperative launch/block
+  schedule and then revalidate from scratch.
+```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Aligned f16 RHS staging/store fast paths.
+status: rejected_profile_gate
+change:
+  Added aligned no-bounds staging and aligned stores for f16 CTA matmul variants
+  with f32 RHS, half RHS, f32 A-transposed RHS, and f32 A-transposed half RHS.
+  The candidate only routed full CTA-aligned shapes through the new helpers; the
+  math and fallback paths were unchanged.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_f16_aligned_rhs.log
+    no spill stores/loads. f16_cta_tc_matmul_f32_rhs_kernel moved from 39 to
+    40 registers, and f16_cta_tc_matmul_f32_a_transposed_rhs_kernel moved from
+    38 to 40 registers.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test l2_attention -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_STEPS=20 TRAIN_LOG_INTERVAL=20
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/f16_rhs_aligned_b16_l4d1024_20_20260623T062823Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.733, completed_steps=20.
+measured_effect:
+  Against the promoted profile:
+    target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log
+  total kernel time regressed from 5656.514ms to 5829.540ms over 20 steps.
+  The f16 CTA matmul family regressed from 893.553ms to 945.987ms. The target
+  kernels also moved the wrong way:
+    f16_cta_tc_matmul_f32_rhs_kernel: 121.575ms -> 129.277ms
+    f16_cta_tc_matmul_f32_half_rhs_kernel: 111.540ms -> 118.000ms
+    f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel: 233.496ms -> 252.913ms
+decision:
+  Reject before the 100-step and 900-second gates. The added aligned branches
+  increased register pressure and made the profiled f16 family slower. Code was
+  reverted. This result only rejects this branch-based helper implementation,
+  not future dedicated f16 attention kernels with cleaner launch contracts.
+```

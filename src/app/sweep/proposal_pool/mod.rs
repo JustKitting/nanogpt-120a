@@ -2,6 +2,7 @@ mod coverage;
 mod direction;
 mod factorial;
 mod guided;
+mod local;
 mod variance;
 
 #[cfg(test)]
@@ -25,6 +26,7 @@ pub struct PooledCandidate {
 #[derive(Clone, Copy, Debug, Default)]
 struct SourceBudget {
     guided: usize,
+    local: usize,
     factorial: usize,
     variance: usize,
     coverage: usize,
@@ -45,10 +47,16 @@ pub fn sample(
     let direction = direction::from_analysis(analysis, config);
     let budget = source_budget(target, analysis, config);
     debug_assert_eq!(
-        budget.guided + budget.factorial + budget.variance + budget.coverage + budget.random,
+        budget.guided
+            + budget.local
+            + budget.factorial
+            + budget.variance
+            + budget.coverage
+            + budget.random,
         target
     );
     push_guided(&mut pool, &mut used, rng, &direction, budget.guided);
+    push_local(&mut pool, &mut used, rng, center, budget.local);
     push_factorial(
         &mut pool,
         &mut used,
@@ -77,6 +85,7 @@ fn source_budget(target: usize, analysis: &SweepAnalysis, config: &SweepConfig) 
 #[derive(Clone, Copy, Debug)]
 struct SourceWeights {
     guided: f64,
+    local: f64,
     factorial: f64,
     variance: f64,
     coverage: f64,
@@ -102,7 +111,7 @@ fn source_weights(analysis: &SweepAnalysis, config: &SweepConfig) -> SourceWeigh
     let has_response_model = analysis
         .models
         .iter()
-        .any(|model| model.name.contains("quality") || model.name.contains("tokens_per_s"));
+        .any(|model| model.name.contains("quality"));
     let exploitation = if has_response_model {
         (0.25 + 0.55 * model_maturity * confidence).clamp(0.0, 0.8)
     } else {
@@ -112,6 +121,11 @@ fn source_weights(analysis: &SweepAnalysis, config: &SweepConfig) -> SourceWeigh
 
     SourceWeights {
         guided: exploitation,
+        local: if has_response_model {
+            (0.2 + 0.3 * model_maturity).clamp(0.0, 0.45)
+        } else {
+            0.0
+        },
         factorial: 0.15 + 0.25 * uncertainty,
         variance: 0.2 + 0.35 * uncertainty,
         coverage: 0.15 + 0.3 * (1.0 - model_maturity),
@@ -122,6 +136,7 @@ fn source_weights(analysis: &SweepAnalysis, config: &SweepConfig) -> SourceWeigh
 fn normalized_budget(target: usize, weights: SourceWeights) -> SourceBudget {
     let raw = [
         weights.guided,
+        weights.local,
         weights.factorial,
         weights.variance,
         weights.coverage,
@@ -135,8 +150,8 @@ fn normalized_budget(target: usize, weights: SourceWeights) -> SourceBudget {
         };
     }
 
-    let mut counts = [0usize; 5];
-    let mut remainders = [(0usize, 0.0); 5];
+    let mut counts = [0usize; 6];
+    let mut remainders = [(0usize, 0.0); 6];
     for (index, weight) in raw.iter().enumerate() {
         if *weight <= 0.0 {
             continue;
@@ -175,10 +190,11 @@ fn normalized_budget(target: usize, weights: SourceWeights) -> SourceBudget {
 
     SourceBudget {
         guided: counts[0],
-        factorial: counts[1],
-        variance: counts[2],
-        coverage: counts[3],
-        random: counts[4],
+        local: counts[1],
+        factorial: counts[2],
+        variance: counts[3],
+        coverage: counts[4],
+        random: counts[5],
     }
 }
 
@@ -200,6 +216,19 @@ fn push_guided(
             "guided",
         );
         attempts += 1;
+    }
+}
+
+fn push_local(
+    pool: &mut Vec<PooledCandidate>,
+    used: &mut HashSet<String>,
+    rng: &mut SweepRng,
+    center: Option<&Candidate>,
+    count: usize,
+) {
+    let target = (pool.len() + count).min(pool.capacity().max(1));
+    for candidate in local::candidates(used, rng, center, target - pool.len()) {
+        push_unique(pool, used, candidate, "local");
     }
 }
 

@@ -48,23 +48,34 @@ fn scoring_reports_expected_improvement_against_best_observed_quality() {
 }
 
 #[test]
-fn scoring_uses_speed_weight_when_configured() {
-    let mut config = config();
-    config.sweep_quality_weight = 0.0;
-    config.sweep_speed_weight = 1.0;
-    config.sweep_exploration_weight = 0.0;
+fn scoring_prefers_screen_quality_over_sparse_full_quality_for_proposals() {
+    let config = config();
     let trials = [
-        trial(candidate(4, 4), 4.0),
-        trial(candidate(4, 8), 4.1),
-        trial(candidate(16, 4), 4.2),
-        trial(candidate(16, 8), 4.3),
+        trial_with_losses(candidate(4, 4), 9.0, 1.0),
+        trial_with_losses(candidate(8, 4), 7.0, 3.0),
+        trial_with_losses(candidate(16, 4), 3.0, 7.0),
+        trial_with_losses(candidate(32, 4), 1.0, 9.0),
     ];
     let analysis = super::analyze(&trials, &config);
-    let small_batch = super::score_candidate(&analysis, &config, &candidate(4, 4));
-    let large_batch = super::score_candidate(&analysis, &config, &candidate(16, 4));
+    let low_batch = super::score_candidate(&analysis, &config, &candidate(4, 4));
+    let high_batch = super::score_candidate(&analysis, &config, &candidate(32, 4));
 
-    assert!(large_batch.expected_speed > small_batch.expected_speed);
-    assert!(large_batch.score > small_batch.score);
+    assert!(
+        analysis
+            .models
+            .iter()
+            .any(|model| model.name == "screen_quality")
+    );
+    assert!(
+        analysis
+            .models
+            .iter()
+            .any(|model| model.name == "full_quality")
+    );
+    assert!(
+        low_batch.predicted_quality.unwrap().standard_score
+            > high_batch.predicted_quality.unwrap().standard_score
+    );
 }
 
 #[test]
@@ -86,29 +97,6 @@ fn factor_beliefs_aggregate_direction_and_confidence() {
     assert!(batch.direction > 0.0);
     assert!(batch.confidence > 0.0);
     assert!(batch.variance >= 0.0);
-}
-
-#[test]
-fn factor_beliefs_include_speed_direction_when_weighted() {
-    let mut config = config();
-    config.sweep_quality_weight = 0.0;
-    config.sweep_speed_weight = 1.0;
-    config.sweep_exploration_weight = 0.0;
-    let trials = [
-        trial(candidate(4, 4), 4.0),
-        trial(candidate(4, 8), 4.1),
-        trial(candidate(16, 4), 4.2),
-        trial(candidate(16, 8), 4.3),
-    ];
-    let analysis = super::analyze(&trials, &config);
-    let beliefs = super::factor_beliefs(&analysis, &config);
-    let batch = beliefs
-        .iter()
-        .find(|belief| belief.factor == "batch_size")
-        .unwrap();
-
-    assert!(batch.direction > 0.0);
-    assert!(batch.confidence > 0.0);
 }
 
 #[test]
@@ -156,15 +144,19 @@ fn scoring_uses_stability_prior_when_stability_model_is_constant_failure() {
 }
 
 fn trial(candidate: Candidate, val_loss: f64) -> Trial {
+    trial_with_losses(candidate, val_loss, val_loss + 1.0)
+}
+
+fn trial_with_losses(candidate: Candidate, val_loss: f64, screen_loss: f64) -> Trial {
     Trial {
         candidate,
         status: "success".to_string(),
         val_loss: Some(val_loss),
         completed_steps: Some(10),
-        elapsed_s: Some(5.0),
-        screen_val_loss: Some(val_loss + 1.0),
+        elapsed_s: Some(900.0),
+        screen_val_loss: Some(screen_loss),
         screen_completed_steps: Some(10),
-        screen_elapsed_s: Some(5.0),
+        screen_elapsed_s: Some(30.0),
         screen_reason: Some("screen_loss_improved".to_string()),
         log_path: PathBuf::from("train.log"),
     }
@@ -176,7 +168,7 @@ fn trial_with_status(candidate: Candidate, status: &str) -> Trial {
         status: status.to_string(),
         val_loss: None,
         completed_steps: Some(10),
-        elapsed_s: Some(5.0),
+        elapsed_s: Some(900.0),
         screen_val_loss: None,
         screen_completed_steps: None,
         screen_elapsed_s: None,
@@ -209,10 +201,8 @@ fn config() -> SweepConfig {
         random_trials: 0,
         candidate_samples: 16,
         max_seconds: 900.0,
-        screen_steps: 500,
-        screen_max_seconds: 180.0,
+        screen_max_seconds: 30.0,
         sweep_quality_weight: 1.0,
-        sweep_speed_weight: 0.0,
         sweep_stability_weight: 0.0,
         sweep_exploration_weight: 0.0,
         log_interval: 500,

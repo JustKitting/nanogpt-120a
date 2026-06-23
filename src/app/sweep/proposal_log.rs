@@ -28,27 +28,25 @@ pub fn write(
 fn selected_text(proposal: &Proposal) -> String {
     let (source, selected) = selected_score(proposal);
     format!(
-        "candidate={}\nreason={}\nsource={}\nscore={:.6}\nexpected_quality={:.6}\nexpected_speed={:.6}\nsurvival_prior={:.6}\nprobability_improvement={:.6}\nexpected_improvement={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nspeed={}\nstability={}\n",
+        "candidate={}\nreason={}\nsource={}\nscore={:.6}\nexpected_quality={:.6}\nsurvival_prior={:.6}\nprobability_improvement={:.6}\nexpected_improvement={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nstability={}\n",
         proposal.candidate.key(),
         proposal.reason,
         source,
         selected.score,
         selected.expected_quality,
-        selected.expected_speed,
         selected.survival_prior,
         selected.probability_improvement,
         selected.expected_improvement,
         selected.uncertainty,
         selected.exploration,
         fmt_prediction(selected.predicted_quality),
-        fmt_prediction(selected.predicted_speed),
         fmt_prediction(selected.predicted_stability)
     )
 }
 
 fn ranked_tsv(proposal: &Proposal) -> String {
     let mut text = String::from(
-        "rank\tselected\tsource\tcandidate\tscore\texpected_quality\texpected_speed\tsurvival_prior\tprobability_improvement\texpected_improvement\tuncertainty\texploration\tquality_value\tquality_z\tquality_uncertainty\tspeed_value\tspeed_z\tspeed_uncertainty\tstability_value\tstability_z\tstability_uncertainty\n",
+        "rank\tselected\tsource\tcandidate\tscore\texpected_quality\tsurvival_prior\tprobability_improvement\texpected_improvement\tuncertainty\texploration\tquality_value\tquality_z\tquality_uncertainty\tstability_value\tstability_z\tstability_uncertainty\n",
     );
     for (rank, scored) in proposal.ranked.iter().enumerate() {
         push_ranked_row(
@@ -88,18 +86,17 @@ fn sources_tsv(proposal: &Proposal) -> String {
     }
 
     let mut text = String::from(
-        "source\tcount\tselected\tbest_rank\tbest_score\tbest_expected_quality\tbest_expected_speed\tbest_survival_prior\tbest_probability_improvement\tbest_expected_improvement\tbest_uncertainty\n",
+        "source\tcount\tselected\tbest_rank\tbest_score\tbest_expected_quality\tbest_survival_prior\tbest_probability_improvement\tbest_expected_improvement\tbest_uncertainty\n",
     );
     for (source, summary) in summaries {
         text.push_str(&format!(
-            "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
+            "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
             source,
             summary.count,
             summary.selected,
             summary.best_rank,
             summary.best.score,
             summary.best.expected_quality,
-            summary.best.expected_speed,
             summary.best.survival_prior,
             summary.best.probability_improvement,
             summary.best.expected_improvement,
@@ -111,17 +108,15 @@ fn sources_tsv(proposal: &Proposal) -> String {
 
 fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, selected: bool) {
     let quality = scored.score.predicted_quality;
-    let speed = scored.score.predicted_speed;
     let stability = scored.score.predicted_stability;
     text.push_str(&format!(
-        "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+        "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{}\t{}\n",
         rank,
         selected,
         scored.source,
         scored.candidate.key(),
         scored.score.score,
         scored.score.expected_quality,
-        scored.score.expected_speed,
         scored.score.survival_prior,
         scored.score.probability_improvement,
         scored.score.expected_improvement,
@@ -130,9 +125,6 @@ fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, sel
         value(quality),
         standard_score(quality),
         uncertainty(quality),
-        value(speed),
-        standard_score(speed),
-        uncertainty(speed),
         value(stability),
         standard_score(stability),
         uncertainty(stability)
@@ -212,13 +204,11 @@ mod tests {
                 score,
                 expected_quality: score,
                 survival_prior: 1.0,
-                expected_speed: 0.0,
                 probability_improvement: 0.0,
                 expected_improvement: 0.0,
                 uncertainty: 0.0,
                 exploration: 0.0,
                 predicted_quality: None,
-                predicted_speed: None,
                 predicted_stability: None,
             },
         }

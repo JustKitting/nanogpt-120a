@@ -24,11 +24,15 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
     let mut shared_history = History::load(config.seed_history.clone())?;
     chain::sync_shared_history(&mut shared_history, &history.trials, config.dry_run)?;
     let mut baseline = Baseline::load(config.baseline.clone())?;
-    let mut baseline_screen_loss = screen_baseline(&baseline, &config, &sweep_dir)?;
+    let mut baseline_screen_trial = screen_baseline(&baseline, &config, &sweep_dir)?;
+    let mut baseline_screen_loss = baseline_screen_trial
+        .as_ref()
+        .and_then(|trial| trial.screen_val_loss);
     let mut rng = chain::sweep_rng(config.seed, history.trials.len());
 
     for index in history.trials.len()..config.trials {
-        let baseline_trial = baseline.measured_trial();
+        let baseline_trial =
+            current_baseline_trial(baseline_screen_trial.as_ref(), baseline.measured_trial());
         let all_trials = chain::all_trials_with_baseline(
             baseline_trial.as_ref(),
             &shared_history.trials,
@@ -76,11 +80,15 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
         history.append_unique(trial.clone())?;
         let promoted = baseline.promote_trial(&trial, config.dry_run)?;
         if promoted {
-            baseline_screen_loss = if let Some(loss) = promoted_screen_loss(&trial) {
-                Some(loss)
+            if let Some(loss) = promoted_screen_loss(&trial) {
+                baseline_screen_loss = Some(loss);
+                baseline_screen_trial = Some(trial.clone());
             } else {
-                screen_baseline(&baseline, &config, &sweep_dir)?
-            };
+                baseline_screen_trial = screen_baseline(&baseline, &config, &sweep_dir)?;
+                baseline_screen_loss = baseline_screen_trial
+                    .as_ref()
+                    .and_then(|trial| trial.screen_val_loss);
+            }
             println!(
                 "sweep_baseline_promoted val_loss={:.6} key={} path={}",
                 baseline.val_loss().unwrap_or(f64::NAN),
@@ -94,7 +102,8 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
         if !config.dry_run {
             shared_history.append_unique(trial)?;
         }
-        let baseline_trial = baseline.measured_trial();
+        let baseline_trial =
+            current_baseline_trial(baseline_screen_trial.as_ref(), baseline.measured_trial());
         let all_trials = chain::all_trials_with_baseline(
             baseline_trial.as_ref(),
             &shared_history.trials,
@@ -110,14 +119,11 @@ fn screen_baseline(
     baseline: &Baseline,
     config: &SweepConfig,
     sweep_dir: &Path,
-) -> Result<Option<f64>, Box<dyn std::error::Error>> {
-    let Some(candidate) = baseline.candidate().cloned() else {
+) -> Result<Option<Trial>, Box<dyn std::error::Error>> {
+    let Some(mut trial) = baseline.measured_trial() else {
         return Ok(None);
     };
-    if let Some(loss) = baseline.screen_loss() {
-        println!("sweep_screen_baseline_cached val_loss={loss:.6}");
-        return Ok(Some(loss));
-    }
+    let candidate = trial.candidate.clone();
     if config.dry_run {
         return Ok(None);
     }
@@ -132,11 +138,6 @@ fn screen_baseline(
     }
 
     let result = run_train::run_screen_candidate(&candidate, config, sweep_dir, &trial_dir, 0)?;
-    if result.completed_steps.unwrap_or(0) < config.screen_steps {
-        println!("sweep_screen_baseline_failed=incomplete");
-        return Ok(None);
-    }
-
     if let Some(val_loss) = result.val_loss {
         println!(
             "sweep_screen_baseline val_loss={val_loss:.6} completed_steps={}",
@@ -145,11 +146,23 @@ fn screen_baseline(
                 .map(|value| value.to_string())
                 .unwrap_or_default()
         );
-        Ok(Some(val_loss))
+        trial.screen_val_loss = Some(val_loss);
+        trial.screen_completed_steps = result.completed_steps;
+        trial.screen_elapsed_s = result.last_elapsed_s;
+        trial.screen_reason = Some("screen_baseline".to_string());
+        trial.log_path = trial_dir.join("screen.log");
+        Ok(Some(trial))
     } else {
         println!("sweep_screen_baseline_failed=run");
         Ok(None)
     }
+}
+
+fn current_baseline_trial(
+    screen_trial: Option<&Trial>,
+    measured_trial: Option<Trial>,
+) -> Option<Trial> {
+    screen_trial.cloned().or(measured_trial)
 }
 
 fn run_trial(
@@ -221,12 +234,7 @@ fn run_trial(
 
     let screen_result =
         run_train::run_screen_candidate(&candidate, config, sweep_dir, trial_dir, index)?;
-    let screen_decision = screen_gate::decide(
-        &screen_result,
-        screen_baseline,
-        config.screen_steps,
-        screen_score,
-    );
+    let screen_decision = screen_gate::decide(&screen_result, screen_baseline, screen_score);
     screen_gate::write(&trial_dir.join("screen_decision.env"), &screen_decision)?;
     if !screen_decision.pass {
         status::record(
@@ -382,9 +390,9 @@ fn utc_stamp() -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{fs, path::PathBuf};
 
-    use super::{Trial, promoted_screen_loss};
+    use super::{Trial, current_baseline_trial, promoted_screen_loss};
     use crate::sweep::candidate::Candidate;
 
     #[test]
@@ -407,6 +415,39 @@ mod tests {
 
         assert_eq!(promoted_screen_loss(&trial), Some(3.25));
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn current_screened_baseline_replaces_stale_baseline_screen_metrics() {
+        let measured = Trial {
+            candidate: candidate(),
+            status: "success".to_string(),
+            val_loss: Some(3.5),
+            completed_steps: Some(3000),
+            elapsed_s: Some(900.0),
+            screen_val_loss: Some(6.9),
+            screen_completed_steps: Some(500),
+            screen_elapsed_s: Some(180.0),
+            screen_reason: Some("old_screen".to_string()),
+            log_path: PathBuf::from("old/train.log"),
+        };
+        let screened = Trial {
+            screen_val_loss: Some(6.2),
+            screen_completed_steps: Some(100),
+            screen_elapsed_s: Some(30.0),
+            screen_reason: Some("screen_baseline".to_string()),
+            log_path: PathBuf::from("screen_baseline/screen.log"),
+            ..measured.clone()
+        };
+
+        let current = current_baseline_trial(Some(&screened), Some(measured)).unwrap();
+
+        assert_eq!(current.screen_val_loss, Some(6.2));
+        assert_eq!(current.screen_elapsed_s, Some(30.0));
+        assert_eq!(
+            current.log_path,
+            PathBuf::from("screen_baseline/screen.log")
+        );
     }
 
     fn candidate() -> Candidate {
