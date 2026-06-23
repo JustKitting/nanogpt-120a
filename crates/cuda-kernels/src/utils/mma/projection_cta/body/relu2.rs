@@ -4,7 +4,7 @@ use crate::mma::projection::Nvfp4ProjectionParams;
 use crate::mma::projection_cta::accumulate::{
     projection_accumulator, projection_accumulator_aligned_row_pair,
 };
-use crate::mma::projection_cta::store::store_relu2_accumulator;
+use crate::mma::projection_cta::store::{store_relu2_accumulator, store_relu2_accumulator_aligned};
 use crate::mma::projection_cta::tile::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
     NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile,
@@ -93,7 +93,7 @@ pub fn nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair(
         a1_scales,
         b_scales,
     );
-    store_relu2_accumulator(
+    store_relu2_accumulator_aligned(
         acc0,
         input_global_scales,
         bias_bytes,
@@ -104,7 +104,7 @@ pub fn nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair(
         &params,
     );
     if tile1.row_base < params.token_count {
-        store_relu2_accumulator(
+        store_relu2_accumulator_aligned(
             acc1,
             input_global_scales,
             bias_bytes,

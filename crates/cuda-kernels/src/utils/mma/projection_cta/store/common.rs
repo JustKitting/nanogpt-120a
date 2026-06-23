@@ -15,6 +15,18 @@ pub fn affine_value(
     params: &Nvfp4ProjectionParams,
 ) -> f32 {
     let global_scale = input_global_scales[row as usize] * params.weight_global_scale;
+    affine_value_scaled(acc, global_scale, col, bias_bytes, bias_scales, params)
+}
+
+#[inline(always)]
+pub fn affine_value_scaled(
+    acc: f32,
+    global_scale: f32,
+    col: u32,
+    bias_bytes: &[u8],
+    bias_scales: &[u8],
+    params: &Nvfp4ProjectionParams,
+) -> f32 {
     let bias = nvfp4_value(
         bias_bytes,
         bias_scales,

@@ -11766,3 +11766,51 @@ decision:
   validation loss and higher completed step count under the same 900-second
   SYNTH budget.
 ```
+
+```text
+date: 2026-06-23
+commit: uncommitted candidate, accepted after gate
+experiment: Share row global scale loads in aligned affine and relu2 projection stores.
+status: accepted_900s
+change:
+  Added aligned row-pair store helpers for the affine and relu2 projection
+  paths. The aligned path now loads each row input global scale once, reuses it
+  for the two adjacent accumulator columns, and stores the adjacent output pair
+  directly. Math, launch shape, MMA shape, and the checked fallback store paths
+  are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test lm_head -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test next_latent -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test forward -- --ignored --nocapture --test-threads=1: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_sm120a_verbose_affine_relu_store_candidate.txt
+    mlp_projection_kernel, mlp_projection_relu2_kernel, nextlat_projection_kernel,
+    and lm_head_kernel use 40 registers, 9216 bytes smem, and have 0 spill stores
+    / 0 spill loads. attention_projection_kernel uses 40 registers, 6912 bytes
+    smem, and has 0 spill stores / 0 spill loads.
+  20-step nsys:
+    target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.563, completed_steps=20.
+  100-step SYNTH screen:
+    target/projection_affine_relu_pair_scale_b16_l4d1024_100_powercap_20260623T020735Z.log
+    val_loss=6.301966, train_elapsed_s=28.355, completed_steps=100.
+  900-second held-out gate:
+    target/projection_affine_relu_pair_scale_b16_l4d1024_900_powercap_20260623T021212Z.log
+    val_loss=3.544918, train_elapsed_s=900.013, completed_steps=3107.
+measured_effect:
+  Against the previous promoted baseline
+  target/projection_store_pair_scale_b16_l4d1024_900_powercap_20260623T014507Z.log,
+  held-out validation loss improved from 3.560585 to 3.544918 and completed
+  steps increased from 3091 to 3107. The 20-step profile moved
+  mlp_projection_kernel from 120.870366ms to 100.928659ms over 84 calls,
+  mlp_projection_relu2_kernel from 117.140285ms to 109.873230ms over 84 calls,
+  nextlat_projection_kernel from 65.844732ms to 63.435001ms over 63 calls, and
+  total profiled train time from 5.596s to 5.563s.
+decision:
+  Promote. This passes the fixed-wall objective directly: lower held-out
+  validation loss and higher completed step count under the same 900-second
+  SYNTH budget.
+```
