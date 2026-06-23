@@ -12213,3 +12213,39 @@ decision:
   schedule preserved correctness checks, but the actual target profile got
   slower. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Broadcast no-bias projection row scales within four-lane MMA groups.
+status: rejected_screen
+change:
+  In the aligned no-bias projection store, only thread_in_group=0 loaded the
+  two row global scales and broadcast them to the other lanes in the four-lane
+  MMA group with warp shuffle. The intent was to reduce repeated row-scale
+  loads in linear_backward_projection_pair_cta_device_scale_kernel.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_nobias_scale_shuffle_candidate.log
+    linear_backward_projection_pair_cta_device_scale_kernel changed from the
+    accepted 39 registers/thread to 38 registers/thread, with 32 bytes stack,
+    9216 bytes smem, and 0 spill stores/loads.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/nobias_store_scale_shuffle_b16_l4d1024_20_gpu0_20260623T040119Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.658, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5753.691ms over 20 steps.
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1137.312ms to 1168.827ms over 400 calls. The lower register count did not
+  translate into runtime improvement; the added shuffle/control path lost.
+decision:
+  Reject before the 100-step and 900-second gates. Code was reverted.
+```
