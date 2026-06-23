@@ -11989,3 +11989,39 @@ decision:
   no-op for padded descriptors, but the compiler cost is too high in the current
   kernel shape. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Split Aurora momentum orientation into plain and transposed loops.
+status: rejected_screen
+change:
+  Split momentum_orient into a non-transposed loop that writes oriented[index]
+  directly and a transposed loop that computes row/col and writes
+  oriented[col * rows + row]. The intent was to remove per-element row/col
+  division and conditional destination selection for non-transposed Aurora
+  slots while preserving the same Nesterov momentum math.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_sm120a_verbose_aurora_momentum_orient_split_candidate.txt
+    aurora_mega_update_cooperative_kernel remained at 80 registers/thread,
+    0 spill stores / 0 spill loads.
+  CUDA_DEVICE_INDEX=1 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys, same physical GPU as accepted baseline:
+    target/nsys/aurora_momentum_orient_split_b16_l4d1024_20_gpu0_20260623T030724Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.700, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5796.908ms over 20 steps.
+  aurora_mega_update_cooperative_kernel regressed from 1710.614ms to
+  1745.716ms over 20 calls. linear_backward_projection_pair_cta_device_scale_kernel
+  also moved from 1137.312ms to 1179.797ms in that run.
+decision:
+  Reject before the 100-step and 900-second gates. The split preserved the
+  register budget and correctness tests, but the actual same-device profile got
+  slower. Code was reverted.
+```
