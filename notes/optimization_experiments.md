@@ -12025,3 +12025,40 @@ decision:
   register budget and correctness tests, but the actual same-device profile got
   slower. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Remove tile1 validity guard from linear-backward row-pair CTA store.
+status: rejected_screen
+change:
+  Tightened the linear-backward pair-CTA launcher contract from 32-row
+  alignment to 64-row alignment and removed the tile1.row_base < token_count
+  guard in nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair. The
+  intent was to remove a per-block store-side branch from the hot row-pair
+  projection path while preserving the same math for current B16/L4/d1024
+  aligned shapes.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_sm120a_verbose_row_pair_store_no_guard_candidate.txt
+    linear_backward_projection_pair_cta_device_scale_kernel used 40 registers,
+    9216 bytes smem, and had 0 spill stores / 0 spill loads.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/row_pair_store_no_guard_b16_l4d1024_20_gpu0_20260623T031145Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.668, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5763.891ms over 20 steps.
+  linear_backward_projection_pair_cta_device_scale_kernel regressed from
+  1137.312ms to 1176.004ms over 400 calls, and the register count increased
+  from the accepted 39 registers/thread to 40 registers/thread.
+decision:
+  Reject before the 100-step and 900-second gates. The branch removal raised
+  register pressure and worsened the actual target-kernel profile. Code was
+  reverted.
+```
