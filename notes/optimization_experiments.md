@@ -11850,3 +11850,41 @@ decision:
   different scheduling/control pressure in the cooperative kernel and compile
   effects outside Aurora. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Unroll fixed row-pair CTA projection staging loops.
+status: rejected_screen
+change:
+  Replaced the fixed-shape while loops in stage_row_pair_tiles_aligned with
+  explicit first/second B-pack loads plus guarded scale loads. The intent was
+  to remove loop/control overhead from the aligned row-pair linear-backward
+  projection path. Math, launch geometry, MMA shape, and stores were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_sm120a_verbose_stage_row_pair_unroll_candidate.txt
+    linear_backward_projection_pair_cta_device_scale_kernel used 40 registers,
+    9216 bytes smem, and had 0 spill stores / 0 spill loads.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test linear_backward_projection_cta -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test qkv_projection_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p gpt2-nvfp4 --test block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/stage_row_pair_unroll_b16_l4d1024_20_powercap_20260623T024141Z.run.log
+    val_loss=9.063751, train_elapsed_s=5.643, completed_steps=20.
+measured_effect:
+  Against the promoted affine/relu pair-scale profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total kernel time regressed from 5656.514ms to 5738.940ms over 20 steps.
+  linear_backward_projection_pair_cta_device_scale_kernel moved from
+  1137.312ms to 1158.938ms over 400 calls, and
+  aurora_mega_update_cooperative_kernel moved from 1710.614ms to 1732.628ms
+  over 20 calls.
+decision:
+  Reject before the 100-step and 900-second gates. The explicit unroll did not
+  change register or spill counts, but it worsened the actual profiled runtime
+  for the target kernel and total step profile. Code was reverted.
+```
