@@ -11888,3 +11888,39 @@ decision:
   change register or spill counts, but it worsened the actual profiled runtime
   for the target kernel and total step profile. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Remove Aurora zero-size padding descriptors and launch with ceil matrix_count.
+status: rejected_correctness
+change:
+  Removed host-side Aurora padding descriptors and changed the cooperative
+  launcher matrix_count from slot_count / AURORA_MATRIX_PHASES to ceil(slot_count
+  / AURORA_MATRIX_PHASES). The intent was to use the existing slot < slot_count
+  guard to skip the zero-size padded descriptors without adding a branch inside
+  the hot device slot body.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_sm120a_verbose_aurora_unpadded_slots_candidate.txt
+    aurora_mega_update_cooperative_kernel used 80 registers, 4128 bytes smem,
+    and had 0 spill stores / 0 spill loads.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test optimizer -- --ignored --nocapture --test-threads=1: pass.
+  20-step nsys:
+    target/nsys/aurora_unpadded_slots_b16_l4d1024_20_powercap_20260623T024758Z.run.log
+    did not complete. It printed step 0, then hung until interrupted; the nsys
+    sqlite export failed because the profiled process was interrupted.
+measured_effect:
+  Invalid candidate. In a partially filled Aurora phase, some matrix groups
+  entered aurora_matrix_update_body and reached internal cooperative grid::sync
+  calls while other matrix groups skipped directly to the outer phase sync.
+  Cooperative grid sync requires all blocks in the cooperative grid to reach the
+  same sync point, so this scheduling shape can deadlock.
+decision:
+  Reject before any 100-step or 900-second gate. The zero-size padding
+  descriptors are currently required so every matrix group participates in the
+  same internal grid sync sequence for each phase. Code was reverted.
+```
