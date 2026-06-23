@@ -11960,3 +11960,32 @@ decision:
   separate aligned paths increased the profiled runtime of the target kernels
   and total kernel profile. Code was reverted.
 ```
+
+```text
+date: 2026-06-23
+commit: rejected uncommitted candidate, code reverted
+experiment: Add Aurora zero-size padding no-op branch with matching grid syncs.
+status: rejected_compile_screen
+change:
+  Added a device branch in aurora_mega_update_cooperative_kernel for
+  rows == 0 || cols == 0 padded slots. The branch preserved the same cooperative
+  grid::sync sequence as the real Aurora matrix body, but skipped zero-length
+  momentum, normalization, polar tile, update, and quantization work for padded
+  descriptors.
+verification:
+  cargo fmt --all: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_sm120a_verbose_aurora_padding_noop_candidate.txt
+measured_effect:
+  aurora_mega_update_cooperative_kernel register usage regressed from the
+  accepted 80 registers/thread to 125 registers/thread, with a 128-byte stack
+  frame. Spills remained 0, but the register jump is enough to reject before
+  runtime profiling.
+decision:
+  Reject before GPU tests, 20-step nsys, 100-step, or 900-second gates. The
+  padding no-op branch is mathematically intended to be a sync-preserving
+  no-op for padded descriptors, but the compiler cost is too high in the current
+  kernel shape. Code was reverted.
+```
