@@ -12,6 +12,8 @@ mod embedding;
 mod grad_clip;
 #[path = "optimizer/polar_coefficients.rs"]
 mod polar_coefficients;
+#[path = "optimizer/polar_gram_ns.rs"]
+mod polar_gram_ns;
 #[path = "optimizer/polar_nvfp4.rs"]
 mod polar_nvfp4;
 #[path = "optimizer/polar_reference.rs"]

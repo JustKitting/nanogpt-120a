@@ -32,6 +32,348 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
 ```text
+date: 2026-06-25
+commit: uncommitted
+experiment: Add isolated Parallax attention forward kernel.
+status: forward_kernel_validated_training_not_wired
+change:
+  Added a separate CUDA attention module for Parallax forward with packed
+  QRKV layout [Q | R | K | V]. The kernel computes the standard QK softmax
+  scores, the Parallax RK probe scores, the probe weighted mean, and the
+  corrected output:
+    O1 / d1 * (1 + d2 / d1) - O2 / d1
+  matching the official reference formula.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check -p rust-kernels-cuda --test causal_attention_log_sum_exp: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    causal_attention_log_sum_exp -- --ignored --nocapture: pass.
+measured_effect:
+  No training timing or validation loss is claimed. This is a correctness
+  primitive for the forward attention mechanism only.
+decision:
+  Keep as the Parallax forward primitive. Do not route the GPT training path to
+  QRKV until the matching backward/tape contract is implemented and validated;
+  changing the projection shape without Parallax gradients would make training
+  incorrect.
+```
+
+```text
+date: 2026-06-25
+commit: uncommitted prototype
+experiment: Per-phase static safety schedule search for Gram-form NVFP4 Polar.
+status: prototype_evidence_not_training_validated
+change:
+  Added a test-only per-phase coefficient-safety schedule mode for the
+  Gram-form NVFP4 Polar correction probe, plus a bounded deterministic search.
+  This tests the hypothesis that the NVFP4 failure is a discrete convergence
+  issue for this matrix shape and can be corrected by static phase-local
+  damping rather than by a general-purpose runtime correction.
+verification:
+  cargo fmt --all: pass.
+  cargo check -p rust-kernels-cuda --test optimizer: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+    nvfp4_gram_form_safety_schedule_search -- --ignored --nocapture: pass.
+  report:
+    target/nvfp4_gram_form_schedule_search_20260625T013908Z.log
+measured_effect:
+  At the active 8-phase count for the 32x64 test matrix:
+    Best raw NVFP4-only static schedule:
+      schedule=1.000_1.000_1.040_1.010_1.030_1.080_1.000_1.080
+      finite=true, cosine=0.99245042, rel_l2=1.22767411e-1,
+      nvfp4_grams=8, hi_grams=0.
+    Previous best raw schedule from phase-local safety:
+      late2_safety1045 rel_l2=1.28836051e-1.
+    Applying the same schedule to prefix3 stale-reject correction:
+      finite=true, cosine=0.99956954, rel_l2=2.92980112e-2,
+      nvfp4_grams=5, hi_grams=6, rejected=1.
+    Best lower-refresh corrected schedules from the same expanded search:
+      prefix3_stale_reject3 with the same schedule:
+        cosine=0.99937963, rel_l2=3.52141000e-2,
+        nvfp4_grams=5, hi_grams=5, rejected=1.
+      prefix3_stale_reject5 with the same schedule:
+        cosine=0.99723411, rel_l2=7.43364543e-2,
+        nvfp4_grams=5, hi_grams=4, rejected=1.
+    Previous prefix3 stale-reject fixed safety103:
+      rel_l2=3.05449944e-2.
+decision:
+  The search supports shape-specific per-phase damping as a real correction
+  lever, but the raw NVFP4-only path is still too inaccurate for training. The
+  corrected stale path improved modestly, but still uses six high-precision Gram
+  formations for this 8-phase probe at its best accuracy. Reducing refreshes to
+  five or four high-precision Gram formations is possible but measurably worsens
+  error. This is not yet a plausible faster Aurora replacement. Next useful work
+  is a shape/layer-specific coefficient search that reduces high-precision
+  refreshes, or a device-resident correction path that makes exact/stale refresh
+  cheaper.
+```
+
+```text
+date: 2026-06-25
+commit: uncommitted prototype
+experiment: Cheap diagonal-ridge correction for Gram-form NVFP4 Polar.
+status: rejected_prototype
+change:
+  Added a test-only static diagonal shift to the NVFP4 Gram before forming
+  Q = aI + bR + cR^2. This was intended to test whether the discrete
+  Gram-NS failure could be corrected by a cheap PSD-style ridge rather than by
+  high-precision refreshes.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check -p rust-kernels-cuda --test optimizer: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+    nvfp4_gram_form_correction_variants_report_update_error -- --ignored
+    --nocapture: pass.
+  report:
+    target/nvfp4_gram_form_ridge_20260625T012908Z.log
+measured_effect:
+  At the active 8-phase count for the 32x64 test matrix:
+    nvfp4_gram_only_ridge001/ridge003/ridge010:
+      finite=false.
+    nvfp4_gram_only_safety103_ridge003:
+      finite=true, cosine=0.98932707, rel_l2=1.45953462e-1.
+    nvfp4_gram_only_safety1045_ridge003:
+      finite=true, cosine=0.98848766, rel_l2=1.51517898e-1.
+    For comparison, safety-only extra_safety105 was finite with
+      cosine=0.98926187, rel_l2=1.46404773e-1.
+decision:
+  Reject static diagonal ridge as the correction mechanism. It does not rescue
+  raw NVFP4 Gram-only convergence, and when combined with coefficient safety it
+  does not improve accuracy over safety alone. The useful path remains a
+  device-resident stale/exact correction or a different per-phase coefficient
+  schedule, not a diagonal ridge.
+```
+
+```text
+date: 2026-06-25
+commit: uncommitted prototype
+experiment: Phase-local static safety for Gram-form NVFP4 Polar.
+status: prototype_evidence_not_training_validated
+change:
+  Added test-only late-start coefficient-safety variants to determine whether
+  damping only the final failing phases can preserve early NVFP4 speed/accuracy
+  while avoiding the 8-phase divergence.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check -p rust-kernels-cuda --test optimizer: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+    nvfp4_gram_form_correction_variants_report_update_error -- --ignored
+    --nocapture: pass.
+  reports:
+    target/nvfp4_gram_form_late_safety_20260625T012721Z.log
+    target/nvfp4_gram_form_late_safety_early_20260625T012750Z.log
+    target/nvfp4_gram_form_static_cleanup_20260625T013109Z.log
+measured_effect:
+  At the active 8-phase count for the 32x64 test matrix:
+    late4_safety1045, late4_safety105, late3_safety1045,
+    late3_safety105, and late5_safety105:
+      finite=false.
+    late2_safety1045:
+      finite=true, cosine=0.99167454, rel_l2=1.28836051e-1,
+      nvfp4_grams=8, hi_grams=0.
+    blanket extra_safety1045:
+      finite=true, cosine=0.98899901, rel_l2=1.48223892e-1.
+decision:
+  Phase-local safety works only when it starts early enough to affect iteration
+  2. That is a small accuracy improvement over blanket safety, but still not
+  accurate enough to replace the FP16 Aurora path. This supports the discrete
+  convergence view: the correction must be applied before the visible blowup,
+  not only at the final failing phase.
+```
+
+```text
+date: 2026-06-25
+commit: uncommitted prototype
+experiment: Shape-specific static safety scaling for Gram-form NVFP4 Polar.
+status: prototype_evidence_not_training_validated
+change:
+  Added test-only coefficient-safety variants to the Gram-form NVFP4 Polar
+  correction probe. The existing Polar coefficients already include the base
+  1.01 safety divisor; this experiment applies an extra static divisor to
+  (a, b, c) as (a/s, b/s^3, c/s^5) to test whether this discrete NVFP4
+  convergence failure has a shape-specific safety threshold.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check -p rust-kernels-cuda --test optimizer: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+    nvfp4_gram_form_correction_variants_report_update_error -- --ignored
+    --nocapture: pass.
+  report:
+    target/nvfp4_gram_form_static_safety_window_20260625T012459Z.log
+measured_effect:
+  At the active 8-phase count for the 32x64 test matrix:
+    high_precision:
+      finite=true, cosine=0.99999827, rel_l2=1.02117832e-3.
+    high_precision_extra_safety1045:
+      finite=true, cosine=0.99999774, rel_l2=1.15225138e-3.
+    nvfp4_gram_only through extra_safety104:
+      finite=false.
+    nvfp4_gram_only_extra_safety1045:
+      finite=true, cosine=0.98899901, rel_l2=1.48223892e-1,
+      nvfp4_grams=8, hi_grams=0.
+    nvfp4_gram_only_extra_safety105:
+      finite=true, cosine=0.98926187, rel_l2=1.46404773e-1,
+      nvfp4_grams=8, hi_grams=0.
+    prefix3_stale_reject2:
+      finite=true, cosine=0.99937171, rel_l2=3.54756676e-2,
+      nvfp4_grams=5, hi_grams=6, rejected=1.
+    prefix3_stale_reject2_extra_safety103:
+      finite=true, cosine=0.99953383, rel_l2=3.05449944e-2,
+      nvfp4_grams=5, hi_grams=6, rejected=1.
+decision:
+  Static coefficient safety does expose a discrete convergence threshold for
+  this shape: the raw NVFP4 Gram-only recurrence fails at extra_safety104 and
+  survives at extra_safety1045. Accuracy is still too rough for replacing the
+  FP16 Aurora path directly, and the more accurate prefix/stale path still uses
+  six high-precision Gram products. Do not route this into training until there
+  is a device-resident correction/rejection path that can plausibly beat the
+  accepted FP16 Gram-form kernel.
+```
+
+```text
+date: 2026-06-25
+commit: uncommitted prototype
+experiment: Gram-form NVFP4 stale correction with rejection gate.
+status: prototype_evidence_not_training_validated
+change:
+  Added a test-only Gram-form Polar correction path that matches the accepted
+  Aurora recurrence shape, Q = aI + bR + cR^2 followed by X_next = QX. Tested
+  NVFP4 Gram-only, averaged NVFP4 Gram, period-2 stale correction, period-2
+  stale correction with residual rejection, and scaled stale correction.
+verification:
+  cargo fmt --all: pass.
+  cargo check -p rust-kernels-cuda --test optimizer: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+    nvfp4_gram_form_correction_variants_report_update_error -- --ignored
+    --nocapture: pass.
+  report:
+    target/nvfp4_gram_form_correction_8phase_20260625T011423Z.log
+measured_effect:
+  At the active 8-phase count:
+    high_precision:
+      finite=true, cosine=0.99999827, rel_l2=1.02117832e-3,
+      nvfp4_grams=0, hi_grams=8.
+    nvfp4_gram_only:
+      finite=false.
+    nvfp4_avg4:
+      finite=false, nvfp4_grams=32.
+    stale_period2:
+      finite=false, nvfp4_grams=8, hi_grams=4.
+    stale_reject_period2:
+      finite=true, cosine=0.99699473, rel_l2=7.75589645e-2,
+      nvfp4_grams=8, hi_grams=4, rejected=2.
+    stale_scaled25/50/75_period2:
+      finite=false.
+    prefix3_stale_reject2:
+      finite=true, cosine=0.99937171, rel_l2=3.54756676e-2,
+      nvfp4_grams=5, hi_grams=6, rejected=1.
+decision:
+  Do not route this into training yet. Period-2 stale rejection is the first
+  NVFP4 correction mode here that survives the 8-phase Gram-form recurrence,
+  but it needs a device-resident residual/rejection mechanism before timing is
+  meaningful. Prefix-3 is more accurate but uses six high-precision Grams, so
+  it is unlikely to beat the accepted FP16 Gram-form path.
+```
+
+```text
+date: 2026-06-25
+commit: uncommitted candidate, accepted after gate
+experiment: Integrate FP16 Gram-form Polar update into Aurora cooperative path.
+status: accepted_900s
+change:
+  Replaced the Aurora Polar iteration's second rectangular product with an
+  exact Gram-form polynomial path. Each iteration now computes R = X X^T,
+  Q = aI + bR + cR^2, then X_next = Q X. This keeps the FP16 tensor-core
+  Polar path and avoids promoting the noisy NVFP4 correction probes as a full
+  replacement.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check -p rust-kernels-cuda --tests: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 timeout 300 cargo test -p rust-kernels-cuda --test
+    optimizer -- --ignored --nocapture --test-threads=1: pass.
+  ptxas -arch=sm_120a -v:
+    target/ptxas_gram_ns_polar.log
+    aurora_mega_update_cooperative_kernel uses 80 registers, 4128 bytes smem,
+    and has 0 spill stores / 0 spill loads.
+  20-step nsys:
+    target/nsys/gram_ns_polar_b16_l4d1024_20_20260625T004850Z.run.log
+    val_loss=8.815909, train_elapsed_s=5.259, completed_steps=20.
+  100-step SYNTH screen:
+    target/gram_ns_polar_b16_l4d1024_100_20260625T005158Z.log
+    val_loss=6.140056, train_elapsed_s=26.110, completed_steps=100.
+  900-second held-out gate:
+    target/gram_ns_polar_b16_l4d1024_900_20260625T005304Z.log
+    val_loss=3.472538, train_elapsed_s=900.218, completed_steps=3367.
+measured_effect:
+  Against the accepted profile
+  target/nsys/projection_affine_relu_pair_scale_b16_l4d1024_20_powercap_20260623T020719Z.run.log,
+  total profiled kernel time moved from 5656.514ms to 5331.113ms over
+  20 steps, and aurora_mega_update_cooperative_kernel moved from
+  1710.614ms to 1248.858ms.
+  Against the active baseline in notes/sweep_baseline.env before this change,
+  held-out validation loss improved from 3.529561 to 3.472538 and completed
+  steps increased from 3073 to 3367 under the fixed 900-second SYNTH budget.
+decision:
+  Promote this FP16 Gram-form Aurora restructuring. It passes the fixed-wall
+  objective directly with lower held-out validation loss and higher completed
+  step count. This does not promote the full NVFP4 Gram-correction algorithm;
+  those probes remain too noisy or too expensive relative to the FP16 path.
+```
+
+```text
+date: 2026-06-25
+commit: uncommitted prototype
+experiment: Polar/Aurora replacement probes: FP16 Gram-NS restarts and NVFP4 Gram correction.
+status: prototype_evidence_not_training_validated
+change:
+  Added a focused Gram Newton-Schulz device prototype that compares the current
+  FP16 Polar Express sequence against a Gram-NS recurrence with explicit restart
+  schedules. Also ran the existing NVFP4 Gram-correction accuracy probe against
+  the current PTX.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check -p rust-kernels-cuda --tests: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+    stabilized_gram_ns -- --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+    device_stabilized_gram_ns_reports_timing -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test optimizer
+    nvfp4_gram_correction_variants_report_update_error -- --ignored
+    --nocapture: pass.
+measured_effect:
+  FP16 Gram-NS device prototype, rows=128 cols=512, five Polar iterations:
+    reset_2:
+      speedup=1.246185, rel_l2=5.44989109e-1, cosine=0.87804192.
+    reset_2_4:
+      speedup=1.167778, rel_l2=4.44058850e-2, cosine=0.99898630.
+    reset_1_3:
+      speedup=1.172951, rel_l2=1.47635238e-2, cosine=0.99989182.
+    reset_2_3_4:
+      speedup=1.099822, rel_l2=6.61655236e-3, cosine=0.99997562.
+    reset_every:
+      speedup=1.053571, rel_l2=4.93001239e-3, cosine=0.99999684.
+  Existing NVFP4 Gram-correction accuracy probe, rows=32 cols=64:
+    Raw NVFP4 Gram-only diverges by five iterations
+      rel_l2=5.69066200e7, cosine=0.16993564.
+    NVFP4 avg8 remains finite but loose
+      iter5 rel_l2=7.99720287e-2, cosine=0.99679697.
+    Stale period1 matches high precision but computes both NVFP4 and high
+      precision Gram every step, so it is not a cheaper replacement.
+    Stale period2/3 and adaptive loose thresholds diverge or NaN by 5-7
+      iterations in this probe.
+decision:
+  Do not promote a full NVFP4 Polar replacement. The accurate NVFP4 correction
+  modes either require high-precision Gram every step or many NVFP4 samples,
+  which is not yet cheaper than the FP16 path. The useful candidate is narrower:
+  integrate the FP16 Gram-NS restart schedule into the Aurora polar path and
+  profile it. That would be a math-preserving Polar restructuring, not yet the
+  requested quantization-aware Aurora replacement.
+```
+
+```text
 date: 2026-06-23
 commit: uncommitted candidate, reverted after gate
 experiment: Fuse AdamW update with Adam tensor chunk-amax.

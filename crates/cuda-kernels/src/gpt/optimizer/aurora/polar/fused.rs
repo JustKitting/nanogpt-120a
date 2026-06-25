@@ -15,7 +15,7 @@ mod tiles;
 use coefficients::coefficients;
 use normalize::normalize_source_to_x;
 use ptr::{source_ptr, target_ptr};
-use tiles::{run_next_tiles, run_plain_tiles, run_symmetric_tiles};
+use tiles::{run_plain_tiles, run_symmetric_polynomial_tiles, run_symmetric_tiles};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn polar_express_from_source_ptr(
@@ -69,24 +69,20 @@ pub(crate) fn polar_express_from_source_ptr(
         );
         grid::sync();
 
-        run_plain_tiles(
-            gram_ptr, source, ax_ptr, a_tile, b_tile, work, polar_rows, polar_cols, polar_rows,
-            true,
-        );
-        grid::sync();
-
-        run_next_tiles(
+        run_symmetric_polynomial_tiles(
+            gram_ptr,
             gram_ptr,
             ax_ptr,
-            source,
-            ax_ptr,
-            target,
             a_tile,
             b_tile,
             work,
             polar_rows,
-            polar_cols,
             coefficients(iter),
+        );
+        grid::sync();
+
+        run_plain_tiles(
+            ax_ptr, source, target, a_tile, b_tile, work, polar_rows, polar_cols, polar_rows, true,
         );
         grid::sync();
 

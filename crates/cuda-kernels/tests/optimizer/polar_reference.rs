@@ -9,11 +9,11 @@ pub fn polar_first_iteration_scalar(x: f32, rows: usize, cols: usize) -> f32 {
     let xh = round_f16_to_f32(x);
     let gram = rows as f32 * xh * xh;
     let gramh = round_f16_to_f32(gram);
-    let ax = cols as f32 * xh * gramh;
-    let axh = round_f16_to_f32(ax);
-    let aax = cols as f32 * axh * gramh;
-    let base = (8.287_212 / 1.01_f32).mul_add(x, (-23.595_886 / 1.030_301_f32) * ax);
-    (17.300_388 / 1.051_010_1_f32).mul_add(aax, base)
+    let gram2 = cols as f32 * gramh * gramh;
+    let off_diag =
+        (17.300_388 / 1.051_010_1_f32).mul_add(gram2, (-23.595_886 / 1.030_301_f32) * gram);
+    let diag = off_diag + 8.287_212 / 1.01_f32;
+    xh * (round_f16_to_f32(diag) + (cols as f32 - 1.0) * round_f16_to_f32(off_diag))
 }
 
 pub fn round_f16_to_f32(value: f32) -> f32 {

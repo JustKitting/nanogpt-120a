@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use cuda_core::CudaContext;
+use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::nvfp4_tc_matmul::Nvfp4TcMatmulModule;
 
@@ -15,7 +16,8 @@ mod scratch;
 
 const ROWS: usize = 32;
 const COLS: usize = 64;
-const MAX_ITERATIONS: usize = 7;
+const MAX_ITERATIONS: usize = 8;
+const PRODUCTION_ITERATIONS: usize = 5;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -23,9 +25,10 @@ fn nvfp4_rht_polar_estimator_reports_update_error() -> Result<(), Box<dyn Error>
     let ctx = CudaContext::new(common::gpu_device_index())?;
     let stream = ctx.new_stream()?;
     let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let f16 = F16TcMatmulModule::from_module(ptx.clone())?;
     let matmul = Nvfp4TcMatmulModule::from_module(ptx.clone())?;
     let quant = Nvfp4QuantModule::from_module(ptx)?;
-    let polar = device::Nvfp4Polar::new(&stream, &matmul, &quant);
+    let polar = device::Nvfp4Polar::new(&stream, &f16, &matmul, &quant);
 
     let source = math::normalized_source(&math::gradient(ROWS, COLS), ROWS, COLS);
     let gram_expected = math::matmul_f16_leaf(&source, &source, ROWS, ROWS, COLS);
@@ -85,4 +88,1006 @@ fn nvfp4_rht_polar_estimator_reports_update_error() -> Result<(), Box<dyn Error>
     }
 
     Ok(())
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn nvfp4_gram_correction_variants_report_update_error() -> Result<(), Box<dyn Error>> {
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let f16 = F16TcMatmulModule::from_module(ptx.clone())?;
+    let matmul = Nvfp4TcMatmulModule::from_module(ptx.clone())?;
+    let quant = Nvfp4QuantModule::from_module(ptx)?;
+    let polar = device::Nvfp4Polar::new(&stream, &f16, &matmul, &quant);
+    let source = math::normalized_source(&math::gradient(ROWS, COLS), ROWS, COLS);
+
+    for iterations in 1..=MAX_ITERATIONS {
+        let expected = math::polar_iterations_f16_leaf(source.clone(), ROWS, COLS, iterations);
+        for (name, mode) in [
+            ("high_precision", device::GramCorrectionMode::HighPrecision),
+            ("nvfp4_gram_only", device::GramCorrectionMode::Nvfp4GramOnly),
+            (
+                "nvfp4_avg2",
+                device::GramCorrectionMode::Nvfp4GramAverage { samples: 2 },
+            ),
+            (
+                "nvfp4_avg4",
+                device::GramCorrectionMode::Nvfp4GramAverage { samples: 4 },
+            ),
+            (
+                "nvfp4_avg8",
+                device::GramCorrectionMode::Nvfp4GramAverage { samples: 8 },
+            ),
+            (
+                "prefix2_nvfp4",
+                device::GramCorrectionMode::ExactPrefixThenNvfp4 { exact_steps: 2 },
+            ),
+            (
+                "prefix3_nvfp4",
+                device::GramCorrectionMode::ExactPrefixThenNvfp4 { exact_steps: 3 },
+            ),
+            (
+                "prefix2_avg4",
+                device::GramCorrectionMode::ExactPrefixThenNvfp4Average {
+                    exact_steps: 2,
+                    samples: 4,
+                },
+            ),
+            (
+                "prefix3_avg4",
+                device::GramCorrectionMode::ExactPrefixThenNvfp4Average {
+                    exact_steps: 3,
+                    samples: 4,
+                },
+            ),
+            (
+                "stale_period1",
+                device::GramCorrectionMode::Stale { period: 1 },
+            ),
+            (
+                "stale_period2",
+                device::GramCorrectionMode::Stale { period: 2 },
+            ),
+            (
+                "stale_period3",
+                device::GramCorrectionMode::Stale { period: 3 },
+            ),
+            (
+                "prefix2_stale2",
+                device::GramCorrectionMode::ExactPrefixThenStale {
+                    exact_steps: 2,
+                    period: 2,
+                },
+            ),
+            (
+                "prefix3_stale2",
+                device::GramCorrectionMode::ExactPrefixThenStale {
+                    exact_steps: 3,
+                    period: 2,
+                },
+            ),
+            (
+                "prefix4_stale2",
+                device::GramCorrectionMode::ExactPrefixThenStale {
+                    exact_steps: 4,
+                    period: 2,
+                },
+            ),
+            (
+                "adaptive_p2_e03",
+                device::GramCorrectionMode::Adaptive {
+                    period: 2,
+                    max_relative_defect: 3.0e-2,
+                },
+            ),
+            (
+                "adaptive_p2_e05",
+                device::GramCorrectionMode::Adaptive {
+                    period: 2,
+                    max_relative_defect: 5.0e-2,
+                },
+            ),
+            (
+                "adaptive_p3_e05",
+                device::GramCorrectionMode::Adaptive {
+                    period: 3,
+                    max_relative_defect: 5.0e-2,
+                },
+            ),
+        ] {
+            let (actual, stats) =
+                polar.gram_corrected_iterations(source.clone(), ROWS, COLS, iterations, mode)?;
+            let finite = actual.iter().all(|value| value.is_finite());
+            println!(
+                "nvfp4_gram_correction mode={name} iterations={iterations} finite={finite} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} max_defect={:.8e} last_defect={:.8e}",
+                math::cosine(&actual, &expected),
+                math::relative_l2(&actual, &expected),
+                math::max_abs_error(&actual, &expected),
+                stats.nvfp4_gram_count,
+                stats.high_precision_gram_count,
+                stats.max_relative_defect,
+                stats.last_relative_defect,
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn nvfp4_gram_form_correction_variants_report_update_error() -> Result<(), Box<dyn Error>> {
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let f16 = F16TcMatmulModule::from_module(ptx.clone())?;
+    let matmul = Nvfp4TcMatmulModule::from_module(ptx.clone())?;
+    let quant = Nvfp4QuantModule::from_module(ptx)?;
+    let polar = device::Nvfp4Polar::new(&stream, &f16, &matmul, &quant);
+    let source = math::normalized_source(&math::gradient(ROWS, COLS), ROWS, COLS);
+
+    for iterations in 1..=MAX_ITERATIONS {
+        let expected =
+            math::gram_form_polar_iterations_f16_leaf(source.clone(), ROWS, COLS, iterations);
+        for (name, mode) in [
+            ("high_precision", device::GramCorrectionMode::HighPrecision),
+            (
+                "high_precision_extra_safety101",
+                device::GramCorrectionMode::HighPrecisionSafety {
+                    coefficient_safety: 1.01,
+                },
+            ),
+            (
+                "high_precision_extra_safety103",
+                device::GramCorrectionMode::HighPrecisionSafety {
+                    coefficient_safety: 1.03,
+                },
+            ),
+            (
+                "high_precision_extra_safety104",
+                device::GramCorrectionMode::HighPrecisionSafety {
+                    coefficient_safety: 1.04,
+                },
+            ),
+            (
+                "high_precision_extra_safety1045",
+                device::GramCorrectionMode::HighPrecisionSafety {
+                    coefficient_safety: 1.045,
+                },
+            ),
+            (
+                "high_precision_extra_safety105",
+                device::GramCorrectionMode::HighPrecisionSafety {
+                    coefficient_safety: 1.05,
+                },
+            ),
+            ("nvfp4_gram_only", device::GramCorrectionMode::Nvfp4GramOnly),
+            (
+                "nvfp4_gram_only_extra_safety101",
+                device::GramCorrectionMode::Nvfp4GramOnlySafety {
+                    coefficient_safety: 1.01,
+                },
+            ),
+            (
+                "nvfp4_gram_only_extra_safety103",
+                device::GramCorrectionMode::Nvfp4GramOnlySafety {
+                    coefficient_safety: 1.03,
+                },
+            ),
+            (
+                "nvfp4_gram_only_extra_safety104",
+                device::GramCorrectionMode::Nvfp4GramOnlySafety {
+                    coefficient_safety: 1.04,
+                },
+            ),
+            (
+                "nvfp4_gram_only_extra_safety1045",
+                device::GramCorrectionMode::Nvfp4GramOnlySafety {
+                    coefficient_safety: 1.045,
+                },
+            ),
+            (
+                "nvfp4_gram_only_extra_safety105",
+                device::GramCorrectionMode::Nvfp4GramOnlySafety {
+                    coefficient_safety: 1.05,
+                },
+            ),
+            (
+                "nvfp4_gram_only_late4_safety1045",
+                device::GramCorrectionMode::Nvfp4GramOnlyLateSafety {
+                    start_iter: 4,
+                    coefficient_safety: 1.045,
+                },
+            ),
+            (
+                "nvfp4_gram_only_late4_safety105",
+                device::GramCorrectionMode::Nvfp4GramOnlyLateSafety {
+                    start_iter: 4,
+                    coefficient_safety: 1.05,
+                },
+            ),
+            (
+                "nvfp4_gram_only_late3_safety1045",
+                device::GramCorrectionMode::Nvfp4GramOnlyLateSafety {
+                    start_iter: 3,
+                    coefficient_safety: 1.045,
+                },
+            ),
+            (
+                "nvfp4_gram_only_late3_safety105",
+                device::GramCorrectionMode::Nvfp4GramOnlyLateSafety {
+                    start_iter: 3,
+                    coefficient_safety: 1.05,
+                },
+            ),
+            (
+                "nvfp4_gram_only_late2_safety1045",
+                device::GramCorrectionMode::Nvfp4GramOnlyLateSafety {
+                    start_iter: 2,
+                    coefficient_safety: 1.045,
+                },
+            ),
+            (
+                "nvfp4_gram_only_late5_safety105",
+                device::GramCorrectionMode::Nvfp4GramOnlyLateSafety {
+                    start_iter: 5,
+                    coefficient_safety: 1.05,
+                },
+            ),
+            (
+                "nvfp4_avg4",
+                device::GramCorrectionMode::Nvfp4GramAverage { samples: 4 },
+            ),
+            (
+                "stale_period2",
+                device::GramCorrectionMode::Stale { period: 2 },
+            ),
+            (
+                "stale_reject_period2",
+                device::GramCorrectionMode::StaleReject { period: 2 },
+            ),
+            (
+                "stale_reject_p2_extra_safety101",
+                device::GramCorrectionMode::StaleRejectSafety {
+                    period: 2,
+                    coefficient_safety: 1.01,
+                },
+            ),
+            (
+                "stale_reject_p2_extra_safety103",
+                device::GramCorrectionMode::StaleRejectSafety {
+                    period: 2,
+                    coefficient_safety: 1.03,
+                },
+            ),
+            (
+                "stale_reject_p2_extra_safety105",
+                device::GramCorrectionMode::StaleRejectSafety {
+                    period: 2,
+                    coefficient_safety: 1.05,
+                },
+            ),
+            (
+                "stale_scaled25_period2",
+                device::GramCorrectionMode::StaleScaled {
+                    period: 2,
+                    scale: 0.25,
+                },
+            ),
+            (
+                "stale_scaled50_period2",
+                device::GramCorrectionMode::StaleScaled {
+                    period: 2,
+                    scale: 0.50,
+                },
+            ),
+            (
+                "stale_scaled75_period2",
+                device::GramCorrectionMode::StaleScaled {
+                    period: 2,
+                    scale: 0.75,
+                },
+            ),
+            (
+                "prefix2_stale_reject2",
+                device::GramCorrectionMode::ExactPrefixThenStaleReject {
+                    exact_steps: 2,
+                    period: 2,
+                },
+            ),
+            (
+                "prefix3_stale_reject2",
+                device::GramCorrectionMode::ExactPrefixThenStaleReject {
+                    exact_steps: 3,
+                    period: 2,
+                },
+            ),
+            (
+                "prefix3_stale_reject2_extra_safety101",
+                device::GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
+                    exact_steps: 3,
+                    period: 2,
+                    coefficient_safety: 1.01,
+                },
+            ),
+            (
+                "prefix3_stale_reject2_extra_safety103",
+                device::GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
+                    exact_steps: 3,
+                    period: 2,
+                    coefficient_safety: 1.03,
+                },
+            ),
+            (
+                "prefix3_stale_reject2_extra_safety105",
+                device::GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
+                    exact_steps: 3,
+                    period: 2,
+                    coefficient_safety: 1.05,
+                },
+            ),
+            (
+                "prefix3_stale_reject2_late4_safety103",
+                device::GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety {
+                    exact_steps: 3,
+                    period: 2,
+                    start_iter: 4,
+                    coefficient_safety: 1.03,
+                },
+            ),
+            (
+                "prefix3_stale_reject2_late5_safety103",
+                device::GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety {
+                    exact_steps: 3,
+                    period: 2,
+                    start_iter: 5,
+                    coefficient_safety: 1.03,
+                },
+            ),
+        ] {
+            let (actual, stats) = polar.gram_form_corrected_iterations(
+                source.clone(),
+                ROWS,
+                COLS,
+                iterations,
+                mode,
+            )?;
+            let finite = actual.iter().all(|value| value.is_finite());
+            println!(
+                "nvfp4_gram_form_correction mode={name} iterations={iterations} finite={finite} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} rejected={} max_defect={:.8e} last_defect={:.8e}",
+                math::cosine(&actual, &expected),
+                math::relative_l2(&actual, &expected),
+                math::max_abs_error(&actual, &expected),
+                stats.nvfp4_gram_count,
+                stats.high_precision_gram_count,
+                stats.rejected_stale_steps,
+                stats.max_relative_defect,
+                stats.last_relative_defect,
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn nvfp4_gram_form_safety_schedule_search() -> Result<(), Box<dyn Error>> {
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let f16 = F16TcMatmulModule::from_module(ptx.clone())?;
+    let matmul = Nvfp4TcMatmulModule::from_module(ptx.clone())?;
+    let quant = Nvfp4QuantModule::from_module(ptx)?;
+    let polar = device::Nvfp4Polar::new(&stream, &f16, &matmul, &quant);
+    let source = math::normalized_source(&math::gradient(ROWS, COLS), ROWS, COLS);
+    let expected =
+        math::gram_form_polar_iterations_f16_leaf(source.clone(), ROWS, COLS, MAX_ITERATIONS);
+
+    let mut best = ScheduleResult::missing();
+    for schedule in seed_safety_schedules() {
+        let result = evaluate_schedule(
+            &polar,
+            &source,
+            &expected,
+            &format!("seed_{}", schedule_name(&schedule)),
+            schedule,
+            ROWS,
+            COLS,
+            MAX_ITERATIONS,
+            false,
+        )?;
+        report_schedule(&result);
+        if result.is_better_than(&best) {
+            best = result;
+        }
+    }
+
+    let mut greedy = best.schedule;
+    let values = [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08];
+    for pass in 0..2 {
+        for iter in 0..MAX_ITERATIONS {
+            let mut local_best = best.clone();
+            for value in values {
+                let mut candidate = greedy;
+                candidate[iter] = value;
+                let result = evaluate_schedule(
+                    &polar,
+                    &source,
+                    &expected,
+                    &format!("greedy_pass{pass}_iter{iter}_{value:.3}"),
+                    candidate,
+                    ROWS,
+                    COLS,
+                    MAX_ITERATIONS,
+                    false,
+                )?;
+                if result.is_better_than(&local_best) {
+                    local_best = result;
+                }
+            }
+            if local_best.is_better_than(&best) {
+                report_schedule(&local_best);
+                best = local_best;
+                greedy = best.schedule;
+            }
+        }
+    }
+
+    println!(
+        "nvfp4_gram_form_schedule_search_best kind=nvfp4_only name={} finite={} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} rejected={} schedule={}",
+        best.name,
+        best.finite,
+        best.cosine,
+        best.rel_l2,
+        best.max_abs,
+        best.nvfp4_grams,
+        best.hi_grams,
+        best.rejected,
+        schedule_name(&best.schedule)
+    );
+
+    let mut best_corrected = ScheduleResult::missing();
+    for (exact_steps, period) in [
+        (1, 2),
+        (1, 3),
+        (1, 4),
+        (1, 5),
+        (2, 2),
+        (2, 3),
+        (2, 4),
+        (2, 5),
+        (3, 2),
+        (3, 3),
+        (3, 4),
+        (3, 5),
+    ] {
+        for schedule in corrected_schedule_candidates(best.schedule) {
+            let result = evaluate_stale_reject_schedule(
+                &polar,
+                &source,
+                &expected,
+                exact_steps,
+                period,
+                schedule,
+                ROWS,
+                COLS,
+                MAX_ITERATIONS,
+            )?;
+            report_schedule(&result);
+            if result.is_better_than(&best_corrected) {
+                best_corrected = result;
+            }
+        }
+    }
+    println!(
+        "nvfp4_gram_form_schedule_search_best kind=stale_reject name={} finite={} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} rejected={} schedule={}",
+        best_corrected.name,
+        best_corrected.finite,
+        best_corrected.cosine,
+        best_corrected.rel_l2,
+        best_corrected.max_abs,
+        best_corrected.nvfp4_grams,
+        best_corrected.hi_grams,
+        best_corrected.rejected,
+        schedule_name(&best_corrected.schedule)
+    );
+
+    assert!(
+        best.finite,
+        "at least one static NVFP4 safety schedule must survive"
+    );
+    Ok(())
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn nvfp4_gram_form_ratio_schedule_search() -> Result<(), Box<dyn Error>> {
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let f16 = F16TcMatmulModule::from_module(ptx.clone())?;
+    let matmul = Nvfp4TcMatmulModule::from_module(ptx.clone())?;
+    let quant = Nvfp4QuantModule::from_module(ptx)?;
+    let polar = device::Nvfp4Polar::new(&stream, &f16, &matmul, &quant);
+
+    for (name, rows, cols) in [
+        ("square_ratio", 128, 128),
+        ("qkv_ratio", 128, 384),
+        ("mlp_ratio", 128, 512),
+    ] {
+        let source = math::normalized_source(&math::gradient(rows, cols), rows, cols);
+        let (expected, _) = polar.gram_form_corrected_iterations(
+            source.clone(),
+            rows,
+            cols,
+            PRODUCTION_ITERATIONS,
+            device::GramCorrectionMode::HighPrecision,
+        )?;
+        let raw = evaluate_mode(
+            &polar,
+            &source,
+            &expected,
+            "nvfp4_raw",
+            [1.0; MAX_ITERATIONS],
+            rows,
+            cols,
+            PRODUCTION_ITERATIONS,
+            device::GramCorrectionMode::Nvfp4GramOnly,
+        )?;
+        let best_raw = search_best_raw_schedule(
+            &polar,
+            &source,
+            &expected,
+            rows,
+            cols,
+            PRODUCTION_ITERATIONS,
+            name,
+        )?;
+        let best_corrected = search_best_corrected_schedule(
+            &polar,
+            &source,
+            &expected,
+            rows,
+            cols,
+            PRODUCTION_ITERATIONS,
+            best_raw.schedule,
+        )?;
+
+        println!(
+            "nvfp4_gram_form_ratio_search name={name} rows={rows} cols={cols} raw_rel_l2={:.8e} raw_cosine={:.8} best_raw_rel_l2={:.8e} best_raw_cosine={:.8} best_raw_schedule={} best_corrected_rel_l2={:.8e} best_corrected_cosine={:.8} best_corrected_name={} best_corrected_nvfp4_grams={} best_corrected_hi_grams={} best_corrected_rejected={} best_corrected_schedule={}",
+            raw.rel_l2,
+            raw.cosine,
+            best_raw.rel_l2,
+            best_raw.cosine,
+            schedule_name(&best_raw.schedule),
+            best_corrected.rel_l2,
+            best_corrected.cosine,
+            best_corrected.name,
+            best_corrected.nvfp4_grams,
+            best_corrected.hi_grams,
+            best_corrected.rejected,
+            schedule_name(&best_corrected.schedule),
+        );
+    }
+
+    Ok(())
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
+fn nvfp4_gram_form_production_shapes_report() -> Result<(), Box<dyn Error>> {
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let f16 = F16TcMatmulModule::from_module(ptx.clone())?;
+    let matmul = Nvfp4TcMatmulModule::from_module(ptx.clone())?;
+    let quant = Nvfp4QuantModule::from_module(ptx)?;
+    let polar = device::Nvfp4Polar::new(&stream, &f16, &matmul, &quant);
+
+    for (name, rows, cols) in [
+        ("attn_c_proj_square", 1024, 1024),
+        ("attn_qkv_rect", 1024, 3072),
+        ("mlp_up_rect", 1024, 4096),
+    ] {
+        let source = math::normalized_source(&math::gradient(rows, cols), rows, cols);
+        let (expected, expected_stats) = polar.gram_form_corrected_iterations(
+            source.clone(),
+            rows,
+            cols,
+            PRODUCTION_ITERATIONS,
+            device::GramCorrectionMode::HighPrecision,
+        )?;
+        println!(
+            "nvfp4_gram_form_production_shape name={name} rows={rows} cols={cols} reference=high_precision finite={} hi_grams={} nvfp4_grams={}",
+            expected.iter().all(|value| value.is_finite()),
+            expected_stats.high_precision_gram_count,
+            expected_stats.nvfp4_gram_count,
+        );
+
+        for (mode_name, mode) in production_shape_modes() {
+            let (actual, stats) = polar.gram_form_corrected_iterations(
+                source.clone(),
+                rows,
+                cols,
+                PRODUCTION_ITERATIONS,
+                mode,
+            )?;
+            let finite = actual.iter().all(|value| value.is_finite());
+            println!(
+                "nvfp4_gram_form_production_shape name={name} mode={mode_name} iterations={PRODUCTION_ITERATIONS} finite={finite} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} rejected={}",
+                math::cosine(&actual, &expected),
+                if finite {
+                    math::relative_l2(&actual, &expected)
+                } else {
+                    f32::INFINITY
+                },
+                if finite {
+                    math::max_abs_error(&actual, &expected)
+                } else {
+                    f32::INFINITY
+                },
+                stats.nvfp4_gram_count,
+                stats.high_precision_gram_count,
+                stats.rejected_stale_steps,
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Clone)]
+struct ScheduleResult {
+    name: String,
+    schedule: [f32; MAX_ITERATIONS],
+    finite: bool,
+    cosine: f32,
+    rel_l2: f32,
+    max_abs: f32,
+    nvfp4_grams: usize,
+    hi_grams: usize,
+    rejected: usize,
+}
+
+impl ScheduleResult {
+    fn missing() -> Self {
+        Self {
+            name: "missing".to_owned(),
+            schedule: [1.0; MAX_ITERATIONS],
+            finite: false,
+            cosine: f32::NEG_INFINITY,
+            rel_l2: f32::INFINITY,
+            max_abs: f32::INFINITY,
+            nvfp4_grams: 0,
+            hi_grams: 0,
+            rejected: 0,
+        }
+    }
+
+    fn is_better_than(&self, other: &Self) -> bool {
+        match (self.finite, other.finite) {
+            (true, false) => true,
+            (false, true) => false,
+            (true, true) => self.rel_l2 < other.rel_l2,
+            (false, false) => false,
+        }
+    }
+}
+
+fn seed_safety_schedules() -> Vec<[f32; MAX_ITERATIONS]> {
+    let mut schedules = Vec::new();
+    for value in [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08] {
+        schedules.push([value; MAX_ITERATIONS]);
+    }
+    for start in 0..MAX_ITERATIONS {
+        for value in [1.03, 1.04, 1.045, 1.05, 1.06] {
+            let mut schedule = [1.0; MAX_ITERATIONS];
+            for slot in schedule.iter_mut().skip(start) {
+                *slot = value;
+            }
+            schedules.push(schedule);
+        }
+    }
+    for high in [1.04, 1.045, 1.05, 1.06] {
+        let mut schedule = [1.0; MAX_ITERATIONS];
+        for (iter, slot) in schedule.iter_mut().enumerate() {
+            let t = iter as f32 / (MAX_ITERATIONS - 1) as f32;
+            *slot = 1.0 + (high - 1.0) * t;
+        }
+        schedules.push(schedule);
+    }
+    schedules.sort_by(|a, b| schedule_name(a).cmp(&schedule_name(b)));
+    schedules.dedup();
+    schedules
+}
+
+fn corrected_schedule_candidates(best_raw: [f32; MAX_ITERATIONS]) -> Vec<[f32; MAX_ITERATIONS]> {
+    let mut schedules = vec![
+        best_raw,
+        [1.01; MAX_ITERATIONS],
+        [1.03; MAX_ITERATIONS],
+        [1.05; MAX_ITERATIONS],
+    ];
+    for start in 2..=5 {
+        let mut schedule = [1.0; MAX_ITERATIONS];
+        for slot in schedule.iter_mut().skip(start) {
+            *slot = 1.03;
+        }
+        schedules.push(schedule);
+    }
+    schedules.sort_by(|a, b| schedule_name(a).cmp(&schedule_name(b)));
+    schedules.dedup();
+    schedules
+}
+
+fn search_best_raw_schedule(
+    polar: &device::Nvfp4Polar<'_>,
+    source: &[f32],
+    expected: &[f32],
+    rows: usize,
+    cols: usize,
+    iterations: usize,
+    label: &str,
+) -> Result<ScheduleResult, Box<dyn Error>> {
+    let mut best = ScheduleResult::missing();
+    for schedule in seed_safety_schedules() {
+        let result = evaluate_schedule(
+            polar,
+            source,
+            expected,
+            &format!("{label}_seed_{}", schedule_name(&schedule)),
+            schedule,
+            rows,
+            cols,
+            iterations,
+            false,
+        )?;
+        if result.is_better_than(&best) {
+            best = result;
+        }
+    }
+
+    let mut greedy = best.schedule;
+    let values = [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08];
+    for pass in 0..2 {
+        for iter in 0..iterations {
+            let mut local_best = best.clone();
+            for value in values {
+                let mut candidate = greedy;
+                candidate[iter] = value;
+                let result = evaluate_schedule(
+                    polar,
+                    source,
+                    expected,
+                    &format!("{label}_greedy_pass{pass}_iter{iter}_{value:.3}"),
+                    candidate,
+                    rows,
+                    cols,
+                    iterations,
+                    false,
+                )?;
+                if result.is_better_than(&local_best) {
+                    local_best = result;
+                }
+            }
+            if local_best.is_better_than(&best) {
+                best = local_best;
+                greedy = best.schedule;
+            }
+        }
+    }
+
+    Ok(best)
+}
+
+fn search_best_corrected_schedule(
+    polar: &device::Nvfp4Polar<'_>,
+    source: &[f32],
+    expected: &[f32],
+    rows: usize,
+    cols: usize,
+    iterations: usize,
+    raw_schedule: [f32; MAX_ITERATIONS],
+) -> Result<ScheduleResult, Box<dyn Error>> {
+    let mut best = ScheduleResult::missing();
+    for (exact_steps, period) in [
+        (1, 2),
+        (1, 3),
+        (1, 4),
+        (1, 5),
+        (2, 2),
+        (2, 3),
+        (2, 4),
+        (2, 5),
+        (3, 2),
+        (3, 3),
+        (3, 4),
+        (3, 5),
+    ] {
+        for schedule in corrected_schedule_candidates(raw_schedule) {
+            let result = evaluate_stale_reject_schedule(
+                polar,
+                source,
+                expected,
+                exact_steps,
+                period,
+                schedule,
+                rows,
+                cols,
+                iterations,
+            )?;
+            if result.is_better_than(&best) {
+                best = result;
+            }
+        }
+    }
+    Ok(best)
+}
+
+fn evaluate_schedule(
+    polar: &device::Nvfp4Polar<'_>,
+    source: &[f32],
+    expected: &[f32],
+    name: &str,
+    schedule: [f32; MAX_ITERATIONS],
+    rows: usize,
+    cols: usize,
+    iterations: usize,
+    stale_reject: bool,
+) -> Result<ScheduleResult, Box<dyn Error>> {
+    if stale_reject {
+        return evaluate_stale_reject_schedule(
+            polar, source, expected, 3, 2, schedule, rows, cols, iterations,
+        );
+    }
+
+    let mode = device::GramCorrectionMode::Nvfp4GramOnlySchedule {
+        coefficient_safety: schedule,
+    };
+    evaluate_mode(
+        polar, source, expected, name, schedule, rows, cols, iterations, mode,
+    )
+}
+
+fn evaluate_stale_reject_schedule(
+    polar: &device::Nvfp4Polar<'_>,
+    source: &[f32],
+    expected: &[f32],
+    exact_steps: usize,
+    period: usize,
+    schedule: [f32; MAX_ITERATIONS],
+    rows: usize,
+    cols: usize,
+    iterations: usize,
+) -> Result<ScheduleResult, Box<dyn Error>> {
+    let mode = device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+        exact_steps,
+        period,
+        coefficient_safety: schedule,
+    };
+    evaluate_mode(
+        polar,
+        source,
+        expected,
+        &format!(
+            "prefix{exact_steps}_stale_reject{period}_{}",
+            schedule_name(&schedule)
+        ),
+        schedule,
+        rows,
+        cols,
+        iterations,
+        mode,
+    )
+}
+
+fn evaluate_mode(
+    polar: &device::Nvfp4Polar<'_>,
+    source: &[f32],
+    expected: &[f32],
+    name: &str,
+    schedule: [f32; MAX_ITERATIONS],
+    rows: usize,
+    cols: usize,
+    iterations: usize,
+    mode: device::GramCorrectionMode,
+) -> Result<ScheduleResult, Box<dyn Error>> {
+    let (actual, stats) =
+        polar.gram_form_corrected_iterations(source.to_vec(), rows, cols, iterations, mode)?;
+    let finite = actual.iter().all(|value| value.is_finite());
+    Ok(ScheduleResult {
+        name: name.to_owned(),
+        schedule,
+        finite,
+        cosine: math::cosine(&actual, expected),
+        rel_l2: if finite {
+            math::relative_l2(&actual, expected)
+        } else {
+            f32::INFINITY
+        },
+        max_abs: if finite {
+            math::max_abs_error(&actual, expected)
+        } else {
+            f32::INFINITY
+        },
+        nvfp4_grams: stats.nvfp4_gram_count,
+        hi_grams: stats.high_precision_gram_count,
+        rejected: stats.rejected_stale_steps,
+    })
+}
+
+fn report_schedule(result: &ScheduleResult) {
+    println!(
+        "nvfp4_gram_form_schedule name={} finite={} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} rejected={} schedule={}",
+        result.name,
+        result.finite,
+        result.cosine,
+        result.rel_l2,
+        result.max_abs,
+        result.nvfp4_grams,
+        result.hi_grams,
+        result.rejected,
+        schedule_name(&result.schedule),
+    );
+}
+
+fn production_shape_modes() -> [(&'static str, device::GramCorrectionMode); 7] {
+    let tuned_schedule = [1.0, 1.0, 1.04, 1.01, 1.03, 1.08, 1.0, 1.08];
+    [
+        ("nvfp4_raw", device::GramCorrectionMode::Nvfp4GramOnly),
+        (
+            "nvfp4_safety105",
+            device::GramCorrectionMode::Nvfp4GramOnlySafety {
+                coefficient_safety: 1.05,
+            },
+        ),
+        (
+            "nvfp4_tuned_schedule",
+            device::GramCorrectionMode::Nvfp4GramOnlySchedule {
+                coefficient_safety: tuned_schedule,
+            },
+        ),
+        (
+            "prefix2_stale_reject3_tuned",
+            device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+                exact_steps: 2,
+                period: 3,
+                coefficient_safety: tuned_schedule,
+            },
+        ),
+        (
+            "prefix3_stale_reject2_tuned",
+            device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+                exact_steps: 3,
+                period: 2,
+                coefficient_safety: tuned_schedule,
+            },
+        ),
+        (
+            "prefix3_stale_reject3_tuned",
+            device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+                exact_steps: 3,
+                period: 3,
+                coefficient_safety: tuned_schedule,
+            },
+        ),
+        (
+            "prefix3_stale_reject5_tuned",
+            device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+                exact_steps: 3,
+                period: 5,
+                coefficient_safety: tuned_schedule,
+            },
+        ),
+    ]
+}
+
+fn schedule_name(schedule: &[f32; MAX_ITERATIONS]) -> String {
+    schedule
+        .iter()
+        .map(|value| format!("{value:.3}"))
+        .collect::<Vec<_>>()
+        .join("_")
 }

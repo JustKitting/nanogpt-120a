@@ -28,11 +28,43 @@ pub fn polar_iterations_f16_leaf(
     source
 }
 
+pub fn gram_form_polar_iterations_f16_leaf(
+    mut source: Vec<f32>,
+    rows: usize,
+    cols: usize,
+    iterations: usize,
+) -> Vec<f32> {
+    for iter in 0..iterations {
+        source = gram_form_polar_step_f16_leaf(&source, rows, cols, iter);
+    }
+    source
+}
+
 pub fn polar_step_f16_leaf(source: &[f32], rows: usize, cols: usize, iter: usize) -> Vec<f32> {
     let gram = matmul_f16_leaf(source, source, rows, rows, cols);
     let ax = matmul_f16_leaf(&gram, &transpose(source, rows, cols), rows, cols, rows);
     let aax = matmul_f16_leaf(&gram, &transpose(&ax, rows, cols), rows, cols, rows);
     combine_next(source, &ax, &aax, iter)
+}
+
+pub fn gram_form_polar_step_f16_leaf(
+    source: &[f32],
+    rows: usize,
+    cols: usize,
+    iter: usize,
+) -> Vec<f32> {
+    let (a, b, c) = coefficients(iter);
+    let gram = matmul_f16_leaf(source, source, rows, rows, cols);
+    let gram2 = matmul_f16_leaf(&gram, &transpose(&gram, rows, rows), rows, rows, rows);
+    let mut q = gram
+        .iter()
+        .zip(gram2)
+        .map(|(gram, gram2)| c.mul_add(gram2, b * *gram))
+        .collect::<Vec<_>>();
+    for row in 0..rows {
+        q[row * rows + row] += a;
+    }
+    matmul_f16_leaf(&q, &transpose(source, rows, cols), rows, cols, rows)
 }
 
 pub fn combine_next(x: &[f32], ax: &[f32], aax: &[f32], iter: usize) -> Vec<f32> {
