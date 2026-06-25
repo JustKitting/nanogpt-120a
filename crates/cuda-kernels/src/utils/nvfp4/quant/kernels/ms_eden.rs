@@ -891,6 +891,50 @@ pub(crate) mod module {
     }
 
     #[kernel]
+    #[allow(clippy::too_many_arguments)]
+    pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_source_cols_pow2_kernel(
+        bytes: &[u8],
+        scales: &[u8],
+        source_global_scales: &[f32],
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        global_scale: &[f32],
+        source_cols_shift: u32,
+        chunks_per_row_shift: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+    ) {
+        let lane = warp::lane_id();
+        let chunk = pack_chunk();
+        let chunk_in_row_mask = (1u32 << chunks_per_row_shift) - 1;
+        let row = chunk >> chunks_per_row_shift;
+        let chunk_in_row = (chunk & chunk_in_row_mask) * HADAMARD_DIM;
+        let input_col = chunk_in_row + lane;
+        let input = nvfp4_rowwise_value_at_pow2(
+            bytes,
+            scales,
+            source_global_scales,
+            source_cols_shift,
+            input_col,
+            row,
+        ) * random_sign(sign_seed, input_col);
+        ms_eden_pack_chunk_no_chunk_amax_row(
+            input,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            chunk,
+            row,
+            chunk_in_row == 0,
+            global_scale[0],
+            scale_override,
+            scale_seed,
+        );
+    }
+
+    #[kernel]
     pub fn quartet_backward_ms_eden_global_scale_from_chunks_kernel(
         chunk_amax: &[f32],
         mut out_global_scale: DisjointSlice<f32>,
@@ -1499,6 +1543,28 @@ pub(crate) mod module {
             row as usize,
             col as usize,
         )
+    }
+
+    #[inline(always)]
+    fn nvfp4_rowwise_value_at_pow2(
+        bytes: &[u8],
+        scales: &[u8],
+        global_scales: &[f32],
+        row_len_shift: u32,
+        row: u32,
+        col: u32,
+    ) -> f32 {
+        let index = (row << row_len_shift) + col;
+        let byte = bytes[(index >> 1) as usize];
+        let payload = if index & 1 == 0 {
+            byte & 0x0f
+        } else {
+            byte >> 4
+        };
+
+        e2m1_value(payload)
+            * e4m3_value(scales[(index >> 4) as usize] as u16)
+            * global_scales[row as usize]
     }
 
     #[inline(always)]

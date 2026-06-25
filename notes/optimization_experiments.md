@@ -56,6 +56,675 @@ evidence unless a later structural change directly changes their cost or benefit
 - Remove unused weight_global_scale from LM-head params struct.
 - Route aligned NextLat projection through a host-selected kernel.
 - Power-of-two QKV gather index decode for active attention shape.
+- Remove redundant row-count guard from row_amax_f32_kernel.
+- Retest eight-row unroll for linear_bias_grad_kernel on current baseline.
+- Retest attention projection row-pair CTA routing on current baseline.
+- Remove redundant column-count guards from layer_norm_backward_params kernels.
+- Retest power-of-two index decode fast path in attention_prob_ds_kernel.
+- Route full-row attention softmax forward through an unguarded entrypoint.
+- Retest host-selected aligned LM-head kernel split on current baseline.
+- Retest mixed row-divide / transpose-power-of-two MS-EDEN pair packer.
+- Route exact-length residual gradient kernels through unguarded entrypoints.
+- Add power-of-two index decode fast path to scatter_dqkv_kernel.
+- Retest aligned RHS-transposed f16 CTA matmul staging/stores on current baseline.
+- Retest combined cross-entropy denominator and grad-scale reciprocal hoist.
+- Route exact tensor_chunk_amax_f32 shapes through a no-tail kernel.
+- Route active-shape RoPE save-f16 through a power-of-two entrypoint.
+- Route rowwise four-six quantization through a warp-shared global-scale path.
+- Route exact-length fp32_to_f16 conversions through a no-tail entrypoint.
+
+```text
+date: 2026-06-25
+commit: accepted local jj commit after full gate
+experiment: Route rowwise transpose no-pad MS-EDEN pack through source-column power-of-two indexing.
+status: accepted_900s
+change:
+  Added
+  rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_source_cols_pow2_kernel
+  and routed the no-chunk-amax rowwise-NVFP4 transpose MS-EDEN pack path to it
+  when source_rows == dst_row_len, dst_row_len was a power-of-two chunk
+  multiple, and source_cols was a power of two. The candidate computes the
+  source rowwise-NVFP4 index with source_cols_shift instead of the generic
+  row_len multiply helper while preserving the existing exact no-pad kernel as
+  fallback. Quantization math, signs, scale seeds, output layouts, model shape,
+  and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test ms_eden_transpose
+    -- --ignored --nocapture --test-threads=1: pass, including the new
+    rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode path
+    test.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward
+    -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    linear_backward_projection_cta -- --ignored --nocapture --test-threads=1:
+    pass.
+  30-second candidate screen:
+    target/runs/20260625_rowwise_transpose_source_cols_pow2_30s
+    val_loss=5.956693, train_elapsed_s=30.257, completed_steps=117.
+  900-second gate:
+    target/runs/20260625_rowwise_transpose_source_cols_pow2_900s
+    val_loss=3.468285, train_elapsed_s=900.003, completed_steps=3372.
+measured_effect:
+  The 30-second screen qualified on both criteria against the accepted
+  attention-out f16 scatter baseline:
+    val_loss: 5.961005 -> 5.956693
+    completed_steps: 116 -> 117
+  The 900-second gate stayed within the +1% validation-loss band and increased
+  completed steps:
+    val_loss: 3.459726 -> 3.468285
+    completed_steps: 3370 -> 3372
+  The +1% cutoff for the prior baseline was 3.494323, so the gate satisfies the
+  kernel/runtime acceptance rule.
+decision:
+  Accept as the new active kernel/runtime baseline. Keep the code and update
+  notes/sweep_baseline.env to this run.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Route exact-length fp32_to_f16 conversions through a no-tail entrypoint.
+status: rejected_900s
+change:
+  Added fp32_to_f16_exact_kernel and routed F16TcMatmulModule::fp32_to_f16 to
+  it when element_count was nonzero and exactly divisible by the 256-thread
+  f16 conversion block size. The exact entrypoint removed the per-thread tail
+  bounds check from active f16 tape-conversion launches while preserving the
+  existing guarded fp32_to_f16_kernel for non-exact lengths. Conversion
+  rounding, output layout, model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test f16_tc_matmul --
+    --ignored --nocapture --test-threads=1: pass, including the temporary
+    fp32_to_f16_exact_route_writes_expected_bits path test.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_fp32_to_f16_exact_30s
+    val_loss=5.960840, train_elapsed_s=30.046, completed_steps=116.
+  900-second gate:
+    target/runs/20260625_fp32_to_f16_exact_900s
+    val_loss=3.471947, train_elapsed_s=900.117, completed_steps=3370.
+measured_effect:
+  The 30-second screen qualified for the full gate by slightly improving
+  validation loss from 5.961005 to 5.960840 with the same completed step count,
+  116. The 900-second gate stayed inside the +1% validation-loss band against
+  the accepted attention-out f16 scatter baseline, but did not improve the
+  fixed-wall objective and did not increase completed steps:
+    val_loss: 3.459726 -> 3.471947
+    completed_steps: 3370 -> 3370
+decision:
+  Reject and revert. The full gate did not lower validation loss and did not
+  preserve validation loss with a higher completed step count.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Route rowwise four-six quantization through a warp-shared global-scale path.
+status: rejected_30s_screen
+change:
+  Added fp32_to_nvfp4_four_six_rowwise_pow2_warp_scale_kernel and routed
+  fp32_to_nvfp4_four_six_rowwise to it for exact block-covered power-of-two
+  row lengths of at least 32 values. The candidate computed the row global
+  scale once per warp and broadcast it to the two 16-value quantization groups
+  in that warp, instead of recomputing the same row scale per half-warp group.
+  The existing rowwise pow2 kernel remained the fallback for smaller rows, and
+  quantization math, scale override, output layout, model shape, and
+  hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test nvfp4_quant --
+    --ignored --nocapture --test-threads=1: pass, including the temporary
+    fp32_to_nvfp4_four_six_rowwise_pow2_writes_row_scales path test.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_four_six_rowwise_warp_scale_30s
+    val_loss=5.964768, train_elapsed_s=30.035, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.964768 with the
+  same completed step count, 116. The warp-shared row global-scale route did
+  not produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Route active-shape RoPE save-f16 through a power-of-two entrypoint.
+status: rejected_30s_screen
+change:
+  Added apply_rope_save_f16_pow2_kernel and routed the qkv_f16 RoPE path to it
+  only for the active power-of-two shape:
+    row_count == batch_size * seq_len, seq_len=1024, embedding_dim=1024,
+    qkv_dim=3072, head_count=16, head_dim=64.
+  The candidate decoded pair/head/token/batch with shifts and masks, used
+  direct section offsets for q/k/v, rotated q and k, and saved q/k/v as f16.
+  RoPE math, launch size, model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l2_attention --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    causal_attention_backward -- --ignored --nocapture --test-threads=1:
+    pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_rope_save_f16_pow2_30s
+    val_loss=5.975755, train_elapsed_s=30.087, completed_steps=115.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.975755 and
+  completed steps fell from 116 to 115. The power-of-two RoPE save-f16 route did
+  not produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Route exact tensor_chunk_amax_f32 shapes through a no-tail kernel.
+status: rejected_30s_screen
+change:
+  Added tensor_chunk_amax_f32_exact_kernel and routed tensor_chunk_amax_f32
+  calls to it only when element_count was nonzero and exactly divisible by the
+  1024-value chunk size. The exact kernel removed the per-chunk tail branch and
+  checked_abs_f32 fallback from full chunks while preserving the original
+  tensor_chunk_amax_f32_kernel for non-exact element counts. Amax math,
+  reduction shape, launch block size, model shape, and hyperparameters were
+  unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test nvfp4_quant --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward
+    -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward
+    -- --ignored --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_tensor_chunk_amax_exact_30s
+    val_loss=5.983590, train_elapsed_s=30.100, completed_steps=115.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.983590 and
+  completed steps fell from 116 to 115. The exact tensor chunk-amax route did
+  not produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Retest combined cross-entropy denominator and grad-scale reciprocal hoist.
+status: rejected_30s_screen
+change:
+  Retested the old cross-entropy reciprocal-hoist ideas as one combined change
+  on the current accepted attention-output f16 scatter baseline. The dlogits
+  write loop computed inv_denom = 1.0 / denom and
+  grad_scale = 1.0 / token_count once per row, then used exp(logit - row_max)
+  * inv_denom and the hoisted grad_scale for each vocab element. Loss formula,
+  dlogits layout, row amax reduction, block size, launch geometry, model shape,
+  and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss --
+    --ignored --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_cross_entropy_recip_hoist_retest_30s
+    val_loss=5.975200, train_elapsed_s=30.054, completed_steps=115.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.975200 and
+  completed steps fell from 116 to 115. The combined cross-entropy reciprocal
+  hoist did not produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Retest aligned RHS-transposed f16 CTA matmul staging/stores on current baseline.
+status: rejected_30s_screen
+change:
+  Retested aligned staging/store paths for the RHS-transposed f16 CTA matmul
+  variants after the accepted attention-output f16 scatter baseline changed the
+  active profile. Added aligned staging helpers and aligned output stores for
+  f32-RHS, f32-half-RHS, f32-A-transposed-RHS, and
+  f32-A-transposed-half-RHS matmul bodies when m, n, and k were exact multiples
+  of CTA_M, CTA_N, and CTA_K. Non-aligned shapes kept the original guarded
+  staging and store paths. Matmul math, MMA tile shape, launch geometry, model
+  shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    f16_tc_matmul -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    f16_tc_matmul_tiled -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    causal_attention_backward_tc -- --ignored --nocapture --test-threads=1:
+    pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l2_attention --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_f16_rhs_aligned_retest_30s
+    val_loss=5.980591, train_elapsed_s=30.100, completed_steps=115.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.980591 and
+  completed steps fell from 116 to 115. The aligned RHS-transposed f16 CTA
+  matmul staging/store retest did not produce a screen-qualified fixed-wall
+  objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Add power-of-two index decode fast path to scatter_dqkv_kernel.
+status: rejected_30s_screen
+change:
+  Added a guarded active-shape fast path to scatter_dqkv_kernel for the current
+  B16/L4/d1024/h16 attention-backward shape: seq_len=1024, head_count=16,
+  head_dim=64, embedding_dim=1024, and qkv_dim=3072. The fast path decoded dim,
+  token, batch, and head with shifts and masks and skipped the row_count guard
+  when row_count equaled batch_size * seq_len. Other shapes kept the original
+  division/modulo decode and row guard. RoPE gradient math, dQKV layout, launch
+  geometry, model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    causal_attention_backward_tc -- --ignored --nocapture --test-threads=1:
+    pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_scatter_dqkv_pow2_decode_30s
+    val_loss=5.965687, train_elapsed_s=30.044, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.965687 with the
+  same completed step count, 116. The scatter_dqkv decode fast path did not
+  produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Route exact-length residual gradient kernels through unguarded entrypoints.
+status: rejected_30s_screen
+change:
+  Added residual_grad_add_exact_kernel and residual_grad_accumulate_exact_kernel
+  and routed calls to them when len was exactly divisible by the 256-thread
+  block size. The active B16/L4/d1024 residual-gradient lengths are
+  row_count * embedding_dim and are 256-aligned, so the intended change was only
+  to remove the redundant tail bounds check from residual gradient add and
+  accumulate kernels. The original guarded kernels remained the fallback for
+  non-aligned lengths. Residual gradient math, launch coverage, model shape,
+  and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    residual_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_residual_grad_exact_retest_30s
+    val_loss=5.961605, train_elapsed_s=30.024, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.961605 with the
+  same completed step count, 116. The exact residual-gradient entrypoints did
+  not produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Retest mixed row-divide / transpose-power-of-two MS-EDEN pair packer.
+status: rejected_30s_screen
+change:
+  Retested the older mixed
+  fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_row_div_transpose_pow2_kernel
+  after the accepted attention-output f16 scatter baseline changed the active
+  profile. The launcher routed exact no-padding pair-pack shapes to the mixed
+  kernel when the transpose-side chunks per row were a power of two but the
+  full pair power-of-two route did not match. The row-side pack kept the
+  generic no-pad row divide path, while the transpose-side pack used shift/mask
+  row indexing. Quantization math, scale handling, output layouts, model shape,
+  and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    ms_eden_transpose -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    linear_backward_projection_cta -- --ignored --nocapture --test-threads=1:
+    pass.
+  30-second candidate screen:
+    target/runs/20260625_ms_eden_row_div_transpose_pow2_retest_30s
+    val_loss=5.966859, train_elapsed_s=30.039, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.966859 with the
+  same completed step count, 116. Retesting the mixed MS-EDEN pair packer did
+  not produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Retest host-selected aligned LM-head kernel split on current baseline.
+status: rejected_900s
+change:
+  Retested the older LM-head aligned/generic host split after the accepted
+  attention-output f16 scatter baseline changed the active profile. Added a
+  separate lm_head_aligned_kernel that directly called the aligned row-pair
+  no-bias NVFP4 CTA projection body, and routed aligned shapes to it from the
+  host launcher. Non-aligned shapes kept the existing lm_head_kernel fallback.
+  LM-head math, tied-weight scale handling, logits layout, model shape, and
+  hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_lm_head_host_aligned_split_retest_30s
+    val_loss=5.959499, train_elapsed_s=30.029, completed_steps=116.
+  900-second gate:
+    target/runs/20260625_lm_head_host_aligned_split_retest_900s
+    val_loss=3.497937, train_elapsed_s=900.192, completed_steps=3373.
+measured_effect:
+  The 30-second screen qualified for the full gate by improving validation loss
+  from 5.961005 to 5.959499 with the same completed step count, 116. The
+  900-second gate completed more steps than the accepted attention-out f16
+  scatter baseline, 3373 vs 3370, but held-out validation loss worsened from
+  3.459726 to 3.497937. The +1% loss-band cutoff for the active baseline is
+  3.494323, so this result is outside the allowed noise band.
+decision:
+  Reject and revert. The host-selected aligned LM-head split produced a
+  promising 30-second screen but failed the fixed-wall held-out validation
+  objective.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Route full-row attention softmax forward through an unguarded entrypoint.
+status: rejected_30s_screen
+change:
+  Added attention_softmax_forward_full_rows_kernel for the causal tensor-core
+  attention forward path and routed the launcher to it only when row_count
+  equaled batch_size * seq_len. The new entrypoint skipped the row_count guard
+  that is redundant for the active full-row training shape while preserving the
+  original guarded attention_softmax_forward_kernel as the fallback for any
+  partial-row caller. Softmax math, log_sum_exp layout, probability layout,
+  model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    causal_attention_log_sum_exp -- --ignored --nocapture --test-threads=1:
+    pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l2_attention --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_attention_softmax_full_rows_30s
+    val_loss=5.965259, train_elapsed_s=30.047, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.965259 with the
+  same completed step count, 116. The full-row unguarded entrypoint did not
+  produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Retest power-of-two index decode fast path in attention_prob_ds_kernel.
+status: rejected_30s_screen
+change:
+  Retested the older attention_prob_ds_kernel index-decode fast path after the
+  accepted attention-output f16 scatter baseline changed the active profile.
+  Added a guarded active-shape path for seq_len=1024 and head_count=16 that
+  decoded key, query, batch, and head with shifts and masks instead of runtime
+  division/modulo. Other shapes kept the original generic decode. Probability
+  math, dS math, launch geometry, model shape, and hyperparameters were
+  unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    causal_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_attention_prob_ds_pow2_decode_retest_30s
+    val_loss=5.968218, train_elapsed_s=30.025, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.968218 with the
+  same completed step count, 116. Retesting the power-of-two decode path did
+  not produce a screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Remove redundant column-count guards from layer_norm_backward_params kernels.
+status: rejected_30s_screen
+change:
+  Removed the col < embedding_dim guard from both layer_norm_backward_params_kernel
+  and layer_norm_backward_params_f32_kernel. The launcher uses grid_dim.x equal
+  to embedding_dim for both entry points, so the intended change was only to
+  remove redundant per-CTA control flow around the existing accumulation,
+  reduction, and d_weight/d_bias stores. Layer-norm math, launch geometry, row
+  traversal, model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    layer_norm_backward_params -- --ignored --nocapture --test-threads=1:
+    pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    layer_norm_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_layer_norm_param_no_col_guard_30s
+    val_loss=5.964223, train_elapsed_s=30.054, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.964223 with the
+  same completed step count, 116. Removing the guards did not produce a
+  screen-qualified fixed-wall objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Remove redundant row-count guard from row_amax_f32_kernel.
+status: rejected_900s
+change:
+  Removed the row < row_count guard from row_amax_f32_kernel. The host launcher
+  uses exactly grid_dim=(row_count, 1, 1), so the intended change was only to
+  remove a redundant device-side branch around the existing row amax reduction.
+  Row amax math, row_len handling, rowwise activation quantization, model
+  shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test nvfp4_quant --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_row_amax_no_guard_30s
+    val_loss=5.960824, train_elapsed_s=30.115, completed_steps=116.
+  900-second gate:
+    target/runs/20260625_row_amax_no_guard_900s
+    val_loss=3.465635, train_elapsed_s=900.223, completed_steps=3365.
+measured_effect:
+  The 30-second screen qualified for the full gate by slightly improving
+  validation loss from 5.961005 to 5.960824 with the same completed step count,
+  116. The 900-second gate stayed within the +1% validation-loss band against
+  the accepted attention-out f16 scatter baseline, but completed fewer steps:
+  val_loss moved from 3.459726 to 3.465635 and completed_steps moved from 3370
+  to 3365.
+decision:
+  Reject and revert. The full gate did not lower validation loss and did not
+  preserve validation loss with a higher completed step count.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Retest eight-row unroll for linear_bias_grad_kernel on current baseline.
+status: rejected_900s
+change:
+  Retested the older linear-bias gradient row unroll after the accepted
+  attention-output f16 scatter baseline changed the active profile. Increased
+  the coalesced 32-column linear_bias_grad_kernel row unroll from 4 rows/thread
+  to 8 rows/thread while keeping the same CTA mapping, shared-memory reduction,
+  output layout, launch geometry, model shape, and hyperparameters.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test linear_backward --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    linear_backward_projection_cta -- --ignored --nocapture --test-threads=1:
+    pass.
+  30-second candidate screen:
+    target/runs/20260625_linear_bias_unroll8_retest_30s
+    val_loss=5.959526, train_elapsed_s=30.204, completed_steps=117.
+  900-second gate:
+    target/runs/20260625_linear_bias_unroll8_retest_900s
+    val_loss=3.520099, train_elapsed_s=900.126, completed_steps=3381.
+measured_effect:
+  The 30-second screen qualified for the full gate on both criteria:
+  validation loss improved from 5.961005 to 5.959526, and completed steps
+  increased from 116 to 117. The 900-second gate completed more steps than the
+  accepted attention-out f16 scatter baseline, 3381 vs 3370, but held-out
+  validation loss worsened from 3.459726 to 3.520099. The +1% loss-band cutoff
+  for the active baseline is 3.494323, so this result is outside the allowed
+  noise band.
+decision:
+  Reject and revert. The larger bias-gradient row unroll produced a promising
+  30-second screen but failed the fixed-wall held-out validation objective.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Retest attention projection row-pair CTA routing on current baseline.
+status: rejected_900s
+change:
+  Retested the older attention_projection_kernel row-pair CTA routing after the
+  accepted attention-output f16 scatter baseline changed the active profile.
+  The host selected projection_cta_row_pair_grid_dim for CTA-aligned QKV and
+  c_proj shapes, and the device kernel used
+  nvfp4_projection_cta_kernel_body_at_aligned_row_pair with separate A/A1 shared
+  staging. Unaligned shapes kept the original generic CTA body. Projection math,
+  quantized inputs, biases, residual-add behavior, model shape, and
+  hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test l2_attention --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward
+    -- --ignored --nocapture --test-threads=1: pass.
+  Direct target/release/rust-kernels and cargo run --release --bin rust-kernels
+    launches failed immediately with DriverError(100,
+    "no CUDA-capable device is detected"), matching the known bad standalone
+    launch mode from the prior cross-entropy gate. cargo run --release --bin
+    run_rebuilt launched the actual training path successfully.
+  30-second candidate screen:
+    target/runs/20260625_attention_projection_row_pair_retest_30s
+    val_loss=5.963734, train_elapsed_s=30.183, completed_steps=117.
+  900-second gate:
+    target/runs/20260625_attention_projection_row_pair_retest_900s
+    val_loss=3.500403, train_elapsed_s=900.163, completed_steps=3383.
+measured_effect:
+  The 30-second screen qualified for the full gate by increasing completed
+  steps from 116 to 117, despite worse screen validation loss
+  (5.961005 -> 5.963734). The 900-second gate completed more steps than the
+  accepted attention-out f16 scatter baseline, 3383 vs 3370, but held-out
+  validation loss worsened from 3.459726 to 3.500403. The +1% loss-band cutoff
+  for the active baseline is 3.494323, so this result is outside the allowed
+  noise band.
+decision:
+  Reject and revert. The row-pair attention projection route increased fixed
+  wall-clock step count but failed the primary held-out validation objective.
+```
 
 ```text
 date: 2026-06-25

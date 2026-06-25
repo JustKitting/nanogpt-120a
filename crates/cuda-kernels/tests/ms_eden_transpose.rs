@@ -200,6 +200,129 @@ fn rowwise_nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), B
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
+fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
+-> Result<(), Box<dyn Error>> {
+    const LOCAL_ROWS: usize = 32;
+    const LOCAL_COLS: usize = 16;
+
+    let ctx = CudaContext::new(common::gpu_device_index())?;
+    let stream = ctx.new_stream()?;
+    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let decode = Nvfp4DecodeModule::from_module(ptx.clone())?;
+    let quant = Nvfp4QuantModule::from_module(ptx)?;
+
+    let x = (0..LOCAL_ROWS * LOCAL_COLS)
+        .map(|index| {
+            let row = index / LOCAL_COLS;
+            let col = index % LOCAL_COLS;
+            (row as f32 - 12.0) * 0.015625 + (col as f32 - 5.0) * 0.03125
+        })
+        .collect::<Vec<_>>();
+    let x_dev = DeviceBuffer::from_host(&stream, &x)?;
+    let mut row_amax = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_ROWS)?;
+    let mut source_bytes = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 2)?;
+    let mut source_scales = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 16)?;
+    let mut source_global_scales = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_ROWS)?;
+    let mut x_t_dev = DeviceBuffer::<f32>::zeroed(&stream, x.len())?;
+
+    let out_bytes = LOCAL_ROWS * LOCAL_COLS / 2;
+    let out_scales = LOCAL_ROWS * LOCAL_COLS / 16;
+    let out_chunks = LOCAL_ROWS * LOCAL_COLS / 32;
+    let mut materialized_bytes = DeviceBuffer::<u8>::zeroed(&stream, out_bytes)?;
+    let mut materialized_scales = DeviceBuffer::<u8>::zeroed(&stream, out_scales)?;
+    let mut materialized_global_scales = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_COLS)?;
+    let mut materialized_chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, out_chunks)?;
+    let mut materialized_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let mut direct_bytes = DeviceBuffer::<u8>::zeroed(&stream, out_bytes)?;
+    let mut direct_scales = DeviceBuffer::<u8>::zeroed(&stream, out_scales)?;
+    let mut direct_global_scales = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_COLS)?;
+    let mut direct_chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, out_chunks)?;
+    let mut direct_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+
+    quant.row_amax_f32(RowAmaxArgs {
+        stream: &stream,
+        x: &x_dev,
+        out: &mut row_amax,
+        row_count: LOCAL_ROWS as u32,
+        row_len: LOCAL_COLS as u32,
+    })?;
+    quant.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
+        stream: &stream,
+        x: &x_dev,
+        amax: &row_amax,
+        out_fp4: &mut source_bytes,
+        out_scales: &mut source_scales,
+        out_global_scale: &mut source_global_scales,
+        group_count: (LOCAL_ROWS * LOCAL_COLS / 16) as u32,
+        row_len: LOCAL_COLS as u32,
+    })?;
+
+    let source_tensor = Nvfp4RowwiseDeviceTensor {
+        bytes: &source_bytes,
+        scales: &source_scales,
+        global_scales: &source_global_scales,
+    };
+    decode.decode_rowwise_transpose_f32(Nvfp4RowwiseDecodeTransposeArgs {
+        stream: &stream,
+        input: source_tensor,
+        output: &mut x_t_dev,
+        rows: LOCAL_ROWS as u32,
+        cols: LOCAL_COLS as u32,
+    })?;
+    quant.fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
+        QuartetBackwardMsEdenDeviceScaleQuantArgs {
+            stream: &stream,
+            x: &x_t_dev,
+            out_fp4: &mut materialized_bytes,
+            out_scales: &mut materialized_scales,
+            out_global_scales: &mut materialized_global_scales,
+            out_chunk_amax: &mut materialized_chunk_amax,
+            out_global_scale: &mut materialized_global_scale,
+            row_count: LOCAL_COLS as u32,
+            src_row_len: LOCAL_ROWS as u32,
+            dst_row_len: LOCAL_ROWS as u32,
+            sign_seed: SIGN_SEED,
+            scale_seed: SCALE_SEED,
+        },
+    )?;
+    quant.rowwise_nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
+        RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs {
+            stream: &stream,
+            input: source_tensor,
+            out_fp4: &mut direct_bytes,
+            out_scales: &mut direct_scales,
+            out_global_scales: &mut direct_global_scales,
+            out_chunk_amax: &mut direct_chunk_amax,
+            out_global_scale: &mut direct_global_scale,
+            source_rows: LOCAL_ROWS as u32,
+            source_cols: LOCAL_COLS as u32,
+            dst_row_len: LOCAL_ROWS as u32,
+            sign_seed: SIGN_SEED,
+            scale_seed: SCALE_SEED,
+        },
+    )?;
+
+    assert_eq!(
+        direct_bytes.to_host_vec(&stream)?,
+        materialized_bytes.to_host_vec(&stream)?
+    );
+    assert_eq!(
+        direct_scales.to_host_vec(&stream)?,
+        materialized_scales.to_host_vec(&stream)?
+    );
+    assert_eq!(
+        direct_global_scales.to_host_vec(&stream)?,
+        materialized_global_scales.to_host_vec(&stream)?
+    );
+    assert_eq!(
+        direct_global_scale.to_host_vec(&stream)?,
+        materialized_global_scale.to_host_vec(&stream)?
+    );
+    Ok(())
+}
+
+#[ignore = "requires generated sm_120a PTX"]
+#[test]
 fn nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), Box<dyn Error>> {
     let ctx = CudaContext::new(common::gpu_device_index())?;
     let stream = ctx.new_stream()?;

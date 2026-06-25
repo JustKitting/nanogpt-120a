@@ -1,9 +1,9 @@
-#  nanogpt-120a
+# nanogpt-120a
 
 This is an experiment in cost-constrained language-model training.
-The project goal is to fully train a small model, including both pretraining and
-post-training, and see how well it can perform on standard benchmarks such as
-GSM8K after roughly `$1` of training compute.
+The project goal is to fully train a small model, including pre-training and
+post-training, and measure how well it can perform on standard benchmarks such
+as GSM8K after roughly `$1` of training compute.
 
 For this project, `$1` currently means about one hour on a single RTX 6000
 Blackwell-class GPU. The target is not maximum tokens per dollar in the abstract;
@@ -28,10 +28,10 @@ but they are not the objective by themselves.
 ## Why Quantized And Fused Kernels
 
 This repo is intentionally not a clean reference implementation of GPT-2
-training. Unlike llm.c-style fixed-token training comparisons, wall-clock time
-is the optimization target here. That makes quantization, custom CUDA kernels,
-kernel fusion, layout changes, and optimizer-specific fast paths acceptable and
-expected when they improve the fixed-budget result.
+training. Unlike Karpathy-style fixed-token training comparisons, wall-clock
+time is the optimization target here. That makes quantization, custom CUDA
+kernels, kernel fusion, layout changes, and optimizer-specific fast paths
+acceptable and expected when they improve the fixed-budget result.
 
 The code already leans heavily on:
 
@@ -77,13 +77,13 @@ cargo oxide build --arch sm_120a
 Run the default training loop:
 
 ```bash
-CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=900 cargo run --release
+CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=900 cargo run --release --bin run_rebuilt
 ```
 
 Run a short screen:
 
 ```bash
-CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=30 cargo run --release
+CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=30 cargo run --release --bin run_rebuilt
 ```
 
 Run a coupled sweep:
