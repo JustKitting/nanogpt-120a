@@ -31,6 +31,32 @@ Primary optimization target:
 heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
+## Retest Policy
+
+As of 2026-06-25, historical rejected or previously tested experiments are
+retestable by default. Kernel and runtime edits have changed launch mix,
+occupancy, codegen, and baseline objective values enough that older negative
+results should not be treated as permanent exclusions.
+
+Older `rejected_*`, `reverted`, `avoid repeating`, `do not promote`, and similar
+entries mean only that the candidate did not pass under the code, profile, and
+baseline active at the time of that entry. Treat those notes as stale negative
+evidence, not as a skip list. When retesting an old idea, add a new dated entry
+with the current baseline, logs, and screen or gate result instead of rewriting
+the old measurement.
+
+Fresh cooldown exceptions: the few candidates tested in the last several hours
+against the accepted attention-output f16 scatter baseline remain fresh negative
+evidence unless a later structural change directly changes their cost or benefit:
+
+- Route layer-norm mean/inv_std stats directly into tape.
+- Write attention log-sum-exp directly into block tape.
+- Quantize final LM-head input directly into forward tape.
+- Remove redundant cross-entropy row bounds guard.
+- Remove unused weight_global_scale from LM-head params struct.
+- Route aligned NextLat projection through a host-selected kernel.
+- Power-of-two QKV gather index decode for active attention shape.
+
 ```text
 date: 2026-06-25
 commit: rejected uncommitted candidate, code reverted
