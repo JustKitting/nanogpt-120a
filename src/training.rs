@@ -25,6 +25,7 @@ mod scratch;
 mod tape;
 mod tape_block;
 mod tape_leaf;
+mod update_skip;
 
 pub use batch::{ReusableTokenBatch, TokenBatch};
 pub use data::TokenDataLoader;
@@ -68,6 +69,11 @@ pub struct OptimizerTrace {
     pub adam_ms: f64,
     pub adam_lr: f32,
     pub aurora_lr: f32,
+    pub grad_norm: f32,
+    pub update_skipped: bool,
+    pub skip_loss_spike: bool,
+    pub skip_grad_norm_spike: bool,
+    pub skip_non_finite: bool,
 }
 
 impl Trainer {

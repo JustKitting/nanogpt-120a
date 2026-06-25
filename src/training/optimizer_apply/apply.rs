@@ -25,6 +25,7 @@ pub fn apply_weight_updates(
     uploaded: &mut UploadedModel,
     grads: &mut BackwardBuffers,
     next_latent_grads: &NextLatGradBuffers,
+    observed_loss: Option<f32>,
     scratch: &mut OptimizerScratch,
     state: &mut OptimizerStateBuffers,
     aurora: &mut AuroraScratchBuffers,
@@ -33,15 +34,31 @@ pub fn apply_weight_updates(
 ) -> AppResult<WeightUpdateResult> {
     let optimizer = &runtime.optimizer;
     let mut trace = OptimizerTrace::default();
-    let step = state.advance();
-    let average_coefficient = state.schedule_free_average_coefficient(step);
-    trace.adam_lr = adam_learning_rate(step);
-    trace.aurora_lr = aurora_learning_rate(step);
+    let candidate_step = state.next_step();
+    trace.adam_lr = adam_learning_rate(candidate_step);
+    trace.aurora_lr = aurora_learning_rate(candidate_step);
     let start = Instant::now();
     add_embedding_lookup_grad(stream, optimizer, batch, grads, next_latent_grads)?;
     trace.embedding_lookup_ms = elapsed_ms(start);
 
-    grad_clip.clip(stream, optimizer)?;
+    let grad_norm = grad_clip.clip(stream, optimizer)?;
+    trace.grad_norm = grad_norm;
+
+    let skip = state.should_skip_update(observed_loss, grad_norm);
+    trace.update_skipped = skip.skipped;
+    trace.skip_loss_spike = skip.loss_spike;
+    trace.skip_grad_norm_spike = skip.grad_norm_spike;
+    trace.skip_non_finite = skip.non_finite;
+    if skip.skipped {
+        return Ok(WeightUpdateResult {
+            trace,
+            diagnostics: None,
+        });
+    }
+
+    let step = state.advance();
+    debug_assert_eq!(step, candidate_step);
+    let average_coefficient = state.schedule_free_average_coefficient(step);
 
     let diagnostics = if super::super::diagnostics::enabled() {
         Some(

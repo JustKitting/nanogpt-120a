@@ -20,6 +20,7 @@ fn global_clip_scales_all_gradient_buffers_together() -> Result<(), Box<dyn Erro
     let chunk_offsets = DeviceBuffer::from_host(&stream, &[0_u32, chunks(4)])?;
     let mut chunk_sums = DeviceBuffer::<f32>::zeroed(&stream, chunks(4) as usize * 2)?;
     let mut scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let mut norm = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
 
     module.clip_gradients(GradientClipArgs {
         stream: &stream,
@@ -28,6 +29,7 @@ fn global_clip_scales_all_gradient_buffers_together() -> Result<(), Box<dyn Erro
         chunk_offsets: &chunk_offsets,
         chunk_sums: &mut chunk_sums,
         scale: &mut scale,
+        norm: &mut norm,
         slot_count: 2,
         chunk_count: chunks(4) * 2,
         max_norm: 6.5,
@@ -36,6 +38,7 @@ fn global_clip_scales_all_gradient_buffers_together() -> Result<(), Box<dyn Erro
     assert_close(&first.to_host_vec(&stream)?, &[1.5, 2.0, 0.0, 0.0]);
     assert_close(&second.to_host_vec(&stream)?, &[6.0, 0.0, 0.0, 0.0]);
     assert_close(&scale.to_host_vec(&stream)?, &[0.5]);
+    assert_close(&norm.to_host_vec(&stream)?, &[13.0]);
     Ok(())
 }
 

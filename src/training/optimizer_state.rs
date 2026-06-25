@@ -6,9 +6,12 @@ use crate::upload::{
     UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4,
 };
 
+use super::update_skip::{UpdateSkipDecision, UpdateSkipState};
+
 pub struct OptimizerStateBuffers {
     step: u32,
     schedule_free_weight_sum: f32,
+    update_skip: UpdateSkipState,
     pub(super) token_embedding: AdamState,
     pub(super) ln_f: LayerNormState,
     pub(super) next_latent: NextLatState,
@@ -63,6 +66,7 @@ impl OptimizerStateBuffers {
         Ok(Self {
             step: 0,
             schedule_free_weight_sum: 0.0,
+            update_skip: UpdateSkipState::new(),
             token_embedding: AdamState::new(stream, decode, &uploaded.token_embedding)?,
             ln_f: LayerNormState::new(stream, decode, &uploaded.ln_f)?,
             next_latent: NextLatState::new(stream, decode, &uploaded.next_latent)?,
@@ -84,6 +88,14 @@ impl OptimizerStateBuffers {
 
     pub(super) fn next_step(&self) -> u32 {
         self.step + 1
+    }
+
+    pub(super) fn should_skip_update(
+        &mut self,
+        loss: Option<f32>,
+        grad_norm: f32,
+    ) -> UpdateSkipDecision {
+        self.update_skip.observe(loss, grad_norm)
     }
 }
 

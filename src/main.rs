@@ -47,6 +47,18 @@ fn main() -> AppResult {
         let batch = trainer.upload_default_batch(&mut train_batch, &window.tokens)?;
         let stats = trainer.train_step(&batch, log_step)?;
 
+        if stats.optimizer.update_skipped {
+            println!(
+                "optimizer_step_skipped step={step} loss_observed={} loss={:.6} grad_norm={:.6e} loss_spike={} grad_norm_spike={} non_finite={}",
+                log_step,
+                stats.loss,
+                stats.optimizer.grad_norm,
+                stats.optimizer.skip_loss_spike,
+                stats.optimizer.skip_grad_norm_spike,
+                stats.optimizer.skip_non_finite,
+            );
+        }
+
         if log_step {
             logger.log_step(
                 StepLogContext {

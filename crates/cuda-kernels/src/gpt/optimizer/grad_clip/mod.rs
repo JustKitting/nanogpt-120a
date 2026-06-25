@@ -67,6 +67,7 @@ pub(super) mod module {
     pub fn grad_clip_scale_kernel(
         chunk_sums: &[f32],
         mut scale: DisjointSlice<f32>,
+        mut norm_out: DisjointSlice<f32>,
         chunk_count: u32,
         max_norm: f32,
     ) {
@@ -98,6 +99,7 @@ pub(super) mod module {
                 1.0
             };
             write_f32(scale.as_mut_ptr(), 0, value);
+            write_f32(norm_out.as_mut_ptr(), 0, norm);
         }
     }
 

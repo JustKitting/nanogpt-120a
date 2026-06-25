@@ -13,6 +13,7 @@ pub(super) struct GradientClipBuffers {
     chunk_offsets: DeviceBuffer<u32>,
     chunk_sums: DeviceBuffer<f32>,
     scale: DeviceBuffer<f32>,
+    norm: DeviceBuffer<f32>,
     slot_count: u32,
     chunk_count: u32,
 }
@@ -42,6 +43,7 @@ impl GradientClipBuffers {
             chunk_offsets: upload(stream, &rows, |row| row.chunk_offset)?,
             chunk_sums: DeviceBuffer::zeroed(stream, chunk_count as usize)?,
             scale: DeviceBuffer::zeroed(stream, 1)?,
+            norm: DeviceBuffer::zeroed(stream, 1)?,
             slot_count: rows.len() as u32,
             chunk_count,
         })
@@ -51,7 +53,7 @@ impl GradientClipBuffers {
         &mut self,
         stream: &CudaStream,
         optimizer: &OptimizerModule,
-    ) -> Result<(), DriverError> {
+    ) -> Result<f32, DriverError> {
         optimizer.clip_gradients(GradientClipArgs {
             stream,
             ptrs: &self.ptrs,
@@ -59,10 +61,12 @@ impl GradientClipBuffers {
             chunk_offsets: &self.chunk_offsets,
             chunk_sums: &mut self.chunk_sums,
             scale: &mut self.scale,
+            norm: &mut self.norm,
             slot_count: self.slot_count,
             chunk_count: self.chunk_count,
             max_norm: GLOBAL_GRAD_CLIP_NORM,
-        })
+        })?;
+        Ok(self.norm.to_host_vec(stream)?[0])
     }
 }
 

@@ -11,6 +11,7 @@ impl OptimizerModule {
         assert!(args.chunk_offsets.len() >= args.slot_count as usize);
         assert!(args.chunk_sums.len() >= args.chunk_count as usize);
         assert!(!args.scale.is_empty());
+        assert!(!args.norm.is_empty());
 
         let chunk_grid = (args.chunk_count, 1, 1);
         let chunk_block = (GRAD_CLIP_THREADS_PER_BLOCK, 1, 1);
@@ -38,6 +39,7 @@ impl OptimizerModule {
             },
             args.chunk_sums,
             args.scale,
+            args.norm,
             args.chunk_count,
             args.max_norm,
         )?;

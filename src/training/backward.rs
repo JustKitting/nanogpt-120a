@@ -85,6 +85,7 @@ impl Trainer {
             stats.nonzero |= active_losses.iter().any(|value| value.abs() > 0.0);
             stats.loss_host_wait_ms = loss_sync_start.elapsed().as_secs_f64() * 1000.0;
         }
+        let observed_loss = sync_loss.then_some(stats.loss);
 
         let optimizer_start = Instant::now();
         let updates = super::optimizer_apply::apply_weight_updates(
@@ -94,6 +95,7 @@ impl Trainer {
             &mut self.uploaded,
             &mut self.buffers.backward,
             &self.buffers.next_latent_grads,
+            observed_loss,
             &mut self.buffers.optimizer,
             &mut self.buffers.optimizer_state,
             &mut self.buffers.aurora,
