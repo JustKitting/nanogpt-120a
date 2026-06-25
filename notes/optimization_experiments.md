@@ -33,6 +33,295 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Power-of-two QKV gather index decode for active attention shape.
+status: rejected_30s_screen
+change:
+  Added guarded fast paths to gather_qkv_forward_kernel and
+  gather_qkv_dout_kernel for the active B16/L4/d1024/h16 shape:
+  head_dim=64, seq_len=1024, head_count=16, embedding_dim=1024,
+  qkv_dim=3072. The fast paths decoded dim/token/batch/head using shifts and
+  masks and loaded the same Q/K/V and d_out values as the generic path.
+  Other shapes kept the existing division/modulo path. Attention math, tensor
+  layouts, launch geometry, model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test causal_attention_backward
+    -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test block_attention_backward
+    -- --ignored --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_164637Z_synth_30s
+    val_loss=5.962629, train_elapsed_s=30.068, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.962629 with the
+  same completed step count, 116. The shape-specific shift/mask decode did not
+  produce a screen-qualified objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Route aligned NextLat projection through a host-selected kernel.
+status: rejected_30s_screen
+change:
+  Added a nextlat_projection_aligned_kernel and routed the host launcher to it
+  when token_count, input_dim, and output_dim were already CTA-aligned. The
+  aligned kernel called the same row-pair affine projection body and loaded the
+  same device weight/bias global scales; the original mixed aligned/generic
+  kernel remained the fallback. Projection math, launch geometry for aligned
+  shapes, quantized inputs, model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test next_latent --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_164241Z_synth_30s
+    val_loss=5.964277, train_elapsed_s=30.071, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.964277 with the
+  same completed step count, 116. Removing the device-side aligned/generic
+  branch from the active NextLat projection path did not produce a
+  screen-qualified objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Remove unused weight_global_scale from LM-head params struct.
+status: rejected_30s_screen
+change:
+  Removed the unused weight_global_scale field from LmHeadParams and its host
+  initializer. The LM-head kernel still loaded the real tied-weight global scale
+  from the device weight_global_scale buffer, and projection math, launch
+  geometry, quantized inputs, model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test lm_head --
+    --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_163814Z_synth_30s
+    val_loss=5.968795, train_elapsed_s=30.061, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.968795 with the
+  same completed step count, 116. The params shrink did not produce a
+  screen-qualified objective signal.
+decision:
+  Reject before the 900-second gate and revert the code.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Remove redundant cross-entropy row bounds guard.
+status: rejected_900s
+change:
+  Removed the outer row < token_count guard from cross_entropy_kernel. The
+  launch grid already uses exactly token_count blocks, so the intended change
+  was only to remove a redundant branch around the existing max/sum/loss/dlogits
+  reductions. Loss math, dlogits scaling, row amax math, model shape, and
+  hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test loss -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_161638Z_synth_30s
+    val_loss=5.964351, train_elapsed_s=30.257, completed_steps=117.
+  900-second gate:
+    target/runs/20260625_161751Z_synth_900s
+    val_loss=3.505327, train_elapsed_s=900.044, completed_steps=3368.
+measured_effect:
+  The 30-second screen increased completed steps from 116 to 117, so it
+  qualified for the 900-second gate despite worse screen val_loss
+  (5.961005 -> 5.964351). The full gate failed against the accepted
+  attention-out f16 scatter baseline: val_loss worsened from 3.459726 to
+  3.505327, and completed steps decreased from 3370 to 3368.
+decision:
+  Reject and revert. The redundant guard removal did not improve the fixed
+  900-second validation objective.
+```
+
+```text
+date: 2026-06-25
+commit: profiling current accepted baseline, no code change
+experiment: Refresh post-attention-out-scatter B16/L4/d1024 nsys baseline.
+status: profile_only
+change:
+  No code or hyperparameter change. Rebuilt the accepted baseline after
+  rejecting the direct-tape candidates, then captured a 20-step SYNTH nsys
+  profile for the current post-attention-out-f16-scatter code path.
+verification:
+  cargo fmt --all --check: pass after reverting failed candidates.
+  cargo check --all-targets: pass after reverting failed candidates.
+  cargo oxide build --arch sm_120a: pass after reverting failed candidates.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_STEPS=20
+    TRAIN_LOG_INTERVAL=20 nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/current_after_attention_out_b16_l4d1024_20_20260625T160859Z.run.log
+    val_loss=8.815909, train_elapsed_s=5.248, completed_steps=20.
+  nsys stats:
+    target/nsys/current_after_attention_out_b16_l4d1024_20_20260625T160859Z_kernels_cuda_gpu_kern_sum.csv
+    target/nsys/current_after_attention_out_b16_l4d1024_20_20260625T160859Z_mem_cuda_gpu_mem_time_sum.csv
+measured_effect:
+  Current top GPU kernel families over 20 profiled steps:
+    aurora_mega_update_cooperative_kernel:
+      1247.692289ms over 20 calls.
+    linear_backward_projection_pair_cta_device_scale_kernel:
+      1187.935852ms over 400 calls.
+    f16_cta_tc_matmul_kernel:
+      293.763497ms over 160 calls.
+    f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel:
+      244.068508ms over 160 calls.
+    fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel:
+      242.960098ms over 100 calls.
+    lm_head_kernel:
+      210.830721ms over 21 calls.
+    rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel:
+      156.031062ms over 400 calls.
+    attention_prob_ds_kernel:
+      125.775850ms over 80 calls.
+  CUDA memcpy is no longer a meaningful target in this profile:
+    Device-to-Device memcpy total was 3.824584ms over 1592 copies.
+decision:
+  Use this as the current profiling basis for future kernel candidates. The
+  direct tape-copy removal direction is not supported by the latest screens,
+  and remaining work should target real kernel time rather than D2D copies.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Quantize final LM-head input directly into forward tape.
+status: rejected_30s_screen
+change:
+  In training-tape mode, routed the final normalized activation quantization
+  output directly into tape.lm_head_input_nvfp4 and fed the LM-head matmul
+  from that tape tensor. The no-tape/inference path kept the original
+  hidden_nvfp4 scratch output. Final layer-norm math, logits, backward math,
+  optimizer math, model shape, and hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass. This existing test covers the no-tape
+    branch; the 30-second training screen below exercised the training-tape
+    branch directly.
+  30-second candidate screen:
+    target/runs/20260625_160710Z_synth_30s
+    val_loss=5.968163, train_elapsed_s=30.014, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.968163 with the
+  same completed step count, 116. Runtime moved from 30.081s to 30.014s, but
+  this did not satisfy the screen rule because it neither lowered validation
+  loss nor increased completed steps.
+decision:
+  Reject before the 900-second gate and revert the code. Removing the final
+  LM-head input tape copy did not produce a screen-qualified objective signal.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Write attention log-sum-exp directly into block tape.
+status: rejected_30s_screen
+change:
+  Extended the attention forward tape with an attention_log_sum_exp buffer and
+  passed that buffer directly to causal_attention_tc during training-tape
+  block forward. This removed the immediate post-attention D2D copy of
+  log-sum-exp into the block tape. The change was intentionally narrower than
+  the older rejected QKV-plus-log-sum-exp direct tape attempt: QKV save,
+  attention math, attention_out f16 tape scatter, c_proj input
+  requantization, optimizer math, model shape, and hyperparameters were
+  unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    causal_attention_backward -- --ignored --nocapture --test-threads=1:
+    pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_160257Z_synth_30s
+    val_loss=5.963951, train_elapsed_s=30.016, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.963951 with the
+  same completed step count, 116. Runtime moved from 30.081s to 30.016s, but
+  this did not satisfy the screen rule because it neither lowered validation
+  loss nor increased completed steps.
+decision:
+  Reject before the 900-second gate and revert the code. Removing the
+  log-sum-exp tape copy did not produce a screen-qualified objective signal.
+```
+
+```text
+date: 2026-06-25
+commit: rejected uncommitted candidate, code reverted
+experiment: Route layer-norm mean/inv_std stats directly into tape.
+status: rejected_30s_screen
+change:
+  Added a training-tape layer-norm wrapper that passed the tape mean and
+  inv_std buffers directly to the existing layer-norm-save-residual-f16 kernel
+  for block ln_1, block ln_2, and final ln_f. This removed the immediate
+  post-kernel D2D copies of layer-norm stats into tape. Layer-norm math,
+  residual f16 tape, normalized output, optimizer math, model shape, and
+  hyperparameters were unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    layer_norm_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p rust-kernels-cuda --test
+    layer_norm_backward_params -- --ignored --nocapture --test-threads=1:
+    pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  30-second candidate screen:
+    target/runs/20260625_155751Z_synth_30s
+    val_loss=5.963547, train_elapsed_s=30.013, completed_steps=116.
+measured_effect:
+  Against the active 30-second screen baseline from the accepted attention-out
+  f16 scatter candidate, val_loss worsened from 5.961005 to 5.963547 with the
+  same completed step count, 116. Runtime moved from 30.081s to 30.013s, but
+  this did not satisfy the screen rule because it neither lowered validation
+  loss nor increased completed steps.
+decision:
+  Reject before the 900-second gate and revert the code. The saved stats-copy
+  launches were not enough to produce a screen-qualified objective signal.
+```
+
+```text
+date: 2026-06-25
 commit: uncommitted candidate, accepted after gate
 experiment: Fuse attention-output f16 tape save into attention scatter.
 status: accepted_900s
