@@ -62,9 +62,23 @@ impl AttentionModule {
                 n: args.head_dim,
                 k: args.seq_len,
             })?;
+        let config = linear_config(batch_head * args.seq_len * args.head_dim);
+        if let Some(attention_out_f16) = args.attention_out_f16 {
+            return self
+                .causal_attention_tc
+                .scatter_attention_forward_save_f16_kernel(
+                    args.stream,
+                    config,
+                    &*scratch.compact_out,
+                    args.out,
+                    attention_out_f16,
+                    params,
+                );
+        }
+
         self.causal_attention_tc.scatter_attention_forward_kernel(
             args.stream,
-            linear_config(batch_head * args.seq_len * args.head_dim),
+            config,
             &*scratch.compact_out,
             args.out,
             params,

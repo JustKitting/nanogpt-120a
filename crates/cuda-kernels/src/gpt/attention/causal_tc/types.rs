@@ -16,6 +16,7 @@ pub struct CausalAttentionTcArgs<'a, 'scratch, 'out> {
     pub tc_module: &'a F16TcMatmulModule,
     pub qkv: &'a DeviceBuffer<f32>,
     pub out: &'out mut DeviceBuffer<f32>,
+    pub attention_out_f16: Option<&'out mut DeviceBuffer<u16>>,
     pub log_sum_exp: &'out mut DeviceBuffer<f32>,
     pub scratch: CausalAttentionTcScratch<'scratch>,
     pub row_count: u32,

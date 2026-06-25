@@ -1,7 +1,7 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel};
 
 use super::gather::gather_qkv_body;
-use super::scatter::scatter_output_body;
+use super::scatter::{scatter_output_body, scatter_output_save_f16_body};
 use super::softmax::softmax_body;
 use crate::attention::CausalAttentionParams;
 
@@ -39,6 +39,16 @@ pub(super) mod module {
         params: CausalAttentionParams,
     ) {
         scatter_output_body(compact, out, params);
+    }
+
+    #[kernel]
+    pub fn scatter_attention_forward_save_f16_kernel(
+        compact: &[f32],
+        out: DisjointSlice<f32>,
+        attention_out_f16: DisjointSlice<u16>,
+        params: CausalAttentionParams,
+    ) {
+        scatter_output_save_f16_body(compact, out, attention_out_f16, params);
     }
 }
 

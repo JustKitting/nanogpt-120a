@@ -36,6 +36,7 @@ impl Gpt2BlockWeights {
         let attention_tape = tape.as_mut().map(|tape| AttentionForwardTape {
             qkv_input_nvfp4: tape.qkv_input_nvfp4.reborrow(),
             qkv_f16: &mut *tape.qkv,
+            attention_out_f16: &mut *tape.attention_out,
             c_proj_input_nvfp4: tape.c_proj_input_nvfp4.reborrow(),
         });
 
@@ -53,11 +54,6 @@ impl Gpt2BlockWeights {
         ))?;
 
         if let Some(tape) = tape.as_mut() {
-            tape.save_attention_out_f16(
-                hidden.stream,
-                args.attention_tc_module,
-                hidden.normalized,
-            )?;
             tape.save_attention_log_sum_exp(hidden.stream, attention_log_sum_exp)?;
         }
 

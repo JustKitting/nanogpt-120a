@@ -33,6 +33,54 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-06-25
+commit: uncommitted candidate, accepted after gate
+experiment: Fuse attention-output f16 tape save into attention scatter.
+status: accepted_900s
+change:
+  Added a training-tape scatter variant for causal attention forward that
+  writes the FP32 attention output and the saved f16 attention_out tape in the
+  same kernel. The no-tape/inference scatter path still uses the original
+  kernel. Removed the separate block-level fp32_to_f16 launch for
+  attention_out after attention forward. Attention math, c_proj input
+  requantization, log-sum-exp tape, optimizer math, model shape, and
+  hyperparameters are unchanged.
+verification:
+  cargo fmt --all --check: pass.
+  cargo check --all-targets: pass.
+  cargo oxide build --arch sm_120a: pass after replacing an unsupported
+    device-side Option<DisjointSlice<u16>> helper with separate scatter
+    kernel bodies.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test forward -- --ignored
+    --nocapture --test-threads=1: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    causal_attention_backward -- --ignored --nocapture --test-threads=1:
+    pass.
+  CUDA_DEVICE_INDEX=0 cargo test -p gpt2-nvfp4 --test
+    block_attention_backward -- --ignored --nocapture --test-threads=1: pass.
+  30-second baseline screen:
+    target/runs/20260625_153037Z_synth_30s
+    val_loss=5.965470, train_elapsed_s=30.057, completed_steps=116.
+  30-second candidate screen:
+    target/runs/20260625_153501Z_synth_30s
+    val_loss=5.961005, train_elapsed_s=30.081, completed_steps=116.
+  900-second held-out gate:
+    target/attention_out_f16_scatter_b16_l4d1024_900_20260625T1536Z.log
+    val_loss=3.459726, train_elapsed_s=900.259, completed_steps=3370.
+measured_effect:
+  The 30-second screen showed a tiny validation-loss improvement with the same
+  step count, so it was only evidence to continue to the fixed-wall gate.
+  Against the active baseline
+  target/gram_ns_polar_b16_l4d1024_900_20260625T005304Z.log, the 900-second
+  gate improved held-out validation loss from 3.472538 to 3.459726 and
+  completed steps from 3367 to 3370.
+decision:
+  Promote. The candidate passes the primary fixed-wall objective directly with
+  lower held-out validation loss and higher completed step count. Update
+  notes/sweep_baseline.env to this accepted baseline.
+```
+
+```text
+date: 2026-06-25
 commit: uncommitted
 experiment: Add isolated Parallax attention forward kernel.
 status: forward_kernel_validated_training_not_wired

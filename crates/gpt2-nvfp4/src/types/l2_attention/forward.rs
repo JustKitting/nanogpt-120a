@@ -76,6 +76,7 @@ pub(super) fn forward<'a, 'scratch>(
         tc_module: args.tc_module,
         qkv: &*args.qkv,
         out: normalized,
+        attention_out_f16: tape.as_mut().map(|tape| &mut *tape.attention_out_f16),
         log_sum_exp: args.attention_log_sum_exp,
         scratch: args.tc_scratch,
         row_count,

@@ -44,21 +44,6 @@ impl<'a> BlockForwardTape<'a> {
         }
     }
 
-    pub(crate) fn save_attention_out_f16(
-        &mut self,
-        stream: &CudaStream,
-        module: &F16TcMatmulModule,
-        out: &DeviceBuffer<f32>,
-    ) -> Result<(), DriverError> {
-        let element_count = self.attention_out.len() as u32;
-        module.fp32_to_f16(F16ConvertArgs {
-            stream,
-            src: out,
-            dst: self.attention_out,
-            element_count,
-        })
-    }
-
     pub(crate) fn save_attention_log_sum_exp(
         &mut self,
         stream: &CudaStream,
