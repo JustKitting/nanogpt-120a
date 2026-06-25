@@ -1,6 +1,6 @@
-# nanogpt-120a
+# rust-kernels
 
-This is an experiment in cost-constrained language-model training.
+This repository is an experiment in cost-constrained language-model training.
 The project goal is to fully train a small model, including pre-training and
 post-training, and measure how well it can perform on standard benchmarks such
 as GSM8K after roughly `$1` of training compute.
@@ -108,3 +108,8 @@ only justify continuing. The current rules and active baseline live in:
 - `notes/optimization_rules.md`
 - `notes/sweep_baseline.env`
 - `notes/optimization_experiments.md`
+
+Do not retest old optimization failures, and do not use failed historical
+experiments as inspiration for new candidates. The hill-climb must start from
+current kernels, current profiles, and fresh source analysis. Historical failed
+entries are records of what not to try again.

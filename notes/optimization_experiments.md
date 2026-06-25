@@ -33,45 +33,14 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ## Retest Policy
 
-As of 2026-06-25, historical rejected or previously tested experiments are
-retestable by default. Kernel and runtime edits have changed launch mix,
-occupancy, codegen, and baseline objective values enough that older negative
-results should not be treated as permanent exclusions.
+Do not retest old optimization failures, and do not use failed historical
+experiments as inspiration for new candidates. This is a standing instruction
+for future work and compaction summaries: old failed tests are records, not a
+candidate queue, not a prompt source, and not background inspiration.
 
-Older `rejected_*`, `reverted`, `avoid repeating`, `do not promote`, and similar
-entries mean only that the candidate did not pass under the code, profile, and
-baseline active at the time of that entry. Treat those notes as stale negative
-evidence, not as a skip list. When retesting an old idea, add a new dated entry
-with the current baseline, logs, and screen or gate result instead of rewriting
-the old measurement.
-
-Fresh cooldown exceptions: the few candidates tested in the last several hours
-against the accepted attention-output f16 scatter baseline remain fresh negative
-evidence unless a later structural change directly changes their cost or benefit:
-
-- Route layer-norm mean/inv_std stats directly into tape.
-- Write attention log-sum-exp directly into block tape.
-- Quantize final LM-head input directly into forward tape.
-- Remove redundant cross-entropy row bounds guard.
-- Remove unused weight_global_scale from LM-head params struct.
-- Route aligned NextLat projection through a host-selected kernel.
-- Power-of-two QKV gather index decode for active attention shape.
-- Remove redundant row-count guard from row_amax_f32_kernel.
-- Retest eight-row unroll for linear_bias_grad_kernel on current baseline.
-- Retest attention projection row-pair CTA routing on current baseline.
-- Remove redundant column-count guards from layer_norm_backward_params kernels.
-- Retest power-of-two index decode fast path in attention_prob_ds_kernel.
-- Route full-row attention softmax forward through an unguarded entrypoint.
-- Retest host-selected aligned LM-head kernel split on current baseline.
-- Retest mixed row-divide / transpose-power-of-two MS-EDEN pair packer.
-- Route exact-length residual gradient kernels through unguarded entrypoints.
-- Add power-of-two index decode fast path to scatter_dqkv_kernel.
-- Retest aligned RHS-transposed f16 CTA matmul staging/stores on current baseline.
-- Retest combined cross-entropy denominator and grad-scale reciprocal hoist.
-- Route exact tensor_chunk_amax_f32 shapes through a no-tail kernel.
-- Route active-shape RoPE save-f16 through a power-of-two entrypoint.
-- Route rowwise four-six quantization through a warp-shared global-scale path.
-- Route exact-length fp32_to_f16 conversions through a no-tail entrypoint.
+The hill-climb must start from current kernels, current profiles, and fresh
+source analysis. Preserve old entries as factual history, but do not select,
+reshape, or revive those candidates.
 
 ```text
 date: 2026-06-25
