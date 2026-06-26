@@ -5,7 +5,6 @@ use time::OffsetDateTime;
 
 use crate::AppResult;
 
-const TRAIN_RUN_DIR_ENV: &str = "TRAIN_RUN_DIR";
 const RUNS_DIR: &str = "target/runs";
 
 pub(crate) struct RunOutput {
@@ -14,11 +13,7 @@ pub(crate) struct RunOutput {
 
 impl RunOutput {
     pub fn new(dataset: &str, label: &str) -> AppResult<Self> {
-        let dir = std::env::var(TRAIN_RUN_DIR_ENV)
-            .ok()
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .unwrap_or_else(|| default_run_dir(dataset, label));
+        let dir = default_run_dir(dataset, label);
         fs::create_dir_all(&dir)?;
         Ok(Self { dir })
     }

@@ -55,13 +55,6 @@ impl Stage {
         }
     }
 
-    fn run_dir_name(self) -> &'static str {
-        match self {
-            Self::Screen => "screen",
-            Self::Full => "run",
-        }
-    }
-
     fn log_name(self) -> &'static str {
         match self {
             Self::Screen => "screen.log",
@@ -94,7 +87,6 @@ fn run_candidate_stage(
         format!("{:.3}", stage.max_seconds(config)),
     );
     command.env("TRAIN_LOG_INTERVAL", config.log_interval.to_string());
-    command.env("TRAIN_RUN_DIR", trial_dir.join(stage.run_dir_name()));
     if let Some(device) = &config.cuda_device {
         command.env("CUDA_DEVICE_INDEX", device);
     }
