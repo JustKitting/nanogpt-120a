@@ -24,6 +24,11 @@ pub(super) fn gather_qkv_body(
     let head = batch_head - batch * params.head_count;
     let row = batch * params.seq_len + token;
     if row >= params.row_count {
+        unsafe {
+            *q.get_unchecked_mut(index as usize) = 0.0;
+            *k.get_unchecked_mut(index as usize) = 0.0;
+            *v.get_unchecked_mut(index as usize) = 0.0;
+        }
         return;
     }
 

@@ -26,7 +26,13 @@ impl F16TcMatmulModule {
         self.module.fp32_to_f16_kernel(
             args.stream,
             LaunchConfig {
-                grid_dim: (args.element_count.div_ceil(F16_THREADS_PER_BLOCK), 1, 1),
+                grid_dim: (
+                    args.element_count
+                        .div_ceil(2)
+                        .div_ceil(F16_THREADS_PER_BLOCK),
+                    1,
+                    1,
+                ),
                 block_dim: (F16_THREADS_PER_BLOCK, 1, 1),
                 shared_mem_bytes: 0,
             },

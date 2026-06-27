@@ -1,12 +1,12 @@
 use cuda_core::{DeviceBuffer, DriverError};
 
 use super::types::{Gpt2BackwardModules, Gpt2BackwardSeeds, Gpt2BackwardWeights};
-use crate::GPT2_N_LAYER;
 use crate::backward::{
     BlockAttentionBackwardArgs, BlockAttentionBackwardScratch, BlockMlpBackwardArgs,
     MlpBackwardScratch, attention_side_backward, mlp_side_backward,
 };
 use crate::types::{BlockBackwardGrads, Gpt2ForwardSaved};
+use crate::{GPT2_N_LAYER, uses_full_attention};
 
 pub(super) fn run_blocks<'a, 'scratch, 'out>(
     stream: &'a cuda_core::CudaStream,
@@ -69,6 +69,7 @@ fn run_block<'a, 'scratch, 'out>(
         seeds: seeds.mlp[block_index],
     })?;
     attention_side_backward(BlockAttentionBackwardArgs {
+        use_full_attention: uses_full_attention(block_index),
         stream,
         modules: modules.attention,
         saved: saved.blocks[block_index],

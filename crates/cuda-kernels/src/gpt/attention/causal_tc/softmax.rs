@@ -2,7 +2,7 @@ use cuda_device::{DisjointSlice, SharedArray, thread};
 
 use super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
-use crate::float_ptx::{exp_f32, ln_f32, max_f32};
+use crate::float_ptx::{exp_f32, ln_f32, max_f32, safe_positive_denom};
 
 mod index;
 mod reduce;
@@ -26,11 +26,20 @@ pub(super) fn softmax_body(
     let tid = thread::threadIdx_x();
     let row = batch * params.seq_len + query;
     if row >= params.row_count {
+        zero_prob_row(&mut probs, batch, head, query, tid, params);
+        if tid == 0 {
+            unsafe {
+                *log_sum_exp.get_unchecked_mut(log_sum_exp_index(batch, query, head, &params)) =
+                    0.0;
+            }
+        }
         return;
     }
 
     let max_score = query_max(scores, query, head, batch, tid, params, reduce);
-    let denom = query_denom(scores, query, head, batch, tid, params, max_score, reduce);
+    let denom = safe_positive_denom(query_denom(
+        scores, query, head, batch, tid, params, max_score, reduce,
+    ));
     if tid == 0 {
         unsafe {
             *log_sum_exp.get_unchecked_mut(log_sum_exp_index(batch, query, head, &params)) =
@@ -39,10 +48,31 @@ pub(super) fn softmax_body(
     }
 
     let mut key = tid;
-    while key <= query {
-        let prob = exp_f32(score(scores, batch, head, query, key, &params) - max_score) / denom;
+    while key < params.seq_len {
+        let prob = if key <= query {
+            exp_f32(score(scores, batch, head, query, key, &params) - max_score) / denom
+        } else {
+            0.0
+        };
         unsafe {
             *probs.get_unchecked_mut(score_index(batch, head, query, key, &params)) = prob;
+        }
+        key += TC_FORWARD_THREADS_PER_BLOCK;
+    }
+}
+
+fn zero_prob_row(
+    probs: &mut DisjointSlice<f32>,
+    batch: u32,
+    head: u32,
+    query: u32,
+    tid: u32,
+    params: CausalAttentionParams,
+) {
+    let mut key = tid;
+    while key < params.seq_len {
+        unsafe {
+            *probs.get_unchecked_mut(score_index(batch, head, query, key, &params)) = 0.0;
         }
         key += TC_FORWARD_THREADS_PER_BLOCK;
     }

@@ -14,6 +14,7 @@ pub fn attention_side_backward(
     args: BlockAttentionBackwardArgs<'_, '_, '_>,
 ) -> Result<(), DriverError> {
     let BlockAttentionBackwardArgs {
+        use_full_attention,
         stream,
         modules,
         saved,
@@ -55,6 +56,7 @@ pub fn attention_side_backward(
         seeds: seeds.c_proj,
     })?;
     causal_attention_backward(AttentionCoreBackwardArgs {
+        use_full_attention,
         stream,
         module: modules.attention,
         tc_module: modules.f16_tc,
@@ -64,6 +66,7 @@ pub fn attention_side_backward(
         scratch: scratch.core,
     })?;
     qkv_projection_backward(AttentionQkvBackwardArgs {
+        use_full_attention,
         stream,
         modules: modules.linear,
         saved,

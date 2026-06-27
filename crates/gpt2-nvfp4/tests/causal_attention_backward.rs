@@ -24,8 +24,8 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
     let module = AttentionModule::from_module(ptx.clone())?;
     let tc_module = F16TcMatmulModule::from_module(ptx)?;
 
-    let qkv = DeviceBuffer::from_host(&stream, &vec![0_u16; QkvActivation::LEN])?;
-    let attention_out = DeviceBuffer::from_host(&stream, &vec![0_u16; HiddenState::LEN])?;
+    let qkv = DeviceBuffer::from_host(&stream, &vec![0x3c00_u16; QkvActivation::LEN])?;
+    let attention_out = DeviceBuffer::from_host(&stream, &vec![0x2e66_u16; HiddenState::LEN])?;
     let d_out = DeviceBuffer::from_host(&stream, &data::d_out_values())?;
     let log_sum_exp = DeviceBuffer::from_host(&stream, &data::log_sum_exp_values())?;
     let dummy = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
@@ -49,6 +49,7 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
     let mut direct_scratch = attention_core_scratch::AttentionCoreScratchBuffers::new(&stream)?;
 
     gpt2_causal_attention_backward(AttentionCoreBackwardArgs {
+        use_full_attention: false,
         stream: &stream,
         module: &module,
         tc_module: &tc_module,

@@ -31,6 +31,88 @@ Primary optimization target:
 heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
+```text
+date: 2026-06-26
+commit: uncommitted Kimi KDA candidate, not promoted
+experiment: Replace 3/4 attention layers with chunkwise KDA attention.
+status: failed_900s_gate_not_commit_eligible
+change:
+  Added KDA Q/K/V/G/beta projection width, chunkwise KDA forward/backward
+  kernels, saved chunk states for backward, and kept every fourth layer on the
+  existing full softmax attention path. Padded active KDA QKV width to 4192 so
+  QKV projection backward uses the paired CTA path instead of the generic
+  projection fallback.
+verification:
+  30s screen: target/runs/20260626_214155Z_synth_30s, 118 steps,
+    val_loss=5.810336, train_elapsed_s=30.026.
+  180s screen: target/runs/20260626_215129Z_synth_180s, 698 steps,
+    val_loss=4.581712, train_elapsed_s=180.042.
+  900s gate: target/runs/20260626_215731Z_synth_900s failed before
+    completion; non-finite gradient skips began at step 1277. Last observed:
+    step=1300, elapsed_s=300.778, loss=4.889318, grad_norm=NaN.
+measured_effect:
+  The 30s candidate beat the active 30s baseline (117 steps, val_loss=5.956693)
+  but the 900s fixed-wall gate failed on training instability, so the candidate
+  cannot be accepted or committed.
+decision:
+  Keep working on the KDA implementation, but this candidate is not
+  commit-eligible. Cleanup priority before further bug fixing: keep the active
+  KDA path narrow, reuse shared utility code, and remove tests that did not
+  catch the sustained-run instability.
+```
+
+```text
+date: 2026-06-27
+commit: uncommitted Kimi KDA stability candidate, not promoted
+experiment: Add Aurora Q/K clipping for KDA attention and clear stale full-attention scratch.
+status: passed_900s_stability_gate_not_promoted
+change:
+  Added a KDA-aware Aurora Q/K clip after the Aurora update path. KDA layers
+  clip against SiLU(Q/K) norms from the saved qkv tape; retained full-attention
+  layers clip against the RoPE-applied saved Q/K tape. Also fixed the
+  full-attention TC backward probability/dS preparation kernel to write zeroes
+  for masked causal entries instead of returning early with stale scratch data.
+  Follow-up audit found the same stale-buffer pattern in full-attention forward
+  softmax: the retained full-attention layer wrote only the lower causal
+  triangle of probs after KDA layers had reused the same scratch buffer. The
+  forward softmax now overwrites every probability row, with zeroes for masked
+  keys; TC gather/scatter invalid-row paths also zero their destinations.
+verification:
+  cargo check: pass.
+  30s screen after the masked-scratch fix:
+    target/runs/20260627_044710Z_synth_30s
+    val_loss=5.859953, train_elapsed_s=30.250, completed_steps=113.
+  900s gate after the masked-scratch fix:
+    target/runs/20260627_044751Z_synth_900s
+    val_loss=4.065206, train_elapsed_s=900.263, completed_steps=3314.
+  30s screen after forward probs and TC invalid-row zeroing:
+    target/runs/20260627_051035Z_synth_30s
+    val_loss=5.847902, train_elapsed_s=30.073, completed_steps=112.
+  900s gate after forward probs and TC invalid-row zeroing:
+    target/runs/20260627_051132Z_synth_900s
+    val_loss=3.521061, train_elapsed_s=900.030, completed_steps=3310.
+    Saved stdout log:
+    target/kda_900_verify_after_softmax_zero_20260627_051125Z.log.
+    Grep for non_finite=true, skip_non_finite=true, NaN, non_finite_gradient,
+    and non_finite_flow returned no matches. Finite grad-norm/loss spike skips
+    remained, all with non_finite=false.
+  Intermediate 900s run with Aurora Q/K clip before the masked-scratch fix:
+    target/runs/20260627_044118Z_synth_900s failed at optimizer step candidate
+    831 with blocks.3.d_qkv and lm_head.weight non-finite gradients.
+measured_effect:
+  The non-finite failure moved from a sustained-run blocker to completed
+  900-second runs. The direct root cause for the observed blocks.3.d_qkv NaNs was
+  stale masked probability/dS scratch in the retained full-attention backward
+  path. The follow-up forward softmax stale-probs fix removed another
+  KDA/full-attention scratch reuse bug and improved the 900-second held-out
+  result from 4.065206 to 3.521061. Aurora Q/K clip remains in place as the
+  KDA-specific clipping guard.
+decision:
+  Continue from this stable KDA path, but do not promote it as a speed/loss win
+  yet. It has not beaten the active accepted 900-second baseline on fixed-wall
+  held-out validation loss.
+```
+
 ## Retest Policy
 
 Do not retest old optimization failures, and do not use failed historical

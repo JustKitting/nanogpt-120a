@@ -1,6 +1,6 @@
 use cuda_device::{DisjointSlice, thread};
 
-use super::types::CausalAttentionBackwardTcParams;
+use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 
 pub(super) const TC_BACKWARD_THREADS_PER_BLOCK: u32 = 256;
@@ -13,7 +13,7 @@ pub(super) fn gather_body(
     mut k: DisjointSlice<u16>,
     mut v: DisjointSlice<u16>,
     mut d_out: DisjointSlice<u16>,
-    params: CausalAttentionBackwardTcParams,
+    params: CausalAttentionParams,
 ) {
     let index = thread::blockIdx_x() * TC_BACKWARD_THREADS_PER_BLOCK + thread::threadIdx_x();
     let total = params.batch_size * params.head_count * params.seq_len * params.head_dim;
@@ -28,6 +28,12 @@ pub(super) fn gather_body(
     let head = batch_head - batch * params.head_count;
     let row = batch * params.seq_len + token;
     if row >= params.row_count {
+        unsafe {
+            *q.get_unchecked_mut(index as usize) = 0;
+            *k.get_unchecked_mut(index as usize) = 0;
+            *v.get_unchecked_mut(index as usize) = 0;
+            *d_out.get_unchecked_mut(index as usize) = 0;
+        }
         return;
     }
 
@@ -57,7 +63,7 @@ fn qkv_value(
     head: u32,
     dim: u32,
     section_offset: u32,
-    params: &CausalAttentionBackwardTcParams,
+    params: &CausalAttentionParams,
 ) -> u16 {
     qkv[qkv_index(batch, token, head, dim, section_offset, params)]
 }
@@ -69,7 +75,7 @@ pub(super) fn qkv_index(
     head: u32,
     dim: u32,
     section_offset: u32,
-    params: &CausalAttentionBackwardTcParams,
+    params: &CausalAttentionParams,
 ) -> usize {
     (batch as usize * params.seq_len as usize + token as usize) * params.qkv_dim as usize
         + section_offset as usize
@@ -83,7 +89,7 @@ fn hidden_index(
     token: u32,
     head: u32,
     dim: u32,
-    params: &CausalAttentionBackwardTcParams,
+    params: &CausalAttentionParams,
 ) -> usize {
     (batch as usize * params.seq_len as usize + token as usize) * params.embedding_dim as usize
         + head as usize * params.head_dim as usize

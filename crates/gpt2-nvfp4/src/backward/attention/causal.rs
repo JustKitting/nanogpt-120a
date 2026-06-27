@@ -2,28 +2,37 @@ use cuda_core::DriverError;
 use rust_kernels_cuda::attention::CausalAttentionBackwardTcArgs;
 
 use super::types::AttentionCoreBackwardArgs;
-use crate::{GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV};
+use crate::{GPT2_FULL_ATTENTION_QKV, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV};
 
 pub fn causal_attention_backward(
     args: AttentionCoreBackwardArgs<'_, '_, '_>,
 ) -> Result<(), DriverError> {
-    args.module
-        .causal_attention_backward_tc(CausalAttentionBackwardTcArgs {
-            stream: args.stream,
-            tc_module: args.tc_module,
-            qkv: args.saved.qkv,
-            attention_out: args.saved.attention_out,
-            d_out: args.d_attention_out,
-            log_sum_exp: args.saved.attention_log_sum_exp,
-            softmax_d: args.scratch.softmax_d,
-            d_qkv: args.d_qkv,
-            scratch: args.scratch.tc,
-            row_count: args.saved.row_count,
-            seq_len: args.saved.seq_len,
-            batch_size: args.saved.batch_size,
-            embedding_dim: GPT2_N_EMBD as u32,
-            qkv_dim: GPT2_QKV as u32,
-            head_count: GPT2_N_HEAD as u32,
-            head_dim: (GPT2_N_EMBD / GPT2_N_HEAD) as u32,
-        })
+    let qkv_dim = if args.use_full_attention {
+        GPT2_FULL_ATTENTION_QKV
+    } else {
+        GPT2_QKV
+    } as u32;
+    let tc_args = CausalAttentionBackwardTcArgs {
+        stream: args.stream,
+        tc_module: args.tc_module,
+        qkv: args.saved.qkv,
+        attention_out: args.saved.attention_out,
+        d_out: args.d_attention_out,
+        log_sum_exp: args.saved.attention_log_sum_exp,
+        softmax_d: args.scratch.softmax_d,
+        d_qkv: args.d_qkv,
+        scratch: args.scratch.tc,
+        row_count: args.saved.row_count,
+        seq_len: args.saved.seq_len,
+        batch_size: args.saved.batch_size,
+        embedding_dim: GPT2_N_EMBD as u32,
+        qkv_dim,
+        head_count: GPT2_N_HEAD as u32,
+        head_dim: (GPT2_N_EMBD / GPT2_N_HEAD) as u32,
+    };
+    if args.use_full_attention {
+        args.module.causal_attention_backward_tc(tc_args)
+    } else {
+        args.module.kda_attention_backward_tc(tc_args)
+    }
 }

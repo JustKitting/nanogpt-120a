@@ -79,6 +79,7 @@ fn run_forward() -> TestResult {
     let mut tc_scores_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
     let mut tc_probs_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
     let mut tc_out_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
+    let mut tc_chunk_states_dev = DeviceBuffer::<u16>::zeroed(&stream, HiddenState::LEN)?;
     let mut logits_dev = DeviceBuffer::<f32>::zeroed(&stream, Logits::LEN)?;
 
     model.forward(Gpt2ForwardArgs {
@@ -114,6 +115,7 @@ fn run_forward() -> TestResult {
             scores: &mut tc_scores_dev,
             probs: &mut tc_probs_dev,
             compact_out: &mut tc_out_dev,
+            chunk_states: &mut tc_chunk_states_dev,
         },
         mlp_activation_nvfp4: MlpActivationNvfp4 {
             bytes: &mut mlp_activation_bytes_dev,

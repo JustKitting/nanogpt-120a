@@ -3,7 +3,10 @@ use super::super::next_latent::NextLatGradBuffers;
 use super::super::optimizer_state::OptimizerStateBuffers;
 use crate::upload::UploadedModel;
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, GPT2_QKV, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
+use gpt2_nvfp4::{
+    GPT2_FULL_ATTENTION_QKV, GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, GPT2_QKV, NEXTLAT_HIDDEN,
+    NEXTLAT_INPUT, uses_full_attention,
+};
 use rust_kernels_cuda::optimizer::{AURORA_MATRIX_PHASES, AuroraSlotDescriptor};
 
 mod padding;
@@ -63,9 +66,14 @@ fn all_slots(
     state: &OptimizerStateBuffers,
 ) -> Vec<HostPtrs> {
     let mut rows = Vec::with_capacity(GPT2_N_LAYER * 4 + 3);
-    append(&mut rows, GPT2_N_EMBD, GPT2_QKV, |i| {
-        ptrs::qkv(uploaded, grads, state, i)
-    });
+    for i in 0..GPT2_N_LAYER {
+        let qkv_dim = if uses_full_attention(i) {
+            GPT2_FULL_ATTENTION_QKV
+        } else {
+            GPT2_QKV
+        };
+        rows.push(ptrs::qkv(uploaded, grads, state, i).shape(GPT2_N_EMBD, qkv_dim));
+    }
     append(&mut rows, GPT2_N_EMBD, GPT2_N_EMBD, |i| {
         ptrs::c_proj(uploaded, grads, state, i)
     });

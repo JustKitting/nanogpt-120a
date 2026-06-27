@@ -1,6 +1,6 @@
 use cuda_device::{DisjointSlice, SharedArray, thread, warp};
 
-use super::types::CausalAttentionBackwardTcParams;
+use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_f32_f16;
 use crate::warp_reduce::warp_sum_f32;
 
@@ -11,7 +11,7 @@ fn value(
     token: u32,
     head: u32,
     dim: u32,
-    params: &CausalAttentionBackwardTcParams,
+    params: &CausalAttentionParams,
 ) -> f32 {
     values[(batch as usize * params.seq_len as usize + token as usize)
         * params.embedding_dim as usize
@@ -38,7 +38,7 @@ pub(super) fn softmax_d_f16_body(
     out: &[u16],
     d_out: &[f32],
     mut softmax_d: DisjointSlice<f32>,
-    params: CausalAttentionBackwardTcParams,
+    params: CausalAttentionParams,
     reduce: &mut SharedArray<f32, 2>,
 ) {
     let token = thread::blockIdx_x();
@@ -76,7 +76,7 @@ fn value_f16(
     token: u32,
     head: u32,
     dim: u32,
-    params: &CausalAttentionBackwardTcParams,
+    params: &CausalAttentionParams,
 ) -> f32 {
     cvt_f32_f16(
         values[(batch as usize * params.seq_len as usize + token as usize)

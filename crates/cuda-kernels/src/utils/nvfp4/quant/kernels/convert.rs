@@ -2,10 +2,31 @@ use cuda_device::ptx_asm;
 
 use crate::nvfp4_cast::{e2m1_value, e4m3_value};
 
+const NVFP4_DENOM_EPS: f32 = 1.0e-20;
+
+#[inline(always)]
+pub(crate) fn nonzero_global_scale(global_scale: f32) -> f32 {
+    if global_scale == 0.0 {
+        1.0
+    } else {
+        global_scale
+    }
+}
+
+#[inline(always)]
+pub(crate) fn nonzero_scale(scale: f32) -> f32 {
+    if scale == 0.0 { 1.0 } else { scale }
+}
+
+#[inline(always)]
+pub(crate) fn nvfp4_inv_scale(scale: f32, global_scale: f32) -> f32 {
+    1.0 / (nonzero_scale(scale) * nonzero_global_scale(global_scale) + NVFP4_DENOM_EPS)
+}
+
 #[inline(always)]
 pub(crate) fn candidate_error(value: f32, scale: f32, global_scale: f32) -> f32 {
-    let scale_for_payload = if scale == 0.0 { 1.0 } else { scale };
-    let inv_scale = 1.0 / (scale_for_payload * global_scale);
+    let global_scale = nonzero_global_scale(global_scale);
+    let inv_scale = nvfp4_inv_scale(scale, global_scale);
     let dequant_scale = scale * global_scale;
     let packed = cvt_rn_satfinite_e2m1x2_f32(0.0, value * inv_scale);
     let dequant = e2m1_value(packed & 0x0f) * dequant_scale;
@@ -20,7 +41,8 @@ pub(crate) fn local_scale_bits(
     scale_override: f32,
     grid_max: f32,
 ) -> u16 {
-    let value = group_amax * scale_override / (grid_max * global_scale);
+    let global_scale = nonzero_global_scale(global_scale);
+    let value = group_amax * scale_override / (grid_max * global_scale + NVFP4_DENOM_EPS);
     let packed: u16;
 
     unsafe {

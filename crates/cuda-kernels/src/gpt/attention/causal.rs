@@ -2,7 +2,7 @@ use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig}
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use super::AttentionModule;
-use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32};
+use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32, safe_positive_denom};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
 pub(crate) const CAUSAL_ATTENTION_MAX_THREADS_PER_BLOCK: u32 = 128;
@@ -19,6 +19,8 @@ pub struct CausalAttentionParams {
     pub head_count: u32,
     pub head_dim: u32,
     pub scale: f32,
+    pub chunk_size: u32,
+    pub decay_scale: f32,
 }
 
 unsafe impl DeviceCopy for CausalAttentionParams {}
@@ -58,6 +60,8 @@ impl AttentionModule {
                 head_count: args.head_count,
                 head_dim: args.head_dim,
                 scale: 1.0 / (args.head_dim as f32).sqrt(),
+                chunk_size: 64,
+                decay_scale: 0.01,
             },
         )
     }
@@ -146,7 +150,7 @@ pub mod kernels {
         }
 
         let score_max = score_max(query, thread_index);
-        let denom = score_denom(query, thread_index, score_max);
+        let denom = safe_positive_denom(score_denom(query, thread_index, score_max));
         if thread_index == 0 {
             let log_sum_exp_index = (batch as usize * params.head_count as usize + head as usize)
                 * params.seq_len as usize

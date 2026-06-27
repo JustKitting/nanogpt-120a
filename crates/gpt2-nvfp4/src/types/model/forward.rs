@@ -5,6 +5,7 @@ use super::args::Gpt2ForwardArgs;
 use super::final_logits::{FinalForwardArgs, finish_forward};
 use super::weights::Gpt2Weights;
 use crate::types::{AttentionProjectionTensors, BlockForwardArgs, HiddenStateDevice};
+use crate::uses_full_attention;
 
 pub(super) fn forward<'a>(
     weights: &Gpt2Weights,
@@ -48,6 +49,7 @@ pub(super) fn forward<'a>(
 
     for (block_index, block) in weights.h.iter().enumerate() {
         hidden = block.forward(BlockForwardArgs {
+            use_full_attention: uses_full_attention(block_index),
             attention_module,
             attention_tc_module,
             quant_module,

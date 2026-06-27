@@ -11,6 +11,7 @@ use crate::types::{
 };
 
 pub struct BlockForwardArgs<'a, 'scratch> {
+    pub use_full_attention: bool,
     pub attention_module: &'a AttentionModule,
     pub attention_tc_module: &'a F16TcMatmulModule,
     pub quant_module: &'a Nvfp4QuantModule,

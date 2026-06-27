@@ -47,6 +47,10 @@ impl ForwardTapeBuffers {
             lm_head_input_nvfp4: self.lm_head_input.tape(),
         }
     }
+
+    pub fn block_qkv(&self, index: usize) -> &DeviceBuffer<u16> {
+        self.blocks[index].qkv()
+    }
 }
 
 fn block_array<F, T>(mut f: F) -> Result<[T; GPT2_N_LAYER], DriverError>

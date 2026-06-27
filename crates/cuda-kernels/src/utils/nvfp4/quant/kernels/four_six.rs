@@ -3,7 +3,10 @@ use cuda_device::{DisjointSlice, cuda_module, kernel, thread, warp};
 use crate::float_ptx::abs_f32;
 use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32};
 
-use super::convert::{candidate_error, cvt_rn_satfinite_e2m1x2_f32, local_scale_bits, scale_value};
+use super::convert::{
+    candidate_error, cvt_rn_satfinite_e2m1x2_f32, local_scale_bits, nonzero_global_scale,
+    nvfp4_inv_scale, scale_value,
+};
 
 #[cuda_module]
 pub(crate) mod module {
@@ -47,6 +50,7 @@ pub(crate) mod module {
             } else {
                 tensor_amax * scale_override / (FP8_MAX_FOUR_SIX * FP4_MAX)
             };
+            let global_scale = nonzero_global_scale(global_scale);
             let writes_global_scale = if scalar_scale {
                 group == 0
             } else {
@@ -96,8 +100,7 @@ pub(crate) mod module {
                 } else {
                     scale_four
                 };
-                let scale_for_payload = if scale == 0.0 { 1.0 } else { scale };
-                let inv_scale = 1.0 / (scale_for_payload * global_scale);
+                let inv_scale = nvfp4_inv_scale(scale, global_scale);
 
                 if lane_in_group == 0 {
                     *out_scales.get_unchecked_mut(group) = scale_bits as u8;
@@ -145,6 +148,7 @@ pub(crate) mod module {
         } else {
             tensor_amax * scale_override / (FP8_MAX_FOUR_SIX * FP4_MAX)
         };
+        let global_scale = nonzero_global_scale(global_scale);
 
         unsafe {
             if (base as u32 & row_mask) == 0 && lane_in_group == 0 {
@@ -187,8 +191,7 @@ pub(crate) mod module {
             } else {
                 scale_four
             };
-            let scale_for_payload = if scale == 0.0 { 1.0 } else { scale };
-            let inv_scale = 1.0 / (scale_for_payload * global_scale);
+            let inv_scale = nvfp4_inv_scale(scale, global_scale);
 
             if lane_in_group == 0 {
                 *out_scales.get_unchecked_mut(group) = scale_bits as u8;

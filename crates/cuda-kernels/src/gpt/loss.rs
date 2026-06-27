@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
-use crate::float_ptx::{abs_f32, exp_f32, ln_f32, max_f32};
+use crate::float_ptx::{abs_f32, exp_f32, ln_f32, max_f32, safe_positive_denom};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
 const CROSS_ENTROPY_THREADS_PER_BLOCK: u32 = 1024;
@@ -151,7 +151,7 @@ mod kernels {
 
             thread::sync_threads();
 
-            let denom = unsafe { REDUCE[0] };
+            let denom = safe_positive_denom(unsafe { REDUCE[0] });
             let target = targets[row as usize];
             if thread == 0 {
                 let target_logit = logits[row_base + target as usize];

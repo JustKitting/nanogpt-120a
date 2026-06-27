@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
+use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, GPT2_QKV, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
 use rust_kernels_cuda::optimizer::{AURORA_COOPERATIVE_BLOCKS, AURORA_MATRIX_PHASES};
 
 pub struct AuroraScratchBuffers {
@@ -35,7 +35,11 @@ const fn active_matrix_slots() -> usize {
 }
 
 const fn max_matrix() -> usize {
-    max2(GPT2_MLP * GPT2_N_EMBD, NEXTLAT_INPUT * NEXTLAT_HIDDEN)
+    max3(
+        GPT2_N_EMBD * GPT2_QKV,
+        GPT2_MLP * GPT2_N_EMBD,
+        NEXTLAT_INPUT * NEXTLAT_HIDDEN,
+    )
 }
 
 const fn max_square_matrix() -> usize {
@@ -48,4 +52,8 @@ const fn max_gram() -> usize {
 
 const fn max2(a: usize, b: usize) -> usize {
     if a > b { a } else { b }
+}
+
+const fn max3(a: usize, b: usize, c: usize) -> usize {
+    max2(max2(a, b), c)
 }

@@ -16,6 +16,16 @@ pub mod f16_tc_matmul;
 pub mod f32_matrix_ops;
 #[path = "utils/float_ptx.rs"]
 pub mod float_ptx;
+#[path = "utils/kda_backward.rs"]
+pub(crate) mod kda_backward;
+#[path = "utils/kda_common.rs"]
+pub(crate) mod kda_common;
+#[path = "utils/kda_elementwise.rs"]
+pub(crate) mod kda_elementwise;
+#[path = "utils/kda_launch.rs"]
+pub(crate) mod kda_launch;
+#[path = "utils/kda_tc.rs"]
+pub(crate) mod kda_tc;
 #[path = "gpt/layer_norm.rs"]
 pub mod layer_norm;
 #[path = "gpt/layer_norm_backward/mod.rs"]

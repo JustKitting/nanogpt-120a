@@ -1,7 +1,7 @@
 use cuda_device::{DisjointSlice, thread};
 
 use super::gather::{TC_BACKWARD_THREADS_PER_BLOCK, qkv_index};
-use super::types::CausalAttentionBackwardTcParams;
+use crate::attention::CausalAttentionParams;
 use crate::float_ptx::{exp_f32, fma_f32, sincos_f32};
 
 pub(super) fn scatter_body(
@@ -9,7 +9,7 @@ pub(super) fn scatter_body(
     d_k: &[f32],
     d_v: &[f32],
     mut d_qkv: DisjointSlice<f32>,
-    params: CausalAttentionBackwardTcParams,
+    params: CausalAttentionParams,
 ) {
     let index = thread::blockIdx_x() * TC_BACKWARD_THREADS_PER_BLOCK + thread::threadIdx_x();
     let total = params.batch_size * params.head_count * params.seq_len * params.head_dim;
@@ -23,7 +23,15 @@ pub(super) fn scatter_body(
     let batch = batch_head / params.head_count;
     let head = batch_head - batch * params.head_count;
     let row = batch * params.seq_len + token;
+    let q = qkv_index(batch, token, head, dim, 0, &params);
+    let k = qkv_index(batch, token, head, dim, params.embedding_dim, &params);
+    let v = qkv_index(batch, token, head, dim, params.embedding_dim * 2, &params);
     if row >= params.row_count {
+        unsafe {
+            *d_qkv.get_unchecked_mut(q) = 0.0;
+            *d_qkv.get_unchecked_mut(k) = 0.0;
+            *d_qkv.get_unchecked_mut(v) = 0.0;
+        }
         return;
     }
 
@@ -44,23 +52,9 @@ pub(super) fn scatter_body(
     );
 
     unsafe {
-        *d_qkv.get_unchecked_mut(qkv_index(batch, token, head, dim, 0, &params)) = dq;
-        *d_qkv.get_unchecked_mut(qkv_index(
-            batch,
-            token,
-            head,
-            dim,
-            params.embedding_dim,
-            &params,
-        )) = dk;
-        *d_qkv.get_unchecked_mut(qkv_index(
-            batch,
-            token,
-            head,
-            dim,
-            params.embedding_dim * 2,
-            &params,
-        )) = d_v[index as usize];
+        *d_qkv.get_unchecked_mut(q) = dq;
+        *d_qkv.get_unchecked_mut(k) = dk;
+        *d_qkv.get_unchecked_mut(v) = d_v[index as usize];
     }
 }
 

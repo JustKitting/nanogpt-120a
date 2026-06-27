@@ -9,6 +9,7 @@ pub struct CausalAttentionTcScratch<'a> {
     pub scores: &'a mut DeviceBuffer<f32>,
     pub probs: &'a mut DeviceBuffer<f32>,
     pub compact_out: &'a mut DeviceBuffer<f32>,
+    pub chunk_states: &'a mut DeviceBuffer<u16>,
 }
 
 pub struct CausalAttentionTcArgs<'a, 'scratch, 'out> {
@@ -16,6 +17,7 @@ pub struct CausalAttentionTcArgs<'a, 'scratch, 'out> {
     pub tc_module: &'a F16TcMatmulModule,
     pub qkv: &'a DeviceBuffer<f32>,
     pub out: &'out mut DeviceBuffer<f32>,
+    pub qkv_f16: Option<&'out mut DeviceBuffer<u16>>,
     pub attention_out_f16: Option<&'out mut DeviceBuffer<u16>>,
     pub log_sum_exp: &'out mut DeviceBuffer<f32>,
     pub scratch: CausalAttentionTcScratch<'scratch>,
@@ -37,6 +39,7 @@ impl<'a> CausalAttentionTcScratch<'a> {
             scores: self.scores,
             probs: self.probs,
             compact_out: self.compact_out,
+            chunk_states: self.chunk_states,
         }
     }
 }

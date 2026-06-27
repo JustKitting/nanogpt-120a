@@ -21,6 +21,7 @@ impl AttentionWeights {
     }
 
     pub fn input_from_embeddings<'a, 'scratch>(
+        use_full_attention: bool,
         module: &'a rust_kernels_cuda::attention::AttentionModule,
         tc_module: &'a rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule,
         quant_module: &'a rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule,
@@ -32,6 +33,7 @@ impl AttentionWeights {
         hidden: HiddenStateDevice<'a>,
     ) -> AttentionForwardArgs<'a, 'scratch> {
         Self::input_from_embeddings_with_tape(
+            use_full_attention,
             module,
             tc_module,
             quant_module,
@@ -47,6 +49,7 @@ impl AttentionWeights {
 
     #[allow(clippy::too_many_arguments)]
     pub fn input_from_embeddings_with_tape<'a, 'scratch>(
+        use_full_attention: bool,
         module: &'a rust_kernels_cuda::attention::AttentionModule,
         tc_module: &'a rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule,
         quant_module: &'a rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule,
@@ -59,6 +62,7 @@ impl AttentionWeights {
         tape: Option<AttentionForwardTape<'scratch>>,
     ) -> AttentionForwardArgs<'a, 'scratch> {
         AttentionForwardArgs {
+            use_full_attention,
             module,
             tc_module,
             quant_module,

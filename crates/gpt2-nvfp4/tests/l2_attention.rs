@@ -50,6 +50,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let mut tc_scores_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
     let mut tc_probs_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
     let mut tc_out_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
+    let mut tc_chunk_states_dev = DeviceBuffer::<u16>::zeroed(&stream, HiddenState::LEN)?;
 
     let weight_bytes = qkv_identity_weight_bytes();
     let weight_scales = vec![E4M3_ONE; QkvWeightShape::SCALE_LEN];
@@ -73,6 +74,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let c_proj_bias_scales_dev = DeviceBuffer::from_host(&stream, &c_proj_bias_scales)?;
 
     AttentionWeights::forward(AttentionWeights::input_from_embeddings(
+        true,
         &attention_module,
         &tc_module,
         &quant_module,
@@ -88,6 +90,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
             scores: &mut tc_scores_dev,
             probs: &mut tc_probs_dev,
             compact_out: &mut tc_out_dev,
+            chunk_states: &mut tc_chunk_states_dev,
         },
         AttentionProjectionTensors {
             qkv_weight: Nvfp4FourSixMmaWeightTensor {

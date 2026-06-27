@@ -1,5 +1,12 @@
 use cuda_device::ptx_asm;
 
+const POSITIVE_DENOM_EPS: f32 = 1.0e-20;
+
+#[inline(always)]
+pub fn safe_positive_denom(x: f32) -> f32 {
+    x + POSITIVE_DENOM_EPS
+}
+
 #[inline(always)]
 pub fn sqrt_f32(x: f32) -> f32 {
     let y: f32;

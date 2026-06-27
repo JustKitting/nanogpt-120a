@@ -9,7 +9,10 @@ use crate::quartet::{
 };
 use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32, warp_max_f32};
 
-use super::convert::{cvt_rn_satfinite_e2m1x2_f32, cvt_rn_satfinite_e4m3x2_f32};
+use super::convert::{
+    cvt_rn_satfinite_e2m1x2_f32, cvt_rn_satfinite_e4m3x2_f32, nonzero_global_scale, nonzero_scale,
+    nvfp4_inv_scale,
+};
 use super::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK;
 
 #[allow(static_mut_refs)]
@@ -1433,18 +1436,14 @@ pub(crate) mod module {
         };
         let group_leader = lane & !0x0f;
         let group = chunk * 2 + lane / GROUP_SIZE;
-        let safe_global_scale = if global_scale == 0.0 {
-            1.0
-        } else {
-            global_scale
-        };
+        let safe_global_scale = nonzero_global_scale(global_scale);
         let group_amax = half_warp_max_f32(abs_f32(value), group_mask);
         let scale_bits = cvt_rn_satfinite_e4m3x2_f32(
             0.0,
-            group_amax * scale_override / (FP4_MAX * safe_global_scale),
+            group_amax * scale_override * nvfp4_inv_scale(FP4_MAX, safe_global_scale),
         );
         let scale = nonzero_scale(e4m3_value(scale_bits as u16));
-        let inv_scale = 1.0 / (scale * safe_global_scale);
+        let inv_scale = nvfp4_inv_scale(scale, safe_global_scale);
         let x_scaled = value * inv_scale;
         let payload = cvt_rn_satfinite_e2m1x2_f32(0.0, x_scaled) & 0x0f;
         let fp4_value = e2m1_value(payload);
@@ -1806,10 +1805,5 @@ pub(crate) mod module {
         value ^= value >> 15;
         value = value.wrapping_mul(0x846c_a68b);
         value ^ (value >> 16)
-    }
-
-    #[inline(always)]
-    fn nonzero_scale(scale: f32) -> f32 {
-        if scale == 0.0 { 1.0 } else { scale }
     }
 }

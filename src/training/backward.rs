@@ -100,6 +100,7 @@ impl Trainer {
             &mut self.buffers.optimizer_state,
             &mut self.buffers.aurora,
             &self.buffers.aurora_tables,
+            &self.buffers.tape,
             &mut self.buffers.grad_clip,
         )?;
         stats.optimizer = updates.trace;

@@ -17,6 +17,7 @@ pub struct AttentionProjectionTensors<'a> {
 }
 
 pub struct AttentionForwardArgs<'a, 'scratch> {
+    pub use_full_attention: bool,
     pub module: &'a AttentionModule,
     pub tc_module: &'a F16TcMatmulModule,
     pub quant_module: &'a Nvfp4QuantModule,

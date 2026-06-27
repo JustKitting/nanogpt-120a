@@ -19,6 +19,11 @@ pub struct AttentionCoreScratchBuffers {
     d_q: DeviceBuffer<f32>,
     d_k: DeviceBuffer<f32>,
     d_v: DeviceBuffer<f32>,
+    kda_d_q: DeviceBuffer<f32>,
+    kda_d_k: DeviceBuffer<f32>,
+    kda_d_v: DeviceBuffer<f32>,
+    kda_d_g: DeviceBuffer<f32>,
+    kda_d_beta: DeviceBuffer<f32>,
 }
 
 impl AttentionCoreScratchBuffers {
@@ -42,6 +47,11 @@ impl AttentionCoreScratchBuffers {
             d_q: zero(stream, compact)?,
             d_k: zero(stream, compact)?,
             d_v: zero(stream, compact)?,
+            kda_d_q: zero(stream, compact)?,
+            kda_d_k: zero(stream, compact)?,
+            kda_d_v: zero(stream, compact)?,
+            kda_d_g: zero(stream, compact)?,
+            kda_d_beta: zero(stream, GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN)?,
         })
     }
 
@@ -49,6 +59,10 @@ impl AttentionCoreScratchBuffers {
         AttentionCoreScratch {
             softmax_d: &mut self.softmax_d,
             tc: CausalAttentionBackwardTcScratch {
+                q_f32: &mut self.q,
+                k_f32: &mut self.k,
+                v_f32: &mut self.v,
+                g_f32: &mut self.d_out,
                 q: &mut self.backward_q,
                 k: &mut self.backward_k,
                 v: &mut self.backward_v,
@@ -60,6 +74,11 @@ impl AttentionCoreScratchBuffers {
                 d_q: &mut self.d_q,
                 d_k: &mut self.d_k,
                 d_v: &mut self.d_v,
+                kda_d_q: &mut self.kda_d_q,
+                kda_d_k: &mut self.kda_d_k,
+                kda_d_v: &mut self.kda_d_v,
+                kda_d_g: &mut self.kda_d_g,
+                kda_d_beta: &mut self.kda_d_beta,
             },
         }
     }
@@ -72,6 +91,7 @@ impl AttentionCoreScratchBuffers {
             scores: &mut self.scores,
             probs: &mut self.p,
             compact_out: &mut self.d_out,
+            chunk_states: &mut self.backward_q,
         }
     }
 }

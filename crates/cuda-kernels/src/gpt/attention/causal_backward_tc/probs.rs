@@ -1,7 +1,7 @@
 use cuda_device::{DisjointSlice, thread};
 
 use super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
-use super::types::CausalAttentionBackwardTcParams;
+use crate::attention::CausalAttentionParams;
 use crate::float_ptx::exp_f32;
 
 pub(super) fn prob_ds_body(
@@ -11,7 +11,7 @@ pub(super) fn prob_ds_body(
     softmax_d: &[f32],
     mut p: DisjointSlice<f32>,
     mut ds: DisjointSlice<f32>,
-    params: CausalAttentionBackwardTcParams,
+    params: CausalAttentionParams,
 ) {
     let index = thread::blockIdx_x() * TC_BACKWARD_THREADS_PER_BLOCK + thread::threadIdx_x();
     let total = params.batch_size * params.head_count * params.seq_len * params.seq_len;
@@ -26,6 +26,10 @@ pub(super) fn prob_ds_body(
     let head = batch_head - batch * params.head_count;
     let row = batch * params.seq_len + query;
     if key > query || row >= params.row_count {
+        unsafe {
+            *p.get_unchecked_mut(index as usize) = 0.0;
+            *ds.get_unchecked_mut(index as usize) = 0.0;
+        }
         return;
     }
 
@@ -40,12 +44,7 @@ pub(super) fn prob_ds_body(
 }
 
 #[inline(always)]
-fn log_sum_exp_index(
-    batch: u32,
-    token: u32,
-    head: u32,
-    params: &CausalAttentionBackwardTcParams,
-) -> usize {
+fn log_sum_exp_index(batch: u32, token: u32, head: u32, params: &CausalAttentionParams) -> usize {
     (batch as usize * params.head_count as usize + head as usize) * params.seq_len as usize
         + token as usize
 }

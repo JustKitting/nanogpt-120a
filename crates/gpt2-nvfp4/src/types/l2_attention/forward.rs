@@ -14,6 +14,11 @@ pub(super) fn forward<'a, 'scratch>(
 ) -> Result<HiddenStateDevice<'a>, DriverError> {
     let mut input_nvfp4 = args.input_nvfp4;
     let mut tape = args.tape;
+    let qkv_dim = if args.use_full_attention {
+        crate::GPT2_FULL_ATTENTION_QKV
+    } else {
+        crate::GPT2_QKV
+    } as u32;
     let HiddenStateDevice {
         stream,
         batch_size,
@@ -55,38 +60,52 @@ pub(super) fn forward<'a, 'scratch>(
         out: args.qkv,
         token_count: row_count,
         input_dim: crate::GPT2_N_EMBD as u32,
-        output_dim: crate::GPT2_QKV as u32,
+        output_dim: qkv_dim,
     })?;
 
-    args.module.apply_rope(ApplyRopeArgs {
-        stream,
-        qkv: args.qkv,
-        qkv_f16: tape.as_mut().map(|tape| &mut *tape.qkv_f16),
-        row_count,
-        seq_len,
-        batch_size,
-        embedding_dim: crate::GPT2_N_EMBD as u32,
-        qkv_dim: crate::GPT2_QKV as u32,
-        head_count: crate::GPT2_N_HEAD as u32,
-        head_dim: (crate::GPT2_N_EMBD / crate::GPT2_N_HEAD) as u32,
-    })?;
+    if args.use_full_attention {
+        args.module.apply_rope(ApplyRopeArgs {
+            stream,
+            qkv: args.qkv,
+            qkv_f16: tape.as_mut().map(|tape| &mut *tape.qkv_f16),
+            row_count,
+            seq_len,
+            batch_size,
+            embedding_dim: crate::GPT2_N_EMBD as u32,
+            qkv_dim,
+            head_count: crate::GPT2_N_HEAD as u32,
+            head_dim: (crate::GPT2_N_EMBD / crate::GPT2_N_HEAD) as u32,
+        })?;
+    }
 
-    args.module.causal_attention_tc(CausalAttentionTcArgs {
+    let (qkv_f16, attention_out_f16) = match tape.as_mut() {
+        Some(tape) if args.use_full_attention => (None, Some(&mut *tape.attention_out_f16)),
+        Some(tape) => (Some(&mut *tape.qkv_f16), Some(&mut *tape.attention_out_f16)),
+        None => (None, None),
+    };
+
+    let attention_args = CausalAttentionTcArgs {
         stream,
         tc_module: args.tc_module,
         qkv: &*args.qkv,
         out: normalized,
-        attention_out_f16: tape.as_mut().map(|tape| &mut *tape.attention_out_f16),
+        qkv_f16,
+        attention_out_f16,
         log_sum_exp: args.attention_log_sum_exp,
         scratch: args.tc_scratch,
         row_count,
         seq_len,
         batch_size,
         embedding_dim: crate::GPT2_N_EMBD as u32,
-        qkv_dim: crate::GPT2_QKV as u32,
+        qkv_dim,
         head_count: crate::GPT2_N_HEAD as u32,
         head_dim: (crate::GPT2_N_EMBD / crate::GPT2_N_HEAD) as u32,
-    })?;
+    };
+    if args.use_full_attention {
+        args.module.causal_attention_tc(attention_args)?;
+    } else {
+        args.module.kda_attention_tc(attention_args)?;
+    }
 
     requantize_attention(
         args.quant_module,

@@ -1,23 +1,12 @@
-use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy};
+use cuda_core::{CudaStream, DeviceBuffer};
 
 use crate::f16_tc_matmul::F16TcMatmulModule;
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct CausalAttentionBackwardTcParams {
-    pub row_count: u32,
-    pub seq_len: u32,
-    pub batch_size: u32,
-    pub embedding_dim: u32,
-    pub qkv_dim: u32,
-    pub head_count: u32,
-    pub head_dim: u32,
-    pub scale: f32,
-}
-
-unsafe impl DeviceCopy for CausalAttentionBackwardTcParams {}
-
 pub struct CausalAttentionBackwardTcScratch<'a> {
+    pub q_f32: &'a mut DeviceBuffer<f32>,
+    pub k_f32: &'a mut DeviceBuffer<f32>,
+    pub v_f32: &'a mut DeviceBuffer<f32>,
+    pub g_f32: &'a mut DeviceBuffer<f32>,
     pub q: &'a mut DeviceBuffer<u16>,
     pub k: &'a mut DeviceBuffer<u16>,
     pub v: &'a mut DeviceBuffer<u16>,
@@ -29,6 +18,11 @@ pub struct CausalAttentionBackwardTcScratch<'a> {
     pub d_q: &'a mut DeviceBuffer<f32>,
     pub d_k: &'a mut DeviceBuffer<f32>,
     pub d_v: &'a mut DeviceBuffer<f32>,
+    pub kda_d_q: &'a mut DeviceBuffer<f32>,
+    pub kda_d_k: &'a mut DeviceBuffer<f32>,
+    pub kda_d_v: &'a mut DeviceBuffer<f32>,
+    pub kda_d_g: &'a mut DeviceBuffer<f32>,
+    pub kda_d_beta: &'a mut DeviceBuffer<f32>,
 }
 
 pub struct CausalAttentionBackwardTcArgs<'a, 'scratch, 'out> {
@@ -53,6 +47,10 @@ pub struct CausalAttentionBackwardTcArgs<'a, 'scratch, 'out> {
 impl<'a> CausalAttentionBackwardTcScratch<'a> {
     pub fn reborrow(&mut self) -> CausalAttentionBackwardTcScratch<'_> {
         CausalAttentionBackwardTcScratch {
+            q_f32: self.q_f32,
+            k_f32: self.k_f32,
+            v_f32: self.v_f32,
+            g_f32: self.g_f32,
             q: self.q,
             k: self.k,
             v: self.v,
@@ -64,6 +62,11 @@ impl<'a> CausalAttentionBackwardTcScratch<'a> {
             d_q: self.d_q,
             d_k: self.d_k,
             d_v: self.d_v,
+            kda_d_q: self.kda_d_q,
+            kda_d_k: self.kda_d_k,
+            kda_d_v: self.kda_d_v,
+            kda_d_g: self.kda_d_g,
+            kda_d_beta: self.kda_d_beta,
         }
     }
 }

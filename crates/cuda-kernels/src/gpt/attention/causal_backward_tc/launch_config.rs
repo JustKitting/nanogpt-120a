@@ -1,7 +1,8 @@
 use cuda_core::LaunchConfig;
 
 use super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
-use super::types::CausalAttentionBackwardTcParams;
+use crate::attention::CausalAttentionParams;
+use crate::kda_launch::{KDA_CHUNK_SIZE, KDA_DECAY_SCALE};
 
 const SOFTMAX_D_THREADS_PER_BLOCK: u32 = 64;
 
@@ -13,8 +14,8 @@ pub(super) fn tc_params(
     qkv_dim: u32,
     head_count: u32,
     head_dim: u32,
-) -> CausalAttentionBackwardTcParams {
-    CausalAttentionBackwardTcParams {
+) -> CausalAttentionParams {
+    CausalAttentionParams {
         row_count,
         seq_len,
         batch_size,
@@ -23,6 +24,8 @@ pub(super) fn tc_params(
         head_count,
         head_dim,
         scale: 1.0 / (head_dim as f32).sqrt(),
+        chunk_size: KDA_CHUNK_SIZE,
+        decay_scale: KDA_DECAY_SCALE,
     }
 }
 

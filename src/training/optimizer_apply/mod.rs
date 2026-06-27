@@ -4,6 +4,7 @@ mod aurora;
 mod base;
 mod block;
 mod embedding;
+mod kda_clip;
 mod layer_norm;
 mod mlp;
 mod next_latent;

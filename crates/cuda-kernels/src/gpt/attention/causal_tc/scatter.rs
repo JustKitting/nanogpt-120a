@@ -21,13 +21,16 @@ pub(super) fn scatter_output_body(
     let batch = batch_head / params.head_count;
     let head = batch_head - batch * params.head_count;
     let row = batch * params.seq_len + token;
-    if row >= params.row_count {
-        return;
-    }
-
     let out_index = (row as usize * params.embedding_dim as usize)
         + head as usize * params.head_dim as usize
         + dim as usize;
+    if row >= params.row_count {
+        unsafe {
+            *out.get_unchecked_mut(out_index) = 0.0;
+        }
+        return;
+    }
+
     let value = compact[index as usize];
     unsafe {
         *out.get_unchecked_mut(out_index) = value;
@@ -52,13 +55,17 @@ pub(super) fn scatter_output_save_f16_body(
     let batch = batch_head / params.head_count;
     let head = batch_head - batch * params.head_count;
     let row = batch * params.seq_len + token;
-    if row >= params.row_count {
-        return;
-    }
-
     let out_index = (row as usize * params.embedding_dim as usize)
         + head as usize * params.head_dim as usize
         + dim as usize;
+    if row >= params.row_count {
+        unsafe {
+            *out.get_unchecked_mut(out_index) = 0.0;
+            *attention_out_f16.get_unchecked_mut(out_index) = 0;
+        }
+        return;
+    }
+
     let value = compact[index as usize];
     unsafe {
         *out.get_unchecked_mut(out_index) = value;

@@ -4,6 +4,10 @@ use rust_kernels_cuda::attention::CausalAttentionBackwardTcScratch;
 use super::shape::{HEAD_DIM, HEADS, TOKEN_COUNT};
 
 pub struct TcScratchBuffers {
+    q_f32: DeviceBuffer<f32>,
+    k_f32: DeviceBuffer<f32>,
+    v_f32: DeviceBuffer<f32>,
+    g_f32: DeviceBuffer<f32>,
     q: DeviceBuffer<u16>,
     k: DeviceBuffer<u16>,
     v: DeviceBuffer<u16>,
@@ -15,6 +19,11 @@ pub struct TcScratchBuffers {
     d_q: DeviceBuffer<f32>,
     d_k: DeviceBuffer<f32>,
     d_v: DeviceBuffer<f32>,
+    kda_d_q: DeviceBuffer<f32>,
+    kda_d_k: DeviceBuffer<f32>,
+    kda_d_v: DeviceBuffer<f32>,
+    kda_d_g: DeviceBuffer<f32>,
+    kda_d_beta: DeviceBuffer<f32>,
 }
 
 impl TcScratchBuffers {
@@ -22,6 +31,10 @@ impl TcScratchBuffers {
         let compact = HEADS * TOKEN_COUNT * HEAD_DIM;
         let square = HEADS * TOKEN_COUNT * TOKEN_COUNT;
         Ok(Self {
+            q_f32: zero(stream, compact)?,
+            k_f32: zero(stream, compact)?,
+            v_f32: zero(stream, compact)?,
+            g_f32: zero(stream, compact)?,
             q: zero(stream, compact)?,
             k: zero(stream, compact)?,
             v: zero(stream, compact)?,
@@ -33,11 +46,20 @@ impl TcScratchBuffers {
             d_q: zero(stream, compact)?,
             d_k: zero(stream, compact)?,
             d_v: zero(stream, compact)?,
+            kda_d_q: zero(stream, compact)?,
+            kda_d_k: zero(stream, compact)?,
+            kda_d_v: zero(stream, compact)?,
+            kda_d_g: zero(stream, compact)?,
+            kda_d_beta: zero(stream, TOKEN_COUNT * HEADS)?,
         })
     }
 
     pub fn args(&mut self) -> CausalAttentionBackwardTcScratch<'_> {
         CausalAttentionBackwardTcScratch {
+            q_f32: &mut self.q_f32,
+            k_f32: &mut self.k_f32,
+            v_f32: &mut self.v_f32,
+            g_f32: &mut self.g_f32,
             q: &mut self.q,
             k: &mut self.k,
             v: &mut self.v,
@@ -49,6 +71,11 @@ impl TcScratchBuffers {
             d_q: &mut self.d_q,
             d_k: &mut self.d_k,
             d_v: &mut self.d_v,
+            kda_d_q: &mut self.kda_d_q,
+            kda_d_k: &mut self.kda_d_k,
+            kda_d_v: &mut self.kda_d_v,
+            kda_d_g: &mut self.kda_d_g,
+            kda_d_beta: &mut self.kda_d_beta,
         }
     }
 }

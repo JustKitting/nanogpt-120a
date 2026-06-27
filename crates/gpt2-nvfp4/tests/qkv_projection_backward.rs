@@ -67,6 +67,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
     let mut d_attn_qkv_bias = DeviceBuffer::<f32>::zeroed(&stream, GPT2_QKV)?;
 
     qkv_projection_backward(AttentionQkvBackwardArgs {
+        use_full_attention: false,
         stream: &stream,
         modules: AttentionBackwardModules {
             transpose: &transpose,

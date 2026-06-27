@@ -3,7 +3,8 @@ use cuda_device::{thread, warp};
 use crate::f16_tc_matmul::cta_tile::CTA_THREADS;
 use crate::float_ptx::abs_f32;
 use crate::nvfp4_quant::kernels::convert::{
-    candidate_error, cvt_rn_satfinite_e2m1x2_f32, local_scale_bits, scale_value,
+    candidate_error, cvt_rn_satfinite_e2m1x2_f32, local_scale_bits, nonzero_global_scale,
+    nvfp4_inv_scale, scale_value,
 };
 use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32};
 
@@ -25,7 +26,7 @@ pub(super) fn encode_four_six(
     let group_count = len / GROUP_SIZE;
     let group_stride = work.blocks() * groups_per_block;
     let mut group = work.block() * groups_per_block + thread::threadIdx_x() / GROUP_SIZE;
-    let global_scale = unsafe { *out_global_scale };
+    let global_scale = nonzero_global_scale(unsafe { *out_global_scale });
 
     while group < group_count {
         encode_group(x, out_fp4, out_scales, global_scale, group);
@@ -59,8 +60,7 @@ fn encode_group(
         group_leader,
         lane_in_group,
     );
-    let scale_for_payload = if scale == 0.0 { 1.0 } else { scale };
-    let inv_scale = 1.0 / (scale_for_payload * global_scale);
+    let inv_scale = nvfp4_inv_scale(scale, global_scale);
 
     unsafe {
         if lane_in_group == 0 {

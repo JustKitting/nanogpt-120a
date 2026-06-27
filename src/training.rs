@@ -66,6 +66,7 @@ pub struct OptimizerTrace {
     pub final_norm_ms: f64,
     pub blocks_ms: f64,
     pub aurora_ms: f64,
+    pub kda_clip_ms: f64,
     pub adam_ms: f64,
     pub adam_lr: f32,
     pub aurora_lr: f32,

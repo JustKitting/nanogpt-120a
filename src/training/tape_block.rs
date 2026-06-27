@@ -67,4 +67,8 @@ impl BlockTapeBuffers {
             mlp_down_input_nvfp4: self.mlp_down_input.saved(),
         }
     }
+
+    pub fn qkv(&self) -> &DeviceBuffer<u16> {
+        &self.qkv
+    }
 }

@@ -82,6 +82,7 @@ pub struct AttentionCProjBackwardArgs<'a, 'scratch, 'out> {
 }
 
 pub struct AttentionCoreBackwardArgs<'a, 'scratch, 'out> {
+    pub use_full_attention: bool,
     pub stream: &'a CudaStream,
     pub module: &'a AttentionModule,
     pub tc_module: &'a F16TcMatmulModule,
@@ -92,6 +93,7 @@ pub struct AttentionCoreBackwardArgs<'a, 'scratch, 'out> {
 }
 
 pub struct AttentionQkvBackwardArgs<'a, 'scratch, 'out> {
+    pub use_full_attention: bool,
     pub stream: &'a CudaStream,
     pub modules: AttentionBackwardModules<'a>,
     pub saved: BlockForwardSaved<'a>,

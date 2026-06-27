@@ -1,4 +1,6 @@
 mod gather;
+mod kda;
+mod kda_elementwise;
 pub(super) mod kernels;
 mod launch;
 mod scatter;

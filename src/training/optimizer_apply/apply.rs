@@ -1,16 +1,18 @@
-use super::super::grad_clip::GradientClipBuffers;
+use super::super::grad_clip::{GradientClipBuffers, first_non_finite_gradient};
 use super::super::grads::BackwardBuffers;
 use super::super::next_latent::NextLatGradBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_aurora::{AuroraPointerTables, aurora_learning_rate};
 use super::super::optimizer_state::OptimizerStateBuffers;
 use super::super::optimizer_tc_scratch::AuroraScratchBuffers;
+use super::super::tape::ForwardTapeBuffers;
 use super::super::{OptimizerTrace, TokenBatch};
 use super::adam::adam_learning_rate;
 use super::aurora::update_aurora_groups;
 use super::base::{BaseAdamUpdateArgs, update_base_adam};
 use super::block::update_block;
 use super::embedding::add_embedding_lookup_grad;
+use super::kda_clip::apply_kda_aurora_clip;
 use super::result::WeightUpdateResult;
 use super::utils::elapsed_ms;
 use crate::AppResult;
@@ -30,6 +32,7 @@ pub fn apply_weight_updates(
     state: &mut OptimizerStateBuffers,
     aurora: &mut AuroraScratchBuffers,
     aurora_tables: &AuroraPointerTables,
+    tape: &ForwardTapeBuffers,
     grad_clip: &mut GradientClipBuffers,
 ) -> AppResult<WeightUpdateResult> {
     let optimizer = &runtime.optimizer;
@@ -49,6 +52,18 @@ pub fn apply_weight_updates(
     trace.skip_loss_spike = skip.loss_spike;
     trace.skip_grad_norm_spike = skip.grad_norm_spike;
     trace.skip_non_finite = skip.non_finite;
+    if skip.non_finite {
+        if let Some(bad) = first_non_finite_gradient(stream, grads, next_latent_grads)? {
+            eprintln!(
+                "non_finite_gradient optimizer_step_candidate={candidate_step} tensor={} index={} value={:.9e}",
+                bad.name, bad.index, bad.value
+            );
+        } else {
+            eprintln!(
+                "non_finite_gradient optimizer_step_candidate={candidate_step} tensor=unknown"
+            );
+        }
+    }
     if skip.skipped {
         return Ok(WeightUpdateResult {
             trace,
@@ -120,6 +135,7 @@ pub fn apply_weight_updates(
         average_coefficient,
         &mut trace,
     )?;
+    apply_kda_aurora_clip(stream, runtime, uploaded, tape, scratch, state, &mut trace)?;
 
     let diagnostics = diagnostics
         .map(|pending| pending.finish(stream, uploaded))

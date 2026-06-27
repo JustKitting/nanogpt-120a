@@ -1,0 +1,121 @@
+use cuda_device::DisjointSlice;
+
+use super::super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
+use crate::attention::CausalAttentionParams;
+use crate::f16_tc_matmul::convert::cvt_f32_f16;
+use crate::float_ptx::{fma_f32, sqrt_f32};
+use crate::kda_common::{
+    KDA_DENOM_EPS, beta_compact_index, beta_index, compact_index, g_offset, k_offset, q_offset,
+    qkv_index, safe_denom, sigmoid, silu_grad, v_offset,
+};
+use crate::kda_elementwise::{KdaQkAct, KdaWarpCtx, kda_warp_ctx, read_qk_act};
+use crate::warp_reduce::warp_sum_f32;
+
+pub(crate) fn finish_kda_backward_body(
+    qkv: &[u16],
+    d_q: &[f32],
+    d_k: &[f32],
+    d_v: &[f32],
+    d_g: &[f32],
+    d_beta: &[f32],
+    mut d_qkv: DisjointSlice<f32>,
+    params: CausalAttentionParams,
+) {
+    let ctx = kda_warp_ctx(TC_BACKWARD_THREADS_PER_BLOCK, &params);
+    if !ctx.valid {
+        return;
+    }
+
+    let mut q_sum = 0.0;
+    let mut k_sum = 0.0;
+    let mut q_dot = 0.0;
+    let mut k_dot = 0.0;
+
+    let dim0 = ctx.lane;
+    let mut qk0 = KdaQkAct::zero();
+    if dim0 < params.head_dim {
+        qk0 = read_qk_act(qkv, ctx.row, ctx.head, dim0, &params);
+        let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim0, &params);
+        q_sum = fma_f32(qk0.q_act, qk0.q_act, q_sum);
+        k_sum = fma_f32(qk0.k_act, qk0.k_act, k_sum);
+        q_dot = fma_f32(d_q[compact], qk0.q_act, q_dot);
+        k_dot = fma_f32(d_k[compact], qk0.k_act, k_dot);
+    }
+
+    let dim1 = ctx.lane + 32;
+    let mut qk1 = KdaQkAct::zero();
+    if dim1 < params.head_dim {
+        qk1 = read_qk_act(qkv, ctx.row, ctx.head, dim1, &params);
+        let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim1, &params);
+        q_sum = fma_f32(qk1.q_act, qk1.q_act, q_sum);
+        k_sum = fma_f32(qk1.k_act, qk1.k_act, k_sum);
+        q_dot = fma_f32(d_q[compact], qk1.q_act, q_dot);
+        k_dot = fma_f32(d_k[compact], qk1.k_act, k_dot);
+    }
+
+    let q_norm = sqrt_f32(warp_sum_f32(q_sum) + KDA_DENOM_EPS);
+    let k_norm = sqrt_f32(warp_sum_f32(k_sum) + KDA_DENOM_EPS);
+    let q_dot = warp_sum_f32(q_dot);
+    let k_dot = warp_sum_f32(k_dot);
+
+    if dim0 < params.head_dim {
+        finish_dim(
+            qkv, d_q, d_k, d_v, d_g, &mut d_qkv, ctx, dim0, qk0, q_norm, k_norm, q_dot, k_dot,
+            &params,
+        );
+    }
+    if dim1 < params.head_dim {
+        finish_dim(
+            qkv, d_q, d_k, d_v, d_g, &mut d_qkv, ctx, dim1, qk1, q_norm, k_norm, q_dot, k_dot,
+            &params,
+        );
+    }
+    if ctx.lane == 0 {
+        let raw_beta = cvt_f32_f16(qkv[beta_index(ctx.row, ctx.head, &params)]);
+        let beta_value = sigmoid(raw_beta);
+        let grad = d_beta[beta_compact_index(ctx.batch, ctx.token, ctx.head, &params)]
+            * beta_value
+            * (1.0 - beta_value);
+        unsafe {
+            *d_qkv.get_unchecked_mut(beta_index(ctx.row, ctx.head, &params)) = grad;
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_dim(
+    qkv: &[u16],
+    d_q: &[f32],
+    d_k: &[f32],
+    d_v: &[f32],
+    d_g: &[f32],
+    d_qkv: &mut DisjointSlice<f32>,
+    ctx: KdaWarpCtx,
+    dim: u32,
+    qk: KdaQkAct,
+    q_norm: f32,
+    k_norm: f32,
+    q_dot: f32,
+    k_dot: f32,
+    params: &CausalAttentionParams,
+) {
+    let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim, params);
+    let q_denom = safe_denom(q_norm);
+    let k_denom = safe_denom(k_norm);
+    let q_cubic_denom = safe_denom(q_norm * q_norm * q_norm);
+    let k_cubic_denom = safe_denom(k_norm * k_norm * k_norm);
+    let dq_norm = params.scale * (d_q[compact] / q_denom - qk.q_act * q_dot / q_cubic_denom);
+    let dk_norm = d_k[compact] / k_denom - qk.k_act * k_dot / k_cubic_denom;
+    let raw_v = cvt_f32_f16(qkv[qkv_index(ctx.row, ctx.head, dim, v_offset(params), params)]);
+    let raw_g = cvt_f32_f16(qkv[qkv_index(ctx.row, ctx.head, dim, g_offset(params), params)]);
+    unsafe {
+        *d_qkv.get_unchecked_mut(qkv_index(ctx.row, ctx.head, dim, q_offset(params), params)) =
+            dq_norm * silu_grad(qk.raw_q);
+        *d_qkv.get_unchecked_mut(qkv_index(ctx.row, ctx.head, dim, k_offset(params), params)) =
+            dk_norm * silu_grad(qk.raw_k);
+        *d_qkv.get_unchecked_mut(qkv_index(ctx.row, ctx.head, dim, v_offset(params), params)) =
+            d_v[compact] * silu_grad(raw_v);
+        *d_qkv.get_unchecked_mut(qkv_index(ctx.row, ctx.head, dim, g_offset(params), params)) =
+            -params.decay_scale * d_g[compact] * sigmoid(raw_g);
+    }
+}

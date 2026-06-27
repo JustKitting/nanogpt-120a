@@ -1,4 +1,5 @@
 mod gather;
+mod kda;
 pub(super) mod kernels;
 mod launch;
 mod launch_config;

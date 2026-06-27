@@ -32,9 +32,16 @@ fn materialized_tc_backward_matches_reference() -> Result<(), Box<dyn Error>> {
 
     let (qkv, qkv_ref) = f16::saved_f16(&stream, &tc, &case.qkv)?;
     let (out, out_ref) = f16::saved_f16(&stream, &tc, &case.out)?;
+    let (_, d_out_ref) = f16::saved_f16(&stream, &tc, &case.d_out)?;
     let d_out = DeviceBuffer::from_host(&stream, &case.d_out)?;
     let log_sum_exp = DeviceBuffer::from_host(&stream, &case.log_sum_exp)?;
-    let expected = reference::backward(&qkv_ref, &out_ref, &case.d_out, &case.log_sum_exp);
+    let expected = reference::backward(
+        &qkv_ref,
+        &out_ref,
+        &case.d_out,
+        &d_out_ref,
+        &case.log_sum_exp,
+    );
     let mut tc_softmax_d = DeviceBuffer::<f32>::zeroed(&stream, shape::TOKEN_COUNT * shape::HEADS)?;
     let mut tc_grad = DeviceBuffer::<f32>::zeroed(&stream, shape::TOKEN_COUNT * shape::QKV_DIM)?;
     let mut scratch = TcScratchBuffers::new(&stream)?;

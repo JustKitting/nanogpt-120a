@@ -15,6 +15,7 @@ mod args;
 mod aurora;
 mod embedding;
 mod grad_clip;
+mod kda_clip;
 mod launcher;
 mod modules;
 mod schedule_free;
@@ -23,7 +24,7 @@ mod work_grid;
 
 pub use args::{
     AdamWUpdateArgs, AuroraMegaUpdateArgs, AuroraSlotDescriptor, EmbeddingLookupGradArgs,
-    GradientClipArgs, ScheduleFreeMaterializeArgs,
+    GradientClipArgs, KdaAuroraClipArgs, ScheduleFreeMaterializeArgs,
 };
 pub use grad_clip::GRAD_CLIP_VALUES_PER_CHUNK;
 pub use launcher::OptimizerModule;

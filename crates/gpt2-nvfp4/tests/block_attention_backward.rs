@@ -37,6 +37,7 @@ fn block_attention_side_backward_runs_full_chain() -> Result<(), Box<dyn Error>>
     let mut rng = Gpt2Rng::new(0x4154_544e);
 
     attention_side_backward(BlockAttentionBackwardArgs {
+        use_full_attention: false,
         stream: &stream,
         modules: BlockAttentionBackwardModules {
             residual: &ResidualBackwardModule::from_module(ptx.clone())?,
