@@ -812,7 +812,6 @@ impl Nvfp4QuantModule {
         &self,
         args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let args = args;
         let element_count = args.row_count * args.src_row_len;
         let chunk_count = self.tensor_chunk_amax_f32(
             args.stream,
@@ -849,7 +848,6 @@ impl Nvfp4QuantModule {
         &self,
         args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let args = args;
         let element_count = args.row_count * args.src_row_len;
         let chunk_count = self.tensor_chunk_amax_f32(
             args.stream,
