@@ -1,11 +1,9 @@
 use cuda_device::{DisjointSlice, SharedArray, thread};
 
-use super::cta_stage::{load_a_fragments, load_b_fragments};
 use super::cta_stage_f32::stage_tiles_f32_rhs_transposed;
 use super::cta_store_add::store_add;
 use super::cta_sync::sync_before_next_k;
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, active_tile};
-use crate::mma::mma_m16n8k16_f16_f16_f32;
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn cta_matmul_add_f32_rhs_transposed_base_body(
@@ -33,72 +31,22 @@ pub(super) fn cta_matmul_add_f32_rhs_transposed_base_body(
     while k_base < k {
         stage_tiles_f32_rhs_transposed(a, rhs, a_tile, b_tile, tile, m, n, k, k_base);
         thread::sync_threads();
-        let a_fragments = load_a_fragments(a_tile, tile);
-        mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            load_b_fragments(b_tile, tile, tile.warp_n0),
-            &mut acc0,
-        );
-        mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            load_b_fragments(b_tile, tile, tile.warp_n0 + 1),
-            &mut acc1,
-        );
-        mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            load_b_fragments(b_tile, tile, tile.warp_n0 + 2),
-            &mut acc2,
-        );
-        mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            load_b_fragments(b_tile, tile, tile.warp_n0 + 3),
-            &mut acc3,
-        );
+        cta_mma4!(a_tile, b_tile, tile, acc0, acc1, acc2, acc3);
         sync_before_next_k(k_base, k);
         k_base += CTA_K;
     }
-    store_add(
-        acc0,
+    cta_store_add4!(
+        store_add,
         tile,
-        tile.warp_n0,
         base,
         &mut out,
         m,
         n,
         base_scale,
         matmul_scale,
-    );
-    store_add(
-        acc1,
-        tile,
-        tile.warp_n0 + 1,
-        base,
-        &mut out,
-        m,
-        n,
-        base_scale,
-        matmul_scale,
-    );
-    store_add(
-        acc2,
-        tile,
-        tile.warp_n0 + 2,
-        base,
-        &mut out,
-        m,
-        n,
-        base_scale,
-        matmul_scale,
-    );
-    store_add(
-        acc3,
-        tile,
-        tile.warp_n0 + 3,
-        base,
-        &mut out,
-        m,
-        n,
-        base_scale,
-        matmul_scale,
+        acc0 => 0,
+        acc1 => 1,
+        acc2 => 2,
+        acc3 => 3,
     );
 }

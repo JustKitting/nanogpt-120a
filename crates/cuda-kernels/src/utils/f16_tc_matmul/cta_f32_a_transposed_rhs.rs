@@ -1,11 +1,9 @@
 use cuda_device::{DisjointSlice, SharedArray, thread};
 
-use super::cta_stage::{load_a_fragments, load_b_fragments};
 use super::cta_stage_f32_transposed::stage_tiles_f32_a_transposed_rhs;
 use super::cta_store::store;
 use super::cta_sync::sync_before_next_k;
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, active_tile};
-use crate::mma::mma_m16n8k16_f16_f16_f32;
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn cta_matmul_f32_a_transposed_rhs_body(
@@ -30,32 +28,9 @@ pub(super) fn cta_matmul_f32_a_transposed_rhs_body(
     while k_base < k {
         stage_tiles_f32_a_transposed_rhs(a, rhs, a_tile, b_tile, tile, m, n, k, k_base);
         thread::sync_threads();
-        let a_fragments = load_a_fragments(a_tile, tile);
-        mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            load_b_fragments(b_tile, tile, tile.warp_n0),
-            &mut acc0,
-        );
-        mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            load_b_fragments(b_tile, tile, tile.warp_n0 + 1),
-            &mut acc1,
-        );
-        mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            load_b_fragments(b_tile, tile, tile.warp_n0 + 2),
-            &mut acc2,
-        );
-        mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            load_b_fragments(b_tile, tile, tile.warp_n0 + 3),
-            &mut acc3,
-        );
+        cta_mma4!(a_tile, b_tile, tile, acc0, acc1, acc2, acc3);
         sync_before_next_k(k_base, k);
         k_base += CTA_K;
     }
-    store(acc0, tile, tile.warp_n0, &mut out, m, n);
-    store(acc1, tile, tile.warp_n0 + 1, &mut out, m, n);
-    store(acc2, tile, tile.warp_n0 + 2, &mut out, m, n);
-    store(acc3, tile, tile.warp_n0 + 3, &mut out, m, n);
+    cta_store4!(store, tile, &mut out, m, n, acc0, acc1, acc2, acc3);
 }
