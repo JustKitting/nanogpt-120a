@@ -7,7 +7,7 @@ use super::cta_sync::sync_before_next_k;
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
 use crate::mma::mma_m16n8k16_f16_f16_f32;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn cta_matmul_f32_half_rhs_body(
     a: &[f32],
     rhs: &[u16],

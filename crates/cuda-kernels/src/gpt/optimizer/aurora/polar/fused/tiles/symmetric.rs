@@ -8,7 +8,6 @@ use super::super::coefficients::Coefficients;
 use super::super::store::{store_plain, store_plain_transposed, store_symmetric_polynomial};
 use super::compute_tile;
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_symmetric_tiles(
     source: *const f32,
     out: *mut f32,
@@ -29,7 +28,7 @@ pub(crate) fn run_symmetric_tiles(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(crate) fn run_symmetric_polynomial_tiles(
     source: *const f32,
     base: *const f32,
@@ -70,7 +69,7 @@ fn upper_triangle_tile(index: u32, tile_dim: u32) -> (u32, u32) {
     (row, col)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 fn run_tile(
     source: *const f32,
     out: *mut f32,
@@ -96,7 +95,7 @@ fn run_tile(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 fn run_polynomial_tile(
     source: *const f32,
     base: *const f32,

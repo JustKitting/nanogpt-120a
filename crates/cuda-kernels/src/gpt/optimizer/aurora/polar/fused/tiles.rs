@@ -10,7 +10,7 @@ use compute::compute_tile;
 mod symmetric;
 pub(super) use symmetric::{run_symmetric_polynomial_tiles, run_symmetric_tiles};
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn run_plain_tiles(
     a: *const f32,
     b: *const f32,

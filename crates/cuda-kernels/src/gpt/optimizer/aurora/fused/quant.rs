@@ -6,7 +6,7 @@ use super::super::super::work_grid::WorkGrid;
 mod encode;
 mod reduce_scale;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn quantize_updated_master(
     x: *const f32,
     block_amax: *mut f32,

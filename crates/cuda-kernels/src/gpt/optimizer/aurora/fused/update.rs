@@ -11,7 +11,7 @@ mod one;
 
 const UPDATE_VALUES_PER_CHUNK: u32 = crate::nvfp4_quant::NVFP4_TENSOR_AMAX_VALUES_PER_BLOCK as u32;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn update_master_chunks(
     u: *const f32,
     z_master: *mut f32,

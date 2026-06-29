@@ -25,7 +25,7 @@ impl OptimizerModule {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     fn requantize(
         &self,
         stream: &CudaStream,

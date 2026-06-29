@@ -83,7 +83,7 @@ fn store_plain_transposed_one(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 fn store_symmetric_polynomial_one(
     acc: f32,

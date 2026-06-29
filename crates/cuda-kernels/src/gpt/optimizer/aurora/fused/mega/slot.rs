@@ -7,7 +7,7 @@ use super::super::super::super::threads::WARPS_PER_BLOCK;
 use super::super::super::super::work_grid::WorkGrid;
 use super::super::body::aurora_matrix_update_body;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn launch_slot(
     slot: u32,
     scratch_slot: u32,

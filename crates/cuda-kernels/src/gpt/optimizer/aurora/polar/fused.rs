@@ -17,7 +17,7 @@ use normalize::normalize_source_to_x;
 use ptr::{source_ptr, target_ptr};
 use tiles::{run_plain_tiles, run_symmetric_polynomial_tiles, run_symmetric_tiles};
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(crate) fn polar_express_from_source_ptr(
     source: *const f32,
     x_ptr: *mut f32,

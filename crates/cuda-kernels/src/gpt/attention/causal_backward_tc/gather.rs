@@ -5,7 +5,6 @@ use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 
 pub(super) const TC_BACKWARD_THREADS_PER_BLOCK: u32 = 256;
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn gather_body(
     qkv: &[u16],
     d_out_src: &[f32],

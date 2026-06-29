@@ -132,7 +132,7 @@ pub fn centered_column(col: u32, row_len: u32, value: f32, mean: f32) -> f32 {
     if col < row_len { value - mean } else { 0.0 }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub fn nvfp4_affine_normalized_column(
     weight_bytes: &[u8],

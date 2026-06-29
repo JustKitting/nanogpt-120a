@@ -9,7 +9,7 @@ use super::polar_step::run_polar_step;
 use super::quant::quantize_updated_master;
 use super::update::update_master_chunks;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn aurora_matrix_update_body(
     grad: *const f32,
     momentum: *mut f32,

@@ -6,7 +6,7 @@ use crate::mma::mma_m16n8k16_f16_f16_f32;
 
 use super::super::stage::stage_tiles;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn compute_tile(
     a: *const f32,
     b: *const f32,

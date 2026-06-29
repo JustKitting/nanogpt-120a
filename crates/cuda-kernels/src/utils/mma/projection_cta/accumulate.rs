@@ -11,7 +11,7 @@ use super::tile::{
     Nvfp4ProjectionCtaTile,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn projection_accumulator(
     input_bytes: &[u8],
     input_scales: &[u8],
@@ -60,7 +60,7 @@ pub fn projection_accumulator(
     acc
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn projection_accumulator_aligned(
     input_bytes: &[u8],
     input_scales: &[u8],
@@ -109,7 +109,7 @@ pub fn projection_accumulator_aligned(
     acc
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn projection_accumulator_aligned_row_pair(
     input_bytes: &[u8],
     input_scales: &[u8],

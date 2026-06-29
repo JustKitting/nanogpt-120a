@@ -2,7 +2,7 @@ use crate::float_ptx::abs_f32;
 
 use crate::device_ptr::read_f32;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn update_one(
     u: *const f32,
     z_master: *mut f32,

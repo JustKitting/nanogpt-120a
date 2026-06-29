@@ -65,7 +65,6 @@ pub mod kernels {
     use super::*;
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
     pub fn token_embedding_kernel(
         tokens: &[u32],
         token_embedding_bytes: &[u8],

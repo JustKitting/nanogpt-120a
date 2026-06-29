@@ -6,7 +6,7 @@ use crate::mma::projection::Nvfp4ProjectionParams;
 use super::super::tile::Nvfp4ProjectionCtaTile;
 use super::common::{affine_value, affine_value_scaled, row_col};
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub fn store_relu2_accumulator(
     acc: [f32; 4],
@@ -64,7 +64,7 @@ pub fn store_relu2_accumulator(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub fn store_relu2_accumulator_aligned(
     acc: [f32; 4],
@@ -107,7 +107,7 @@ pub fn store_relu2_accumulator_aligned(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 fn store_one(
     acc: f32,
@@ -140,7 +140,7 @@ fn store_one(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 fn store_pair_aligned(
     acc0: f32,

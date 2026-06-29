@@ -23,7 +23,7 @@ macro_rules! update_at {
     };
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn update_four_amax(
     u: *const f32,
     z_master: *mut f32,

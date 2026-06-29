@@ -43,7 +43,6 @@ pub fn store_accumulator_aligned(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn store_one(
     acc: f32,

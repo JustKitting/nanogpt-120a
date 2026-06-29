@@ -10,7 +10,7 @@ use crate::mma::projection_cta::tile::{
     NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn nvfp4_projection_cta_nobias_kernel_body(
     input_bytes: &[u8],
     input_scales: &[u8],
@@ -46,7 +46,7 @@ pub fn nvfp4_projection_cta_nobias_kernel_body(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn nvfp4_projection_cta_nobias_kernel_body_at(
     input_bytes: &[u8],
     input_scales: &[u8],
@@ -77,7 +77,7 @@ pub fn nvfp4_projection_cta_nobias_kernel_body_at(
     store_accumulator(acc, input_global_scales, out, tile, &params);
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned(
     input_bytes: &[u8],
     input_scales: &[u8],
@@ -108,7 +108,7 @@ pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned(
     store_accumulator_aligned(acc, input_global_scales, out, tile, &params);
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
     input_bytes: &[u8],
     input_scales: &[u8],

@@ -13,7 +13,7 @@ pub(super) struct AttentionTcMatmulContext<'a> {
     pub head_dim: u32,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn run_tc_matmul(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,
@@ -37,7 +37,7 @@ pub(super) fn run_tc_matmul(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn run_tc_matmul_rhs(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,
@@ -61,7 +61,7 @@ pub(super) fn run_tc_matmul_rhs(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn run_tc_matmul_a_transposed_rhs(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,

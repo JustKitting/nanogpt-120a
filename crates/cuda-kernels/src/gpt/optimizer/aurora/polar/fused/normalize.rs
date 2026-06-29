@@ -8,7 +8,7 @@ use cuda_device::{SharedArray, grid, thread};
 const POLAR_EXPRESS_NORM_SAFETY: f32 = 1.01;
 const POLAR_EXPRESS_EPS: f32 = 1.0e-7;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn normalize_source_to_x(
     source: *const f32,
     x: *mut f32,
@@ -56,7 +56,7 @@ pub(super) fn normalize_source_to_x(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 fn normalize_source_to_x_from_chunks(
     source: *const f32,
     x: *mut f32,

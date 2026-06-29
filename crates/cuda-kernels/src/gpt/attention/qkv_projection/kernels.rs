@@ -12,7 +12,7 @@ mod module {
     use super::*;
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn attention_projection_kernel(
         input_bytes: &[u8],
         input_scales: &[u8],

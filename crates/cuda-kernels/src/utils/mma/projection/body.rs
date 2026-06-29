@@ -9,7 +9,7 @@ use super::store::{
     StoreAccumulatorArgs, StoreAccumulatorNoBiasArgs, store_accumulator, store_accumulator_nobias,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub fn nvfp4_projection_kernel_body(
     input_bytes: &[u8],

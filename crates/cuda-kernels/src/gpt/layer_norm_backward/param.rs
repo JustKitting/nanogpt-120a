@@ -16,7 +16,7 @@ pub(super) mod kernels {
     use super::*;
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn layer_norm_backward_params_kernel(
         residual: &[u16],
         d_normalized: &[f32],
@@ -89,7 +89,7 @@ pub(super) mod kernels {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn layer_norm_backward_params_f32_kernel(
         residual: &[f32],
         d_normalized: &[f32],

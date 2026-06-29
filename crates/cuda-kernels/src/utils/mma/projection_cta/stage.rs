@@ -93,7 +93,7 @@ pub fn stage_tiles_aligned(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn stage_row_pair_tiles_aligned(
     input_bytes: &[u8],
     input_scales: &[u8],

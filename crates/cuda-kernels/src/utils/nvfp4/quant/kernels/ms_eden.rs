@@ -39,7 +39,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_to_nvfp4_ms_eden_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -73,7 +73,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_to_nvfp4_ms_eden_device_scale_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -107,7 +107,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -139,7 +139,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -168,7 +168,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -204,7 +204,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -238,7 +238,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -269,7 +269,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -326,7 +326,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -381,7 +381,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
         x: &[f32],
         mut out_fp4: DisjointSlice<u8>,
@@ -556,7 +556,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -604,7 +604,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -650,7 +650,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -694,7 +694,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -742,7 +742,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -788,7 +788,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -832,7 +832,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -876,7 +876,7 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_source_cols_pow2_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -984,7 +984,7 @@ pub(crate) mod module {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn fp32_to_nvfp4_ms_eden_body(
         x: &[f32],
@@ -1018,7 +1018,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn fp32_to_nvfp4_ms_eden_body_no_chunk_amax(
         x: &[f32],
@@ -1050,7 +1050,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn fp32_transpose_to_nvfp4_ms_eden_body(
         x: &[f32],
@@ -1093,7 +1093,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax(
         x: &[f32],
@@ -1134,7 +1134,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn fp32_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad_pow2(
         x: &[f32],
@@ -1172,7 +1172,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad_pow2(
         x: &[f32],
@@ -1210,7 +1210,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn fp32_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
         x: &[f32],
@@ -1242,7 +1242,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
         x: &[f32],
@@ -1280,7 +1280,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn ms_eden_pack_chunk(
         input: f32,
@@ -1326,7 +1326,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn ms_eden_pack_chunk_no_chunk_amax(
         input: f32,
@@ -1364,7 +1364,7 @@ pub(crate) mod module {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn ms_eden_pack_chunk_no_chunk_amax_row(
         input: f32,
@@ -1480,7 +1480,7 @@ pub(crate) mod module {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn nvfp4_transposed_hadamard_input(
         bytes: &[u8],
@@ -1564,7 +1564,7 @@ pub(crate) mod module {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[inline(always)]
     fn rowwise_transposed_hadamard_input(
         bytes: &[u8],

@@ -31,16 +31,16 @@ impl Nvfp4QuantModule {
     }
 
     pub fn fp32_to_nvfp4_four_six(&self, args: Nvfp4QuantArgs<'_, '_>) -> Result<(), DriverError> {
-        self.launch_fp32_to_nvfp4_four_six(
-            args.stream,
-            args.x,
-            args.amax,
-            args.out_fp4,
-            args.out_scales,
-            args.out_global_scale,
-            args.group_count,
-            0,
-        )
+        self.launch_fp32_to_nvfp4_four_six(Nvfp4QuantRowwiseArgs {
+            stream: args.stream,
+            x: args.x,
+            amax: args.amax,
+            out_fp4: args.out_fp4,
+            out_scales: args.out_scales,
+            out_global_scale: args.out_global_scale,
+            group_count: args.group_count,
+            row_len: 0,
+        })
     }
 
     pub fn fp32_to_nvfp4_four_six_rowwise(
@@ -52,16 +52,7 @@ impl Nvfp4QuantModule {
             return self.launch_fp32_to_nvfp4_four_six_rowwise_pow2(args);
         }
 
-        self.launch_fp32_to_nvfp4_four_six(
-            args.stream,
-            args.x,
-            args.amax,
-            args.out_fp4,
-            args.out_scales,
-            args.out_global_scale,
-            args.group_count,
-            args.row_len,
-        )
+        self.launch_fp32_to_nvfp4_four_six(args)
     }
 
     pub fn row_amax_f32(&self, args: RowAmaxArgs<'_, '_>) -> Result<(), DriverError> {
@@ -931,33 +922,25 @@ impl Nvfp4QuantModule {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn launch_fp32_to_nvfp4_four_six(
         &self,
-        stream: &CudaStream,
-        x: &DeviceBuffer<f32>,
-        amax: &DeviceBuffer<f32>,
-        out_fp4: &mut DeviceBuffer<u8>,
-        out_scales: &mut DeviceBuffer<u8>,
-        out_global_scale: &mut DeviceBuffer<f32>,
-        group_count: u32,
-        row_len: u32,
+        args: Nvfp4QuantRowwiseArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
 
         self.four_six.fp32_to_nvfp4_four_six_kernel(
-            stream,
+            args.stream,
             LaunchConfig {
-                grid_dim: (group_count.div_ceil(groups_per_block), 1, 1),
+                grid_dim: (args.group_count.div_ceil(groups_per_block), 1, 1),
                 block_dim: (THREADS_PER_BLOCK, 1, 1),
                 shared_mem_bytes: 0,
             },
-            x,
-            amax,
-            out_fp4,
-            out_scales,
-            out_global_scale,
-            row_len,
+            args.x,
+            args.amax,
+            args.out_fp4,
+            args.out_scales,
+            args.out_global_scale,
+            args.row_len,
             SCALE_OVERRIDE,
         )
     }

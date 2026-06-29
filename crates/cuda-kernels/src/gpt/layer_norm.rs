@@ -57,7 +57,7 @@ mod kernels {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn gpt_layer_norm_kernel(
         residual: &[f32],
         weight_bytes: &[u8],
@@ -158,7 +158,7 @@ mod kernels {
     }
 
     #[kernel]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn gpt_layer_norm_save_residual_f16_kernel(
         residual: &[f32],
         weight_bytes: &[u8],

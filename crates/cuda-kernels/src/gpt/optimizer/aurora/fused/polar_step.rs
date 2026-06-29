@@ -6,7 +6,7 @@ use super::super::super::threads::WARPS_PER_BLOCK;
 use super::super::super::work_grid::WorkGrid;
 use super::super::polar::fused::polar_express_from_source_ptr;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn run_polar_step(
     oriented_ptr: *mut f32,
     scaled_ptr: *mut f32,

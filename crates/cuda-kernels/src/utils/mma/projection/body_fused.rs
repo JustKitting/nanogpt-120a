@@ -5,7 +5,7 @@ use super::args::{NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams};
 use super::body::projection_tile;
 use super::store::{StoreAccumulatorArgs, store_relu2_accumulator, store_residual_accumulator};
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub fn nvfp4_projection_relu2_kernel_body(
     input_bytes: &[u8],
@@ -38,7 +38,7 @@ pub fn nvfp4_projection_relu2_kernel_body(
     store_relu2_accumulator(acc, tile, args, pre_activation, out);
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub fn nvfp4_projection_residual_kernel_body(
     input_bytes: &[u8],

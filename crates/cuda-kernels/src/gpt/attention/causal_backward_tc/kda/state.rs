@@ -38,7 +38,7 @@ pub(crate) enum ChunkStateMatmulMode {
     Dqg,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(crate) fn chunk_state_matmul_body(
     a_src: &[f32],
     vnew_base: &[f32],

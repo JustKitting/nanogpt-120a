@@ -582,7 +582,7 @@ mod kernels {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn linear_backward_projection_pair_cta_device_scale_kernel(
         dinput_input_bytes: &[u8],

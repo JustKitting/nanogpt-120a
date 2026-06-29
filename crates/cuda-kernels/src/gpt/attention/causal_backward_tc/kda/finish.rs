@@ -82,7 +82,7 @@ pub(crate) fn finish_kda_backward_body(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 fn finish_dim(
     qkv: &[u16],
     d_q: &[f32],
