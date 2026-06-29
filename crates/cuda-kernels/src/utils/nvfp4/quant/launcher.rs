@@ -124,8 +124,7 @@ impl Nvfp4QuantModule {
     }
 
     pub fn fp32_to_nvfp4_ms_eden(&self, args: MsEdenQuantArgs<'_, '_>) -> Result<(), DriverError> {
-        let element_count = args.row_count * args.dst_row_len;
-        let chunk_count = ms_eden_chunk_count(element_count);
+        let chunk_count = ms_eden_chunk_count(args.row_count * args.dst_row_len);
         self.ms_eden.fp32_to_nvfp4_ms_eden_kernel(
             args.stream,
             grid_config(pack_grid_dim(chunk_count)),
@@ -148,8 +147,7 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.row_count * args.dst_row_len;
-        let chunk_count = ms_eden_chunk_count(element_count);
+        let chunk_count = ms_eden_chunk_count(args.row_count * args.dst_row_len);
         self.ms_eden.fp32_to_nvfp4_ms_eden_device_scale_kernel(
             args.stream,
             grid_config(pack_grid_dim(chunk_count)),
@@ -172,8 +170,7 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.row_count * args.dst_row_len;
-        let chunk_count = ms_eden_chunk_count(element_count);
+        let chunk_count = ms_eden_chunk_count(args.row_count * args.dst_row_len);
         if pack_grid_is_exact(chunk_count) {
             return self
                 .ms_eden
@@ -215,8 +212,7 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenTransposeDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.source_cols * args.dst_row_len;
-        let chunk_count = ms_eden_chunk_count(element_count);
+        let chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
         self.ms_eden
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
@@ -241,8 +237,7 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenTransposeDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.source_cols * args.dst_row_len;
-        let chunk_count = ms_eden_chunk_count(element_count);
+        let chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
         if pack_grid_is_exact(chunk_count) {
             return self
                 .ms_eden
@@ -286,7 +281,6 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenPairDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.row_count * args.src_row_len;
         let chunk_count = if let Some(chunk_count) = args.precomputed_chunk_count {
             chunk_count
         } else {
@@ -294,7 +288,7 @@ impl Nvfp4QuantModule {
                 args.stream,
                 args.x,
                 &mut *args.out_chunk_amax,
-                element_count,
+                args.row_count * args.src_row_len,
             )?
         };
 
@@ -434,8 +428,8 @@ impl Nvfp4QuantModule {
         &self,
         args: RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.source_rows * args.source_cols;
-        let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
+        let chunk_count = (args.source_rows * args.source_cols)
+            .div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
         self.ms_eden.rowwise_nvfp4_chunk_amax_kernel(
             args.stream,
             grid_config(chunk_count),
@@ -454,8 +448,7 @@ impl Nvfp4QuantModule {
             chunk_count,
         )?;
 
-        let element_count = args.source_cols * args.dst_row_len;
-        let pack_chunk_count = ms_eden_chunk_count(element_count);
+        let pack_chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
         self.ms_eden
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
@@ -482,8 +475,8 @@ impl Nvfp4QuantModule {
         &self,
         args: RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.source_rows * args.source_cols;
-        let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
+        let chunk_count = (args.source_rows * args.source_cols)
+            .div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
         self.ms_eden.rowwise_nvfp4_chunk_amax_kernel(
             args.stream,
             grid_config(chunk_count),
@@ -502,8 +495,7 @@ impl Nvfp4QuantModule {
             chunk_count,
         )?;
 
-        let element_count = args.source_cols * args.dst_row_len;
-        let pack_chunk_count = ms_eden_chunk_count(element_count);
+        let pack_chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
         if pack_grid_is_exact(pack_chunk_count) {
             if rowwise_transpose_has_no_padding(args.source_rows, args.dst_row_len) {
                 if args.source_cols.is_power_of_two() {
@@ -612,8 +604,7 @@ impl Nvfp4QuantModule {
             chunk_count,
         )?;
 
-        let element_count = args.source_cols * args.dst_row_len;
-        let pack_chunk_count = ms_eden_chunk_count(element_count);
+        let pack_chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
         self.ms_eden
             .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
@@ -659,8 +650,7 @@ impl Nvfp4QuantModule {
             chunk_count,
         )?;
 
-        let element_count = args.source_cols * args.dst_row_len;
-        let pack_chunk_count = ms_eden_chunk_count(element_count);
+        let pack_chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
         if pack_grid_is_exact(pack_chunk_count) {
             return self
                 .ms_eden
@@ -708,12 +698,11 @@ impl Nvfp4QuantModule {
         &self,
         args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.row_count * args.src_row_len;
         let chunk_count = self.tensor_chunk_amax_f32(
             args.stream,
             args.x,
             &mut *args.out_chunk_amax,
-            element_count,
+            args.row_count * args.src_row_len,
         )?;
 
         self.quartet_backward_ms_eden_global_scale_from_chunks(
@@ -744,12 +733,11 @@ impl Nvfp4QuantModule {
         &self,
         args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let element_count = args.row_count * args.src_row_len;
         let chunk_count = self.tensor_chunk_amax_f32(
             args.stream,
             args.x,
             &mut *args.out_chunk_amax,
-            element_count,
+            args.row_count * args.src_row_len,
         )?;
 
         self.quartet_backward_ms_eden_global_scale_from_chunks(
