@@ -73,16 +73,6 @@ pub fn sincos_f32(x: f32) -> (f32, f32) {
 }
 
 #[inline(always)]
-pub fn sin_f32(x: f32) -> f32 {
-    sin_reduced_f32(reduce_angle_f32(x))
-}
-
-#[inline(always)]
-pub fn cos_f32(x: f32) -> f32 {
-    cos_reduced_f32(reduce_angle_f32(x))
-}
-
-#[inline(always)]
 fn sin_reduced_f32(x: f32) -> f32 {
     let y: f32;
     unsafe {
