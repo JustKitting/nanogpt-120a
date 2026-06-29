@@ -58,11 +58,7 @@ impl Nvfp4QuantModule {
     pub fn row_amax_f32(&self, args: RowAmaxArgs<'_, '_>) -> Result<(), DriverError> {
         self.row_amax.row_amax_f32_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.row_count, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(args.row_count),
             args.x,
             args.out,
             args.row_count,
@@ -80,11 +76,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .quartet_backward_ms_eden_global_scale_from_chunks_kernel(
                 stream,
-                LaunchConfig {
-                    grid_dim: (1, 1, 1),
-                    block_dim: (THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_config(1),
                 chunk_amax,
                 out_global_scale,
                 chunk_count,
@@ -106,11 +98,7 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         self.row_amax.tensor_amax_from_chunks_f32_kernel(
             stream,
-            LaunchConfig {
-                grid_dim: (1, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(1),
             chunk_amax,
             out,
             chunk_count,
@@ -127,11 +115,7 @@ impl Nvfp4QuantModule {
         let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
         self.row_amax.tensor_chunk_amax_f32_kernel(
             stream,
-            LaunchConfig {
-                grid_dim: (chunk_count, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(chunk_count),
             x,
             out,
             element_count,
@@ -144,11 +128,7 @@ impl Nvfp4QuantModule {
         let chunk_count = ms_eden_chunk_count(element_count);
         self.ms_eden.fp32_to_nvfp4_ms_eden_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (pack_grid_dim(chunk_count), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(pack_grid_dim(chunk_count)),
             args.x,
             args.out_fp4,
             args.out_scales,
@@ -172,11 +152,7 @@ impl Nvfp4QuantModule {
         let chunk_count = ms_eden_chunk_count(element_count);
         self.ms_eden.fp32_to_nvfp4_ms_eden_device_scale_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (pack_grid_dim(chunk_count), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(pack_grid_dim(chunk_count)),
             args.x,
             args.out_fp4,
             args.out_scales,
@@ -203,11 +179,7 @@ impl Nvfp4QuantModule {
                 .ms_eden
                 .fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    LaunchConfig {
-                        grid_dim: (pack_grid_dim(chunk_count), 1, 1),
-                        block_dim: (THREADS_PER_BLOCK, 1, 1),
-                        shared_mem_bytes: 0,
-                    },
+                    grid_config(pack_grid_dim(chunk_count)),
                     args.x,
                     args.out_fp4,
                     args.out_scales,
@@ -224,11 +196,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (pack_grid_dim(chunk_count), 1, 1),
-                    block_dim: (THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_config(pack_grid_dim(chunk_count)),
                 args.x,
                 args.out_fp4,
                 args.out_scales,
@@ -252,11 +220,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (pack_grid_dim(chunk_count), 1, 1),
-                    block_dim: (THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_config(pack_grid_dim(chunk_count)),
                 args.x,
                 args.out_fp4,
                 args.out_scales,
@@ -284,11 +248,7 @@ impl Nvfp4QuantModule {
                 .ms_eden
                 .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    LaunchConfig {
-                        grid_dim: (pack_grid_dim(chunk_count), 1, 1),
-                        block_dim: (THREADS_PER_BLOCK, 1, 1),
-                        shared_mem_bytes: 0,
-                    },
+                    grid_config(pack_grid_dim(chunk_count)),
                     args.x,
                     args.out_fp4,
                     args.out_scales,
@@ -306,11 +266,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (pack_grid_dim(chunk_count), 1, 1),
-                    block_dim: (THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_config(pack_grid_dim(chunk_count)),
                 args.x,
                 args.out_fp4,
                 args.out_scales,
@@ -365,11 +321,7 @@ impl Nvfp4QuantModule {
                     .ms_eden
                     .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel(
                         args.stream,
-                        LaunchConfig {
-                            grid_dim: (row_grid_dim + transpose_grid_dim, 1, 1),
-                            block_dim: (THREADS_PER_BLOCK, 1, 1),
-                            shared_mem_bytes: 0,
-                        },
+                        grid_config(row_grid_dim + transpose_grid_dim),
                         args.x,
                         args.out_fp4,
                         args.out_scales,
@@ -398,11 +350,7 @@ impl Nvfp4QuantModule {
                     .ms_eden
                     .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
                         args.stream,
-                        LaunchConfig {
-                            grid_dim: (row_grid_dim + transpose_grid_dim, 1, 1),
-                            block_dim: (THREADS_PER_BLOCK, 1, 1),
-                            shared_mem_bytes: 0,
-                        },
+                        grid_config(row_grid_dim + transpose_grid_dim),
                         args.x,
                         args.out_fp4,
                         args.out_scales,
@@ -426,11 +374,7 @@ impl Nvfp4QuantModule {
                 .ms_eden
                 .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    LaunchConfig {
-                        grid_dim: (row_grid_dim + transpose_grid_dim, 1, 1),
-                        block_dim: (THREADS_PER_BLOCK, 1, 1),
-                        shared_mem_bytes: 0,
-                    },
+                    grid_config(row_grid_dim + transpose_grid_dim),
                     args.x,
                     args.out_fp4,
                     args.out_scales,
@@ -494,11 +438,7 @@ impl Nvfp4QuantModule {
         let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
         self.ms_eden.rowwise_nvfp4_chunk_amax_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (chunk_count, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(chunk_count),
             args.input.bytes,
             args.input.scales,
             args.input.global_scales,
@@ -519,11 +459,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
-                    block_dim: (THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_config(pack_grid_dim(pack_chunk_count)),
                 args.input.bytes,
                 args.input.scales,
                 args.input.global_scales,
@@ -550,11 +486,7 @@ impl Nvfp4QuantModule {
         let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
         self.ms_eden.rowwise_nvfp4_chunk_amax_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (chunk_count, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(chunk_count),
             args.input.bytes,
             args.input.scales,
             args.input.global_scales,
@@ -579,11 +511,7 @@ impl Nvfp4QuantModule {
                         .ms_eden
                         .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_source_cols_pow2_kernel(
                             args.stream,
-                            LaunchConfig {
-                                grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
-                                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                                shared_mem_bytes: 0,
-                            },
+                            grid_config(pack_grid_dim(pack_chunk_count)),
                             args.input.bytes,
                             args.input.scales,
                             args.input.global_scales,
@@ -603,11 +531,7 @@ impl Nvfp4QuantModule {
                     .ms_eden
                     .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
                         args.stream,
-                        LaunchConfig {
-                            grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
-                            block_dim: (THREADS_PER_BLOCK, 1, 1),
-                            shared_mem_bytes: 0,
-                        },
+                        grid_config(pack_grid_dim(pack_chunk_count)),
                         args.input.bytes,
                         args.input.scales,
                         args.input.global_scales,
@@ -627,11 +551,7 @@ impl Nvfp4QuantModule {
                 .ms_eden
                 .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    LaunchConfig {
-                        grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
-                        block_dim: (THREADS_PER_BLOCK, 1, 1),
-                        shared_mem_bytes: 0,
-                    },
+                    grid_config(pack_grid_dim(pack_chunk_count)),
                     args.input.bytes,
                     args.input.scales,
                     args.input.global_scales,
@@ -651,11 +571,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
-                    block_dim: (THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_config(pack_grid_dim(pack_chunk_count)),
                 args.input.bytes,
                 args.input.scales,
                 args.input.global_scales,
@@ -681,11 +597,7 @@ impl Nvfp4QuantModule {
         let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
         self.ms_eden.nvfp4_chunk_amax_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (chunk_count, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(chunk_count),
             args.input.bytes,
             args.input.scales,
             args.input.global_scale,
@@ -705,11 +617,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
-                    block_dim: (THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_config(pack_grid_dim(pack_chunk_count)),
                 args.input.bytes,
                 args.input.scales,
                 args.input.global_scale,
@@ -736,11 +644,7 @@ impl Nvfp4QuantModule {
         let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
         self.ms_eden.nvfp4_chunk_amax_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (chunk_count, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(chunk_count),
             args.input.bytes,
             args.input.scales,
             args.input.global_scale,
@@ -762,11 +666,7 @@ impl Nvfp4QuantModule {
                 .ms_eden
                 .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    LaunchConfig {
-                        grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
-                        block_dim: (THREADS_PER_BLOCK, 1, 1),
-                        shared_mem_bytes: 0,
-                    },
+                    grid_config(pack_grid_dim(pack_chunk_count)),
                     args.input.bytes,
                     args.input.scales,
                     args.input.global_scale,
@@ -786,11 +686,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (pack_grid_dim(pack_chunk_count), 1, 1),
-                    block_dim: (THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_config(pack_grid_dim(pack_chunk_count)),
                 args.input.bytes,
                 args.input.scales,
                 args.input.global_scale,
@@ -928,11 +824,7 @@ impl Nvfp4QuantModule {
 
         self.four_six.fp32_to_nvfp4_four_six_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.group_count.div_ceil(groups_per_block), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(args.group_count.div_ceil(groups_per_block)),
             args.x,
             args.amax,
             args.out_fp4,
@@ -950,11 +842,7 @@ impl Nvfp4QuantModule {
         let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
         self.four_six.fp32_to_nvfp4_four_six_rowwise_pow2_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.group_count.div_ceil(groups_per_block), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_config(args.group_count.div_ceil(groups_per_block)),
             args.x,
             args.amax,
             args.out_fp4,
@@ -964,6 +852,14 @@ impl Nvfp4QuantModule {
             args.row_len - 1,
             SCALE_OVERRIDE,
         )
+    }
+}
+
+fn grid_config(grid_x: u32) -> LaunchConfig {
+    LaunchConfig {
+        grid_dim: (grid_x, 1, 1),
+        block_dim: (THREADS_PER_BLOCK, 1, 1),
+        shared_mem_bytes: 0,
     }
 }
 
