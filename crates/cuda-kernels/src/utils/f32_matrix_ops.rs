@@ -115,9 +115,7 @@ mod module {
         let mut index = thread::blockIdx_x() * thread::blockDim_x() + thread::threadIdx_x();
         let stride = thread::gridDim_x() * thread::blockDim_x();
         while index < len {
-            let row = index / dim;
-            let col = index - row * dim;
-            let add = if row == col { scale } else { 0.0 };
+            let add = if index % (dim + 1) == 0 { scale } else { 0.0 };
             unsafe {
                 *out.get_unchecked_mut(index as usize) = src[index as usize] + add;
             }

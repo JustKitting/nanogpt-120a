@@ -70,9 +70,7 @@ mod kernels {
         let index = thread::blockIdx_x() * TRANSPOSE_THREADS_PER_BLOCK + thread::threadIdx_x();
         let len = params.rows * params.cols;
         if index < len {
-            let row = index / params.cols;
-            let col = index - row * params.cols;
-            let out_index = col * params.rows + row;
+            let out_index = (index % params.cols) * params.rows + index / params.cols;
 
             unsafe {
                 *output.get_unchecked_mut(out_index as usize) = input[index as usize];

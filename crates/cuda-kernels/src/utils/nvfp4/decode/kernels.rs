@@ -19,10 +19,8 @@ mod module {
         let index = thread::blockIdx_x() * DECODE_THREADS_PER_BLOCK + thread::threadIdx_x();
         let len = rows * cols;
         if index < len {
-            let row = index / cols;
-            let col = index - row * cols;
             let value = nvfp4_value(bytes, scales, global_scale[0], index as usize);
-            let out_index = col * rows + row;
+            let out_index = (index % cols) * rows + index / cols;
 
             unsafe {
                 *output.get_unchecked_mut(out_index as usize) = value;
