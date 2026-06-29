@@ -84,24 +84,6 @@ pub(crate) struct MatrixTileCtx<'a> {
     pub(crate) params: &'a CausalAttentionParams,
 }
 
-impl<'a> MatrixTileCtx<'a> {
-    pub(crate) fn new(
-        tile: CtaTile,
-        batch_chunk: (u32, u32),
-        chunk_tokens: u32,
-        params: &'a CausalAttentionParams,
-    ) -> Self {
-        let (bh, chunk) = batch_chunk;
-        Self {
-            tile,
-            bh,
-            chunk,
-            chunk_tokens,
-            params,
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 pub(crate) struct KdaChunkTileCtx<'a> {
     pub(crate) bh: u32,
@@ -128,7 +110,13 @@ impl<'a> KdaChunkTileCtx<'a> {
             bh,
             chunk,
             compact: CompactTileCtx::new(tile, (batch, head), (start, end), params),
-            matrix: MatrixTileCtx::new(tile, (bh, chunk), end - start, params),
+            matrix: MatrixTileCtx {
+                tile,
+                bh,
+                chunk,
+                chunk_tokens: end - start,
+                params,
+            },
         })
     }
 }
