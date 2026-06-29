@@ -10,6 +10,41 @@ use crate::mma::projection_cta::tile::{
     NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile,
 };
 
+macro_rules! nobias_body_at_fn {
+    ($name:ident, $accumulator:ident, $store:ident) => {
+        #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+        pub fn $name(
+            input_bytes: &[u8],
+            input_scales: &[u8],
+            input_global_scales: &[f32],
+            weight_bytes: &[u8],
+            weight_scales: &[u8],
+            out: &mut DisjointSlice<'_, f32>,
+            params: Nvfp4ProjectionParams,
+            a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
+            b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
+            a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
+            b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+            tile: Nvfp4ProjectionCtaTile,
+        ) {
+            let acc = $accumulator(
+                input_bytes,
+                input_scales,
+                weight_bytes,
+                weight_scales,
+                tile,
+                &params,
+                a_packs,
+                b_packs,
+                a_scales,
+                b_scales,
+            );
+
+            $store(acc, input_global_scales, out, tile, &params);
+        }
+    };
+}
+
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn nvfp4_projection_cta_nobias_kernel_body(
     input_bytes: &[u8],
@@ -46,67 +81,16 @@ pub fn nvfp4_projection_cta_nobias_kernel_body(
     );
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
-pub fn nvfp4_projection_cta_nobias_kernel_body_at(
-    input_bytes: &[u8],
-    input_scales: &[u8],
-    input_global_scales: &[f32],
-    weight_bytes: &[u8],
-    weight_scales: &[u8],
-    out: &mut DisjointSlice<'_, f32>,
-    params: Nvfp4ProjectionParams,
-    a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-    a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
-    tile: Nvfp4ProjectionCtaTile,
-) {
-    let acc = projection_accumulator(
-        input_bytes,
-        input_scales,
-        weight_bytes,
-        weight_scales,
-        tile,
-        &params,
-        a_packs,
-        b_packs,
-        a_scales,
-        b_scales,
-    );
-
-    store_accumulator(acc, input_global_scales, out, tile, &params);
-}
-
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
-pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned(
-    input_bytes: &[u8],
-    input_scales: &[u8],
-    input_global_scales: &[f32],
-    weight_bytes: &[u8],
-    weight_scales: &[u8],
-    out: &mut DisjointSlice<'_, f32>,
-    params: Nvfp4ProjectionParams,
-    a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-    a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
-    tile: Nvfp4ProjectionCtaTile,
-) {
-    let acc = projection_accumulator_aligned(
-        input_bytes,
-        input_scales,
-        weight_bytes,
-        weight_scales,
-        tile,
-        &params,
-        a_packs,
-        b_packs,
-        a_scales,
-        b_scales,
-    );
-
-    store_accumulator_aligned(acc, input_global_scales, out, tile, &params);
-}
+nobias_body_at_fn!(
+    nvfp4_projection_cta_nobias_kernel_body_at,
+    projection_accumulator,
+    store_accumulator
+);
+nobias_body_at_fn!(
+    nvfp4_projection_cta_nobias_kernel_body_at_aligned,
+    projection_accumulator_aligned,
+    store_accumulator_aligned
+);
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
