@@ -72,17 +72,15 @@ pub(crate) fn block_max_leader_f32<const WARPS: usize>(
 
     cuda_device::thread::sync_threads();
 
-    if warp == 0 {
-        let partial = if lane < WARPS as u32 {
-            unsafe { storage[lane as usize] }
-        } else {
-            0.0
-        };
-        let block_value = warp_max_f32(partial);
-        if lane == 0 {
-            return Some(block_value);
-        }
+    if warp != 0 {
+        return None;
     }
 
-    None
+    let partial = if lane < WARPS as u32 {
+        unsafe { storage[lane as usize] }
+    } else {
+        0.0
+    };
+    let block_value = warp_max_f32(partial);
+    if lane == 0 { Some(block_value) } else { None }
 }
