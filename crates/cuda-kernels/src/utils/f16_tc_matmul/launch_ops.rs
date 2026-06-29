@@ -31,7 +31,7 @@ pub(super) fn convert(
 ) -> Result<(), DriverError> {
     module.fp32_to_f16_kernel(
         stream,
-        linear_config(element_count),
+        linear_config(element_count.div_ceil(2)),
         src,
         dst,
         element_count,

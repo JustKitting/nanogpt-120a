@@ -8,7 +8,8 @@ use super::args::{
     F16TcMatmulF32RhsArgs, F16TcMatmulHalfArgs,
 };
 use super::cta_tile::{CTA_M, CTA_N, CTA_THREADS};
-use super::kernels::{self, F16_THREADS_PER_BLOCK};
+use super::kernels;
+use super::launch_ops::convert;
 use super::prepare::prepare_halves;
 
 pub struct F16TcMatmulModule {
@@ -23,19 +24,9 @@ impl F16TcMatmulModule {
     }
 
     pub fn fp32_to_f16(&self, args: F16ConvertArgs<'_, '_>) -> Result<(), DriverError> {
-        self.module.fp32_to_f16_kernel(
+        convert(
+            &self.module,
             args.stream,
-            LaunchConfig {
-                grid_dim: (
-                    args.element_count
-                        .div_ceil(2)
-                        .div_ceil(F16_THREADS_PER_BLOCK),
-                    1,
-                    1,
-                ),
-                block_dim: (F16_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
             args.src,
             args.dst,
             args.element_count,
