@@ -6,7 +6,7 @@ use gpt2_nvfp4::{
 use rust_kernels_cuda::optimizer::KdaAuroraClipArgs;
 use std::time::Instant;
 
-use crate::app::runtime::Runtime;
+use crate::training::runtime::Runtime;
 use crate::upload::UploadedModel;
 
 use super::super::OptimizerTrace;

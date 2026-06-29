@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DriverError};
 
-use crate::app::runtime::Runtime;
+use crate::training::runtime::Runtime;
 
 use super::super::OptimizerTrace;
 use super::super::optimizer_aurora::{AuroraMegaArgs, AuroraPointerTables, apply_aurora_mega};

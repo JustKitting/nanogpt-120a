@@ -1,4 +1,4 @@
-#[path = "../app/sweep/mod.rs"]
+#[path = "../sweep/mod.rs"]
 mod sweep;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

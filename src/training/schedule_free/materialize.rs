@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DriverError};
 
 use super::tensor::Materializer;
-use crate::app::runtime::Runtime;
+use crate::training::runtime::Runtime;
 use crate::upload::{UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat};
 
 use super::super::learning_rate::schedule_free_beta;

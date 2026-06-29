@@ -22,6 +22,7 @@ plotters = { version = "0.3.7", default-features = false, features = ["bitmap_ba
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "rustls"] }
 rust-kernels-cuda = { path = "crates/cuda-kernels" }
 time = "0.3"
+burn = { version = "0.21.0", default-features = false, features = ["std", "train", "tui"] }
 
 [package.metadata.cuda-oxide]
 device-crates = [

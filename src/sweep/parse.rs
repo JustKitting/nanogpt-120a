@@ -18,6 +18,16 @@ impl RunResult {
             self.last_elapsed_s = field(line, "elapsed_s=").and_then(parse_f64);
             self.last_train_loss = field(line, "loss=").and_then(parse_f64);
         }
+        if line.starts_with("TrainingProgress ") {
+            if let Some(step) = debug_field(line, "iteration: Some(").and_then(parse_usize) {
+                self.last_step = Some(step);
+            }
+            if let Some(steps) = debug_field(line, "global_progress: Progress { items_processed: ")
+                .and_then(parse_usize)
+            {
+                self.completed_steps = Some(steps);
+            }
+        }
         if line.contains("loss=NaN") || line.contains("finite=false") {
             self.saw_nan = true;
         }
@@ -37,6 +47,12 @@ fn field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
     let start = line.find(prefix)? + prefix.len();
     let value = &line[start..];
     Some(value.split_whitespace().next().unwrap_or(value))
+}
+
+fn debug_field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
+    let start = line.find(prefix)? + prefix.len();
+    let value = &line[start..];
+    Some(value.split([',', ')', '}']).next().unwrap_or(value).trim())
 }
 
 fn parse_f64(value: &str) -> Option<f64> {
@@ -70,5 +86,16 @@ mod tests {
         assert_eq!(result.val_loss, Some(4.125));
         assert_eq!(result.completed_steps, Some(4096));
         assert_eq!(result.last_elapsed_s, Some(900.25));
+    }
+
+    #[test]
+    fn parses_burn_cli_progress() {
+        let mut result = RunResult::default();
+        result.update(
+            "TrainingProgress { progress: Some(Progress { items_processed: 11, items_total: 100 }), global_progress: Progress { items_processed: 11, items_total: 100 }, iteration: Some(10) }",
+        );
+
+        assert_eq!(result.last_step, Some(10));
+        assert_eq!(result.completed_steps, Some(11));
     }
 }

@@ -16,7 +16,7 @@ use super::kda_clip::apply_kda_aurora_clip;
 use super::result::WeightUpdateResult;
 use super::utils::elapsed_ms;
 use crate::AppResult;
-use crate::app::runtime::Runtime;
+use crate::training::runtime::Runtime;
 use crate::upload::UploadedModel;
 use cuda_core::CudaStream;
 use std::time::Instant;

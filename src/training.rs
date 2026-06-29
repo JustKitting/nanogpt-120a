@@ -10,6 +10,7 @@ mod generate;
 mod grad_block;
 mod grad_clip;
 mod grads;
+mod launch;
 mod learning_rate;
 mod linear_scratch;
 mod next_latent;
@@ -19,6 +20,7 @@ mod optimizer_apply;
 mod optimizer_aurora;
 mod optimizer_state;
 mod optimizer_tc_scratch;
+pub(crate) mod runtime;
 mod save;
 mod schedule_free;
 mod scratch;
@@ -30,12 +32,13 @@ mod update_skip;
 pub use batch::{ReusableTokenBatch, TokenBatch};
 pub use data::TokenDataLoader;
 pub use generate::SamplingConfig;
+pub(crate) use launch::launch_from_env;
 
 use gpt2_nvfp4::{GPT2_SEQ_LEN, Gpt2, Gpt2Rng};
 
 use crate::AppResult;
-use crate::app::runtime::Runtime;
 use crate::upload::UploadedModel;
+use runtime::Runtime;
 
 pub struct Trainer {
     runtime: Runtime,

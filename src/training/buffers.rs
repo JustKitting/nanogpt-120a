@@ -12,7 +12,7 @@ use super::optimizer_state::OptimizerStateBuffers;
 use super::optimizer_tc_scratch::AuroraScratchBuffers;
 use super::scratch::BackwardScratchBuffers;
 use super::tape::ForwardTapeBuffers;
-use crate::app::runtime::Runtime;
+use crate::training::runtime::Runtime;
 use crate::upload::UploadedModel;
 
 pub struct TrainBuffers {

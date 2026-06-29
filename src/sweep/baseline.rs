@@ -9,7 +9,7 @@ use super::{
     history::Trial,
 };
 
-const DEFAULT_SEQ_LEN: usize = 1024;
+const DEFAULT_SEQ_LEN: usize = 4096;
 
 pub struct Baseline {
     path: PathBuf,

@@ -4,10 +4,10 @@ fn main() {
     let baseline = Baseline::load();
     let cooperative_blocks = env_usize("AURORA_COOPERATIVE_BLOCKS")
         .or_else(|| baseline.usize("AURORA_COOPERATIVE_BLOCKS"))
-        .unwrap_or(80);
+        .unwrap_or(125);
     let matrix_phases = env_usize("AURORA_MATRIX_PHASES")
         .or_else(|| baseline.usize("AURORA_MATRIX_PHASES"))
-        .unwrap_or(2);
+        .unwrap_or(16);
 
     assert!(
         cooperative_blocks > 0,
