@@ -11,10 +11,9 @@ pub(crate) const CTA_B_ELEMS: usize = CTA_N as usize * CTA_K as usize;
 pub(super) fn active_tile(batch_count: u32) -> Option<CtaTile> {
     let thread_id = thread::threadIdx_x();
     if thread_id >= CTA_THREADS || thread::blockIdx_z() >= batch_count {
-        None
-    } else {
-        Some(CtaTile::new(thread_id))
+        return None;
     }
+    Some(CtaTile::new(thread_id))
 }
 
 #[derive(Clone, Copy)]

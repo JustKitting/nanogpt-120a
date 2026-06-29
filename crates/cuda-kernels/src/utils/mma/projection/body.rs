@@ -82,13 +82,12 @@ pub fn nvfp4_projection_nobias_kernel_body(
 pub(super) fn active_projection_tile() -> Option<Nvfp4ProjectionTile> {
     let lane = thread::threadIdx_x();
     if lane >= NVFP4_PROJECTION_THREADS_PER_BLOCK {
-        None
-    } else {
-        Some(Nvfp4ProjectionTile {
-            tile_col: thread::blockIdx_x() * NVFP4_PROJECTION_N,
-            tile_row: thread::blockIdx_y() * NVFP4_PROJECTION_M,
-            group: lane >> 2,
-            thread_in_group: lane & 0x3,
-        })
+        return None;
     }
+    Some(Nvfp4ProjectionTile {
+        tile_col: thread::blockIdx_x() * NVFP4_PROJECTION_N,
+        tile_row: thread::blockIdx_y() * NVFP4_PROJECTION_M,
+        group: lane >> 2,
+        thread_in_group: lane & 0x3,
+    })
 }
