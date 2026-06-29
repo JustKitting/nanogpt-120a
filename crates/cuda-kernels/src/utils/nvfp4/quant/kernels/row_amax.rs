@@ -1,8 +1,8 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use crate::amax::{amax4_f32, max4_f32};
+use crate::block_reduce::block_max_leader_f32;
 use crate::float_ptx::{abs_f32, max_f32};
-use crate::warp_reduce::warp_max_f32;
 
 use super::super::config::WARPS_PER_BLOCK;
 
@@ -38,26 +38,11 @@ pub(crate) mod module {
                 col += thread::blockDim_x();
             }
 
-            let warp_amax = warp_max_f32(local_amax);
-            if lane == 0 {
+            if let Some(block_amax) =
+                unsafe { block_max_leader_f32(&mut ROW_AMAX, local_amax, lane, warp_in_block) }
+            {
                 unsafe {
-                    ROW_AMAX[warp_in_block as usize] = warp_amax;
-                }
-            }
-
-            thread::sync_threads();
-
-            if warp_in_block == 0 {
-                let partial = if lane < WARPS_PER_BLOCK {
-                    unsafe { ROW_AMAX[lane as usize] }
-                } else {
-                    0.0
-                };
-                let block_amax = warp_max_f32(partial);
-                if lane == 0 {
-                    unsafe {
-                        *out.get_unchecked_mut(row as usize) = block_amax;
-                    }
+                    *out.get_unchecked_mut(row as usize) = block_amax;
                 }
             }
         }
@@ -97,26 +82,11 @@ pub(crate) mod module {
             )
         };
 
-        let warp_amax = warp_max_f32(local_amax);
-        if lane == 0 {
+        if let Some(block_amax) =
+            unsafe { block_max_leader_f32(&mut TENSOR_AMAX, local_amax, lane, warp_in_block) }
+        {
             unsafe {
-                TENSOR_AMAX[warp_in_block as usize] = warp_amax;
-            }
-        }
-
-        thread::sync_threads();
-
-        if warp_in_block == 0 {
-            let partial = if lane < WARPS_PER_BLOCK {
-                unsafe { TENSOR_AMAX[lane as usize] }
-            } else {
-                0.0
-            };
-            let block_amax = warp_max_f32(partial);
-            if lane == 0 {
-                unsafe {
-                    *out.get_unchecked_mut(chunk as usize) = block_amax;
-                }
+                *out.get_unchecked_mut(chunk as usize) = block_amax;
             }
         }
     }
@@ -138,26 +108,11 @@ pub(crate) mod module {
             chunk += thread::blockDim_x();
         }
 
-        let warp_amax = warp_max_f32(local_amax);
-        if lane == 0 {
+        if let Some(block_amax) =
+            unsafe { block_max_leader_f32(&mut TENSOR_AMAX, local_amax, lane, warp_in_block) }
+        {
             unsafe {
-                TENSOR_AMAX[warp_in_block as usize] = warp_amax;
-            }
-        }
-
-        thread::sync_threads();
-
-        if warp_in_block == 0 {
-            let partial = if lane < WARPS_PER_BLOCK {
-                unsafe { TENSOR_AMAX[lane as usize] }
-            } else {
-                0.0
-            };
-            let block_amax = warp_max_f32(partial);
-            if lane == 0 {
-                unsafe {
-                    *out.get_unchecked_mut(0) = block_amax;
-                }
+                *out.get_unchecked_mut(0) = block_amax;
             }
         }
     }

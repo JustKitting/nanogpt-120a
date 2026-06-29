@@ -54,3 +54,35 @@ pub(crate) fn block_max_shared_f32<const WARPS: usize>(
 ) -> f32 {
     block_reduce_f32!(storage, WARPS as u32, local, lane, warp, warp_max_f32, 0.0)
 }
+
+#[allow(unused_unsafe)]
+#[inline(always)]
+pub(crate) fn block_max_leader_f32<const WARPS: usize>(
+    storage: &mut SharedArray<f32, WARPS>,
+    local: f32,
+    lane: u32,
+    warp: u32,
+) -> Option<f32> {
+    let warp_value = warp_max_f32(local);
+    if lane == 0 {
+        unsafe {
+            storage[warp as usize] = warp_value;
+        }
+    }
+
+    cuda_device::thread::sync_threads();
+
+    if warp == 0 {
+        let partial = if lane < WARPS as u32 {
+            unsafe { storage[lane as usize] }
+        } else {
+            0.0
+        };
+        let block_value = warp_max_f32(partial);
+        if lane == 0 {
+            return Some(block_value);
+        }
+    }
+
+    None
+}

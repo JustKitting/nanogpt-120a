@@ -1,6 +1,7 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use crate::amax::{amax4_f32, max4_f32};
+use crate::block_reduce::block_max_leader_f32;
 use crate::float_ptx::{abs_f32, max_f32};
 use crate::nvfp4::{nvfp4_rowwise_value, nvfp4_value};
 use crate::nvfp4_cast::{e2m1_value, e4m3_value};
@@ -472,26 +473,11 @@ pub(crate) mod module {
             )
         };
 
-        let warp_amax = warp_max_f32(local_amax);
-        if lane == 0 {
+        if let Some(block_amax) =
+            unsafe { block_max_leader_f32(&mut AMAX_REDUCE, local_amax, lane, warp_in_block) }
+        {
             unsafe {
-                AMAX_REDUCE[warp_in_block as usize] = warp_amax;
-            }
-        }
-
-        thread::sync_threads();
-
-        if warp_in_block == 0 {
-            let partial = if lane < AMAX_WARPS_PER_BLOCK {
-                unsafe { AMAX_REDUCE[lane as usize] }
-            } else {
-                0.0
-            };
-            let block_amax = warp_max_f32(partial);
-            if lane == 0 {
-                unsafe {
-                    *out.get_unchecked_mut(chunk as usize) = block_amax;
-                }
+                *out.get_unchecked_mut(chunk as usize) = block_amax;
             }
         }
     }
@@ -531,26 +517,11 @@ pub(crate) mod module {
             )
         };
 
-        let warp_amax = warp_max_f32(local_amax);
-        if lane == 0 {
+        if let Some(block_amax) =
+            unsafe { block_max_leader_f32(&mut AMAX_REDUCE, local_amax, lane, warp_in_block) }
+        {
             unsafe {
-                AMAX_REDUCE[warp_in_block as usize] = warp_amax;
-            }
-        }
-
-        thread::sync_threads();
-
-        if warp_in_block == 0 {
-            let partial = if lane < AMAX_WARPS_PER_BLOCK {
-                unsafe { AMAX_REDUCE[lane as usize] }
-            } else {
-                0.0
-            };
-            let block_amax = warp_max_f32(partial);
-            if lane == 0 {
-                unsafe {
-                    *out.get_unchecked_mut(chunk as usize) = block_amax;
-                }
+                *out.get_unchecked_mut(chunk as usize) = block_amax;
             }
         }
     }
@@ -945,32 +916,17 @@ pub(crate) mod module {
             chunk += stride * 4;
         }
 
-        let warp_amax = warp_max_f32(local_amax);
-        if lane == 0 {
-            unsafe {
-                AMAX_REDUCE[warp_in_block as usize] = warp_amax;
-            }
-        }
-
-        thread::sync_threads();
-
-        if warp_in_block == 0 {
-            let partial = if lane < AMAX_WARPS_PER_BLOCK {
-                unsafe { AMAX_REDUCE[lane as usize] }
+        if let Some(amax) =
+            unsafe { block_max_leader_f32(&mut AMAX_REDUCE, local_amax, lane, warp_in_block) }
+        {
+            let global_scale = if amax == 0.0 {
+                1.0
             } else {
-                0.0
+                amax * QUARTET_MS_EDEN_SCALE_OVERRIDE
+                    / (QUARTET_MS_EDEN_FP8_MAX * QUARTET_MS_EDEN_FP4_MAX)
             };
-            let amax = warp_max_f32(partial);
-            if lane == 0 {
-                let global_scale = if amax == 0.0 {
-                    1.0
-                } else {
-                    amax * QUARTET_MS_EDEN_SCALE_OVERRIDE
-                        / (QUARTET_MS_EDEN_FP8_MAX * QUARTET_MS_EDEN_FP4_MAX)
-                };
-                unsafe {
-                    *out_global_scale.get_unchecked_mut(0) = global_scale;
-                }
+            unsafe {
+                *out_global_scale.get_unchecked_mut(0) = global_scale;
             }
         }
     }
