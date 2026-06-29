@@ -6,10 +6,12 @@ use crate::mma::projection::Nvfp4ProjectionParams;
 use super::super::tile::Nvfp4ProjectionCtaTile;
 use super::common::{affine_value, affine_value_scaled, row_col};
 
-struct Relu2StoreArgs<'a> {
+struct Relu2StoreArgs<'a, 'pre, 'out> {
     input_global_scales: &'a [f32],
     bias_bytes: &'a [u8],
     bias_scales: &'a [u8],
+    pre_activation: &'a mut DisjointSlice<'pre, f32>,
+    out: &'a mut DisjointSlice<'out, f32>,
     params: &'a Nvfp4ProjectionParams,
 }
 
@@ -25,16 +27,18 @@ pub fn store_relu2_accumulator(
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
-    let args = Relu2StoreArgs {
+    let mut args = Relu2StoreArgs {
         input_global_scales,
         bias_bytes,
         bias_scales,
+        pre_activation,
+        out,
         params,
     };
-    store_one(acc[0], 0, pre_activation, out, tile, &args);
-    store_one(acc[1], 1, pre_activation, out, tile, &args);
-    store_one(acc[2], 2, pre_activation, out, tile, &args);
-    store_one(acc[3], 3, pre_activation, out, tile, &args);
+    store_one(acc[0], 0, tile, &mut args);
+    store_one(acc[1], 1, tile, &mut args);
+    store_one(acc[2], 2, tile, &mut args);
+    store_one(acc[3], 3, tile, &mut args);
 }
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
@@ -49,10 +53,12 @@ pub fn store_relu2_accumulator_aligned(
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
-    let args = Relu2StoreArgs {
+    let mut args = Relu2StoreArgs {
         input_global_scales,
         bias_bytes,
         bias_scales,
+        pre_activation,
+        out,
         params,
     };
     let row0 = tile.mma_row_base() + tile.group;
@@ -60,36 +66,16 @@ pub fn store_relu2_accumulator_aligned(
     let col0 = tile.mma_col_base() + tile.thread_in_group * 2;
     let scale0 = input_global_scales[row0 as usize] * params.weight_global_scale;
     let scale1 = input_global_scales[row1 as usize] * params.weight_global_scale;
-    store_pair_aligned(
-        acc[0],
-        acc[1],
-        row0,
-        col0,
-        scale0,
-        pre_activation,
-        out,
-        &args,
-    );
-    store_pair_aligned(
-        acc[2],
-        acc[3],
-        row1,
-        col0,
-        scale1,
-        pre_activation,
-        out,
-        &args,
-    );
+    store_pair_aligned(acc[0], acc[1], row0, col0, scale0, &mut args);
+    store_pair_aligned(acc[2], acc[3], row1, col0, scale1, &mut args);
 }
 
 #[inline(always)]
 fn store_one(
     acc: f32,
     index: u32,
-    pre_activation: &mut DisjointSlice<'_, f32>,
-    out: &mut DisjointSlice<'_, f32>,
     tile: Nvfp4ProjectionCtaTile,
-    args: &Relu2StoreArgs<'_>,
+    args: &mut Relu2StoreArgs<'_, '_, '_>,
 ) {
     let (row, col) = row_col(tile, index);
     if row < args.params.token_count && col < args.params.output_dim {
@@ -105,13 +91,12 @@ fn store_one(
         let relu = max_f32(pre, 0.0);
         let offset = row as usize * args.params.output_dim as usize + col as usize;
         unsafe {
-            *pre_activation.get_unchecked_mut(offset) = pre;
-            *out.get_unchecked_mut(offset) = relu * relu;
+            *args.pre_activation.get_unchecked_mut(offset) = pre;
+            *args.out.get_unchecked_mut(offset) = relu * relu;
         }
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 fn store_pair_aligned(
     acc0: f32,
@@ -119,9 +104,7 @@ fn store_pair_aligned(
     row: u32,
     col0: u32,
     scale: f32,
-    pre_activation: &mut DisjointSlice<'_, f32>,
-    out: &mut DisjointSlice<'_, f32>,
-    args: &Relu2StoreArgs<'_>,
+    args: &mut Relu2StoreArgs<'_, '_, '_>,
 ) {
     let pre0 = affine_value_scaled(
         acc0,
@@ -143,9 +126,9 @@ fn store_pair_aligned(
     let relu1 = max_f32(pre1, 0.0);
     let offset = row as usize * args.params.output_dim as usize + col0 as usize;
     unsafe {
-        *pre_activation.get_unchecked_mut(offset) = pre0;
-        *pre_activation.get_unchecked_mut(offset + 1) = pre1;
-        *out.get_unchecked_mut(offset) = relu0 * relu0;
-        *out.get_unchecked_mut(offset + 1) = relu1 * relu1;
+        *args.pre_activation.get_unchecked_mut(offset) = pre0;
+        *args.pre_activation.get_unchecked_mut(offset + 1) = pre1;
+        *args.out.get_unchecked_mut(offset) = relu0 * relu0;
+        *args.out.get_unchecked_mut(offset + 1) = relu1 * relu1;
     }
 }
