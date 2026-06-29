@@ -1,9 +1,6 @@
 macro_rules! cta_accumulators {
-    ($acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident) => {
-        let mut $acc0 = [0.0_f32; 4];
-        let mut $acc1 = [0.0_f32; 4];
-        let mut $acc2 = [0.0_f32; 4];
-        let mut $acc3 = [0.0_f32; 4];
+    ($($acc:ident),+ $(,)?) => {
+        $(let mut $acc = [0.0_f32; 4];)+
     };
 }
 
