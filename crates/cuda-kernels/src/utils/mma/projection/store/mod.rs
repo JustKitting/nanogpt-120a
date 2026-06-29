@@ -27,7 +27,6 @@ impl<'a> StoreAccumulatorArgs<'a> {
         input_global_scales: &'a [f32],
         bias_bytes: &'a [u8],
         bias_scales: &'a [u8],
-        _tile: Nvfp4ProjectionTile,
         params: &'a Nvfp4ProjectionParams,
     ) -> Self {
         Self {
@@ -40,11 +39,7 @@ impl<'a> StoreAccumulatorArgs<'a> {
 }
 
 impl<'a> StoreAccumulatorNoBiasArgs<'a> {
-    pub(super) fn new(
-        input_global_scales: &'a [f32],
-        _tile: Nvfp4ProjectionTile,
-        params: &'a Nvfp4ProjectionParams,
-    ) -> Self {
+    pub(super) fn new(input_global_scales: &'a [f32], params: &'a Nvfp4ProjectionParams) -> Self {
         Self {
             input_global_scales,
             params,

@@ -36,7 +36,7 @@ pub fn nvfp4_projection_kernel_body(
     store_accumulator(
         acc,
         tile,
-        StoreAccumulatorArgs::new(input_global_scales, bias_bytes, bias_scales, tile, &params),
+        StoreAccumulatorArgs::new(input_global_scales, bias_bytes, bias_scales, &params),
         out,
     );
 }
@@ -65,7 +65,7 @@ pub fn nvfp4_projection_nobias_kernel_body(
     store_accumulator_nobias(
         acc,
         tile,
-        StoreAccumulatorNoBiasArgs::new(input_global_scales, tile, &params),
+        StoreAccumulatorNoBiasArgs::new(input_global_scales, &params),
         out,
     );
 }
