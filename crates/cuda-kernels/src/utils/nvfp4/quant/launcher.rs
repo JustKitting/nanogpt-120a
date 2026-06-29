@@ -9,7 +9,7 @@ use super::args::{
     QuartetBackwardMsEdenQuantArgs, RowAmaxArgs, RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
     TensorAmaxArgs,
 };
-use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK, WARPS_PER_BLOCK};
+use super::config::{GROUPS_PER_BLOCK, THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 use super::kernels;
 use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
 
@@ -47,8 +47,7 @@ impl Nvfp4QuantModule {
         &self,
         args: Nvfp4QuantRowwiseArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
-        if args.row_len.is_power_of_two() && args.group_count % groups_per_block == 0 {
+        if args.row_len.is_power_of_two() && args.group_count % GROUPS_PER_BLOCK == 0 {
             return self.launch_fp32_to_nvfp4_four_six_rowwise_pow2(args);
         }
 
@@ -791,11 +790,9 @@ impl Nvfp4QuantModule {
         &self,
         args: Nvfp4QuantRowwiseArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
-
         self.four_six.fp32_to_nvfp4_four_six_kernel(
             args.stream,
-            grid_config(args.group_count.div_ceil(groups_per_block)),
+            grid_config(args.group_count.div_ceil(GROUPS_PER_BLOCK)),
             args.x,
             args.amax,
             args.out_fp4,
@@ -810,10 +807,9 @@ impl Nvfp4QuantModule {
         &self,
         args: Nvfp4QuantRowwiseArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let groups_per_block = THREADS_PER_BLOCK / GROUP_SIZE_U32;
         self.four_six.fp32_to_nvfp4_four_six_rowwise_pow2_kernel(
             args.stream,
-            grid_config(args.group_count.div_ceil(groups_per_block)),
+            grid_config(args.group_count.div_ceil(GROUPS_PER_BLOCK)),
             args.x,
             args.amax,
             args.out_fp4,
