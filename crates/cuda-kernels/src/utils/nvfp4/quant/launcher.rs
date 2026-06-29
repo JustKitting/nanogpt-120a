@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError};
 
 use super::args::{
     MsEdenDeviceScaleQuantArgs, MsEdenPairDeviceScaleQuantArgs, MsEdenQuantArgs,
@@ -9,8 +9,11 @@ use super::args::{
     QuartetBackwardMsEdenQuantArgs, RowAmaxArgs, RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
     TensorAmaxArgs,
 };
-use super::config::{GROUPS_PER_BLOCK, THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 use super::kernels;
+use super::shape::{
+    Fp32PairNoPad, MsEdenPackGrid, RowwiseTransposeNoPad, four_six_grid_config,
+    four_six_rowwise_pow2, grid_config, tensor_amax_chunk_count,
+};
 use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
 
 const SCALE_OVERRIDE: f32 = 1.0;
@@ -47,7 +50,7 @@ impl Nvfp4QuantModule {
         &self,
         args: Nvfp4QuantRowwiseArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        if args.row_len.is_power_of_two() && args.group_count % GROUPS_PER_BLOCK == 0 {
+        if four_six_rowwise_pow2(args.row_len, args.group_count) {
             return self.launch_fp32_to_nvfp4_four_six_rowwise_pow2(args);
         }
 
@@ -111,7 +114,7 @@ impl Nvfp4QuantModule {
         out: &mut DeviceBuffer<f32>,
         element_count: u32,
     ) -> Result<u32, DriverError> {
-        let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
+        let chunk_count = tensor_amax_chunk_count(element_count);
         self.row_amax.tensor_chunk_amax_f32_kernel(
             stream,
             grid_config(chunk_count),
@@ -123,16 +126,16 @@ impl Nvfp4QuantModule {
     }
 
     pub fn fp32_to_nvfp4_ms_eden(&self, args: MsEdenQuantArgs<'_, '_>) -> Result<(), DriverError> {
-        let chunk_count = ms_eden_chunk_count(args.row_count * args.dst_row_len);
+        let pack = MsEdenPackGrid::for_elements(args.row_count * args.dst_row_len);
         self.ms_eden.fp32_to_nvfp4_ms_eden_kernel(
             args.stream,
-            grid_config(pack_grid_dim(chunk_count)),
+            pack.config(),
             args.x,
             args.out_fp4,
             args.out_scales,
             args.out_global_scales,
             args.out_chunk_amax,
-            chunk_count,
+            pack.chunk_count,
             args.src_row_len,
             args.dst_row_len,
             args.global_scale,
@@ -146,17 +149,17 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let chunk_count = ms_eden_chunk_count(args.row_count * args.dst_row_len);
+        let pack = MsEdenPackGrid::for_elements(args.row_count * args.dst_row_len);
         self.ms_eden.fp32_to_nvfp4_ms_eden_device_scale_kernel(
             args.stream,
-            grid_config(pack_grid_dim(chunk_count)),
+            pack.config(),
             args.x,
             args.out_fp4,
             args.out_scales,
             args.out_global_scales,
             args.out_chunk_amax,
             args.global_scale,
-            chunk_count,
+            pack.chunk_count,
             args.src_row_len,
             args.dst_row_len,
             args.scale_override,
@@ -169,13 +172,13 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let chunk_count = ms_eden_chunk_count(args.row_count * args.dst_row_len);
-        if pack_grid_is_exact(chunk_count) {
+        let pack = MsEdenPackGrid::for_elements(args.row_count * args.dst_row_len);
+        if pack.is_exact() {
             return self
                 .ms_eden
                 .fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    grid_config(pack_grid_dim(chunk_count)),
+                    pack.config(),
                     args.x,
                     args.out_fp4,
                     args.out_scales,
@@ -192,13 +195,13 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
-                grid_config(pack_grid_dim(chunk_count)),
+                pack.config(),
                 args.x,
                 args.out_fp4,
                 args.out_scales,
                 args.out_global_scales,
                 args.global_scale,
-                chunk_count,
+                pack.chunk_count,
                 args.src_row_len,
                 args.dst_row_len,
                 args.scale_override,
@@ -211,18 +214,18 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenTransposeDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
+        let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
         self.ms_eden
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
-                grid_config(pack_grid_dim(chunk_count)),
+                pack.config(),
                 args.x,
                 args.out_fp4,
                 args.out_scales,
                 args.out_global_scales,
                 args.out_chunk_amax,
                 args.global_scale,
-                chunk_count,
+                pack.chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -236,13 +239,13 @@ impl Nvfp4QuantModule {
         &self,
         args: MsEdenTransposeDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
-        if pack_grid_is_exact(chunk_count) {
+        let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
+        if pack.is_exact() {
             return self
                 .ms_eden
                 .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    grid_config(pack_grid_dim(chunk_count)),
+                    pack.config(),
                     args.x,
                     args.out_fp4,
                     args.out_scales,
@@ -260,13 +263,13 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
-                grid_config(pack_grid_dim(chunk_count)),
+                pack.config(),
                 args.x,
                 args.out_fp4,
                 args.out_scales,
                 args.out_global_scales,
                 args.global_scale,
-                chunk_count,
+                pack.chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -298,52 +301,47 @@ impl Nvfp4QuantModule {
             chunk_count,
         )?;
 
-        let row_chunk_count = ms_eden_chunk_count(args.row_count * args.dst_row_len);
-        let transpose_chunk_count =
-            ms_eden_chunk_count(args.src_row_len * args.transpose_dst_row_len);
-        if pack_grid_is_exact(row_chunk_count) && pack_grid_is_exact(transpose_chunk_count) {
-            let row_grid_dim = pack_grid_dim(row_chunk_count);
-            let transpose_grid_dim = pack_grid_dim(transpose_chunk_count);
-            if fp32_pair_has_no_padding_pow2(
+        let row_pack = MsEdenPackGrid::for_elements(args.row_count * args.dst_row_len);
+        let transpose_pack =
+            MsEdenPackGrid::for_elements(args.src_row_len * args.transpose_dst_row_len);
+        if row_pack.is_exact() && transpose_pack.is_exact() {
+            let grid = grid_config(row_pack.grid_dim + transpose_pack.grid_dim);
+            if let Some(no_pad) = Fp32PairNoPad::new(
                 args.row_count,
                 args.src_row_len,
                 args.dst_row_len,
                 args.transpose_dst_row_len,
             ) {
-                return self
-                    .ms_eden
-                    .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel(
-                        args.stream,
-                        grid_config(row_grid_dim + transpose_grid_dim),
-                        args.x,
-                        args.out_fp4,
-                        args.out_scales,
-                        args.out_global_scales,
-                        args.transpose_out_fp4,
-                        args.transpose_out_scales,
-                        args.transpose_out_global_scales,
-                        &*args.out_global_scale,
-                        row_grid_dim,
-                        args.src_row_len,
-                        (args.dst_row_len / 32).trailing_zeros(),
-                        (args.transpose_dst_row_len / 32).trailing_zeros(),
-                        args.scale_override,
-                        args.sign_seed,
-                        args.scale_seed,
-                        args.transpose_scale_seed,
-                    );
-            }
-            if fp32_pair_has_no_padding(
-                args.row_count,
-                args.src_row_len,
-                args.dst_row_len,
-                args.transpose_dst_row_len,
-            ) {
+                if let Some(pow2) = no_pad.pow2() {
+                    return self
+                        .ms_eden
+                        .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel(
+                            args.stream,
+                            grid,
+                            args.x,
+                            args.out_fp4,
+                            args.out_scales,
+                            args.out_global_scales,
+                            args.transpose_out_fp4,
+                            args.transpose_out_scales,
+                            args.transpose_out_global_scales,
+                            &*args.out_global_scale,
+                            row_pack.grid_dim,
+                            args.src_row_len,
+                            pow2.chunks_per_row_shift,
+                            pow2.transpose_chunks_per_row_shift,
+                            args.scale_override,
+                            args.sign_seed,
+                            args.scale_seed,
+                            args.transpose_scale_seed,
+                        );
+                }
+
                 return self
                     .ms_eden
                     .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
                         args.stream,
-                        grid_config(row_grid_dim + transpose_grid_dim),
+                        grid,
                         args.x,
                         args.out_fp4,
                         args.out_scales,
@@ -352,10 +350,10 @@ impl Nvfp4QuantModule {
                         args.transpose_out_scales,
                         args.transpose_out_global_scales,
                         &*args.out_global_scale,
-                        row_grid_dim,
+                        row_pack.grid_dim,
                         args.src_row_len,
-                        args.dst_row_len / 32,
-                        args.transpose_dst_row_len / 32,
+                        no_pad.chunks_per_row,
+                        no_pad.transpose_chunks_per_row,
                         args.scale_override,
                         args.sign_seed,
                         args.scale_seed,
@@ -367,7 +365,7 @@ impl Nvfp4QuantModule {
                 .ms_eden
                 .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    grid_config(row_grid_dim + transpose_grid_dim),
+                    grid,
                     args.x,
                     args.out_fp4,
                     args.out_scales,
@@ -376,7 +374,7 @@ impl Nvfp4QuantModule {
                     args.transpose_out_scales,
                     args.transpose_out_global_scales,
                     &*args.out_global_scale,
-                    row_grid_dim,
+                    row_pack.grid_dim,
                     args.row_count,
                     args.src_row_len,
                     args.dst_row_len,
@@ -428,11 +426,11 @@ impl Nvfp4QuantModule {
         mut args: RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         self.derive_rowwise_nvfp4_transpose_global_scale(&mut args)?;
-        let pack_chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
+        let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
         self.ms_eden
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
-                grid_config(pack_grid_dim(pack_chunk_count)),
+                pack.config(),
                 args.input.bytes,
                 args.input.scales,
                 args.input.global_scales,
@@ -441,7 +439,7 @@ impl Nvfp4QuantModule {
                 args.out_global_scales,
                 args.out_chunk_amax,
                 &*args.out_global_scale,
-                pack_chunk_count,
+                pack.chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -456,15 +454,17 @@ impl Nvfp4QuantModule {
         mut args: RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         self.derive_rowwise_nvfp4_transpose_global_scale(&mut args)?;
-        let pack_chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
-        if pack_grid_is_exact(pack_chunk_count) {
-            if rowwise_transpose_has_no_padding(args.source_rows, args.dst_row_len) {
-                if args.source_cols.is_power_of_two() {
+        let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
+        if pack.is_exact() {
+            if let Some(no_pad) =
+                RowwiseTransposeNoPad::new(args.source_rows, args.source_cols, args.dst_row_len)
+            {
+                if let Some(source_cols_shift) = no_pad.source_cols_shift() {
                     return self
                         .ms_eden
                         .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_source_cols_pow2_kernel(
                             args.stream,
-                            grid_config(pack_grid_dim(pack_chunk_count)),
+                            pack.config(),
                             args.input.bytes,
                             args.input.scales,
                             args.input.global_scales,
@@ -472,8 +472,8 @@ impl Nvfp4QuantModule {
                             args.out_scales,
                             args.out_global_scales,
                             &*args.out_global_scale,
-                            args.source_cols.trailing_zeros(),
-                            (args.dst_row_len / 32).trailing_zeros(),
+                            source_cols_shift,
+                            no_pad.chunks_per_row_shift,
                             QUARTET_MS_EDEN_SCALE_OVERRIDE,
                             args.sign_seed,
                             args.scale_seed,
@@ -484,7 +484,7 @@ impl Nvfp4QuantModule {
                     .ms_eden
                     .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
                         args.stream,
-                        grid_config(pack_grid_dim(pack_chunk_count)),
+                        pack.config(),
                         args.input.bytes,
                         args.input.scales,
                         args.input.global_scales,
@@ -492,8 +492,8 @@ impl Nvfp4QuantModule {
                         args.out_scales,
                         args.out_global_scales,
                         &*args.out_global_scale,
-                        args.source_cols,
-                        (args.dst_row_len / 32).trailing_zeros(),
+                        no_pad.source_cols,
+                        no_pad.chunks_per_row_shift,
                         QUARTET_MS_EDEN_SCALE_OVERRIDE,
                         args.sign_seed,
                         args.scale_seed,
@@ -504,7 +504,7 @@ impl Nvfp4QuantModule {
                 .ms_eden
                 .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    grid_config(pack_grid_dim(pack_chunk_count)),
+                    pack.config(),
                     args.input.bytes,
                     args.input.scales,
                     args.input.global_scales,
@@ -524,7 +524,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
-                grid_config(pack_grid_dim(pack_chunk_count)),
+                pack.config(),
                 args.input.bytes,
                 args.input.scales,
                 args.input.global_scales,
@@ -532,7 +532,7 @@ impl Nvfp4QuantModule {
                 args.out_scales,
                 args.out_global_scales,
                 &*args.out_global_scale,
-                pack_chunk_count,
+                pack.chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -546,8 +546,7 @@ impl Nvfp4QuantModule {
         &self,
         args: &mut RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let chunk_count = (args.source_rows * args.source_cols)
-            .div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
+        let chunk_count = tensor_amax_chunk_count(args.source_rows * args.source_cols);
         self.ms_eden.rowwise_nvfp4_chunk_amax_kernel(
             args.stream,
             grid_config(chunk_count),
@@ -572,11 +571,11 @@ impl Nvfp4QuantModule {
         mut args: Nvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         self.derive_nvfp4_transpose_global_scale(&mut args)?;
-        let pack_chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
+        let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
         self.ms_eden
             .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
-                grid_config(pack_grid_dim(pack_chunk_count)),
+                pack.config(),
                 args.input.bytes,
                 args.input.scales,
                 args.input.global_scale,
@@ -585,7 +584,7 @@ impl Nvfp4QuantModule {
                 args.out_global_scales,
                 args.out_chunk_amax,
                 &*args.out_global_scale,
-                pack_chunk_count,
+                pack.chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -600,13 +599,13 @@ impl Nvfp4QuantModule {
         mut args: Nvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         self.derive_nvfp4_transpose_global_scale(&mut args)?;
-        let pack_chunk_count = ms_eden_chunk_count(args.source_cols * args.dst_row_len);
-        if pack_grid_is_exact(pack_chunk_count) {
+        let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
+        if pack.is_exact() {
             return self
                 .ms_eden
                 .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
-                    grid_config(pack_grid_dim(pack_chunk_count)),
+                    pack.config(),
                     args.input.bytes,
                     args.input.scales,
                     args.input.global_scale,
@@ -626,7 +625,7 @@ impl Nvfp4QuantModule {
         self.ms_eden
             .nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
-                grid_config(pack_grid_dim(pack_chunk_count)),
+                pack.config(),
                 args.input.bytes,
                 args.input.scales,
                 args.input.global_scale,
@@ -634,7 +633,7 @@ impl Nvfp4QuantModule {
                 args.out_scales,
                 args.out_global_scales,
                 &*args.out_global_scale,
-                pack_chunk_count,
+                pack.chunk_count,
                 args.source_rows,
                 args.source_cols,
                 args.dst_row_len,
@@ -649,7 +648,7 @@ impl Nvfp4QuantModule {
         args: &mut Nvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         let element_count = args.source_rows * args.source_cols;
-        let chunk_count = element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK);
+        let chunk_count = tensor_amax_chunk_count(element_count);
         self.ms_eden.nvfp4_chunk_amax_kernel(
             args.stream,
             grid_config(chunk_count),
@@ -760,7 +759,7 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         self.four_six.fp32_to_nvfp4_four_six_kernel(
             args.stream,
-            grid_config(args.group_count.div_ceil(GROUPS_PER_BLOCK)),
+            four_six_grid_config(args.group_count),
             args.x,
             args.amax,
             args.out_fp4,
@@ -777,7 +776,7 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         self.four_six.fp32_to_nvfp4_four_six_rowwise_pow2_kernel(
             args.stream,
-            grid_config(args.group_count.div_ceil(GROUPS_PER_BLOCK)),
+            four_six_grid_config(args.group_count),
             args.x,
             args.amax,
             args.out_fp4,
@@ -788,57 +787,4 @@ impl Nvfp4QuantModule {
             SCALE_OVERRIDE,
         )
     }
-}
-
-fn grid_config(grid_x: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim: (grid_x, 1, 1),
-        block_dim: (THREADS_PER_BLOCK, 1, 1),
-        shared_mem_bytes: 0,
-    }
-}
-
-#[inline]
-fn ms_eden_chunk_count(element_count: u32) -> u32 {
-    element_count.div_ceil(32)
-}
-
-#[inline]
-fn pack_grid_dim(chunk_count: u32) -> u32 {
-    chunk_count.div_ceil(WARPS_PER_BLOCK)
-}
-
-#[inline]
-fn pack_grid_is_exact(chunk_count: u32) -> bool {
-    chunk_count % WARPS_PER_BLOCK == 0
-}
-
-#[inline]
-fn rowwise_transpose_has_no_padding(source_rows: u32, dst_row_len: u32) -> bool {
-    source_rows == dst_row_len && dst_row_len % 32 == 0 && (dst_row_len / 32).is_power_of_two()
-}
-
-#[inline]
-fn fp32_pair_has_no_padding_pow2(
-    row_count: u32,
-    src_row_len: u32,
-    dst_row_len: u32,
-    transpose_dst_row_len: u32,
-) -> bool {
-    fp32_pair_has_no_padding(row_count, src_row_len, dst_row_len, transpose_dst_row_len)
-        && (dst_row_len / 32).is_power_of_two()
-        && (transpose_dst_row_len / 32).is_power_of_two()
-}
-
-#[inline]
-fn fp32_pair_has_no_padding(
-    row_count: u32,
-    src_row_len: u32,
-    dst_row_len: u32,
-    transpose_dst_row_len: u32,
-) -> bool {
-    src_row_len == dst_row_len
-        && row_count == transpose_dst_row_len
-        && dst_row_len % 32 == 0
-        && transpose_dst_row_len % 32 == 0
 }

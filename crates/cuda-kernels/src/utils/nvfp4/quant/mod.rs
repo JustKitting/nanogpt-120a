@@ -2,6 +2,7 @@ mod args;
 mod config;
 pub(crate) mod kernels;
 mod launcher;
+mod shape;
 
 pub use args::{
     MsEdenDeviceScaleQuantArgs, MsEdenPairDeviceScaleQuantArgs, MsEdenQuantArgs,
