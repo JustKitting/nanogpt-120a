@@ -5,9 +5,7 @@ use crate::block_reduce::block_max_leader_f32;
 use crate::float_ptx::{abs_f32, max_f32};
 use crate::nvfp4::{nvfp4_rowwise_value, nvfp4_value};
 use crate::nvfp4_cast::{e2m1_value, e4m3_value};
-use crate::quartet::{
-    QUARTET_MS_EDEN_FP4_MAX, QUARTET_MS_EDEN_FP8_MAX, QUARTET_MS_EDEN_SCALE_OVERRIDE,
-};
+use crate::quartet::quartet_backward_ms_eden_global_scale;
 use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32, warp_max_f32};
 
 use super::convert::{
@@ -919,14 +917,9 @@ pub(crate) mod module {
         if let Some(amax) =
             unsafe { block_max_leader_f32(&mut AMAX_REDUCE, local_amax, lane, warp_in_block) }
         {
-            let global_scale = if amax == 0.0 {
-                1.0
-            } else {
-                amax * QUARTET_MS_EDEN_SCALE_OVERRIDE
-                    / (QUARTET_MS_EDEN_FP8_MAX * QUARTET_MS_EDEN_FP4_MAX)
-            };
             unsafe {
-                *out_global_scale.get_unchecked_mut(0) = global_scale;
+                *out_global_scale.get_unchecked_mut(0) =
+                    quartet_backward_ms_eden_global_scale(amax);
             }
         }
     }
