@@ -22,12 +22,9 @@ pub fn nvfp4_projection_kernel_body(
     out: &mut DisjointSlice<'_, f32>,
     params: Nvfp4ProjectionParams,
 ) {
-    let lane = thread::threadIdx_x();
-    if lane >= NVFP4_PROJECTION_THREADS_PER_BLOCK {
+    let Some(tile) = active_projection_tile() else {
         return;
-    }
-
-    let tile = projection_tile(lane);
+    };
     let acc = nvfp4_projection_accumulate_tile(
         input_bytes,
         input_scales,
@@ -54,12 +51,9 @@ pub fn nvfp4_projection_nobias_kernel_body(
     out: &mut DisjointSlice<'_, f32>,
     params: Nvfp4ProjectionParams,
 ) {
-    let lane = thread::threadIdx_x();
-    if lane >= NVFP4_PROJECTION_THREADS_PER_BLOCK {
+    let Some(tile) = active_projection_tile() else {
         return;
-    }
-
-    let tile = projection_tile(lane);
+    };
     let acc = nvfp4_projection_accumulate_tile(
         input_bytes,
         input_scales,
@@ -77,11 +71,16 @@ pub fn nvfp4_projection_nobias_kernel_body(
 }
 
 #[inline(always)]
-pub(super) fn projection_tile(lane: u32) -> Nvfp4ProjectionTile {
-    Nvfp4ProjectionTile {
-        tile_col: thread::blockIdx_x() * NVFP4_PROJECTION_N,
-        tile_row: thread::blockIdx_y() * NVFP4_PROJECTION_M,
-        group: lane >> 2,
-        thread_in_group: lane & 0x3,
+pub(super) fn active_projection_tile() -> Option<Nvfp4ProjectionTile> {
+    let lane = thread::threadIdx_x();
+    if lane >= NVFP4_PROJECTION_THREADS_PER_BLOCK {
+        None
+    } else {
+        Some(Nvfp4ProjectionTile {
+            tile_col: thread::blockIdx_x() * NVFP4_PROJECTION_N,
+            tile_row: thread::blockIdx_y() * NVFP4_PROJECTION_M,
+            group: lane >> 2,
+            thread_in_group: lane & 0x3,
+        })
     }
 }

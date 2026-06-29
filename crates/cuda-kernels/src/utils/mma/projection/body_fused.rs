@@ -1,8 +1,8 @@
-use cuda_device::{DisjointSlice, thread};
+use cuda_device::DisjointSlice;
 
 use super::accumulate::nvfp4_projection_accumulate_tile;
-use super::args::{NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams};
-use super::body::projection_tile;
+use super::args::Nvfp4ProjectionParams;
+use super::body::active_projection_tile;
 use super::store::{StoreAccumulatorArgs, store_relu2_accumulator, store_residual_accumulator};
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
@@ -19,12 +19,9 @@ pub fn nvfp4_projection_relu2_kernel_body(
     out: &mut DisjointSlice<'_, f32>,
     params: Nvfp4ProjectionParams,
 ) {
-    let lane = thread::threadIdx_x();
-    if lane >= NVFP4_PROJECTION_THREADS_PER_BLOCK {
+    let Some(tile) = active_projection_tile() else {
         return;
-    }
-
-    let tile = projection_tile(lane);
+    };
     let acc = nvfp4_projection_accumulate_tile(
         input_bytes,
         input_scales,
@@ -52,12 +49,9 @@ pub fn nvfp4_projection_residual_kernel_body(
     projection_out: &mut DisjointSlice<'_, f32>,
     params: Nvfp4ProjectionParams,
 ) {
-    let lane = thread::threadIdx_x();
-    if lane >= NVFP4_PROJECTION_THREADS_PER_BLOCK {
+    let Some(tile) = active_projection_tile() else {
         return;
-    }
-
-    let tile = projection_tile(lane);
+    };
     let acc = nvfp4_projection_accumulate_tile(
         input_bytes,
         input_scales,
