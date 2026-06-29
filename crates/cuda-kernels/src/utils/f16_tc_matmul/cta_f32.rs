@@ -4,7 +4,7 @@ use super::cta_stage::{load_a_fragments, load_b_fragments};
 use super::cta_stage_f32::{stage_tiles_f32_b_t, stage_tiles_f32_b_t_aligned};
 use super::cta_store::{store, store_aligned};
 use super::cta_sync::sync_before_next_k;
-use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_M, CTA_N, CTA_THREADS, CtaTile};
+use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_M, CTA_N, active_tile};
 use crate::mma::mma_m16n8k16_f16_f16_f32;
 
 pub(super) fn cta_matmul_f32_body(
@@ -18,12 +18,9 @@ pub(super) fn cta_matmul_f32_body(
     n: u32,
     k: u32,
 ) {
-    let thread_id = thread::threadIdx_x();
-    if thread_id >= CTA_THREADS || thread::blockIdx_z() >= batch_count {
+    let Some(tile) = active_tile(batch_count) else {
         return;
-    }
-
-    let tile = CtaTile::new(thread_id);
+    };
     let mut acc0 = [0.0_f32; 4];
     let mut acc1 = [0.0_f32; 4];
     let mut acc2 = [0.0_f32; 4];
