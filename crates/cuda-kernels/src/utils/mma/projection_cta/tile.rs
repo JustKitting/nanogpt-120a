@@ -62,11 +62,6 @@ pub fn projection_cta_grid_dim(token_count: u32, output_dim: u32) -> (u32, u32, 
     )
 }
 
-pub fn projection_cta_tile_count(token_count: u32, output_dim: u32) -> u32 {
-    let grid = projection_cta_grid_dim(token_count, output_dim);
-    grid.0 * grid.1
-}
-
 pub fn projection_cta_row_pair_grid_dim(token_count: u32, output_dim: u32) -> (u32, u32, u32) {
     let grid = projection_cta_grid_dim(token_count, output_dim);
     (grid.0, grid.1.div_ceil(2), 1)

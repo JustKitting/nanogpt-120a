@@ -18,5 +18,4 @@ pub use tile::{
     NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_M,
     NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile,
     projection_cta_grid_dim, projection_cta_row_pair_grid_dim, projection_cta_row_pair_tile_count,
-    projection_cta_tile_count,
 };

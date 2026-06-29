@@ -24,6 +24,5 @@ pub use projection_cta::{
     nvfp4_projection_cta_relu2_kernel_body,
     nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair, projection_cta_grid_dim,
     projection_cta_row_pair_grid_dim, projection_cta_row_pair_tile_count,
-    projection_cta_tile_count,
 };
 pub use tensors::{Nvfp4DeviceScaleMmaWeightTensor, Nvfp4FourSixMmaWeightTensor};
