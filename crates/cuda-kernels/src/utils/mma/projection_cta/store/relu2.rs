@@ -35,10 +35,7 @@ pub fn store_relu2_accumulator(
         out,
         params,
     };
-    store_one(acc[0], 0, tile, &mut args);
-    store_one(acc[1], 1, tile, &mut args);
-    store_one(acc[2], 2, tile, &mut args);
-    store_one(acc[3], 3, tile, &mut args);
+    store_acc4!(store_one, acc, tile, &mut args);
 }
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]

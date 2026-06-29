@@ -1,3 +1,12 @@
+macro_rules! store_acc4 {
+    ($store:ident, $acc:ident, $($args:expr),+ $(,)?) => {
+        $store($acc[0], 0, $($args),+);
+        $store($acc[1], 1, $($args),+);
+        $store($acc[2], 2, $($args),+);
+        $store($acc[3], 3, $($args),+);
+    };
+}
+
 pub mod f16;
 pub mod mxf4nvf4;
 pub mod projection;

@@ -13,10 +13,7 @@ pub fn store_accumulator(
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
-    store_one(acc[0], 0, input_global_scales, out, tile, params);
-    store_one(acc[1], 1, input_global_scales, out, tile, params);
-    store_one(acc[2], 2, input_global_scales, out, tile, params);
-    store_one(acc[3], 3, input_global_scales, out, tile, params);
+    store_acc4!(store_one, acc, input_global_scales, out, tile, params);
 }
 
 #[inline(always)]

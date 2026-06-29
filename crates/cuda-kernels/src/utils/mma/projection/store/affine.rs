@@ -12,10 +12,7 @@ pub(crate) fn store_accumulator(
     args: StoreAccumulatorArgs<'_>,
     out: &mut DisjointSlice<'_, f32>,
 ) {
-    store_one(acc[0], 0, tile, &args, out);
-    store_one(acc[1], 1, tile, &args, out);
-    store_one(acc[2], 2, tile, &args, out);
-    store_one(acc[3], 3, tile, &args, out);
+    store_acc4!(store_one, acc, tile, &args, out);
 }
 
 #[inline(always)]
@@ -26,10 +23,7 @@ pub(crate) fn store_relu2_accumulator(
     pre_activation: &mut DisjointSlice<'_, f32>,
     out: &mut DisjointSlice<'_, f32>,
 ) {
-    store_relu2_one(acc[0], 0, tile, &args, pre_activation, out);
-    store_relu2_one(acc[1], 1, tile, &args, pre_activation, out);
-    store_relu2_one(acc[2], 2, tile, &args, pre_activation, out);
-    store_relu2_one(acc[3], 3, tile, &args, pre_activation, out);
+    store_acc4!(store_relu2_one, acc, tile, &args, pre_activation, out);
 }
 
 #[inline(always)]
@@ -40,10 +34,14 @@ pub(crate) fn store_residual_accumulator(
     residual: &mut DisjointSlice<'_, f32>,
     projection_out: &mut DisjointSlice<'_, f32>,
 ) {
-    store_residual_one(acc[0], 0, tile, &args, residual, projection_out);
-    store_residual_one(acc[1], 1, tile, &args, residual, projection_out);
-    store_residual_one(acc[2], 2, tile, &args, residual, projection_out);
-    store_residual_one(acc[3], 3, tile, &args, residual, projection_out);
+    store_acc4!(
+        store_residual_one,
+        acc,
+        tile,
+        &args,
+        residual,
+        projection_out
+    );
 }
 
 #[inline(always)]

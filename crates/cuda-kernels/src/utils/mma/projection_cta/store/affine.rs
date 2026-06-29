@@ -28,10 +28,7 @@ pub fn store_affine_accumulator(
         bias_scales,
         params,
     };
-    store_one(acc[0], 0, out, tile, &args);
-    store_one(acc[1], 1, out, tile, &args);
-    store_one(acc[2], 2, out, tile, &args);
-    store_one(acc[3], 3, out, tile, &args);
+    store_acc4!(store_one, acc, out, tile, &args);
 }
 
 #[inline(always)]

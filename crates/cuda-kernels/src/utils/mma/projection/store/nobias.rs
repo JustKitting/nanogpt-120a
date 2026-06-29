@@ -10,10 +10,7 @@ pub(crate) fn store_accumulator_nobias(
     args: StoreAccumulatorNoBiasArgs<'_>,
     out: &mut DisjointSlice<'_, f32>,
 ) {
-    store_one(acc[0], 0, tile, &args, out);
-    store_one(acc[1], 1, tile, &args, out);
-    store_one(acc[2], 2, tile, &args, out);
-    store_one(acc[3], 3, tile, &args, out);
+    store_acc4!(store_one, acc, tile, &args, out);
 }
 
 #[inline(always)]
