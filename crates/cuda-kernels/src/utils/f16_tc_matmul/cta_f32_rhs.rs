@@ -20,10 +20,7 @@ pub(super) fn cta_matmul_f32_rhs_body(
     let Some(tile) = active_tile(batch_count) else {
         return;
     };
-    let mut acc0 = [0.0_f32; 4];
-    let mut acc1 = [0.0_f32; 4];
-    let mut acc2 = [0.0_f32; 4];
-    let mut acc3 = [0.0_f32; 4];
+    cta_accumulators!(acc0, acc1, acc2, acc3);
     let mut k_base = 0;
     while k_base < k {
         stage_tiles_f32_rhs_transposed(a, rhs, a_tile, b_tile, tile, m, n, k, k_base);

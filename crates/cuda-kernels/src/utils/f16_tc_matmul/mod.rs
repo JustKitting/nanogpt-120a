@@ -1,3 +1,12 @@
+macro_rules! cta_accumulators {
+    ($acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident) => {
+        let mut $acc0 = [0.0_f32; 4];
+        let mut $acc1 = [0.0_f32; 4];
+        let mut $acc2 = [0.0_f32; 4];
+        let mut $acc3 = [0.0_f32; 4];
+    };
+}
+
 macro_rules! cta_mma4 {
     ($a_tile:expr, $b_tile:expr, $tile:expr, $acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident) => {{
         let tile = $tile;

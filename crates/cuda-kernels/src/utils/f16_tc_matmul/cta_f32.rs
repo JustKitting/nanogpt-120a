@@ -19,10 +19,7 @@ pub(super) fn cta_matmul_f32_body(
     let Some(tile) = active_tile(batch_count) else {
         return;
     };
-    let mut acc0 = [0.0_f32; 4];
-    let mut acc1 = [0.0_f32; 4];
-    let mut acc2 = [0.0_f32; 4];
-    let mut acc3 = [0.0_f32; 4];
+    cta_accumulators!(acc0, acc1, acc2, acc3);
     let aligned = m % CTA_M == 0 && n % CTA_N == 0 && k % CTA_K == 0;
     let mut k_base = 0;
     while k_base < k {
