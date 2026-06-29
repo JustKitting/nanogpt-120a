@@ -38,7 +38,9 @@ impl TransposeModule {
             args.stream,
             LaunchConfig {
                 grid_dim: (
-                    element_count(args.rows, args.cols).div_ceil(TRANSPOSE_THREADS_PER_BLOCK),
+                    args.rows
+                        .saturating_mul(args.cols)
+                        .div_ceil(TRANSPOSE_THREADS_PER_BLOCK),
                     1,
                     1,
                 ),
@@ -53,10 +55,6 @@ impl TransposeModule {
             },
         )
     }
-}
-
-fn element_count(rows: u32, cols: u32) -> u32 {
-    rows.saturating_mul(cols)
 }
 
 #[cuda_module]
