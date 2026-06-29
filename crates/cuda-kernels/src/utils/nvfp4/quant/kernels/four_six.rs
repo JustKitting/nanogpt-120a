@@ -178,16 +178,10 @@ pub(crate) mod module {
             half_warp_sum_f32(candidate_error(value, scale_six, global_scale), group_mask);
         let err_four =
             half_warp_sum_f32(candidate_error(value, scale_four, global_scale), group_mask);
-        let grid_max = if err_six <= err_four { 6.0 } else { 4.0 };
-        let scale_bits = if grid_max == 6.0 {
-            scale_bits_six
+        let (scale_bits, scale) = if err_six <= err_four {
+            (scale_bits_six, scale_six)
         } else {
-            scale_bits_four
-        };
-        let scale = if grid_max == 6.0 {
-            scale_six
-        } else {
-            scale_four
+            (scale_bits_four, scale_four)
         };
         (scale_bits as u8, nvfp4_inv_scale(scale, global_scale))
     }

@@ -847,8 +847,7 @@ fn pack_grid_is_exact(chunk_count: u32) -> bool {
 
 #[inline]
 fn rowwise_transpose_has_no_padding(source_rows: u32, dst_row_len: u32) -> bool {
-    let chunks_per_row = dst_row_len / 32;
-    source_rows == dst_row_len && dst_row_len % 32 == 0 && chunks_per_row.is_power_of_two()
+    source_rows == dst_row_len && dst_row_len % 32 == 0 && (dst_row_len / 32).is_power_of_two()
 }
 
 #[inline]
