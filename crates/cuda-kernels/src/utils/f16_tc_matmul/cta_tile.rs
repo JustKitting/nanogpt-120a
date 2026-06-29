@@ -51,4 +51,11 @@ impl CtaTile {
             thread_in_group: lane & 0x3,
         }
     }
+
+    #[inline(always)]
+    pub(crate) fn accumulator_coords(self, warp_n: u32, acc_index: usize) -> (u32, u32) {
+        let row = self.row_base + self.warp_m * 16 + self.group + if acc_index < 2 { 0 } else { 8 };
+        let col = self.col_base + warp_n * 8 + self.thread_in_group * 2 + (acc_index as u32 & 1);
+        (row, col)
+    }
 }

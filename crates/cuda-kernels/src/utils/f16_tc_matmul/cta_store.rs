@@ -42,8 +42,7 @@ fn store_one(
     rows: u32,
     cols: u32,
 ) {
-    let row = tile.row_base + tile.warp_m * 16 + tile.group + if acc_index < 2 { 0 } else { 8 };
-    let col = tile.col_base + warp_n * 8 + tile.thread_in_group * 2 + (acc_index as u32 & 1);
+    let (row, col) = tile.accumulator_coords(warp_n, acc_index);
     if row < rows && col < cols {
         unsafe {
             *out.get_unchecked_mut(((tile.batch * rows + row) * cols + col) as usize) = acc;
@@ -61,8 +60,7 @@ fn store_one_aligned(
     rows: u32,
     cols: u32,
 ) {
-    let row = tile.row_base + tile.warp_m * 16 + tile.group + if acc_index < 2 { 0 } else { 8 };
-    let col = tile.col_base + warp_n * 8 + tile.thread_in_group * 2 + (acc_index as u32 & 1);
+    let (row, col) = tile.accumulator_coords(warp_n, acc_index);
     unsafe {
         *out.get_unchecked_mut(((tile.batch * rows + row) * cols + col) as usize) = acc;
     }

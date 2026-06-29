@@ -46,14 +46,7 @@ fn store_add_one(
     out: &mut DisjointSlice<f32>,
     args: &StoreAddArgs<'_>,
 ) {
-    let row = args.tile.row_base
-        + args.tile.warp_m * 16
-        + args.tile.group
-        + if acc_index < 2 { 0 } else { 8 };
-    let col = args.tile.col_base
-        + args.warp_n * 8
-        + args.tile.thread_in_group * 2
-        + (acc_index as u32 & 1);
+    let (row, col) = args.tile.accumulator_coords(args.warp_n, acc_index);
     if row < args.rows && col < args.cols {
         let offset = ((args.tile.batch * args.rows + row) * args.cols + col) as usize;
         unsafe {
