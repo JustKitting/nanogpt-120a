@@ -12,41 +12,33 @@ macro_rules! layer_norm_columns3 {
 
 macro_rules! layer_norm_map3 {
     ($cols:expr, |$col:ident| $body:expr) => {{
+        layer_norm_map3!(@items $cols, |$col| $body, 0, 1, 2)
+    }};
+    (@items $cols:expr, |$col:ident| $body:expr, $($index:expr),+ $(,)?) => {{
         [
-            {
-                let $col = $cols[0];
-                $body
-            },
-            {
-                let $col = $cols[1];
-                $body
-            },
-            {
-                let $col = $cols[2];
-                $body
-            },
+            $(
+                {
+                    let $col = $cols[$index];
+                    $body
+                },
+            )+
         ]
     }};
 }
 
 macro_rules! layer_norm_map3_indexed {
     ($cols:expr, |$index:ident, $col:ident| $body:expr) => {{
+        layer_norm_map3_indexed!(@items $cols, |$index, $col| $body, 0usize, 1usize, 2usize)
+    }};
+    (@items $cols:expr, |$index:ident, $col:ident| $body:expr, $($offset:expr),+ $(,)?) => {{
         [
-            {
-                let $index = 0usize;
-                let $col = $cols[$index];
-                $body
-            },
-            {
-                let $index = 1usize;
-                let $col = $cols[$index];
-                $body
-            },
-            {
-                let $index = 2usize;
-                let $col = $cols[$index];
-                $body
-            },
+            $(
+                {
+                    let $index = $offset;
+                    let $col = $cols[$index];
+                    $body
+                },
+            )+
         ]
     }};
 }
