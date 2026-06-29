@@ -86,13 +86,7 @@ pub(crate) fn softplus(x: f32) -> f32 {
 
 #[inline(always)]
 pub(crate) fn kda_decay_exp(x: f32) -> f32 {
-    exp_f32(if x > KDA_DECAY_EXP_LIMIT {
-        KDA_DECAY_EXP_LIMIT
-    } else if x < -KDA_DECAY_EXP_LIMIT {
-        -KDA_DECAY_EXP_LIMIT
-    } else {
-        x
-    })
+    exp_f32(x.clamp(-KDA_DECAY_EXP_LIMIT, KDA_DECAY_EXP_LIMIT))
 }
 
 #[inline(always)]
