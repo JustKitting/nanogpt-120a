@@ -149,50 +149,35 @@ fn stage_b_t_aligned(
     }
 }
 
-fn stage_rhs_transposed(
-    rhs: &[f32],
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-    tile: CtaTile,
-    n: u32,
-    k: u32,
-    k_base: u32,
-) {
-    let mut offset = thread::threadIdx_x();
-    while offset < CTA_B_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.col_base + row;
-        let global_col = k_base + col;
-        b_tile[offset as usize] = if global_row < n && global_col < k {
-            let index = ((tile.batch * k + global_col) * n + global_row) as usize;
-            cvt_rn_f16_f32(rhs[index])
-        } else {
-            0
-        };
-        offset += CTA_THREADS;
-    }
+macro_rules! stage_rhs_transposed_fn {
+    ($name:ident, $rhs_ty:ty, |$rhs:ident, $index:ident| $value:expr) => {
+        fn $name(
+            $rhs: &[$rhs_ty],
+            b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+            tile: CtaTile,
+            n: u32,
+            k: u32,
+            k_base: u32,
+        ) {
+            let mut offset = thread::threadIdx_x();
+            while offset < CTA_B_ELEMS as u32 {
+                let row = offset / CTA_K;
+                let col = offset - row * CTA_K;
+                let global_row = tile.col_base + row;
+                let global_col = k_base + col;
+                b_tile[offset as usize] = if global_row < n && global_col < k {
+                    let $index = ((tile.batch * k + global_col) * n + global_row) as usize;
+                    $value
+                } else {
+                    0
+                };
+                offset += CTA_THREADS;
+            }
+        }
+    };
 }
 
-fn stage_half_rhs_transposed(
-    rhs: &[u16],
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-    tile: CtaTile,
-    n: u32,
-    k: u32,
-    k_base: u32,
-) {
-    let mut offset = thread::threadIdx_x();
-    while offset < CTA_B_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.col_base + row;
-        let global_col = k_base + col;
-        b_tile[offset as usize] = if global_row < n && global_col < k {
-            let index = ((tile.batch * k + global_col) * n + global_row) as usize;
-            rhs[index]
-        } else {
-            0
-        };
-        offset += CTA_THREADS;
-    }
-}
+stage_rhs_transposed_fn!(stage_rhs_transposed, f32, |rhs, index| cvt_rn_f16_f32(
+    rhs[index]
+));
+stage_rhs_transposed_fn!(stage_half_rhs_transposed, u16, |rhs, index| rhs[index]);
