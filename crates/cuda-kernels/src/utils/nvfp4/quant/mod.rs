@@ -1,5 +1,6 @@
 mod args;
 mod config;
+mod global_scale;
 pub(crate) mod kernels;
 mod launcher;
 mod shape;
