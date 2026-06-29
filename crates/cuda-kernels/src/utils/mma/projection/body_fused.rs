@@ -30,7 +30,12 @@ pub fn nvfp4_projection_relu2_kernel_body(
         tile,
         &params,
     );
-    let args = StoreAccumulatorArgs::new(input_global_scales, bias_bytes, bias_scales, &params);
+    let args = StoreAccumulatorArgs {
+        input_global_scales,
+        bias_bytes,
+        bias_scales,
+        params: &params,
+    };
     store_relu2_accumulator(acc, tile, args, pre_activation, out);
 }
 
@@ -59,6 +64,11 @@ pub fn nvfp4_projection_residual_kernel_body(
         tile,
         &params,
     );
-    let args = StoreAccumulatorArgs::new(input_global_scales, bias_bytes, bias_scales, &params);
+    let args = StoreAccumulatorArgs {
+        input_global_scales,
+        bias_bytes,
+        bias_scales,
+        params: &params,
+    };
     store_residual_accumulator(acc, tile, args, residual, projection_out);
 }

@@ -11,40 +11,15 @@ pub(super) use affine::{store_accumulator, store_relu2_accumulator, store_residu
 pub(super) use nobias::store_accumulator_nobias;
 
 pub(super) struct StoreAccumulatorArgs<'a> {
-    input_global_scales: &'a [f32],
-    bias_bytes: &'a [u8],
-    bias_scales: &'a [u8],
-    params: &'a Nvfp4ProjectionParams,
+    pub(super) input_global_scales: &'a [f32],
+    pub(super) bias_bytes: &'a [u8],
+    pub(super) bias_scales: &'a [u8],
+    pub(super) params: &'a Nvfp4ProjectionParams,
 }
 
 pub(super) struct StoreAccumulatorNoBiasArgs<'a> {
-    input_global_scales: &'a [f32],
-    params: &'a Nvfp4ProjectionParams,
-}
-
-impl<'a> StoreAccumulatorArgs<'a> {
-    pub(super) fn new(
-        input_global_scales: &'a [f32],
-        bias_bytes: &'a [u8],
-        bias_scales: &'a [u8],
-        params: &'a Nvfp4ProjectionParams,
-    ) -> Self {
-        Self {
-            input_global_scales,
-            bias_bytes,
-            bias_scales,
-            params,
-        }
-    }
-}
-
-impl<'a> StoreAccumulatorNoBiasArgs<'a> {
-    pub(super) fn new(input_global_scales: &'a [f32], params: &'a Nvfp4ProjectionParams) -> Self {
-        Self {
-            input_global_scales,
-            params,
-        }
-    }
+    pub(super) input_global_scales: &'a [f32],
+    pub(super) params: &'a Nvfp4ProjectionParams,
 }
 
 #[inline(always)]
