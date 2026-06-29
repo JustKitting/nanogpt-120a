@@ -16,10 +16,7 @@ pub(super) fn stage_tiles(
     let thread_id = thread::threadIdx_x();
     let mut offset = thread_id;
     while offset < CTA_A_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.row_base + row;
-        let global_col = k_base + col;
+        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
         a_tile[offset as usize] = if global_row < m && global_col < k {
             a[((tile.batch * m + global_row) * k + global_col) as usize]
         } else {
@@ -30,10 +27,7 @@ pub(super) fn stage_tiles(
 
     let mut offset = thread_id;
     while offset < CTA_B_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.col_base + row;
-        let global_col = k_base + col;
+        let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
         b_tile[offset as usize] = if global_row < n && global_col < k {
             b_t[((tile.batch * n + global_row) * k + global_col) as usize]
         } else {
@@ -57,23 +51,24 @@ pub(super) fn stage_tiles_aligned(
     let thread_id = thread::threadIdx_x();
     let mut offset = thread_id;
     while offset < CTA_A_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.row_base + row;
-        let global_col = k_base + col;
+        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
         a_tile[offset as usize] = a[((tile.batch * m + global_row) * k + global_col) as usize];
         offset += CTA_THREADS;
     }
 
     let mut offset = thread_id;
     while offset < CTA_B_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.col_base + row;
-        let global_col = k_base + col;
+        let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
         b_tile[offset as usize] = b_t[((tile.batch * n + global_row) * k + global_col) as usize];
         offset += CTA_THREADS;
     }
+}
+
+#[inline(always)]
+pub(crate) fn stage_coords(offset: u32, row_base: u32, k_base: u32) -> (u32, u32) {
+    let row = offset / CTA_K;
+    let col = offset - row * CTA_K;
+    (row_base + row, k_base + col)
 }
 
 #[inline(always)]

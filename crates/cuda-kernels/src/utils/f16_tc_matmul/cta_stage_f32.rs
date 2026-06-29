@@ -1,7 +1,8 @@
 use cuda_device::{SharedArray, thread};
 
 use super::convert::cvt_rn_f16_f32;
-use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
+use super::cta_stage::stage_coords;
+use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_THREADS, CtaTile};
 
 pub(super) fn stage_tiles_f32_b_t(
     a: &[f32],
@@ -73,10 +74,7 @@ fn stage_a(
 ) {
     let mut offset = thread::threadIdx_x();
     while offset < CTA_A_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.row_base + row;
-        let global_col = k_base + col;
+        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
         a_tile[offset as usize] = if global_row < m && global_col < k {
             cvt_rn_f16_f32(a[((tile.batch * m + global_row) * k + global_col) as usize])
         } else {
@@ -96,10 +94,7 @@ fn stage_a_aligned(
 ) {
     let mut offset = thread::threadIdx_x();
     while offset < CTA_A_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.row_base + row;
-        let global_col = k_base + col;
+        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
         a_tile[offset as usize] =
             cvt_rn_f16_f32(a[((tile.batch * m + global_row) * k + global_col) as usize]);
         offset += CTA_THREADS;
@@ -116,10 +111,7 @@ fn stage_b_t(
 ) {
     let mut offset = thread::threadIdx_x();
     while offset < CTA_B_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.col_base + row;
-        let global_col = k_base + col;
+        let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
         b_tile[offset as usize] = if global_row < n && global_col < k {
             cvt_rn_f16_f32(b_t[((tile.batch * n + global_row) * k + global_col) as usize])
         } else {
@@ -139,10 +131,7 @@ fn stage_b_t_aligned(
 ) {
     let mut offset = thread::threadIdx_x();
     while offset < CTA_B_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let global_row = tile.col_base + row;
-        let global_col = k_base + col;
+        let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
         b_tile[offset as usize] =
             cvt_rn_f16_f32(b_t[((tile.batch * n + global_row) * k + global_col) as usize]);
         offset += CTA_THREADS;
@@ -161,10 +150,7 @@ macro_rules! stage_rhs_transposed_fn {
         ) {
             let mut offset = thread::threadIdx_x();
             while offset < CTA_B_ELEMS as u32 {
-                let row = offset / CTA_K;
-                let col = offset - row * CTA_K;
-                let global_row = tile.col_base + row;
-                let global_col = k_base + col;
+                let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
                 b_tile[offset as usize] = if global_row < n && global_col < k {
                     let $index = ((tile.batch * k + global_col) * n + global_row) as usize;
                     $value
