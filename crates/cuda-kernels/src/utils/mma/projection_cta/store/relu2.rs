@@ -6,6 +6,13 @@ use crate::mma::projection::Nvfp4ProjectionParams;
 use super::super::tile::Nvfp4ProjectionCtaTile;
 use super::common::{affine_value, affine_value_scaled, row_col};
 
+struct Relu2StoreArgs<'a> {
+    input_global_scales: &'a [f32],
+    bias_bytes: &'a [u8],
+    bias_scales: &'a [u8],
+    params: &'a Nvfp4ProjectionParams,
+}
+
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub fn store_relu2_accumulator(
@@ -18,50 +25,16 @@ pub fn store_relu2_accumulator(
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
-    store_one(
-        acc[0],
-        0,
+    let args = Relu2StoreArgs {
         input_global_scales,
         bias_bytes,
         bias_scales,
-        pre_activation,
-        out,
-        tile,
         params,
-    );
-    store_one(
-        acc[1],
-        1,
-        input_global_scales,
-        bias_bytes,
-        bias_scales,
-        pre_activation,
-        out,
-        tile,
-        params,
-    );
-    store_one(
-        acc[2],
-        2,
-        input_global_scales,
-        bias_bytes,
-        bias_scales,
-        pre_activation,
-        out,
-        tile,
-        params,
-    );
-    store_one(
-        acc[3],
-        3,
-        input_global_scales,
-        bias_bytes,
-        bias_scales,
-        pre_activation,
-        out,
-        tile,
-        params,
-    );
+    };
+    store_one(acc[0], 0, pre_activation, out, tile, &args);
+    store_one(acc[1], 1, pre_activation, out, tile, &args);
+    store_one(acc[2], 2, pre_activation, out, tile, &args);
+    store_one(acc[3], 3, pre_activation, out, tile, &args);
 }
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
@@ -76,6 +49,12 @@ pub fn store_relu2_accumulator_aligned(
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
+    let args = Relu2StoreArgs {
+        input_global_scales,
+        bias_bytes,
+        bias_scales,
+        params,
+    };
     let row0 = tile.mma_row_base() + tile.group;
     let row1 = row0 + 8;
     let col0 = tile.mma_col_base() + tile.thread_in_group * 2;
@@ -87,11 +66,9 @@ pub fn store_relu2_accumulator_aligned(
         row0,
         col0,
         scale0,
-        bias_bytes,
-        bias_scales,
         pre_activation,
         out,
-        params,
+        &args,
     );
     store_pair_aligned(
         acc[2],
@@ -99,40 +76,34 @@ pub fn store_relu2_accumulator_aligned(
         row1,
         col0,
         scale1,
-        bias_bytes,
-        bias_scales,
         pre_activation,
         out,
-        params,
+        &args,
     );
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 fn store_one(
     acc: f32,
     index: u32,
-    input_global_scales: &[f32],
-    bias_bytes: &[u8],
-    bias_scales: &[u8],
     pre_activation: &mut DisjointSlice<'_, f32>,
     out: &mut DisjointSlice<'_, f32>,
     tile: Nvfp4ProjectionCtaTile,
-    params: &Nvfp4ProjectionParams,
+    args: &Relu2StoreArgs<'_>,
 ) {
     let (row, col) = row_col(tile, index);
-    if row < params.token_count && col < params.output_dim {
+    if row < args.params.token_count && col < args.params.output_dim {
         let pre = affine_value(
             acc,
             row,
             col,
-            input_global_scales,
-            bias_bytes,
-            bias_scales,
-            params,
+            args.input_global_scales,
+            args.bias_bytes,
+            args.bias_scales,
+            args.params,
         );
         let relu = max_f32(pre, 0.0);
-        let offset = row as usize * params.output_dim as usize + col as usize;
+        let offset = row as usize * args.params.output_dim as usize + col as usize;
         unsafe {
             *pre_activation.get_unchecked_mut(offset) = pre;
             *out.get_unchecked_mut(offset) = relu * relu;
@@ -148,17 +119,29 @@ fn store_pair_aligned(
     row: u32,
     col0: u32,
     scale: f32,
-    bias_bytes: &[u8],
-    bias_scales: &[u8],
     pre_activation: &mut DisjointSlice<'_, f32>,
     out: &mut DisjointSlice<'_, f32>,
-    params: &Nvfp4ProjectionParams,
+    args: &Relu2StoreArgs<'_>,
 ) {
-    let pre0 = affine_value_scaled(acc0, scale, col0, bias_bytes, bias_scales, params);
-    let pre1 = affine_value_scaled(acc1, scale, col0 + 1, bias_bytes, bias_scales, params);
+    let pre0 = affine_value_scaled(
+        acc0,
+        scale,
+        col0,
+        args.bias_bytes,
+        args.bias_scales,
+        args.params,
+    );
+    let pre1 = affine_value_scaled(
+        acc1,
+        scale,
+        col0 + 1,
+        args.bias_bytes,
+        args.bias_scales,
+        args.params,
+    );
     let relu0 = max_f32(pre0, 0.0);
     let relu1 = max_f32(pre1, 0.0);
-    let offset = row as usize * params.output_dim as usize + col0 as usize;
+    let offset = row as usize * args.params.output_dim as usize + col0 as usize;
     unsafe {
         *pre_activation.get_unchecked_mut(offset) = pre0;
         *pre_activation.get_unchecked_mut(offset + 1) = pre1;
