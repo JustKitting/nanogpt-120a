@@ -85,13 +85,10 @@ macro_rules! layer_norm_store_f16_3 {
     }};
 }
 
-pub(crate) use layer_norm_columns3;
-pub(crate) use layer_norm_map3;
-pub(crate) use layer_norm_map3_indexed;
-pub(crate) use layer_norm_square_sum3;
-pub(crate) use layer_norm_store_f16_3;
-pub(crate) use layer_norm_store3;
-pub(crate) use layer_norm_sum3;
+pub(crate) use {
+    layer_norm_columns3, layer_norm_map3, layer_norm_map3_indexed, layer_norm_square_sum3,
+    layer_norm_store_f16_3, layer_norm_store3, layer_norm_sum3,
+};
 
 #[inline(always)]
 pub fn f32_column(values: &[f32], row_base: usize, col: u32, row_len: u32) -> f32 {
