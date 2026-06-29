@@ -42,15 +42,15 @@ impl LaunchDims {
     }
 
     pub(crate) fn cch(self) -> MatmulShape {
-        shape(self.chunk_size, self.chunk_size, self.head_dim)
+        MatmulShape(self.chunk_size, self.chunk_size, self.head_dim)
     }
 
     pub(crate) fn chc(self) -> MatmulShape {
-        shape(self.chunk_size, self.head_dim, self.chunk_size)
+        MatmulShape(self.chunk_size, self.head_dim, self.chunk_size)
     }
 
     pub(crate) fn ccc(self) -> MatmulShape {
-        shape(self.chunk_size, self.chunk_size, self.chunk_size)
+        MatmulShape(self.chunk_size, self.chunk_size, self.chunk_size)
     }
 }
 
@@ -85,10 +85,6 @@ fn launch_config(grid_dim: (u32, u32, u32), threads_per_block: u32) -> LaunchCon
 
 #[derive(Clone, Copy)]
 pub(crate) struct MatmulShape(u32, u32, u32);
-
-pub(crate) const fn shape(m: u32, n: u32, k: u32) -> MatmulShape {
-    MatmulShape(m, n, k)
-}
 
 pub(crate) struct MatmulRunner<'a> {
     stream: &'a CudaStream,
