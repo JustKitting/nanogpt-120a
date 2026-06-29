@@ -29,13 +29,12 @@ impl LaunchDims {
     ) -> Self {
         let batch_head = batch_size * head_count;
         let chunks = seq_len.div_ceil(chunk_size);
-        let chunk_batch = batch_head * chunks;
         Self {
             batch_head,
             chunks,
-            chunk_batch,
+            chunk_batch: batch_head * chunks,
             compact_elems: batch_head * seq_len * head_dim,
-            chunk_matrix_elems: chunk_batch * chunk_size * chunk_size,
+            chunk_matrix_elems: batch_head * chunks * chunk_size * chunk_size,
             chunk_size,
             head_dim,
         }
