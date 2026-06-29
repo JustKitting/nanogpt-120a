@@ -4,35 +4,31 @@ use super::convert::cvt_rn_f16_f32;
 use super::cta_stage::stage_coords;
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_THREADS, CtaTile};
 
-pub(super) fn stage_tiles_f32_a_transposed_rhs(
-    a: &[f32],
-    rhs: &[f32],
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-    tile: CtaTile,
-    m: u32,
-    n: u32,
-    k: u32,
-    k_base: u32,
-) {
-    stage_a_transposed(a, a_tile, tile, m, k, k_base);
-    stage_rhs(rhs, b_tile, tile, n, k, k_base);
+macro_rules! stage_tiles_a_transposed_fn {
+    ($name:ident, $rhs:ident: $rhs_ty:ty, $stage_rhs:path) => {
+        pub(super) fn $name(
+            a: &[f32],
+            $rhs: &[$rhs_ty],
+            a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+            b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+            tile: CtaTile,
+            m: u32,
+            n: u32,
+            k: u32,
+            k_base: u32,
+        ) {
+            stage_a_transposed(a, a_tile, tile, m, k, k_base);
+            $stage_rhs($rhs, b_tile, tile, n, k, k_base);
+        }
+    };
 }
 
-pub(super) fn stage_tiles_f32_a_transposed_half_rhs(
-    a: &[f32],
-    rhs: &[u16],
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-    tile: CtaTile,
-    m: u32,
-    n: u32,
-    k: u32,
-    k_base: u32,
-) {
-    stage_a_transposed(a, a_tile, tile, m, k, k_base);
-    stage_half_rhs(rhs, b_tile, tile, n, k, k_base);
-}
+stage_tiles_a_transposed_fn!(stage_tiles_f32_a_transposed_rhs, rhs: f32, stage_rhs);
+stage_tiles_a_transposed_fn!(
+    stage_tiles_f32_a_transposed_half_rhs,
+    rhs: u16,
+    stage_half_rhs
+);
 
 fn stage_a_transposed(
     a: &[f32],
