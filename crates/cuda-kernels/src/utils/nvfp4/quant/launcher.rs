@@ -11,7 +11,7 @@ use super::args::{
 };
 use super::config::{GROUP_SIZE_U32, THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 use super::kernels;
-use crate::quartet::{QUARTET_MS_EDEN_SCALE_OVERRIDE, quartet_backward_ms_eden_global_scale};
+use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
 
 const SCALE_OVERRIDE: f32 = 1.0;
 
@@ -764,29 +764,11 @@ impl Nvfp4QuantModule {
         })
     }
 
-    pub fn fp32_to_nvfp4_quartet_backward_ms_eden_with_amax(
-        &self,
-        args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
-        amax: f32,
-    ) -> Result<f32, DriverError> {
-        let global_scale = quartet_backward_ms_eden_global_scale(amax);
-        self.fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(args, global_scale)
-    }
-
     pub fn fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(
         &self,
         args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
         global_scale: f32,
     ) -> Result<f32, DriverError> {
-        self.launch_quartet_backward_ms_eden(args, global_scale)?;
-        Ok(global_scale)
-    }
-
-    fn launch_quartet_backward_ms_eden(
-        &self,
-        args: QuartetBackwardMsEdenQuantArgs<'_, '_>,
-        global_scale: f32,
-    ) -> Result<(), DriverError> {
         self.fp32_to_nvfp4_ms_eden(MsEdenQuantArgs {
             stream: args.stream,
             x: args.x,
@@ -801,7 +783,8 @@ impl Nvfp4QuantModule {
             scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
             sign_seed: args.sign_seed,
             scale_seed: args.scale_seed,
-        })
+        })?;
+        Ok(global_scale)
     }
 
     fn launch_fp32_to_nvfp4_four_six(
