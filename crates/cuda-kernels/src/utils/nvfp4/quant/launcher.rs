@@ -858,11 +858,9 @@ fn fp32_pair_has_no_padding_pow2(
     dst_row_len: u32,
     transpose_dst_row_len: u32,
 ) -> bool {
-    let row_chunks_per_row = dst_row_len / 32;
-    let transpose_chunks_per_row = transpose_dst_row_len / 32;
     fp32_pair_has_no_padding(row_count, src_row_len, dst_row_len, transpose_dst_row_len)
-        && row_chunks_per_row.is_power_of_two()
-        && transpose_chunks_per_row.is_power_of_two()
+        && (dst_row_len / 32).is_power_of_two()
+        && (transpose_dst_row_len / 32).is_power_of_two()
 }
 
 #[inline]
