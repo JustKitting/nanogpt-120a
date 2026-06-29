@@ -670,22 +670,9 @@ impl Nvfp4QuantModule {
 
     pub fn fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
         &self,
-        args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
+        mut args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let chunk_count = self.tensor_chunk_amax_f32(
-            args.stream,
-            args.x,
-            &mut *args.out_chunk_amax,
-            args.row_count * args.src_row_len,
-        )?;
-
-        self.quartet_backward_ms_eden_global_scale_from_chunks(
-            args.stream,
-            &*args.out_chunk_amax,
-            &mut *args.out_global_scale,
-            chunk_count,
-        )?;
-
+        self.derive_fp32_quartet_backward_ms_eden_global_scale(&mut args)?;
         self.fp32_to_nvfp4_ms_eden_device_scale(MsEdenDeviceScaleQuantArgs {
             stream: args.stream,
             x: args.x,
@@ -705,22 +692,9 @@ impl Nvfp4QuantModule {
 
     pub fn fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
         &self,
-        args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
+        mut args: QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        let chunk_count = self.tensor_chunk_amax_f32(
-            args.stream,
-            args.x,
-            &mut *args.out_chunk_amax,
-            args.row_count * args.src_row_len,
-        )?;
-
-        self.quartet_backward_ms_eden_global_scale_from_chunks(
-            args.stream,
-            &*args.out_chunk_amax,
-            &mut *args.out_global_scale,
-            chunk_count,
-        )?;
-
+        self.derive_fp32_quartet_backward_ms_eden_global_scale(&mut args)?;
         self.fp32_to_nvfp4_ms_eden_device_scale_no_chunk_amax(MsEdenDeviceScaleQuantArgs {
             stream: args.stream,
             x: args.x,
@@ -736,6 +710,25 @@ impl Nvfp4QuantModule {
             sign_seed: args.sign_seed,
             scale_seed: args.scale_seed,
         })
+    }
+
+    fn derive_fp32_quartet_backward_ms_eden_global_scale(
+        &self,
+        args: &mut QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let chunk_count = self.tensor_chunk_amax_f32(
+            args.stream,
+            args.x,
+            &mut *args.out_chunk_amax,
+            args.row_count * args.src_row_len,
+        )?;
+
+        self.quartet_backward_ms_eden_global_scale_from_chunks(
+            args.stream,
+            &*args.out_chunk_amax,
+            &mut *args.out_global_scale,
+            chunk_count,
+        )
     }
 
     pub fn fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(
