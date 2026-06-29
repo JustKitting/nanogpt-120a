@@ -5,29 +5,19 @@ macro_rules! cta_accumulators {
 }
 
 macro_rules! cta_mma4 {
-    ($a_tile:expr, $b_tile:expr, $tile:expr, $acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident) => {{
+    ($a_tile:expr, $b_tile:expr, $tile:expr, $acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident) => {
+        cta_mma4!($a_tile, $b_tile, $tile, $acc0 => 0, $acc1 => 1, $acc2 => 2, $acc3 => 3)
+    };
+    ($a_tile:expr, $b_tile:expr, $tile:expr, $($acc:ident => $offset:expr),+ $(,)?) => {{
         let tile = $tile;
         let a_fragments = $crate::f16_tc_matmul::cta_stage::load_a_fragments($a_tile, tile);
-        $crate::mma::mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            $crate::f16_tc_matmul::cta_stage::load_b_fragments($b_tile, tile, tile.warp_n0),
-            &mut $acc0,
-        );
-        $crate::mma::mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            $crate::f16_tc_matmul::cta_stage::load_b_fragments($b_tile, tile, tile.warp_n0 + 1),
-            &mut $acc1,
-        );
-        $crate::mma::mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            $crate::f16_tc_matmul::cta_stage::load_b_fragments($b_tile, tile, tile.warp_n0 + 2),
-            &mut $acc2,
-        );
-        $crate::mma::mma_m16n8k16_f16_f16_f32(
-            a_fragments,
-            $crate::f16_tc_matmul::cta_stage::load_b_fragments($b_tile, tile, tile.warp_n0 + 3),
-            &mut $acc3,
-        );
+        $(
+            $crate::mma::mma_m16n8k16_f16_f16_f32(
+                a_fragments,
+                $crate::f16_tc_matmul::cta_stage::load_b_fragments($b_tile, tile, tile.warp_n0 + $offset),
+                &mut $acc,
+            );
+        )+
     }};
 }
 
