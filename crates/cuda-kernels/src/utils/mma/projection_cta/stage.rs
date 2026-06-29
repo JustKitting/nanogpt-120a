@@ -145,10 +145,7 @@ fn load_a_pack(
     k_base: u32,
     params: &Nvfp4ProjectionParams,
 ) -> u32 {
-    let row = offset / NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
-    let pack = offset - row * NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
-    let global_row = tile.row_base + row;
-    let global_col = k_base + pack * 8;
+    let (global_row, global_col) = pack_coords(offset, tile.row_base, k_base);
     if global_row < params.token_count && global_col + 7 < params.input_dim {
         load_packed8(bytes, (global_row * params.input_dim + global_col) as usize)
     } else {
@@ -164,10 +161,7 @@ fn load_a_pack_aligned(
     k_base: u32,
     params: &Nvfp4ProjectionParams,
 ) -> u32 {
-    let row = offset / NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
-    let pack = offset - row * NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
-    let global_row = tile.row_base + row;
-    let global_col = k_base + pack * 8;
+    let (global_row, global_col) = pack_coords(offset, tile.row_base, k_base);
     load_packed8_aligned(bytes, (global_row * params.input_dim + global_col) as usize)
 }
 
@@ -179,10 +173,7 @@ fn load_b_pack(
     k_base: u32,
     params: &Nvfp4ProjectionParams,
 ) -> u32 {
-    let col = offset / NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
-    let pack = offset - col * NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
-    let global_col = tile.col_base + col;
-    let global_k = k_base + pack * 8;
+    let (global_col, global_k) = pack_coords(offset, tile.col_base, k_base);
     if global_col < params.output_dim && global_k + 7 < params.input_dim {
         load_packed8(bytes, (global_col * params.input_dim + global_k) as usize)
     } else {
@@ -198,10 +189,7 @@ fn load_b_pack_aligned(
     k_base: u32,
     params: &Nvfp4ProjectionParams,
 ) -> u32 {
-    let col = offset / NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
-    let pack = offset - col * NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
-    let global_col = tile.col_base + col;
-    let global_k = k_base + pack * 8;
+    let (global_col, global_k) = pack_coords(offset, tile.col_base, k_base);
     load_packed8_aligned(bytes, (global_col * params.input_dim + global_k) as usize)
 }
 
@@ -213,10 +201,8 @@ fn load_a_scale(
     k_base: u32,
     params: &Nvfp4ProjectionParams,
 ) -> u32 {
-    let k_atom = offset / NVFP4_PROJECTION_CTA_M;
-    let row = offset - k_atom * NVFP4_PROJECTION_CTA_M;
-    let global_row = tile.row_base + row;
-    let scale_k_base = k_base + k_atom * MMA_K;
+    let (global_row, scale_k_base) =
+        scale_coords(offset, tile.row_base, NVFP4_PROJECTION_CTA_M, k_base);
     if global_row < params.token_count && scale_k_base < params.input_dim {
         load_scale4(
             scales,
@@ -235,10 +221,8 @@ fn load_a_scale_aligned(
     k_base: u32,
     params: &Nvfp4ProjectionParams,
 ) -> u32 {
-    let k_atom = offset / NVFP4_PROJECTION_CTA_M;
-    let row = offset - k_atom * NVFP4_PROJECTION_CTA_M;
-    let global_row = tile.row_base + row;
-    let scale_k_base = k_base + k_atom * MMA_K;
+    let (global_row, scale_k_base) =
+        scale_coords(offset, tile.row_base, NVFP4_PROJECTION_CTA_M, k_base);
     load_scale4_aligned(
         scales,
         ((global_row * params.input_dim + scale_k_base) / 16) as usize,
@@ -253,10 +237,8 @@ fn load_b_scale(
     k_base: u32,
     params: &Nvfp4ProjectionParams,
 ) -> u32 {
-    let k_atom = offset / NVFP4_PROJECTION_CTA_N;
-    let col = offset - k_atom * NVFP4_PROJECTION_CTA_N;
-    let global_col = tile.col_base + col;
-    let scale_k_base = k_base + k_atom * MMA_K;
+    let (global_col, scale_k_base) =
+        scale_coords(offset, tile.col_base, NVFP4_PROJECTION_CTA_N, k_base);
     if global_col < params.output_dim && scale_k_base < params.input_dim {
         let scale_base = global_col * (params.input_dim / 16) + scale_k_base / 16;
         load_scale4(scales, scale_base as usize)
@@ -273,10 +255,22 @@ fn load_b_scale_aligned(
     k_base: u32,
     params: &Nvfp4ProjectionParams,
 ) -> u32 {
-    let k_atom = offset / NVFP4_PROJECTION_CTA_N;
-    let col = offset - k_atom * NVFP4_PROJECTION_CTA_N;
-    let global_col = tile.col_base + col;
-    let scale_k_base = k_base + k_atom * MMA_K;
+    let (global_col, scale_k_base) =
+        scale_coords(offset, tile.col_base, NVFP4_PROJECTION_CTA_N, k_base);
     let scale_base = global_col * (params.input_dim / 16) + scale_k_base / 16;
     load_scale4_aligned(scales, scale_base as usize)
+}
+
+#[inline(always)]
+fn pack_coords(offset: u32, row_base: u32, k_base: u32) -> (u32, u32) {
+    let row = offset / NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
+    let pack = offset - row * NVFP4_PROJECTION_CTA_PACKS_PER_ROW;
+    (row_base + row, k_base + pack * 8)
+}
+
+#[inline(always)]
+fn scale_coords(offset: u32, row_base: u32, rows_per_atom: u32, k_base: u32) -> (u32, u32) {
+    let k_atom = offset / rows_per_atom;
+    let row = offset - k_atom * rows_per_atom;
+    (row_base + row, k_base + k_atom * MMA_K)
 }
