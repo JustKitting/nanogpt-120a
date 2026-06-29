@@ -78,22 +78,12 @@ fn store_add_one(
     base_scale: f32,
     matmul_scale: f32,
 ) {
-    let row = row(tile, acc_index);
-    let col = col(tile, warp_n, acc_index);
+    let row = tile.row_base + tile.warp_m * 16 + tile.group + if acc_index < 2 { 0 } else { 8 };
+    let col = tile.col_base + warp_n * 8 + tile.thread_in_group * 2 + (acc_index as u32 & 1);
     if row < rows && col < cols {
         let offset = ((tile.batch * rows + row) * cols + col) as usize;
         unsafe {
             *out.get_unchecked_mut(offset) = base_scale * base[offset] + matmul_scale * acc;
         }
     }
-}
-
-#[inline(always)]
-fn row(tile: CtaTile, acc_index: usize) -> u32 {
-    tile.row_base + tile.warp_m * 16 + tile.group + if acc_index < 2 { 0 } else { 8 }
-}
-
-#[inline(always)]
-fn col(tile: CtaTile, warp_n: u32, acc_index: usize) -> u32 {
-    tile.col_base + warp_n * 8 + tile.thread_in_group * 2 + (acc_index as u32 & 1)
 }
