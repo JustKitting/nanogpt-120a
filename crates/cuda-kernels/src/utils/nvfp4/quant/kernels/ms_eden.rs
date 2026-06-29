@@ -29,6 +29,15 @@ pub(crate) mod module {
     static mut AMAX_REDUCE: SharedArray<f32, { AMAX_WARPS_PER_BLOCK as usize }> =
         SharedArray::UNINIT;
 
+    macro_rules! guarded_pack_chunk {
+        ($chunk:ident, $chunk_count:ident) => {
+            let $chunk = pack_chunk();
+            if $chunk >= $chunk_count {
+                return;
+            }
+        };
+    }
+
     #[kernel]
     #[allow(clippy::too_many_arguments)]
     pub fn fp32_to_nvfp4_ms_eden_kernel(
@@ -45,10 +54,7 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         fp32_to_nvfp4_ms_eden_body(
             x,
@@ -82,10 +88,7 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         fp32_to_nvfp4_ms_eden_body(
             x,
@@ -118,10 +121,7 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         fp32_to_nvfp4_ms_eden_body_no_chunk_amax(
             x,
@@ -184,10 +184,7 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         fp32_transpose_to_nvfp4_ms_eden_body(
             x,
@@ -222,10 +219,7 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax(
             x,
@@ -581,10 +575,7 @@ pub(crate) mod module {
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         let chunk_base = chunk * HADAMARD_DIM;
         let input = nvfp4_transposed_hadamard_input(
@@ -631,10 +622,7 @@ pub(crate) mod module {
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         let chunk_base = chunk * HADAMARD_DIM;
         let input = nvfp4_transposed_hadamard_input(
@@ -725,10 +713,7 @@ pub(crate) mod module {
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         let chunk_base = chunk * HADAMARD_DIM;
         let input = rowwise_transposed_hadamard_input(
@@ -775,10 +760,7 @@ pub(crate) mod module {
         scale_seed: u32,
     ) {
         let lane = warp::lane_id();
-        let chunk = pack_chunk();
-        if chunk >= chunk_count {
-            return;
-        }
+        guarded_pack_chunk!(chunk, chunk_count);
 
         let chunk_base = chunk * HADAMARD_DIM;
         let input = rowwise_transposed_hadamard_input(
