@@ -1,3 +1,5 @@
+use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
+
 macro_rules! tc_stage_loop {
     ($tile:expr, $a_tile:expr, $b_tile:expr, $acc:expr; $k_base:ident < $limit:expr;
      $stage_a:block $stage_b:block) => {{
@@ -32,6 +34,21 @@ macro_rules! for_acc_fragments {
 }
 
 pub(crate) use for_acc_fragments;
+
+pub(crate) type CtaATile = cuda_device::SharedArray<u16, CTA_A_ELEMS>;
+pub(crate) type CtaBTile = cuda_device::SharedArray<u16, CTA_B_ELEMS>;
+
+macro_rules! with_tc_ab_tiles {
+    ($body:ident; $($arg:expr),* $(,)?) => { with_tc_ab_tiles!(@call $body; [$($arg),*]; []) };
+    ($body:ident; $($arg:expr),* ; $($tail:expr),* $(,)?) => { with_tc_ab_tiles!(@call $body; [$($arg),*]; [$($tail),*]) };
+    (@call $body:ident; [$($arg:expr),*]; [$($tail:expr),*]) => {{
+        static mut A_TILE: $crate::kda_tc::CtaATile = cuda_device::SharedArray::UNINIT;
+        static mut B_TILE: $crate::kda_tc::CtaBTile = cuda_device::SharedArray::UNINIT;
+        $body($($arg,)* unsafe { &mut A_TILE }, unsafe { &mut B_TILE } $(, $tail)*);
+    }};
+}
+
+pub(crate) use with_tc_ab_tiles;
 
 #[path = "kda_tc/context.rs"]
 mod context;

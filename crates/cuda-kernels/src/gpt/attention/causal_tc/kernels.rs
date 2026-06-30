@@ -11,6 +11,7 @@ use super::softmax::softmax_body;
 use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
 use crate::kda_common::{KDA_MATRIX_ELEMS, KDA_STATE_ELEMS};
+use crate::kda_tc::with_tc_ab_tiles;
 
 #[allow(static_mut_refs)]
 #[cuda_module]
@@ -31,14 +32,6 @@ pub(super) mod module {
             static mut A_TILE: SharedArray<u16, CTA_A_ELEMS> = SharedArray::UNINIT;
             static mut B_TILE: SharedArray<u16, CTA_B_ELEMS> = SharedArray::UNINIT;
             $body($($arg,)* unsafe { &mut STATE }, unsafe { &mut A_TILE }, unsafe { &mut B_TILE });
-        }};
-    }
-
-    macro_rules! with_ab_tiles {
-        ($body:ident; $($arg:expr),* $(,)?) => {{
-            static mut A_TILE: SharedArray<u16, CTA_A_ELEMS> = SharedArray::UNINIT;
-            static mut B_TILE: SharedArray<u16, CTA_B_ELEMS> = SharedArray::UNINIT;
-            $body($($arg,)* unsafe { &mut A_TILE }, unsafe { &mut B_TILE });
         }};
     }
 
@@ -155,7 +148,7 @@ pub(super) mod module {
         chunk_states: &[u16],
         params: CausalAttentionParams,
     ) {
-        with_ab_tiles!(chunk_kda_output_from_state_body; qg, v_new, aqk, out, chunk_states, params);
+        with_tc_ab_tiles!(chunk_kda_output_from_state_body; qg, v_new, aqk, out, chunk_states, params);
     }
 
     #[kernel]

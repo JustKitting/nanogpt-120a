@@ -14,24 +14,12 @@ use super::softmax_d::softmax_d_f16_body;
 use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
 use crate::kda_common::KDA_STATE_ELEMS;
+use crate::kda_tc::with_tc_ab_tiles;
 
 #[allow(static_mut_refs)]
 #[cuda_module]
 pub(super) mod module {
     use super::*;
-
-    macro_rules! with_ab_tiles {
-        ($func:ident; $($arg:expr),* $(,)?) => {{
-            static mut A_TILE: SharedArray<u16, CTA_A_ELEMS> = SharedArray::UNINIT;
-            static mut B_TILE: SharedArray<u16, CTA_B_ELEMS> = SharedArray::UNINIT;
-            $func($($arg,)* unsafe { &mut A_TILE }, unsafe { &mut B_TILE });
-        }};
-        ($func:ident; $($arg:expr),* ; $($tail:expr),* $(,)?) => {{
-            static mut A_TILE: SharedArray<u16, CTA_A_ELEMS> = SharedArray::UNINIT;
-            static mut B_TILE: SharedArray<u16, CTA_B_ELEMS> = SharedArray::UNINIT;
-            $func($($arg,)* unsafe { &mut A_TILE }, unsafe { &mut B_TILE }, $($tail),*);
-        }};
-    }
 
     macro_rules! with_chunkwise_tiles {
         ($func:ident; $($arg:expr),* $(,)?) => {{
@@ -151,7 +139,7 @@ pub(super) mod module {
         v_new: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        with_ab_tiles!(chunk_state_matmul_body; w, u, chunk_states, v_new, params; ChunkStateMatmulMode::VNew);
+        with_tc_ab_tiles!(chunk_state_matmul_body; w, u, chunk_states, v_new, params; ChunkStateMatmulMode::VNew);
     }
 
     #[kernel]
@@ -161,7 +149,7 @@ pub(super) mod module {
         d_w: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        with_ab_tiles!(chunk_state_matmul_body; d_u, d_u, chunk_states, d_w, params; ChunkStateMatmulMode::Dw);
+        with_tc_ab_tiles!(chunk_state_matmul_body; d_u, d_u, chunk_states, d_w, params; ChunkStateMatmulMode::Dw);
     }
 
     #[kernel]
@@ -171,7 +159,7 @@ pub(super) mod module {
         d_qg: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        with_ab_tiles!(chunk_state_matmul_body; d_out_compact, d_out_compact, chunk_states, d_qg, params; ChunkStateMatmulMode::Dqg);
+        with_tc_ab_tiles!(chunk_state_matmul_body; d_out_compact, d_out_compact, chunk_states, d_qg, params; ChunkStateMatmulMode::Dqg);
     }
 
     #[kernel]
@@ -181,7 +169,7 @@ pub(super) mod module {
         d_kg: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        with_ab_tiles!(chunk_kda_dkg_from_vnew_dh_body; v_new, d_h_states, d_kg, params);
+        with_tc_ab_tiles!(chunk_kda_dkg_from_vnew_dh_body; v_new, d_h_states, d_kg, params);
     }
 
     #[kernel]
@@ -212,7 +200,7 @@ pub(super) mod module {
         d_m: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        with_ab_tiles!(chunk_intra_kda_dm_body; kg, vbeta, g, beta, d_u, d_w, d_m, params);
+        with_tc_ab_tiles!(chunk_intra_kda_dm_body; kg, vbeta, g, beta, d_u, d_w, d_m, params);
     }
 
     #[kernel]
