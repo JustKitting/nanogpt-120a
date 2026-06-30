@@ -1,5 +1,7 @@
 use std::error::Error;
 
+#[path = "aurora/buffers.rs"]
+mod buffers;
 #[path = "aurora/fixture.rs"]
 mod fixture;
 #[path = "aurora/nonconstant.rs"]

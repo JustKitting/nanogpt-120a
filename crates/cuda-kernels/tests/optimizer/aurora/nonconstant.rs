@@ -1,20 +1,15 @@
 use std::error::Error;
 
 use cuda_core::DeviceBuffer;
-use rust_kernels_cuda::optimizer::{
-    AURORA_MATRIX_PHASES, AuroraMegaUpdateArgs, AuroraSlotDescriptor, OptimizerModule,
-};
+use rust_kernels_cuda::optimizer::{AuroraMegaUpdateArgs, OptimizerModule};
 
 use crate::{common, polar_vector};
 
-#[path = "nonconstant_buffers.rs"]
-mod nonconstant_buffers;
-use nonconstant_buffers::{Scratch, Slots};
+use super::buffers::{SLOT_COUNT, Scratch, Slots, descriptors};
 
 const ROWS: usize = 32;
 const COLS: usize = 64;
 const LEN: usize = ROWS * COLS;
-const SLOT_COUNT: usize = AURORA_MATRIX_PHASES;
 const MU: f32 = 0.95;
 const LEARNING_RATE: f32 = 0.25;
 const WEIGHT_DECAY: f32 = 0.1;
@@ -25,8 +20,8 @@ pub fn run_wide_case() -> Result<(), Box<dyn Error>> {
     let module = OptimizerModule::from_module(ptx)?;
     let grad = gradient();
     let mut slots = Slots::new(&stream, &grad)?;
-    let mut scratch = Scratch::new(&stream)?;
-    let slot_descriptors = descriptors(&slots);
+    let mut scratch = Scratch::new(&stream, LEN, ROWS)?;
+    let slot_descriptors = descriptors(&slots, ROWS, COLS);
     let slot_descriptors = DeviceBuffer::from_host(&stream, &slot_descriptors)?;
 
     module.aurora_mega_update(AuroraMegaUpdateArgs {
@@ -61,23 +56,6 @@ pub fn run_wide_case() -> Result<(), Box<dyn Error>> {
     assert_close(&slots.x_masters.remove(0).to_host_vec(&stream)?, &expected);
     assert_close(&slots.z_masters.remove(0).to_host_vec(&stream)?, &expected);
     Ok(())
-}
-
-fn descriptors(slots: &Slots) -> Vec<AuroraSlotDescriptor> {
-    (0..SLOT_COUNT)
-        .map(|slot| AuroraSlotDescriptor {
-            grad: slots.grads[slot].cu_deviceptr(),
-            momentum: slots.momentums[slot].cu_deviceptr(),
-            z_master: slots.z_masters[slot].cu_deviceptr(),
-            x_master: slots.x_masters[slot].cu_deviceptr(),
-            bytes: slots.bytes[slot].cu_deviceptr(),
-            scales: slots.scales[slot].cu_deviceptr(),
-            global_scale: slots.global_scales[slot].cu_deviceptr(),
-            rows: ROWS as u32,
-            cols: COLS as u32,
-            learning_rate_multiplier: 1.0,
-        })
-        .collect()
 }
 
 fn gradient() -> Vec<f32> {
