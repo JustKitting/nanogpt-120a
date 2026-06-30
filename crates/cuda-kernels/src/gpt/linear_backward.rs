@@ -40,58 +40,32 @@ impl LinearBackwardModule {
     }
 
     pub fn backward(&self, args: LinearBackwardArgs<'_, '_>) -> Result<(), DriverError> {
-        let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
-        let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
+        let LinearBackwardArgs {
+            stream,
+            e_h,
+            weight_t_h,
+            e_t_h,
+            input_t_h,
+            dinput,
+            dweight,
+            dbias: _,
+            token_count,
+            input_dim,
+            output_dim,
+        } = args;
 
-        self.module.linear_backward_projection_device_scale_kernel(
-            args.stream,
-            LaunchConfig {
-                grid_dim: projection_grid_dim(args.token_count, args.input_dim),
-                block_dim: (NVFP4_PROJECTION_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
-            args.e_h.bytes,
-            args.e_h.scales,
-            args.e_h.global_scales,
-            args.weight_t_h.bytes,
-            args.weight_t_h.scales,
-            args.weight_t_h.global_scale,
-            args.dinput,
-            Nvfp4ProjectionParams {
-                token_count: args.token_count,
-                input_dim: dinput_k,
-                output_dim: args.input_dim,
-                weight_global_scale: 1.0,
-                bias_global_scale: 0.0,
-                residual_add: 0,
-                activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-            },
-        )?;
-
-        self.module.linear_backward_projection_device_scale_kernel(
-            args.stream,
-            LaunchConfig {
-                grid_dim: projection_grid_dim(args.output_dim, args.input_dim),
-                block_dim: (NVFP4_PROJECTION_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
-            args.e_t_h.bytes,
-            args.e_t_h.scales,
-            args.e_t_h.global_scales,
-            args.input_t_h.bytes,
-            args.input_t_h.scales,
-            args.input_t_h.global_scale,
-            args.dweight,
-            Nvfp4ProjectionParams {
-                token_count: args.output_dim,
-                input_dim: dweight_k,
-                output_dim: args.input_dim,
-                weight_global_scale: 1.0,
-                bias_global_scale: 0.0,
-                residual_add: 0,
-                activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-            },
-        )
+        self.backward_device_scale(LinearBackwardDeviceScaleArgs {
+            stream,
+            e_h,
+            weight_t_h: weight_t_h.into(),
+            e_t_h,
+            input_t_h: input_t_h.into(),
+            dinput,
+            dweight,
+            token_count,
+            input_dim,
+            output_dim,
+        })
     }
 
     pub fn backward_device_scale(

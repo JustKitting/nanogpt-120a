@@ -12,3 +12,13 @@ pub struct Nvfp4DeviceScaleMmaWeightTensor<'a> {
     pub scales: &'a DeviceBuffer<u8>,
     pub global_scale: &'a DeviceBuffer<f32>,
 }
+
+impl<'a> From<Nvfp4FourSixMmaWeightTensor<'a>> for Nvfp4DeviceScaleMmaWeightTensor<'a> {
+    fn from(tensor: Nvfp4FourSixMmaWeightTensor<'a>) -> Self {
+        Self {
+            bytes: tensor.bytes,
+            scales: tensor.scales,
+            global_scale: tensor.global_scale,
+        }
+    }
+}
