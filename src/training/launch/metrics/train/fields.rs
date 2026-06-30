@@ -41,6 +41,8 @@ metric_fields! {
 }
 
 impl NumericMetricSpec for TrainMetricSpec {
+    type Input = CudaTrainOutput;
+
     fn name(self) -> &'static str {
         self.name
     }

@@ -5,16 +5,17 @@ use burn::train::metric::{
     SerializedEntry,
 };
 
-use super::launch::CudaTrainOutput;
 use super::metric_accumulator::MetricAccumulator;
 
 pub(in crate::training) trait NumericMetricSpec:
     Clone + Copy + Send + Sync
 {
+    type Input;
+
     fn name(self) -> &'static str;
     fn unit(self) -> Option<&'static str>;
     fn higher_is_better(self) -> bool;
-    fn value(self, item: &CudaTrainOutput) -> f64;
+    fn value(self, item: &Self::Input) -> f64;
 }
 
 #[derive(Clone)]
@@ -33,7 +34,7 @@ impl<S: NumericMetricSpec> CudaNumericMetric<S> {
 }
 
 impl<S: NumericMetricSpec> Metric for CudaNumericMetric<S> {
-    type Input = CudaTrainOutput;
+    type Input = S::Input;
 
     fn name(&self) -> MetricName {
         Arc::new(self.spec.name().to_string())
