@@ -117,18 +117,13 @@ pub(in crate::sweep) fn measured_candidate() -> Candidate {
 }
 
 pub(in crate::sweep) fn temp_path(name: &str) -> PathBuf {
-    let mut path = std::env::temp_dir();
-    path.push(format!("{}-{}-{name}", std::process::id(), nanos()));
-    path
+    std::env::temp_dir().join(format!(
+        "{}-{}-{name}",
+        std::process::id(),
+        std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()
+    ))
 }
 
 pub(in crate::sweep) fn rng() -> SweepRng {
     SweepRng::new(0x4750_5432)
-}
-
-fn nanos() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos()
 }
