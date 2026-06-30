@@ -10,7 +10,7 @@ use super::super::{OptimizerTrace, TokenBatch};
 use super::adam::adam_learning_rate;
 use super::aurora::update_aurora_groups;
 use super::base::{BaseAdamUpdateArgs, update_base_adam};
-use super::block::update_block;
+use super::block::update_blocks;
 use super::embedding::add_embedding_lookup_grad;
 use super::kda_clip::apply_kda_aurora_clip;
 use super::result::WeightUpdateResult;
@@ -94,26 +94,17 @@ pub fn apply_weight_updates(
     trace.final_norm_ms = base_trace.final_norm_ms;
     trace.adam_ms += base_trace.adam_ms;
 
-    let start = Instant::now();
-    for ((block, grad), state) in uploaded
-        .blocks
-        .iter_mut()
-        .zip(grads.blocks.iter())
-        .zip(state.blocks.iter_mut())
-    {
-        update_block(
-            stream,
-            runtime,
-            block,
-            grad,
-            scratch,
-            state,
-            step,
-            average_coefficient,
-            &mut trace,
-        )?;
-    }
-    trace.blocks_ms = elapsed_ms(start);
+    update_blocks(
+        stream,
+        runtime,
+        uploaded,
+        grads,
+        scratch,
+        state,
+        step,
+        average_coefficient,
+        &mut trace,
+    )?;
 
     update_aurora_groups(
         stream,

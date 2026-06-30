@@ -1,17 +1,52 @@
 use cuda_core::{CudaStream, DriverError};
 
 use crate::training::runtime::Runtime;
-use crate::upload::UploadedBlock;
+use crate::upload::{UploadedBlock, UploadedModel};
 
 use super::super::OptimizerTrace;
 use super::super::grad_block::BlockGradBuffers;
+use super::super::grads::BackwardBuffers;
 use super::super::optimizer::OptimizerScratch;
-use super::super::optimizer_state::BlockState;
+use super::super::optimizer_state::{BlockState, OptimizerStateBuffers};
 use super::elapsed_ms;
 use super::layer_norm::update_layer_norm;
 use super::mlp::update_mlp_biases;
 use super::qkv::update_qkv_biases;
 use std::time::Instant;
+
+pub(super) fn update_blocks(
+    stream: &CudaStream,
+    runtime: &Runtime,
+    uploaded: &mut UploadedModel,
+    grads: &BackwardBuffers,
+    scratch: &mut OptimizerScratch,
+    state: &mut OptimizerStateBuffers,
+    step: u32,
+    average_coefficient: f32,
+    trace: &mut OptimizerTrace,
+) -> Result<(), DriverError> {
+    let start = Instant::now();
+    for ((block, grad), state) in uploaded
+        .blocks
+        .iter_mut()
+        .zip(grads.blocks.iter())
+        .zip(state.blocks.iter_mut())
+    {
+        update_block(
+            stream,
+            runtime,
+            block,
+            grad,
+            scratch,
+            state,
+            step,
+            average_coefficient,
+            trace,
+        )?;
+    }
+    trace.blocks_ms = elapsed_ms(start);
+    Ok(())
+}
 
 pub(super) fn update_block(
     stream: &CudaStream,
