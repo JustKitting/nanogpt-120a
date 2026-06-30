@@ -11,6 +11,8 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 mod common;
 
+use common::set_e2m1_one;
+
 const TOKEN_COUNT: usize = 64;
 const INPUT_DIM: usize = 64;
 const OUTPUT_DIM: usize = 64;
@@ -186,15 +188,6 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
     );
 
     Ok(())
-}
-
-fn set_e2m1_one(bytes: &mut [u8], element: usize) {
-    let byte = &mut bytes[element / 2];
-    if element & 1 == 0 {
-        *byte = (*byte & 0xf0) | 0x2;
-    } else {
-        *byte = (*byte & 0x0f) | 0x20;
-    }
 }
 
 fn assert_close(actual: f32, expected: f32) {

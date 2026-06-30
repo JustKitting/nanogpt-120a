@@ -7,6 +7,8 @@ use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 mod common;
 
+use common::set_e2m1_one;
+
 const TOKEN_COUNT: usize = 2;
 const INPUT_DIM: usize = 64;
 const VOCAB_SIZE: usize = 16;
@@ -68,15 +70,6 @@ fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error
     assert_value(logits[VOCAB_SIZE + 1], 0.0);
     assert_value(logits[VOCAB_SIZE + 2], 1.0);
     Ok(())
-}
-
-fn set_e2m1_one(bytes: &mut [u8], element: usize) {
-    let byte = &mut bytes[element / 2];
-    if element & 1 == 0 {
-        *byte = (*byte & 0xf0) | 0x2;
-    } else {
-        *byte = (*byte & 0x0f) | 0x20;
-    }
 }
 
 fn assert_value(actual: f32, expected: f32) {
