@@ -6,6 +6,10 @@ use super::super::{
     rng::SweepRng,
 };
 use std::collections::HashSet;
+
+#[cfg(test)]
+mod tests;
+
 pub fn candidates(
     used: &HashSet<String>,
     rng: &mut SweepRng,
@@ -120,34 +124,4 @@ fn range_f64(range: (f64, f64), high: bool, log_scale: bool) -> f64 {
 fn range_usize(range: (usize, usize), high: bool) -> usize {
     let t = if high { 0.875 } else { 0.125 };
     range.0 + (((range.1 - range.0) as f64) * t).round() as usize
-}
-
-#[cfg(test)]
-mod tests {
-    use super::high_level;
-
-    #[test]
-    fn hadamard_levels_are_balanced_per_factor() {
-        let rows = 16;
-        for factor in 0..8 {
-            let highs = (0..rows).filter(|row| high_level(*row, factor)).count();
-            assert_eq!(highs, rows / 2);
-        }
-    }
-
-    #[test]
-    fn hadamard_factor_pairs_cover_all_two_level_cells() {
-        let rows = 16;
-        for left in 0..4 {
-            for right in left + 1..4 {
-                let mut cells = [0; 4];
-                for row in 0..rows {
-                    let a = usize::from(high_level(row, left));
-                    let b = usize::from(high_level(row, right));
-                    cells[a * 2 + b] += 1;
-                }
-                assert_eq!(cells, [rows / 4; 4]);
-            }
-        }
-    }
 }
