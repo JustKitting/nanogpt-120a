@@ -126,7 +126,7 @@ pub(super) fn search_best_raw_schedule(
     let mut best = ScheduleResult::missing();
     for schedule in seed_safety_schedules() {
         let name = schedule_result_name(label, format!("seed_{}", schedule_name(&schedule)));
-        let result = evaluate_schedule(eval, &name, schedule, false)?;
+        let result = evaluate_schedule(eval, &name, schedule)?;
         if report_progress {
             report_schedule(&result);
         }
@@ -145,7 +145,7 @@ pub(super) fn search_best_raw_schedule(
                 candidate[iter] = value;
                 let name =
                     schedule_result_name(label, format!("greedy_pass{pass}_iter{iter}_{value:.3}"));
-                let result = evaluate_schedule(eval, &name, candidate, false)?;
+                let result = evaluate_schedule(eval, &name, candidate)?;
                 if result.is_better_than(&local_best) {
                     local_best = result;
                 }
@@ -189,12 +189,7 @@ fn evaluate_schedule(
     eval: ScheduleEval<'_, '_>,
     name: &str,
     schedule: [f32; MAX_ITERATIONS],
-    stale_reject: bool,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
-    if stale_reject {
-        return evaluate_stale_reject_schedule(eval, 3, 2, schedule);
-    }
-
     let mode = device::GramCorrectionMode::Nvfp4GramOnlySchedule {
         coefficient_safety: schedule,
     };
