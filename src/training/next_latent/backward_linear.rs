@@ -3,7 +3,6 @@ use gpt2_nvfp4::{GPT2_N_EMBD, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
 
 use super::backward::NextLatBackwardArgs;
 use super::backward_linear_call::{LinearCall, run_linear};
-use super::quantize::rowwise;
 
 pub(super) fn output_projection_backward(
     args: &mut NextLatBackwardArgs<'_, '_, '_>,
@@ -13,11 +12,7 @@ pub(super) fn output_projection_backward(
         quant: args.quant,
         stream: args.stream,
         e: &args.forward.d_predicted,
-        input: rowwise(
-            &args.forward.act2_bytes,
-            &args.forward.act2_scales,
-            &args.forward.act2_globals,
-        ),
+        input: args.forward.act2_quant.rowwise(),
         weight: &args.weights.output_projection,
         scratch: &mut args.scratch.output_projection,
         dinput: &mut args.grads.d_act2,
@@ -39,11 +34,7 @@ pub(super) fn transition_backward(
         quant: args.quant,
         stream: args.stream,
         e: &args.grads.d_pre2,
-        input: rowwise(
-            &args.forward.act1_bytes,
-            &args.forward.act1_scales,
-            &args.forward.act1_globals,
-        ),
+        input: args.forward.act1_quant.rowwise(),
         weight: &args.weights.transition,
         scratch: &mut args.scratch.transition,
         dinput: &mut args.grads.d_act1,
@@ -65,11 +56,7 @@ pub(super) fn input_projection_backward(
         quant: args.quant,
         stream: args.stream,
         e: &args.grads.d_pre1,
-        input: rowwise(
-            &args.forward.input_bytes,
-            &args.forward.input_scales,
-            &args.forward.input_globals,
-        ),
+        input: args.forward.input_quant.rowwise(),
         weight: &args.weights.input_projection,
         scratch: &mut args.scratch.input_projection,
         dinput: &mut args.grads.d_normalized,

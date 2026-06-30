@@ -5,18 +5,13 @@ use rust_kernels_cuda::next_latent::{
 };
 
 use super::super::forward::NextLatForwardArgs;
-use super::super::quantize::rowwise;
 
 pub(in crate::training::next_latent) fn output_and_loss(
     args: NextLatForwardArgs<'_, '_>,
 ) -> Result<(), DriverError> {
     args.next_latent.projection(NextLatProjectionArgs {
         stream: args.stream,
-        input: rowwise(
-            &args.buffers.act2_bytes,
-            &args.buffers.act2_scales,
-            &args.buffers.act2_globals,
-        ),
+        input: args.buffers.act2_quant.rowwise(),
         weight: args.weights.output_projection.weight.mma(),
         bias: args.weights.output_projection.bias.device(),
         out: &mut args.buffers.delta,

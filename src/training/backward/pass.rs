@@ -56,7 +56,7 @@ impl Trainer {
             .residual
             .grad_accumulate(ResidualGradAccumulateArgs {
                 stream,
-                branch: &self.buffers.next_latent.losses,
+                branch: self.buffers.next_latent.losses(),
                 out: &mut self.buffers.backward.losses,
                 len: batch.token_count as u32,
             })?;
