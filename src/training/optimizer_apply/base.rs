@@ -1,6 +1,5 @@
 use cuda_core::{CudaStream, DriverError};
 use rust_kernels_cuda::optimizer::OptimizerModule;
-use std::time::Instant;
 
 use crate::training::grads::BackwardBuffers;
 use crate::training::next_latent::NextLatGradBuffers;
@@ -11,7 +10,7 @@ use crate::upload::UploadedModel;
 use super::adam::AdamUpdate;
 use super::layer_norm::update_layer_norm;
 use super::next_latent::{NextLatUpdateArgs, update_next_latent};
-use super::utils::elapsed_ms;
+use super::timed_ms;
 
 pub(super) struct BaseAdamUpdateArgs<'a> {
     pub stream: &'a CudaStream,
@@ -45,34 +44,35 @@ pub(super) fn update_base_adam(args: BaseAdamUpdateArgs<'_>) -> Result<BaseAdamT
         &mut args.state.token_embedding,
     )?;
 
-    let final_start = Instant::now();
-    update_layer_norm(
-        args.stream,
-        args.optimizer,
-        &mut args.uploaded.ln_f,
-        &args.grads.final_norm,
-        args.scratch,
-        &mut args.state.ln_f,
-        args.step,
-        args.average_coefficient,
-    )?;
-    let final_norm_ms = elapsed_ms(final_start);
+    let final_norm_ms = timed_ms(|| {
+        update_layer_norm(
+            args.stream,
+            args.optimizer,
+            &mut args.uploaded.ln_f,
+            &args.grads.final_norm,
+            args.scratch,
+            &mut args.state.ln_f,
+            args.step,
+            args.average_coefficient,
+        )
+    })?;
 
-    let next_start = Instant::now();
-    update_next_latent(NextLatUpdateArgs {
-        stream: args.stream,
-        optimizer: args.optimizer,
-        weights: &mut args.uploaded.next_latent,
-        grads: args.next_latent_grads,
-        scratch: args.scratch,
-        state: &mut args.state.next_latent,
-        step: args.step,
-        average_coefficient: args.average_coefficient,
+    let next_latent_ms = timed_ms(|| {
+        update_next_latent(NextLatUpdateArgs {
+            stream: args.stream,
+            optimizer: args.optimizer,
+            weights: &mut args.uploaded.next_latent,
+            grads: args.next_latent_grads,
+            scratch: args.scratch,
+            state: &mut args.state.next_latent,
+            step: args.step,
+            average_coefficient: args.average_coefficient,
+        })
     })?;
 
     Ok(BaseAdamTrace {
         token_embedding_ms,
         final_norm_ms,
-        adam_ms: token_embedding_ms + final_norm_ms + elapsed_ms(next_start),
+        adam_ms: token_embedding_ms + final_norm_ms + next_latent_ms,
     })
 }

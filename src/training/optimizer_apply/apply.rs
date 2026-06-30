@@ -15,12 +15,12 @@ use super::embedding::add_embedding_lookup_grad;
 use super::kda_clip::apply_kda_aurora_clip;
 use super::result::WeightUpdateResult;
 use super::skip::record_skip_decision;
-use super::utils::elapsed_ms;
+use super::timed_ms;
 use crate::AppResult;
 use crate::training::runtime::Runtime;
 use crate::upload::UploadedModel;
 use cuda_core::CudaStream;
-use std::time::Instant;
+
 pub fn apply_weight_updates(
     stream: &CudaStream,
     runtime: &Runtime,
@@ -41,9 +41,8 @@ pub fn apply_weight_updates(
     let candidate_step = state.next_step();
     trace.adam_lr = adam_learning_rate(candidate_step);
     trace.aurora_lr = aurora_learning_rate(candidate_step);
-    let start = Instant::now();
-    add_embedding_lookup_grad(stream, optimizer, batch, grads, next_latent_grads)?;
-    trace.embedding_lookup_ms = elapsed_ms(start);
+    trace.embedding_lookup_ms =
+        timed_ms(|| add_embedding_lookup_grad(stream, optimizer, batch, grads, next_latent_grads))?;
 
     let grad_norm = grad_clip.clip(stream, optimizer)?;
     trace.grad_norm = grad_norm;

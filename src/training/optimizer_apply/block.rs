@@ -8,11 +8,10 @@ use super::super::grad_block::BlockGradBuffers;
 use super::super::grads::BackwardBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::{BlockState, OptimizerStateBuffers};
-use super::elapsed_ms;
 use super::layer_norm::update_layer_norm;
 use super::mlp::update_mlp_biases;
 use super::qkv::update_qkv_biases;
-use std::time::Instant;
+use super::timed_ms;
 
 pub(super) fn update_blocks(
     stream: &CudaStream,
@@ -25,26 +24,27 @@ pub(super) fn update_blocks(
     average_coefficient: f32,
     trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
-    let start = Instant::now();
-    for ((block, grad), state) in uploaded
-        .blocks
-        .iter_mut()
-        .zip(grads.blocks.iter())
-        .zip(state.blocks.iter_mut())
-    {
-        update_block(
-            stream,
-            runtime,
-            block,
-            grad,
-            scratch,
-            state,
-            step,
-            average_coefficient,
-            trace,
-        )?;
-    }
-    trace.blocks_ms = elapsed_ms(start);
+    trace.blocks_ms = timed_ms(|| {
+        for ((block, grad), state) in uploaded
+            .blocks
+            .iter_mut()
+            .zip(grads.blocks.iter())
+            .zip(state.blocks.iter_mut())
+        {
+            update_block(
+                stream,
+                runtime,
+                block,
+                grad,
+                scratch,
+                state,
+                step,
+                average_coefficient,
+                trace,
+            )?;
+        }
+        Ok(())
+    })?;
     Ok(())
 }
 
@@ -60,18 +60,18 @@ pub(super) fn update_block(
     trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
     let optimizer = &runtime.optimizer;
-    let start = Instant::now();
-    update_layer_norm(
-        stream,
-        optimizer,
-        &mut block.ln_1,
-        &grad.ln_1,
-        scratch,
-        &mut state.ln_1,
-        step,
-        average_coefficient,
-    )?;
-    trace.adam_ms += elapsed_ms(start);
+    trace.adam_ms += timed_ms(|| {
+        update_layer_norm(
+            stream,
+            optimizer,
+            &mut block.ln_1,
+            &grad.ln_1,
+            scratch,
+            &mut state.ln_1,
+            step,
+            average_coefficient,
+        )
+    })?;
 
     update_qkv_biases(
         stream,
@@ -85,18 +85,18 @@ pub(super) fn update_block(
         trace,
     )?;
 
-    let start = Instant::now();
-    update_layer_norm(
-        stream,
-        optimizer,
-        &mut block.ln_2,
-        &grad.ln_2,
-        scratch,
-        &mut state.ln_2,
-        step,
-        average_coefficient,
-    )?;
-    trace.adam_ms += elapsed_ms(start);
+    trace.adam_ms += timed_ms(|| {
+        update_layer_norm(
+            stream,
+            optimizer,
+            &mut block.ln_2,
+            &grad.ln_2,
+            scratch,
+            &mut state.ln_2,
+            step,
+            average_coefficient,
+        )
+    })?;
 
     update_mlp_biases(
         stream,
