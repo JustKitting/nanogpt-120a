@@ -1,7 +1,7 @@
 use cuda_core::CudaStream;
 
 use crate::AppResult;
-use crate::upload::{UploadedLayerNorm, UploadedModel, UploadedNvfp4};
+use crate::upload::{UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNvfp4};
 
 use super::snapshot::PendingTensorUpdateDiagnostics;
 use super::stats::tensor_update_stats;
@@ -25,55 +25,11 @@ pub(in crate::training::diagnostics) fn finish_update_snapshots(
 
     for block in &uploaded.blocks {
         finish_layer_norm(&mut updates, stream, &block.ln_1, &mut iter)?;
-        finish_update(
-            &mut updates,
-            stream,
-            &block.attn_qkv.weight,
-            iter.next().unwrap(),
-        )?;
-        finish_update(
-            &mut updates,
-            stream,
-            &block.attn_qkv.bias,
-            iter.next().unwrap(),
-        )?;
-        finish_update(
-            &mut updates,
-            stream,
-            &block.attn_c_proj.weight,
-            iter.next().unwrap(),
-        )?;
-        finish_update(
-            &mut updates,
-            stream,
-            &block.attn_c_proj.bias,
-            iter.next().unwrap(),
-        )?;
+        finish_linear(&mut updates, stream, &block.attn_qkv, &mut iter)?;
+        finish_linear(&mut updates, stream, &block.attn_c_proj, &mut iter)?;
         finish_layer_norm(&mut updates, stream, &block.ln_2, &mut iter)?;
-        finish_update(
-            &mut updates,
-            stream,
-            &block.mlp_up.weight,
-            iter.next().unwrap(),
-        )?;
-        finish_update(
-            &mut updates,
-            stream,
-            &block.mlp_up.bias,
-            iter.next().unwrap(),
-        )?;
-        finish_update(
-            &mut updates,
-            stream,
-            &block.mlp_down.weight,
-            iter.next().unwrap(),
-        )?;
-        finish_update(
-            &mut updates,
-            stream,
-            &block.mlp_down.bias,
-            iter.next().unwrap(),
-        )?;
+        finish_linear(&mut updates, stream, &block.mlp_up, &mut iter)?;
+        finish_linear(&mut updates, stream, &block.mlp_down, &mut iter)?;
     }
 
     Ok(updates)
@@ -87,6 +43,16 @@ fn finish_layer_norm(
 ) -> AppResult {
     finish_update(updates, stream, &layer_norm.weight, iter.next().unwrap())?;
     finish_update(updates, stream, &layer_norm.bias, iter.next().unwrap())
+}
+
+fn finish_linear(
+    updates: &mut Vec<TensorUpdateDiagnostics>,
+    stream: &CudaStream,
+    linear: &UploadedLinear,
+    iter: &mut impl Iterator<Item = PendingTensorUpdateDiagnostics>,
+) -> AppResult {
+    finish_update(updates, stream, &linear.weight, iter.next().unwrap())?;
+    finish_update(updates, stream, &linear.bias, iter.next().unwrap())
 }
 
 fn finish_update(
