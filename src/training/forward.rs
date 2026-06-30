@@ -4,7 +4,7 @@ use gpt2_nvfp4::{
 };
 
 use super::next_latent::{NextLatForwardArgs, forward as next_latent_forward};
-use super::{OptimizerTrace, TokenBatch, TrainStats, Trainer};
+use super::{TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
 
 impl Trainer {
@@ -97,14 +97,7 @@ impl Trainer {
             tokens: batch.token_count,
             logits: batch.token_count * GPT2_VOCAB_SIZE,
             finite: true,
-            nonzero: false,
-            loss: 0.0,
-            forward_ms: 0.0,
-            backward_enqueue_ms: 0.0,
-            loss_host_wait_ms: 0.0,
-            optimizer_ms: 0.0,
-            optimizer: OptimizerTrace::default(),
-            diagnostics: None,
+            ..TrainStats::default()
         })
     }
 }

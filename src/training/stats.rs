@@ -1,5 +1,6 @@
 use super::diagnostics;
 
+#[derive(Default)]
 pub struct TrainStats {
     pub tokens: usize,
     pub logits: usize,
