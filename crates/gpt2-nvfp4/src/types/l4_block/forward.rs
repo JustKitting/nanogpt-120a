@@ -4,8 +4,8 @@ use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use super::args::BlockForwardArgs;
 use super::weights::Gpt2BlockWeights;
 use crate::types::{
-    AttentionForwardTape, AttentionWeights, HiddenStateDevice, LayerNormForwardArgs, LayerNormTape,
-    LayerNormWeights, MlpScratch, MlpWeights,
+    AttentionForwardArgs, AttentionForwardTape, AttentionWeights, HiddenStateDevice,
+    LayerNormForwardArgs, LayerNormTape, LayerNormWeights, MlpScratch, MlpWeights,
 };
 
 impl Gpt2BlockWeights {
@@ -32,19 +32,19 @@ impl Gpt2BlockWeights {
             c_proj_input_nvfp4: tape.c_proj_input_nvfp4.reborrow(),
         });
 
-        let hidden = AttentionWeights::forward(AttentionWeights::input_from_embeddings_with_tape(
-            args.use_full_attention,
-            args.attention_module,
-            args.attention_tc_module,
-            args.quant_module,
-            hidden_nvfp4.reborrow(),
-            args.attention_tc_scratch,
-            args.projections,
-            &mut *qkv,
-            &mut *attention_log_sum_exp,
+        let hidden = AttentionWeights::forward(AttentionForwardArgs {
+            use_full_attention: args.use_full_attention,
+            module: args.attention_module,
+            tc_module: args.attention_tc_module,
+            quant_module: args.quant_module,
+            input_nvfp4: hidden_nvfp4.reborrow(),
+            tc_scratch: args.attention_tc_scratch,
+            projections: args.projections,
+            qkv: &mut *qkv,
+            attention_log_sum_exp: &mut *attention_log_sum_exp,
             hidden,
-            attention_tape,
-        ))?;
+            tape: attention_tape,
+        })?;
 
         if let Some(tape) = tape.as_mut() {
             tape.save_attention_log_sum_exp(hidden.stream, attention_log_sum_exp)?;

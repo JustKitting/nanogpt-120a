@@ -2,9 +2,9 @@ use std::error::Error;
 
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionLogSumExp, AttentionProjectionTensors, AttentionWeights, GPT2_CONTEXT_LEN,
-    GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, HiddenState, HiddenStateDevice, HiddenStateNvfp4,
-    HiddenVectorShape, Nvfp4Shape, QkvActivation, QkvVectorShape, QkvWeightShape,
+    AttentionForwardArgs, AttentionLogSumExp, AttentionProjectionTensors, AttentionWeights,
+    GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, HiddenState, HiddenStateDevice,
+    HiddenStateNvfp4, HiddenVectorShape, Nvfp4Shape, QkvActivation, QkvVectorShape, QkvWeightShape,
     ResidualWeightShape,
 };
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionTcScratch};
@@ -80,17 +80,17 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let c_proj_bias_bytes_dev = DeviceBuffer::from_host(&stream, &c_proj_bias_bytes)?;
     let c_proj_bias_scales_dev = DeviceBuffer::from_host(&stream, &c_proj_bias_scales)?;
 
-    AttentionWeights::forward(AttentionWeights::input_from_embeddings(
-        true,
-        &attention_module,
-        &tc_module,
-        &quant_module,
-        HiddenStateNvfp4 {
+    AttentionWeights::forward(AttentionForwardArgs {
+        use_full_attention: true,
+        module: &attention_module,
+        tc_module: &tc_module,
+        quant_module: &quant_module,
+        input_nvfp4: HiddenStateNvfp4 {
             bytes: &mut input_bytes_dev,
             scales: &mut input_scales_dev,
             global_scales: &mut input_global_scales_dev,
         },
-        CausalAttentionTcScratch {
+        tc_scratch: CausalAttentionTcScratch {
             q: &mut tc_q_dev,
             k: &mut tc_k_dev,
             v: &mut tc_v_dev,
@@ -99,7 +99,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
             compact_out: &mut tc_out_dev,
             chunk_states: &mut tc_chunk_states_dev,
         },
-        AttentionProjectionTensors {
+        projections: AttentionProjectionTensors {
             qkv_weight: Nvfp4FourSixMmaWeightTensor {
                 bytes: &weight_bytes_dev,
                 scales: &weight_scales_dev,
@@ -121,9 +121,9 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
                 global_scale: &global_scale_dev,
             },
         },
-        &mut qkv_dev,
-        &mut attention_log_sum_exp_dev,
-        HiddenStateDevice {
+        qkv: &mut qkv_dev,
+        attention_log_sum_exp: &mut attention_log_sum_exp_dev,
+        hidden: HiddenStateDevice {
             stream: &stream,
             batch_size: 1,
             seq_len: GPT2_CONTEXT_LEN as u32,
@@ -134,7 +134,8 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
             mean: &mut mean_dev,
             inv_std: &mut inv_std_dev,
         },
-    ))?;
+        tape: None,
+    })?;
 
     let qkv = qkv_dev.to_host_vec(&stream)?;
     let out = hidden_dev.to_host_vec(&stream)?;
