@@ -40,6 +40,36 @@ impl ScheduleResult {
     }
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct ScheduleEval<'a, 'cuda> {
+    polar: &'a device::Nvfp4Polar<'cuda>,
+    source: &'a [f32],
+    expected: &'a [f32],
+    rows: usize,
+    cols: usize,
+    iterations: usize,
+}
+
+impl<'a, 'cuda> ScheduleEval<'a, 'cuda> {
+    pub(super) fn new(
+        polar: &'a device::Nvfp4Polar<'cuda>,
+        source: &'a [f32],
+        expected: &'a [f32],
+        rows: usize,
+        cols: usize,
+        iterations: usize,
+    ) -> Self {
+        Self {
+            polar,
+            source,
+            expected,
+            rows,
+            cols,
+            iterations,
+        }
+    }
+}
+
 pub(super) fn seed_safety_schedules() -> Vec<[f32; MAX_ITERATIONS]> {
     let mut schedules = Vec::new();
     for value in [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08] {
@@ -89,21 +119,14 @@ pub(super) fn corrected_schedule_candidates(
 }
 
 pub(super) fn search_best_raw_schedule(
-    polar: &device::Nvfp4Polar<'_>,
-    source: &[f32],
-    expected: &[f32],
-    rows: usize,
-    cols: usize,
-    iterations: usize,
+    eval: ScheduleEval<'_, '_>,
     label: &str,
     report_progress: bool,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
     let mut best = ScheduleResult::missing();
     for schedule in seed_safety_schedules() {
         let name = schedule_result_name(label, format!("seed_{}", schedule_name(&schedule)));
-        let result = evaluate_schedule(
-            polar, source, expected, &name, schedule, rows, cols, iterations, false,
-        )?;
+        let result = evaluate_schedule(eval, &name, schedule, false)?;
         if report_progress {
             report_schedule(&result);
         }
@@ -115,16 +138,14 @@ pub(super) fn search_best_raw_schedule(
     let mut greedy = best.schedule;
     let values = [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08];
     for pass in 0..2 {
-        for iter in 0..iterations {
+        for iter in 0..eval.iterations {
             let mut local_best = best.clone();
             for value in values {
                 let mut candidate = greedy;
                 candidate[iter] = value;
                 let name =
                     schedule_result_name(label, format!("greedy_pass{pass}_iter{iter}_{value:.3}"));
-                let result = evaluate_schedule(
-                    polar, source, expected, &name, candidate, rows, cols, iterations, false,
-                )?;
+                let result = evaluate_schedule(eval, &name, candidate, false)?;
                 if result.is_better_than(&local_best) {
                     local_best = result;
                 }
@@ -143,12 +164,7 @@ pub(super) fn search_best_raw_schedule(
 }
 
 pub(super) fn search_best_corrected_schedule(
-    polar: &device::Nvfp4Polar<'_>,
-    source: &[f32],
-    expected: &[f32],
-    rows: usize,
-    cols: usize,
-    iterations: usize,
+    eval: ScheduleEval<'_, '_>,
     raw_schedule: [f32; MAX_ITERATIONS],
     report_progress: bool,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
@@ -156,17 +172,7 @@ pub(super) fn search_best_corrected_schedule(
     for exact_steps in 1..=3 {
         for period in 2..=5 {
             for schedule in corrected_schedule_candidates(raw_schedule) {
-                let result = evaluate_stale_reject_schedule(
-                    polar,
-                    source,
-                    expected,
-                    exact_steps,
-                    period,
-                    schedule,
-                    rows,
-                    cols,
-                    iterations,
-                )?;
+                let result = evaluate_stale_reject_schedule(eval, exact_steps, period, schedule)?;
                 if report_progress {
                     report_schedule(&result);
                 }
@@ -179,41 +185,27 @@ pub(super) fn search_best_corrected_schedule(
     Ok(best)
 }
 
-pub(super) fn evaluate_schedule(
-    polar: &device::Nvfp4Polar<'_>,
-    source: &[f32],
-    expected: &[f32],
+fn evaluate_schedule(
+    eval: ScheduleEval<'_, '_>,
     name: &str,
     schedule: [f32; MAX_ITERATIONS],
-    rows: usize,
-    cols: usize,
-    iterations: usize,
     stale_reject: bool,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
     if stale_reject {
-        return evaluate_stale_reject_schedule(
-            polar, source, expected, 3, 2, schedule, rows, cols, iterations,
-        );
+        return evaluate_stale_reject_schedule(eval, 3, 2, schedule);
     }
 
     let mode = device::GramCorrectionMode::Nvfp4GramOnlySchedule {
         coefficient_safety: schedule,
     };
-    evaluate_mode(
-        polar, source, expected, name, schedule, rows, cols, iterations, mode,
-    )
+    evaluate_mode(eval, name, schedule, mode)
 }
 
-pub(super) fn evaluate_stale_reject_schedule(
-    polar: &device::Nvfp4Polar<'_>,
-    source: &[f32],
-    expected: &[f32],
+fn evaluate_stale_reject_schedule(
+    eval: ScheduleEval<'_, '_>,
     exact_steps: usize,
     period: usize,
     schedule: [f32; MAX_ITERATIONS],
-    rows: usize,
-    cols: usize,
-    iterations: usize,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
     let mode = device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
         exact_steps,
@@ -221,47 +213,42 @@ pub(super) fn evaluate_stale_reject_schedule(
         coefficient_safety: schedule,
     };
     evaluate_mode(
-        polar,
-        source,
-        expected,
+        eval,
         &format!(
             "prefix{exact_steps}_stale_reject{period}_{}",
             schedule_name(&schedule)
         ),
         schedule,
-        rows,
-        cols,
-        iterations,
         mode,
     )
 }
 
 pub(super) fn evaluate_mode(
-    polar: &device::Nvfp4Polar<'_>,
-    source: &[f32],
-    expected: &[f32],
+    eval: ScheduleEval<'_, '_>,
     name: &str,
     schedule: [f32; MAX_ITERATIONS],
-    rows: usize,
-    cols: usize,
-    iterations: usize,
     mode: device::GramCorrectionMode,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
-    let (actual, stats) =
-        polar.gram_form_corrected_iterations(source.to_vec(), rows, cols, iterations, mode)?;
+    let (actual, stats) = eval.polar.gram_form_corrected_iterations(
+        eval.source.to_vec(),
+        eval.rows,
+        eval.cols,
+        eval.iterations,
+        mode,
+    )?;
     let finite = actual.iter().all(|value| value.is_finite());
     Ok(ScheduleResult {
         name: name.to_owned(),
         schedule,
         finite,
-        cosine: math::cosine(&actual, expected),
+        cosine: math::cosine(&actual, eval.expected),
         rel_l2: if finite {
-            math::relative_l2(&actual, expected)
+            math::relative_l2(&actual, eval.expected)
         } else {
             f32::INFINITY
         },
         max_abs: if finite {
-            math::max_abs_error(&actual, expected)
+            math::max_abs_error(&actual, eval.expected)
         } else {
             f32::INFINITY
         },

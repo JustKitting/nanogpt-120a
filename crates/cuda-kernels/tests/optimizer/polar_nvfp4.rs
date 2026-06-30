@@ -20,8 +20,8 @@ mod scratch;
 
 use mode_cases::{gram_correction_modes, gram_form_correction_modes};
 use schedule::{
-    evaluate_mode, production_shape_modes, report_schedule_search_best, schedule_name,
-    search_best_corrected_schedule, search_best_raw_schedule,
+    ScheduleEval, evaluate_mode, production_shape_modes, report_schedule_search_best,
+    schedule_name, search_best_corrected_schedule, search_best_raw_schedule,
 };
 
 const ROWS: usize = 32;
@@ -184,29 +184,12 @@ fn nvfp4_gram_form_safety_schedule_search() -> Result<(), Box<dyn Error>> {
         let source = math::normalized_source(&math::gradient(ROWS, COLS), ROWS, COLS);
         let expected =
             math::gram_form_polar_iterations_f16_leaf(source.clone(), ROWS, COLS, MAX_ITERATIONS);
+        let eval = ScheduleEval::new(polar, &source, &expected, ROWS, COLS, MAX_ITERATIONS);
 
-        let best = search_best_raw_schedule(
-            &polar,
-            &source,
-            &expected,
-            ROWS,
-            COLS,
-            MAX_ITERATIONS,
-            "",
-            true,
-        )?;
+        let best = search_best_raw_schedule(eval, "", true)?;
         report_schedule_search_best("nvfp4_only", &best);
 
-        let best_corrected = search_best_corrected_schedule(
-            &polar,
-            &source,
-            &expected,
-            ROWS,
-            COLS,
-            MAX_ITERATIONS,
-            best.schedule,
-            true,
-        )?;
+        let best_corrected = search_best_corrected_schedule(eval, best.schedule, true)?;
         report_schedule_search_best("stale_reject", &best_corrected);
 
         assert!(
@@ -234,37 +217,16 @@ fn nvfp4_gram_form_ratio_schedule_search() -> Result<(), Box<dyn Error>> {
                 PRODUCTION_ITERATIONS,
                 device::GramCorrectionMode::HighPrecision,
             )?;
+            let eval =
+                ScheduleEval::new(polar, &source, &expected, rows, cols, PRODUCTION_ITERATIONS);
             let raw = evaluate_mode(
-                &polar,
-                &source,
-                &expected,
+                eval,
                 "nvfp4_raw",
                 [1.0; MAX_ITERATIONS],
-                rows,
-                cols,
-                PRODUCTION_ITERATIONS,
                 device::GramCorrectionMode::Nvfp4GramOnly,
             )?;
-            let best_raw = search_best_raw_schedule(
-                &polar,
-                &source,
-                &expected,
-                rows,
-                cols,
-                PRODUCTION_ITERATIONS,
-                name,
-                false,
-            )?;
-            let best_corrected = search_best_corrected_schedule(
-                &polar,
-                &source,
-                &expected,
-                rows,
-                cols,
-                PRODUCTION_ITERATIONS,
-                best_raw.schedule,
-                false,
-            )?;
+            let best_raw = search_best_raw_schedule(eval, name, false)?;
+            let best_corrected = search_best_corrected_schedule(eval, best_raw.schedule, false)?;
 
             println!(
                 "nvfp4_gram_form_ratio_search name={name} rows={rows} cols={cols} raw_rel_l2={:.8e} raw_cosine={:.8} best_raw_rel_l2={:.8e} best_raw_cosine={:.8} best_raw_schedule={} best_corrected_rel_l2={:.8e} best_corrected_cosine={:.8} best_corrected_name={} best_corrected_nvfp4_grams={} best_corrected_hi_grams={} best_corrected_rejected={} best_corrected_schedule={}",
