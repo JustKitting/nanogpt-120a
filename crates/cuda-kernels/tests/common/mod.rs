@@ -13,3 +13,11 @@ pub fn ptx_path() -> String {
         .to_string_lossy()
         .into_owned()
 }
+
+#[allow(dead_code)]
+pub fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
+    actual
+        .iter()
+        .zip(expected)
+        .fold(0.0, |max, (a, e)| max.max((a - e).abs()))
+}

@@ -8,6 +8,8 @@ use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 mod common;
 
+use common::max_abs_error;
+
 const ROWS: usize = 2;
 const COLS: usize = 32;
 const E2M1_ONE_PAIR: u8 = 0x22;
@@ -111,11 +113,4 @@ fn reference_backward_input(x: &[f32], grad: &[f32], mean: &[f32], inv_std: &[f3
         }
     }
     out
-}
-
-fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
-    actual
-        .iter()
-        .zip(expected)
-        .fold(0.0, |max, (a, e)| max.max((a - e).abs()))
 }

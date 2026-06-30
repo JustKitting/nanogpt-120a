@@ -6,6 +6,8 @@ use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 mod common;
 
+use common::max_abs_error;
+
 const GPT_EMBEDDING_DIM: usize = 768;
 const E2M1_ONE_PAIR: u8 = 0x22;
 const E4M3_ONE: u8 = 0x38;
@@ -213,15 +215,6 @@ fn warp_sum_lane0(mut lanes: [f32; 32]) -> f32 {
         }
     }
     lanes[0] + lanes[1]
-}
-
-fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
-    actual
-        .iter()
-        .zip(expected.iter())
-        .fold(0.0f32, |max, (actual, expected)| {
-            max.max((actual - expected).abs())
-        })
 }
 
 fn assert_row_amax(out: &[f32], amax: &[f32], row_count: usize, row_len: usize) {
