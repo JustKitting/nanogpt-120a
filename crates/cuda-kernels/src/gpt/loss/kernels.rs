@@ -1,9 +1,11 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
 use super::{CROSS_ENTROPY_THREADS_PER_BLOCK, CROSS_ENTROPY_WARPS_PER_BLOCK, CrossEntropyParams};
-use crate::block_reduce::block_reduce_f32;
+use crate::block_reduce::{
+    block_max_shared_f32, block_max_shared_f32_for_warps, block_sum_shared_f32,
+};
 use crate::float_ptx::{abs_f32, exp_f32, ln_f32, max_f32, safe_positive_denom};
-use crate::warp_reduce::{thread_lane_warp, warp_max_f32, warp_sum_f32};
+use crate::warp_reduce::thread_lane_warp;
 
 pub use module::{LoadedModule, from_module};
 
@@ -34,30 +36,25 @@ mod module {
                 local_max = max_f32(local_max, logits[row_base + col as usize]);
                 col += CROSS_ENTROPY_THREADS_PER_BLOCK;
             }
-            let row_max = block_reduce_f32!(
-                REDUCE,
-                CROSS_ENTROPY_WARPS_PER_BLOCK,
-                local_max,
-                lane,
-                warp_in_block,
-                warp_max_f32,
-                f32::NEG_INFINITY
-            );
+            let row_max = unsafe {
+                block_max_shared_f32_for_warps(
+                    &mut REDUCE,
+                    CROSS_ENTROPY_WARPS_PER_BLOCK,
+                    local_max,
+                    lane,
+                    warp_in_block,
+                    f32::NEG_INFINITY,
+                )
+            };
             let mut local_sum = 0.0_f32;
             col = thread;
             while col < params.vocab_size {
                 local_sum += exp_f32(logits[row_base + col as usize] - row_max);
                 col += CROSS_ENTROPY_THREADS_PER_BLOCK;
             }
-            let denom = safe_positive_denom(block_reduce_f32!(
-                REDUCE,
-                CROSS_ENTROPY_WARPS_PER_BLOCK,
-                local_sum,
-                lane,
-                warp_in_block,
-                warp_sum_f32,
-                0.0
-            ));
+            let denom = safe_positive_denom(unsafe {
+                block_sum_shared_f32(&mut REDUCE, local_sum, lane, warp_in_block)
+            });
             let target = targets[row as usize];
             if thread == 0 {
                 let target_logit = logits[row_base + target as usize];
@@ -81,15 +78,9 @@ mod module {
                 col += CROSS_ENTROPY_THREADS_PER_BLOCK;
             }
 
-            let row_dlogits_amax = block_reduce_f32!(
-                REDUCE,
-                CROSS_ENTROPY_WARPS_PER_BLOCK,
-                local_dlogits_amax,
-                lane,
-                warp_in_block,
-                warp_max_f32,
-                0.0
-            );
+            let row_dlogits_amax = unsafe {
+                block_max_shared_f32(&mut REDUCE, local_dlogits_amax, lane, warp_in_block)
+            };
             if thread == 0 {
                 unsafe {
                     *dlogits_row_amax.get_unchecked_mut(row as usize) = row_dlogits_amax;
