@@ -12,7 +12,7 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         self.derive_rowwise_nvfp4_transpose_global_scale(&mut args)?;
         let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
-        self.ms_eden
+        self.ms_eden_rowwise_transpose
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
                 pack.config(),
@@ -46,7 +46,7 @@ impl Nvfp4QuantModule {
             {
                 if let Some(source_cols_shift) = no_pad.source_cols_shift() {
                     return self
-                        .ms_eden
+                        .ms_eden_rowwise_transpose
                         .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_source_cols_pow2_kernel(
                             args.stream,
                             pack.config(),
@@ -66,7 +66,7 @@ impl Nvfp4QuantModule {
                 }
 
                 return self
-                    .ms_eden
+                    .ms_eden_rowwise_transpose
                     .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
                         args.stream,
                         pack.config(),
@@ -86,7 +86,7 @@ impl Nvfp4QuantModule {
             }
 
             return self
-                .ms_eden
+                .ms_eden_rowwise_transpose
                 .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
                     pack.config(),
@@ -106,7 +106,7 @@ impl Nvfp4QuantModule {
                 );
         }
 
-        self.ms_eden
+        self.ms_eden_rowwise_transpose
             .rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
                 pack.config(),
