@@ -5,8 +5,8 @@ use crate::attention::CausalAttentionParams;
 use crate::float_ptx::fma_f32;
 use crate::kda_common::{
     KDA_MATRIX_ELEMS, KDA_MAX_HEAD_DIM, batch_head, beta_compact_index, chunk_count,
-    chunk_g_last_elems, chunk_g_last_index, chunk_matrix_elems, compact_elems, compact_index,
-    compact_linear_parts, kda_decay_exp, linear_thread_index,
+    chunk_end_token, chunk_g_last_elems, chunk_g_last_index, chunk_matrix_elems, compact_elems,
+    compact_index, compact_linear_parts, kda_decay_exp, linear_thread_index,
 };
 use crate::kda_elementwise::{
     chunk_cumsum_g_body as shared_chunk_cumsum_g_body, prepare_kda_inputs_body,
@@ -66,8 +66,7 @@ pub(super) fn make_kg_kpos_vbeta_body(
         return;
     };
     let (dim, token, _bh, batch, head) = compact_linear_parts(index, &params);
-    let chunk = token / params.chunk_size;
-    let chunk_end = params.seq_len.min((chunk + 1) * params.chunk_size) - 1;
+    let chunk_end = chunk_end_token(token / params.chunk_size, &params);
     let g_value = g[index as usize];
     let g_last = g[compact_index(batch, chunk_end, head, dim, &params)];
     let beta_value = beta[beta_compact_index(batch, token, head, &params)];
@@ -95,7 +94,7 @@ pub(super) fn store_chunk_g_last_body(
     let bh = index / (chunks * params.head_dim);
     let batch = bh / params.head_count;
     let head = bh - batch * params.head_count;
-    let chunk_end = params.seq_len.min((chunk + 1) * params.chunk_size) - 1;
+    let chunk_end = chunk_end_token(chunk, &params);
     unsafe {
         *chunk_g_last.get_unchecked_mut(index as usize) =
             g[compact_index(batch, chunk_end, head, dim, &params)];

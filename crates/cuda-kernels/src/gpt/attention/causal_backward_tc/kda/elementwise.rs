@@ -3,8 +3,9 @@ use cuda_device::DisjointSlice;
 use super::super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
 use crate::kda_common::{
-    batch_head, beta_compact_index, chunk_count, chunk_matrix_elems, compact_elems, compact_index,
-    compact_linear_parts, hidden_index, kda_decay_exp, linear_thread_index,
+    batch_head, beta_compact_index, chunk_count, chunk_end_token, chunk_matrix_elems,
+    compact_elems, compact_index, compact_linear_parts, hidden_index, kda_decay_exp,
+    linear_thread_index,
 };
 use crate::kda_elementwise::{
     chunk_cumsum_g_body as shared_chunk_cumsum_g_body, prepare_kda_inputs_body,
@@ -64,10 +65,7 @@ pub(crate) fn make_kda_kneg_from_kg_body(
         return;
     };
     let (dim, token, _bh, batch, head) = compact_linear_parts(index, &params);
-    let chunk_end = params
-        .seq_len
-        .min((token / params.chunk_size + 1) * params.chunk_size)
-        - 1;
+    let chunk_end = chunk_end_token(token / params.chunk_size, &params);
     let g_last = g[compact_index(batch, chunk_end, head, dim, &params)];
     unsafe {
         *kneg.get_unchecked_mut(index as usize) = kg[index as usize] * kda_decay_exp(-g_last);
@@ -85,10 +83,7 @@ pub(crate) fn make_kda_kpos_from_kg_body(
         return;
     };
     let (dim, token, _bh, batch, head) = compact_linear_parts(index, &params);
-    let chunk_end = params
-        .seq_len
-        .min((token / params.chunk_size + 1) * params.chunk_size)
-        - 1;
+    let chunk_end = chunk_end_token(token / params.chunk_size, &params);
     let compact = compact_index(batch, token, head, dim, &params);
     let g_value = g[compact];
     let g_last = g[compact_index(batch, chunk_end, head, dim, &params)];

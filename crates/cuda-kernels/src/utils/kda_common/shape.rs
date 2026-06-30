@@ -28,6 +28,11 @@ pub(crate) fn chunk_count(params: &CausalAttentionParams) -> u32 {
 }
 
 #[inline(always)]
+pub(crate) fn chunk_end_token(chunk: u32, params: &CausalAttentionParams) -> u32 {
+    params.seq_len.min((chunk + 1) * params.chunk_size) - 1
+}
+
+#[inline(always)]
 pub(crate) fn chunk_g_last_elems(params: &CausalAttentionParams) -> u32 {
     batch_head(params) * chunk_count(params) * params.head_dim
 }
