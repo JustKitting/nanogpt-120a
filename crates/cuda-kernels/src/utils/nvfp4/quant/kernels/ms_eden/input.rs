@@ -174,57 +174,51 @@ pub(super) fn transposed_hadamard_input(
     input * random_sign(seed, input_col)
 }
 
-#[inline(always)]
-pub(super) fn hadamard_input_no_pad_pow2(
-    x: &[f32],
-    chunk: u32,
-    lane: u32,
-    src_row_len: u32,
-    chunks_per_row_shift: u32,
-    seed: u32,
-) -> (f32, u32, bool) {
-    let pos = no_pad_pow2_chunk_position(chunk, lane, chunks_per_row_shift);
-    no_pad_result(x, pos.0 * src_row_len + pos.1, seed, pos)
+macro_rules! no_pad_hadamard_input_fn {
+    ($name:ident, $position_fn:ident, $row_len_arg:ident, $chunks_arg:ident, |$row:ident, $col:ident| $index:expr) => {
+        #[inline(always)]
+        pub(super) fn $name(
+            x: &[f32],
+            chunk: u32,
+            lane: u32,
+            $row_len_arg: u32,
+            $chunks_arg: u32,
+            seed: u32,
+        ) -> (f32, u32, bool) {
+            let ($row, $col, first_chunk_in_row) = $position_fn(chunk, lane, $chunks_arg);
+            no_pad_result(x, $index, seed, ($row, $col, first_chunk_in_row))
+        }
+    };
 }
 
-#[inline(always)]
-pub(super) fn transposed_hadamard_input_no_pad_pow2(
-    x: &[f32],
-    chunk: u32,
-    lane: u32,
-    source_cols: u32,
-    chunks_per_row_shift: u32,
-    seed: u32,
-) -> (f32, u32, bool) {
-    let pos = no_pad_pow2_chunk_position(chunk, lane, chunks_per_row_shift);
-    no_pad_result(x, pos.1 * source_cols + pos.0, seed, pos)
-}
-
-#[inline(always)]
-pub(super) fn hadamard_input_no_pad(
-    x: &[f32],
-    chunk: u32,
-    lane: u32,
-    src_row_len: u32,
-    chunks_per_row: u32,
-    seed: u32,
-) -> (f32, u32, bool) {
-    let pos = no_pad_chunk_position(chunk, lane, chunks_per_row);
-    no_pad_result(x, pos.0 * src_row_len + pos.1, seed, pos)
-}
-
-#[inline(always)]
-pub(super) fn transposed_hadamard_input_no_pad(
-    x: &[f32],
-    chunk: u32,
-    lane: u32,
-    source_cols: u32,
-    chunks_per_row: u32,
-    seed: u32,
-) -> (f32, u32, bool) {
-    let pos = no_pad_chunk_position(chunk, lane, chunks_per_row);
-    no_pad_result(x, pos.1 * source_cols + pos.0, seed, pos)
-}
+no_pad_hadamard_input_fn!(
+    hadamard_input_no_pad_pow2,
+    no_pad_pow2_chunk_position,
+    src_row_len,
+    chunks_per_row_shift,
+    |row, col| row * src_row_len + col
+);
+no_pad_hadamard_input_fn!(
+    transposed_hadamard_input_no_pad_pow2,
+    no_pad_pow2_chunk_position,
+    source_cols,
+    chunks_per_row_shift,
+    |row, col| col * source_cols + row
+);
+no_pad_hadamard_input_fn!(
+    hadamard_input_no_pad,
+    no_pad_chunk_position,
+    src_row_len,
+    chunks_per_row,
+    |row, col| row * src_row_len + col
+);
+no_pad_hadamard_input_fn!(
+    transposed_hadamard_input_no_pad,
+    no_pad_chunk_position,
+    source_cols,
+    chunks_per_row,
+    |row, col| col * source_cols + row
+);
 
 #[inline(always)]
 fn padded_chunk_position(chunk_base: u32, lane: u32, dst_row_len: u32) -> (u32, u32) {
