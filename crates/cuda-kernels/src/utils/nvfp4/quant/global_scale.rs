@@ -1,4 +1,4 @@
-use cuda_core::DriverError;
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use super::args::{
     Nvfp4TransposeMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenDeviceScaleQuantArgs,
@@ -8,6 +8,23 @@ use super::launcher::Nvfp4QuantModule;
 use super::shape::{grid_config, tensor_amax_chunk_count};
 
 impl Nvfp4QuantModule {
+    pub fn quartet_backward_ms_eden_global_scale_from_chunks(
+        &self,
+        stream: &CudaStream,
+        chunk_amax: &DeviceBuffer<f32>,
+        out_global_scale: &mut DeviceBuffer<f32>,
+        chunk_count: u32,
+    ) -> Result<(), DriverError> {
+        self.ms_eden
+            .quartet_backward_ms_eden_global_scale_from_chunks_kernel(
+                stream,
+                grid_config(1),
+                chunk_amax,
+                out_global_scale,
+                chunk_count,
+            )
+    }
+
     pub(super) fn derive_rowwise_nvfp4_transpose_global_scale(
         &self,
         args: &mut RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,

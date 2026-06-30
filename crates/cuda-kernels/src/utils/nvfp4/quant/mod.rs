@@ -1,3 +1,4 @@
+mod amax;
 mod args;
 mod config;
 mod global_scale;
