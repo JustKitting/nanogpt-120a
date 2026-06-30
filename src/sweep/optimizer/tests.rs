@@ -1,7 +1,12 @@
 use std::{collections::HashSet, path::PathBuf};
 
 use super::{best_local_center, infeasible_build_shapes, unseen_random};
-use crate::sweep::{candidate::Candidate, config::SweepConfig, history::Trial, rng::SweepRng};
+use crate::sweep::{
+    candidate::Candidate,
+    history::Trial,
+    rng::SweepRng,
+    test_fixtures::{basic_candidate, config as sweep_config},
+};
 
 #[test]
 fn marks_build_shape_infeasible_after_failed_run() {
@@ -73,19 +78,11 @@ fn candidate(
     lr_scale: f64,
 ) -> Candidate {
     Candidate {
-        batch_size,
-        n_layer,
         n_embd,
-        n_head: 16,
         aurora_phases,
         aurora_blocks,
         lr_scale,
-        adam_lr_scale: 1.0,
-        nextlat_lr_scale: 1.0,
-        warmup_steps: 20,
-        start_ratio: 0.1,
-        amuse_beta1: 0.4,
-        amuse_rho: 0.8,
+        ..basic_candidate(batch_size, n_layer)
     }
 }
 
@@ -104,24 +101,6 @@ fn screen_trial(candidate: Candidate, screen_loss: f64) -> Trial {
     }
 }
 
-fn config() -> SweepConfig {
-    SweepConfig {
-        trials: 4,
-        random_trials: 0,
-        candidate_samples: 16,
-        max_seconds: 900.0,
-        screen_max_seconds: 30.0,
-        sweep_quality_weight: 1.0,
-        sweep_stability_weight: 0.75,
-        sweep_exploration_weight: 0.35,
-        log_interval: 500,
-        dataset: "synth".to_string(),
-        arch: "sm_120a".to_string(),
-        cuda_device: None,
-        sweep_dir: None,
-        seed_history: PathBuf::from("notes/sweep_seed_current.tsv"),
-        baseline: PathBuf::from("notes/sweep_baseline.env"),
-        seed: 0x4750_5432,
-        dry_run: false,
-    }
+fn config() -> crate::sweep::config::SweepConfig {
+    sweep_config(0, 16)
 }
