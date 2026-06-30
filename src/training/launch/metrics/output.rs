@@ -4,6 +4,24 @@ use burn::train::metric::Adaptor;
 
 use super::super::super::TrainStats;
 
+macro_rules! impl_output_item {
+    ($ty:ty) => {
+        impl burn::train::ItemLazy for $ty {
+            type ItemSync = Self;
+
+            fn sync(self) -> Self::ItemSync {
+                self
+            }
+        }
+
+        impl Adaptor<$ty> for $ty {
+            fn adapt(&self) -> $ty {
+                self.clone()
+            }
+        }
+    };
+}
+
 #[derive(Clone)]
 pub(in crate::training) struct CudaTrainOutput {
     pub(in crate::training) source: String,
@@ -13,19 +31,7 @@ pub(in crate::training) struct CudaTrainOutput {
     pub(in crate::training) stats: Arc<TrainStats>,
 }
 
-impl burn::train::ItemLazy for CudaTrainOutput {
-    type ItemSync = Self;
-
-    fn sync(self) -> Self::ItemSync {
-        self
-    }
-}
-
-impl Adaptor<CudaTrainOutput> for CudaTrainOutput {
-    fn adapt(&self) -> CudaTrainOutput {
-        self.clone()
-    }
-}
+impl_output_item!(CudaTrainOutput);
 
 #[derive(Clone)]
 pub(in crate::training) struct CudaValidOutput {
@@ -35,16 +41,4 @@ pub(in crate::training) struct CudaValidOutput {
     pub(in crate::training::launch) completed_steps: usize,
 }
 
-impl burn::train::ItemLazy for CudaValidOutput {
-    type ItemSync = Self;
-
-    fn sync(self) -> Self::ItemSync {
-        self
-    }
-}
-
-impl Adaptor<CudaValidOutput> for CudaValidOutput {
-    fn adapt(&self) -> CudaValidOutput {
-        self.clone()
-    }
-}
+impl_output_item!(CudaValidOutput);

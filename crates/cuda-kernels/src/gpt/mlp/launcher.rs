@@ -36,7 +36,7 @@ impl MlpModule {
             args.bias.global_scale,
             args.pre_activation,
             args.out,
-            up_params(&args),
+            projection_params(args.token_count, args.input_dim, args.output_dim, 0),
         )
     }
 
@@ -54,7 +54,7 @@ impl MlpModule {
             args.weight.global_scale,
             args.bias.global_scale,
             args.residual,
-            down_params(&args),
+            projection_params(args.token_count, args.input_dim, args.output_dim, 1),
         )
     }
 
@@ -95,26 +95,19 @@ fn aligned_config(token_count: u32, input_dim: u32, output_dim: u32) -> LaunchCo
     )
 }
 
-fn up_params(args: &MlpUpRelu2Args<'_, '_>) -> Nvfp4ProjectionParams {
+fn projection_params(
+    token_count: u32,
+    input_dim: u32,
+    output_dim: u32,
+    residual_add: u32,
+) -> Nvfp4ProjectionParams {
     Nvfp4ProjectionParams {
-        token_count: args.token_count,
-        input_dim: args.input_dim,
-        output_dim: args.output_dim,
+        token_count,
+        input_dim,
+        output_dim,
         weight_global_scale: 1.0,
         bias_global_scale: 1.0,
-        residual_add: 0,
-        activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-    }
-}
-
-fn down_params(args: &MlpDownResidualArgs<'_, '_>) -> Nvfp4ProjectionParams {
-    Nvfp4ProjectionParams {
-        token_count: args.token_count,
-        input_dim: args.input_dim,
-        output_dim: args.output_dim,
-        weight_global_scale: 1.0,
-        bias_global_scale: 1.0,
-        residual_add: 1,
+        residual_add,
         activation: NVFP4_PROJECTION_ACTIVATION_NONE,
     }
 }
