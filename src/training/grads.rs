@@ -4,8 +4,8 @@ use gpt2_nvfp4::{
     Logits,
 };
 
+use super::device_buffer::zero;
 use super::grad_block::{BlockGradBuffers, LayerNormGradBuffers};
-use super::tape_leaf::zero;
 
 pub struct BackwardBuffers {
     pub losses: DeviceBuffer<f32>,

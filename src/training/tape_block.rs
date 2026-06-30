@@ -4,7 +4,8 @@ use gpt2_nvfp4::{
     MlpActivation, QkvActivation,
 };
 
-use super::tape_leaf::{LayerNormTapeBuffers, RowwiseTapeBuffers, zero};
+use super::device_buffer::zero;
+use super::tape_leaf::{LayerNormTapeBuffers, RowwiseTapeBuffers};
 
 pub struct BlockTapeBuffers {
     ln_1: LayerNormTapeBuffers,
@@ -24,13 +25,13 @@ impl BlockTapeBuffers {
         Ok(Self {
             ln_1: LayerNormTapeBuffers::new(stream)?,
             qkv_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
-            qkv: DeviceBuffer::zeroed(stream, QkvActivation::LEN)?,
-            attention_out: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
+            qkv: zero(stream, QkvActivation::LEN)?,
+            attention_out: zero(stream, HiddenState::LEN)?,
             attention_log_sum_exp: zero(stream, AttentionLogSumExp::LEN)?,
             c_proj_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
             ln_2: LayerNormTapeBuffers::new(stream)?,
             mlp_up_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
-            mlp_up: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
+            mlp_up: zero(stream, MlpActivation::LEN)?,
             mlp_down_input: RowwiseTapeBuffers::new(stream, MlpActivation::LEN, GPT2_TOKEN_ROWS)?,
         })
     }

@@ -7,6 +7,7 @@ mod batch;
 mod buffers;
 mod data;
 mod debug_metrics;
+mod device_buffer;
 mod diagnostics;
 mod env;
 mod eval;

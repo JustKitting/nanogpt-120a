@@ -3,6 +3,7 @@ use gpt2_nvfp4::{AttentionCProjScratch, FinalHeadBackwardScratch, GPT2_TOKEN_ROW
 use rust_kernels_cuda::linear_backward::LinearBackwardMsEdenScratch;
 use rust_kernels_cuda::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 
+use super::device_buffer::zero;
 use super::operand_scratch::OperandScratch;
 
 pub struct LinearScratch {
@@ -25,9 +26,9 @@ impl LinearScratch {
         let token_k = nvfp4_tc_matmul_padded_k(GPT2_TOKEN_ROWS as u32) as usize;
 
         Ok(Self {
-            error_t: DeviceBuffer::zeroed(stream, output_dim * GPT2_TOKEN_ROWS)?,
-            weight_t: DeviceBuffer::zeroed(stream, output_dim * input_dim)?,
-            input_t: DeviceBuffer::zeroed(stream, input_dim * GPT2_TOKEN_ROWS)?,
+            error_t: zero(stream, output_dim * GPT2_TOKEN_ROWS)?,
+            weight_t: zero(stream, output_dim * input_dim)?,
+            input_t: zero(stream, input_dim * GPT2_TOKEN_ROWS)?,
             e: OperandScratch::new(stream, GPT2_TOKEN_ROWS * output_k, GPT2_TOKEN_ROWS)?,
             weight_t_h: OperandScratch::new(stream, input_dim * output_k, input_dim)?,
             e_t: OperandScratch::new(stream, output_dim * token_k, output_dim)?,

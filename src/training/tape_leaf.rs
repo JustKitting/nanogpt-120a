@@ -2,6 +2,8 @@ use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{GPT2_TOKEN_ROWS, HiddenState, LayerNormSaved, LayerNormTape, RowwiseNvfp4Tape};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
+use super::device_buffer::zero;
+
 pub struct LayerNormTapeBuffers {
     residual: DeviceBuffer<u16>,
     mean: DeviceBuffer<f32>,
@@ -11,7 +13,7 @@ pub struct LayerNormTapeBuffers {
 impl LayerNormTapeBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            residual: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
+            residual: zero(stream, HiddenState::LEN)?,
             mean: zero(stream, GPT2_TOKEN_ROWS)?,
             inv_std: zero(stream, GPT2_TOKEN_ROWS)?,
         })
@@ -44,8 +46,8 @@ pub struct RowwiseTapeBuffers {
 impl RowwiseTapeBuffers {
     pub fn new(stream: &CudaStream, elements: usize, rows: usize) -> Result<Self, DriverError> {
         Ok(Self {
-            bytes: DeviceBuffer::zeroed(stream, elements / 2)?,
-            scales: DeviceBuffer::zeroed(stream, elements / 16)?,
+            bytes: zero(stream, elements / 2)?,
+            scales: zero(stream, elements / 16)?,
             global_scales: zero(stream, rows)?,
         })
     }
@@ -65,8 +67,4 @@ impl RowwiseTapeBuffers {
             global_scales: &self.global_scales,
         }
     }
-}
-
-pub fn zero(stream: &CudaStream, len: usize) -> Result<DeviceBuffer<f32>, DriverError> {
-    DeviceBuffer::zeroed(stream, len)
 }

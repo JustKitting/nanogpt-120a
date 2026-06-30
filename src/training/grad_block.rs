@@ -4,7 +4,7 @@ use gpt2_nvfp4::{
     MlpActivation, QkvActivation,
 };
 
-use super::tape_leaf::zero;
+use super::device_buffer::zero;
 
 pub struct BlockGradBuffers {
     pub(super) d_residual_in: DeviceBuffer<f32>,

@@ -1,6 +1,8 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{GPT2_TOKEN_ROWS, HiddenState, NextLatHiddenActivation, NextLatInputActivation};
 
+use super::super::device_buffer::zero;
+
 pub struct NextLatBuffers {
     pub next_token_embeddings: DeviceBuffer<f32>,
     pub concat: DeviceBuffer<f32>,
@@ -36,18 +38,18 @@ impl NextLatBuffers {
             normalized_amax: zero(stream, GPT2_TOKEN_ROWS)?,
             mean: zero(stream, GPT2_TOKEN_ROWS)?,
             inv_std: zero(stream, GPT2_TOKEN_ROWS)?,
-            input_bytes: DeviceBuffer::zeroed(stream, NextLatInputActivation::LEN / 2)?,
-            input_scales: DeviceBuffer::zeroed(stream, NextLatInputActivation::LEN / 16)?,
+            input_bytes: zero(stream, NextLatInputActivation::LEN / 2)?,
+            input_scales: zero(stream, NextLatInputActivation::LEN / 16)?,
             input_globals: zero(stream, GPT2_TOKEN_ROWS)?,
             pre1: zero(stream, NextLatHiddenActivation::LEN)?,
             act1: zero(stream, NextLatHiddenActivation::LEN)?,
-            act1_bytes: DeviceBuffer::zeroed(stream, NextLatHiddenActivation::LEN / 2)?,
-            act1_scales: DeviceBuffer::zeroed(stream, NextLatHiddenActivation::LEN / 16)?,
+            act1_bytes: zero(stream, NextLatHiddenActivation::LEN / 2)?,
+            act1_scales: zero(stream, NextLatHiddenActivation::LEN / 16)?,
             act1_globals: zero(stream, GPT2_TOKEN_ROWS)?,
             pre2: zero(stream, NextLatHiddenActivation::LEN)?,
             act2: zero(stream, NextLatHiddenActivation::LEN)?,
-            act2_bytes: DeviceBuffer::zeroed(stream, NextLatHiddenActivation::LEN / 2)?,
-            act2_scales: DeviceBuffer::zeroed(stream, NextLatHiddenActivation::LEN / 16)?,
+            act2_bytes: zero(stream, NextLatHiddenActivation::LEN / 2)?,
+            act2_scales: zero(stream, NextLatHiddenActivation::LEN / 16)?,
             act2_globals: zero(stream, GPT2_TOKEN_ROWS)?,
             delta: zero(stream, HiddenState::LEN)?,
             predicted: zero(stream, HiddenState::LEN)?,
@@ -55,8 +57,4 @@ impl NextLatBuffers {
             d_predicted: zero(stream, HiddenState::LEN)?,
         })
     }
-}
-
-fn zero(stream: &CudaStream, len: usize) -> Result<DeviceBuffer<f32>, DriverError> {
-    DeviceBuffer::zeroed(stream, len)
 }

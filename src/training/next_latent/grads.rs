@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{GPT2_N_EMBD, HiddenState, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
 
-use crate::training::tape_leaf::zero;
+use super::super::device_buffer::zero;
 
 pub struct NextLatGradBuffers {
     pub d_act2: DeviceBuffer<f32>,

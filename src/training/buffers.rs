@@ -3,6 +3,7 @@ use gpt2_nvfp4::{
     AttentionLogSumExp, GPT2_TOKEN_ROWS, HiddenState, Logits, MlpActivation, QkvActivation,
 };
 
+use super::device_buffer::zero;
 use super::grad_clip::GradientClipBuffers;
 use super::grads::BackwardBuffers;
 use super::next_latent::{NextLatBuffers, NextLatGradBuffers, NextLatScratchBuffers};
@@ -69,13 +70,13 @@ impl TrainBuffers {
             normalized_amax: zero(stream, GPT2_TOKEN_ROWS)?,
             mean: zero(stream, GPT2_TOKEN_ROWS)?,
             inv_std: zero(stream, GPT2_TOKEN_ROWS)?,
-            hidden_bytes: DeviceBuffer::zeroed(stream, HiddenState::LEN / 2)?,
-            hidden_scales: DeviceBuffer::zeroed(stream, HiddenState::LEN / 16)?,
+            hidden_bytes: zero(stream, HiddenState::LEN / 2)?,
+            hidden_scales: zero(stream, HiddenState::LEN / 16)?,
             hidden_globals: zero(stream, GPT2_TOKEN_ROWS)?,
             mlp_pre: zero(stream, MlpActivation::LEN)?,
             mlp_act: zero(stream, MlpActivation::LEN)?,
-            mlp_bytes: DeviceBuffer::zeroed(stream, MlpActivation::LEN / 2)?,
-            mlp_scales: DeviceBuffer::zeroed(stream, MlpActivation::LEN / 16)?,
+            mlp_bytes: zero(stream, MlpActivation::LEN / 2)?,
+            mlp_scales: zero(stream, MlpActivation::LEN / 16)?,
             mlp_globals: zero(stream, GPT2_TOKEN_ROWS)?,
             qkv: zero(stream, QkvActivation::LEN)?,
             log_sum_exp: zero(stream, AttentionLogSumExp::LEN)?,
@@ -93,8 +94,4 @@ impl TrainBuffers {
             grad_clip,
         })
     }
-}
-
-fn zero(stream: &CudaStream, len: usize) -> Result<DeviceBuffer<f32>, DriverError> {
-    DeviceBuffer::zeroed(stream, len)
 }
