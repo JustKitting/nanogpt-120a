@@ -12,7 +12,7 @@ pub(super) struct DebugMetricSpec {
 }
 
 metric_fields! {
-    DebugMetricField, DEBUG_METRIC_FIELDS, DebugMetricSpec, prefix "Diagnostic " {
+    DebugMetricField, DEBUG_METRIC_FIELDS, DebugMetricSpec, "Diagnostic " {
         UpdateCount => ("update count", None, true),
         PositiveUpdateDot => ("positive update dot", None, true),
         ZeroGradChanged => ("zero grad changed", None, false),

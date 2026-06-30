@@ -10,7 +10,7 @@ pub(super) struct TrainMetricSpec {
 }
 
 metric_fields! {
-    TrainMetricField, TRAIN_METRIC_FIELDS, TrainMetricSpec {
+    TrainMetricField, TRAIN_METRIC_FIELDS, TrainMetricSpec, "" {
         Loss => ("Loss", None, false),
         ForwardMs => ("Forward", Some("ms"), false),
         BackwardEnqueueMs => ("Backward enqueue", Some("ms"), false),

@@ -2,35 +2,6 @@ macro_rules! metric_fields {
     (
         $field_ty:ident,
         $field_const:ident,
-        $spec_ty:ident
-        , prefix $prefix:literal
-        {
-            $($variant:ident => ($name:literal, $unit:expr, $higher_is_better:expr),)+
-        }
-    ) => {
-        metric_fields! {
-            @emit $field_ty, $field_const, $spec_ty, $prefix {
-                $($variant => ($name, $unit, $higher_is_better),)+
-            }
-        }
-    };
-    (
-        $field_ty:ident,
-        $field_const:ident,
-        $spec_ty:ident
-        {
-            $($variant:ident => ($name:literal, $unit:expr, $higher_is_better:expr),)+
-        }
-    ) => {
-        metric_fields! {
-            @emit $field_ty, $field_const, $spec_ty, "" {
-                $($variant => ($name, $unit, $higher_is_better),)+
-            }
-        }
-    };
-    (
-        @emit $field_ty:ident,
-        $field_const:ident,
         $spec_ty:ident,
         $prefix:literal
         {

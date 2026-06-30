@@ -10,7 +10,7 @@ pub(super) struct ValidMetricSpec {
 }
 
 metric_fields! {
-    ValidMetricField, VALID_METRIC_FIELDS, ValidMetricSpec {
+    ValidMetricField, VALID_METRIC_FIELDS, ValidMetricSpec, "" {
         Loss => ("Validation loss", None, false),
         EvalElapsed => ("Eval elapsed", Some("s"), false),
         WindowCount => ("Val windows", None, true),
