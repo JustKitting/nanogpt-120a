@@ -6,6 +6,7 @@ use gpt2_nvfp4::{
 };
 use rust_kernels_cuda::optimizer::AURORA_MATRIX_PHASES;
 
+use super::super::AURORA_MATRIX_SLOTS;
 use super::{HostPtrs, padding::AuroraPaddingBuffers, ptrs};
 use crate::{
     training::{
@@ -34,7 +35,7 @@ fn all_slots(
     next_latent_grads: &NextLatGradBuffers,
     state: &OptimizerStateBuffers,
 ) -> Vec<HostPtrs> {
-    let mut rows = Vec::with_capacity(GPT2_N_LAYER * 4 + 3);
+    let mut rows = Vec::with_capacity(AURORA_MATRIX_SLOTS);
     for i in 0..GPT2_N_LAYER {
         let qkv_dim = if uses_full_attention(i) {
             GPT2_FULL_ATTENTION_QKV
@@ -75,7 +76,7 @@ fn schedule_slots(rows: &mut [HostPtrs]) {
 }
 
 fn pad_slots(rows: &mut Vec<HostPtrs>, padding: &AuroraPaddingBuffers) {
-    while rows.len() % AURORA_MATRIX_PHASES != 0 {
+    while !rows.len().is_multiple_of(AURORA_MATRIX_PHASES) {
         rows.push(padding.ptrs());
     }
 }
