@@ -1,4 +1,5 @@
 mod args;
+mod forward;
 mod weights;
 
 pub use args::{LayerNormForwardArgs, LayerNormTensors};
