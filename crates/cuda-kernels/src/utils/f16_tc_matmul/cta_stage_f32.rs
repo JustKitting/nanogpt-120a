@@ -46,76 +46,51 @@ stage_tiles_f32_fn!(
     stage_half_rhs_transposed
 );
 
-fn stage_a(
-    a: &[f32],
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+macro_rules! stage_row_major_f32_fn {
+    ($name:ident, $tile_elems:ident, $row_base:ident, $check_bounds:expr) => {
+        fn $name(
+            src: &[f32],
+            dst: &mut SharedArray<u16, $tile_elems>,
+            tile: CtaTile,
+            rows: u32,
+            cols: u32,
+            k_base: u32,
+        ) {
+            stage_row_major_f32::<$check_bounds, $tile_elems>(
+                src,
+                dst,
+                tile,
+                tile.$row_base,
+                rows,
+                cols,
+                k_base,
+            );
+        }
+    };
+}
+
+stage_row_major_f32_fn!(stage_a, CTA_A_ELEMS, row_base, true);
+stage_row_major_f32_fn!(stage_a_aligned, CTA_A_ELEMS, row_base, false);
+stage_row_major_f32_fn!(stage_b_t, CTA_B_ELEMS, col_base, true);
+stage_row_major_f32_fn!(stage_b_t_aligned, CTA_B_ELEMS, col_base, false);
+
+fn stage_row_major_f32<const CHECK_BOUNDS: bool, const TILE_ELEMS: usize>(
+    src: &[f32],
+    dst: &mut SharedArray<u16, TILE_ELEMS>,
     tile: CtaTile,
-    m: u32,
-    k: u32,
+    row_base: u32,
+    rows: u32,
+    cols: u32,
     k_base: u32,
 ) {
     let mut offset = thread::threadIdx_x();
-    while offset < CTA_A_ELEMS as u32 {
-        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
-        a_tile[offset as usize] = if global_row < m && global_col < k {
-            cvt_rn_f16_f32(a[((tile.batch * m + global_row) * k + global_col) as usize])
+    while offset < TILE_ELEMS as u32 {
+        let (global_row, global_col) = stage_coords(offset, row_base, k_base);
+        dst[offset as usize] = if !CHECK_BOUNDS || (global_row < rows && global_col < cols) {
+            cvt_rn_f16_f32(src[((tile.batch * rows + global_row) * cols + global_col) as usize])
         } else {
             0
         };
-        offset += CTA_THREADS;
-    }
-}
-
-fn stage_a_aligned(
-    a: &[f32],
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    tile: CtaTile,
-    m: u32,
-    k: u32,
-    k_base: u32,
-) {
-    let mut offset = thread::threadIdx_x();
-    while offset < CTA_A_ELEMS as u32 {
-        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
-        a_tile[offset as usize] =
-            cvt_rn_f16_f32(a[((tile.batch * m + global_row) * k + global_col) as usize]);
-        offset += CTA_THREADS;
-    }
-}
-
-fn stage_b_t(
-    b_t: &[f32],
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-    tile: CtaTile,
-    n: u32,
-    k: u32,
-    k_base: u32,
-) {
-    let mut offset = thread::threadIdx_x();
-    while offset < CTA_B_ELEMS as u32 {
-        let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
-        b_tile[offset as usize] = if global_row < n && global_col < k {
-            cvt_rn_f16_f32(b_t[((tile.batch * n + global_row) * k + global_col) as usize])
-        } else {
-            0
-        };
-        offset += CTA_THREADS;
-    }
-}
-
-fn stage_b_t_aligned(
-    b_t: &[f32],
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-    tile: CtaTile,
-    n: u32,
-    k: u32,
-    k_base: u32,
-) {
-    let mut offset = thread::threadIdx_x();
-    while offset < CTA_B_ELEMS as u32 {
-        let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
-        b_tile[offset as usize] =
-            cvt_rn_f16_f32(b_t[((tile.batch * n + global_row) * k + global_col) as usize]);
         offset += CTA_THREADS;
     }
 }
