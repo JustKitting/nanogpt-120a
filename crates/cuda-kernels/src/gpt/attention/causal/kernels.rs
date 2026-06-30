@@ -4,7 +4,7 @@ use super::{CAUSAL_MAX_WARPS_PER_BLOCK, CausalAttentionParams};
 use crate::attention::layout::batched_qkv_index;
 use crate::block_reduce::block_reduce_f32;
 use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32, safe_positive_denom};
-use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
+use crate::warp_reduce::{thread_lane_warp, warp_max_f32, warp_sum_f32};
 
 const MAX_CAUSAL_TOKENS: usize = 1024;
 const NEG_INFINITY: f32 = -3.4028235e38_f32;
@@ -30,9 +30,7 @@ pub mod module {
         let query = thread::blockIdx_x();
         let head = thread::blockIdx_y();
         let batch = thread::blockIdx_z();
-        let thread_index = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread_index / 32;
+        let (thread_index, lane, warp_in_block) = thread_lane_warp();
 
         let row = batch * params.seq_len + query;
         if query >= params.seq_len

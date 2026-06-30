@@ -1,7 +1,15 @@
+use cuda_device::{thread, warp};
+
 use crate::float_ptx::max_f32;
 use crate::shuffle;
 
 const FULL_WARP_MASK: u32 = 0xffff_ffff;
+
+#[inline(always)]
+pub fn thread_lane_warp() -> (u32, u32, u32) {
+    let thread_id = thread::threadIdx_x();
+    (thread_id, warp::lane_id(), thread_id / 32)
+}
 
 #[inline(always)]
 pub fn warp_sum_f32(mut value: f32) -> f32 {

@@ -1,9 +1,9 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
 use super::args::NextLatShape;
 use crate::float_ptx::abs_f32;
 use crate::layer_norm_reduce::layer_norm_block_reduce;
-use crate::warp_reduce::warp_sum_f32;
+use crate::warp_reduce::{thread_lane_warp, warp_sum_f32};
 
 const THREADS_PER_BLOCK: u32 = 256;
 const WARP_SIZE: u32 = 32;
@@ -82,9 +82,7 @@ pub mod module {
         let pos = thread::blockIdx_y();
         let row = batch * shape.seq_len + pos;
         let valid = batch < shape.batch_size && pos + 1 < shape.seq_len;
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / WARP_SIZE;
+        let (thread, lane, warp_in_block) = thread_lane_warp();
         let valid_rows = shape.batch_size * (shape.seq_len - 1);
         let grad_scale = shape.lambda / (valid_rows * shape.embedding_dim) as f32;
 

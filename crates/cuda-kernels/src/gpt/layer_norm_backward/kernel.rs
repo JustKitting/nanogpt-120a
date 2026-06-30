@@ -1,11 +1,11 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
 use crate::layer_norm_reduce::layer_norm_block_reduce;
 use crate::layer_norm_utils::{
     f16_column, f32_column, layer_norm_columns3, layer_norm_map3, layer_norm_map3_indexed,
     layer_norm_store3, layer_norm_sum3, nvfp4_column,
 };
-use crate::warp_reduce::warp_sum_f32;
+use crate::warp_reduce::{thread_lane_warp, warp_sum_f32};
 
 pub const THREADS_PER_BLOCK: u32 = 256;
 const WARP_SIZE: u32 = 32;
@@ -27,9 +27,7 @@ pub(super) mod kernels {
                 SharedArray::UNINIT;
 
             let row = thread::blockIdx_x();
-            let thread = thread::threadIdx_x();
-            let lane = warp::lane_id();
-            let warp_in_block = thread / WARP_SIZE;
+            let (thread, lane, warp_in_block) = thread_lane_warp();
 
             if row < $row_count {
                 let row_base = row as usize * $embedding_dim as usize;

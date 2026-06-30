@@ -7,6 +7,7 @@ use crate::nvfp4_quant::kernels::convert::cvt_rn_satfinite_e2m1x2_f32;
 use crate::nvfp4_quant::kernels::four_six::helpers::{
     GROUP_SIZE, four_six_global_scale, four_six_group_scale,
 };
+use crate::warp_reduce::thread_lane_warp;
 
 use super::threads::WARPS_PER_BLOCK;
 
@@ -31,9 +32,7 @@ pub(super) mod module {
             SharedArray::UNINIT;
 
         let chunk = thread::blockIdx_x();
-        let tid = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = tid / 32;
+        let (tid, lane, warp_in_block) = thread_lane_warp();
         let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
         let stride = thread::blockDim_x();
         let i0 = base + tid;

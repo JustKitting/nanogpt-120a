@@ -29,10 +29,10 @@ macro_rules! gpt_layer_norm_body {
         $epsilon:ident,
         $residual_f16:ident
     ) => {{
-        use cuda_device::{SharedArray, thread, warp};
+        use cuda_device::{SharedArray, thread};
         use $crate::float_ptx::sqrt_f32;
         use $crate::layer_norm::{
-            GPT_LAYER_NORM_THREADS_PER_BLOCK, GPT_LAYER_NORM_WARPS_PER_BLOCK, WARP_SIZE,
+            GPT_LAYER_NORM_THREADS_PER_BLOCK, GPT_LAYER_NORM_WARPS_PER_BLOCK,
         };
         use $crate::layer_norm_reduce::{layer_norm_block_reduce, layer_norm_store_row};
         use $crate::layer_norm_utils::{
@@ -40,15 +40,13 @@ macro_rules! gpt_layer_norm_body {
             layer_norm_map3_indexed, layer_norm_square_sum3, layer_norm_store3, layer_norm_sum3,
             max_abs3, nvfp4_affine_normalized_column,
         };
-        use $crate::warp_reduce::{warp_max_f32, warp_sum_f32};
+        use $crate::warp_reduce::{thread_lane_warp, warp_max_f32, warp_sum_f32};
 
         static mut WARP_SUMS: SharedArray<f32, { GPT_LAYER_NORM_WARPS_PER_BLOCK as usize }> =
             SharedArray::UNINIT;
 
         let row = thread::blockIdx_x();
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / WARP_SIZE;
+        let (thread, lane, warp_in_block) = thread_lane_warp();
 
         if row < $row_count {
             let row_base = row as usize * $embedding_dim as usize;

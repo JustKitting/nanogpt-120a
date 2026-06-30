@@ -1,9 +1,10 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
 use crate::amax::{amax4_f32, max4_f32};
 use crate::block_reduce::{block_max_leader_f32, block_max_store_f32};
 use crate::float_ptx::max_f32;
 use crate::quartet::quartet_backward_ms_eden_global_scale;
+use crate::warp_reduce::thread_lane_warp;
 
 use super::AMAX_WARPS_PER_BLOCK;
 use super::input::{
@@ -29,9 +30,7 @@ pub(crate) mod module {
         cols: u32,
     ) {
         let chunk = thread::blockIdx_x();
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / 32;
+        let (thread, lane, warp_in_block) = thread_lane_warp();
         let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
         let element_count = rows * cols;
         let stride = thread::blockDim_x();
@@ -68,9 +67,7 @@ pub(crate) mod module {
         element_count: u32,
     ) {
         let chunk = thread::blockIdx_x();
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / 32;
+        let (thread, lane, warp_in_block) = thread_lane_warp();
         let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
         let stride = thread::blockDim_x();
         let i0 = base + thread;
@@ -103,9 +100,7 @@ pub(crate) mod module {
         mut out_global_scale: DisjointSlice<f32>,
         chunk_count: u32,
     ) {
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / 32;
+        let (thread, lane, warp_in_block) = thread_lane_warp();
         let mut chunk = thread;
         let mut local_amax = 0.0;
         let stride = thread::blockDim_x();

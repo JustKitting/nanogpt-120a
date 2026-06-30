@@ -1,9 +1,10 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
 use crate::block_reduce::block_max_shared_f32;
 use crate::f16_tc_matmul::convert::cvt_f32_f16;
 use crate::float_ptx::{fma_f32, sqrt_f32};
 use crate::kda_common::{KDA_DENOM_EPS, silu};
+use crate::warp_reduce::thread_lane_warp;
 
 use super::threads::{MATRIX_THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 
@@ -34,9 +35,7 @@ pub(super) mod module {
         }
 
         static mut REDUCE: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
-        let tid = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_id = tid / 32;
+        let (tid, lane, warp_id) = thread_lane_warp();
         let mut q_max = 0.0;
         let mut k_max = 0.0;
         let params = ClipParams {

@@ -1,11 +1,9 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
-use super::{
-    CROSS_ENTROPY_THREADS_PER_BLOCK, CROSS_ENTROPY_WARPS_PER_BLOCK, CrossEntropyParams, WARP_SIZE,
-};
+use super::{CROSS_ENTROPY_THREADS_PER_BLOCK, CROSS_ENTROPY_WARPS_PER_BLOCK, CrossEntropyParams};
 use crate::block_reduce::block_reduce_f32;
 use crate::float_ptx::{abs_f32, exp_f32, ln_f32, max_f32, safe_positive_denom};
-use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
+use crate::warp_reduce::{thread_lane_warp, warp_max_f32, warp_sum_f32};
 
 pub use module::{LoadedModule, from_module};
 
@@ -27,9 +25,7 @@ mod module {
             SharedArray::UNINIT;
 
         let row = thread::blockIdx_x();
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / WARP_SIZE;
+        let (thread, lane, warp_in_block) = thread_lane_warp();
 
         if row < params.token_count {
             let row_base = row as usize * params.vocab_size as usize;

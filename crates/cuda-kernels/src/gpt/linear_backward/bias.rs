@@ -1,4 +1,6 @@
-use cuda_device::{DisjointSlice, SharedArray, thread, warp};
+use cuda_device::{DisjointSlice, SharedArray, thread};
+
+use crate::warp_reduce::thread_lane_warp;
 
 pub const LINEAR_BIAS_THREADS_PER_BLOCK: u32 = 256;
 
@@ -20,9 +22,7 @@ pub fn linear_bias_grad_body(
     output_dim: u32,
     local_sums: &mut SharedArray<f32, { LINEAR_BIAS_THREADS_PER_BLOCK as usize }>,
 ) {
-    let tid = thread::threadIdx_x();
-    let lane = warp::lane_id();
-    let warp_in_block = tid / WARP_SIZE;
+    let (tid, lane, warp_in_block) = thread_lane_warp();
     let col = thread::blockIdx_x() * COLS_PER_BLOCK + lane;
     let mut local = 0.0f32;
 

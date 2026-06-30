@@ -3,7 +3,7 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 use crate::block_reduce::block_reduce_f32;
 use crate::device_ptr::{read_f32, write_f32};
 use crate::float_ptx::sqrt_f32;
-use crate::warp_reduce::warp_sum_f32;
+use crate::warp_reduce::{thread_lane_warp, warp_sum_f32};
 
 const THREADS_PER_BLOCK: u32 = 256;
 const WARPS_PER_BLOCK: u32 = 8;
@@ -34,11 +34,10 @@ pub(super) mod module {
         let ptr = ptrs[slot as usize] as *const f32;
         let len = lens[slot as usize];
         let base = local_chunk * VALUES_PER_CHUNK;
-        let lane = thread::threadIdx_x() & 31;
-        let warp = thread::threadIdx_x() >> 5;
+        let (thread, lane, warp) = thread_lane_warp();
         static mut WARP_SUMS: SharedArray<f32, WARP_SUM_SLOTS> = SharedArray::UNINIT;
         let mut local = 0.0;
-        let mut offset = thread::threadIdx_x();
+        let mut offset = thread;
 
         while offset < VALUES_PER_CHUNK {
             let index = base + offset;
@@ -71,11 +70,10 @@ pub(super) mod module {
         chunk_count: u32,
         max_norm: f32,
     ) {
-        let lane = thread::threadIdx_x() & 31;
-        let warp = thread::threadIdx_x() >> 5;
+        let (thread, lane, warp) = thread_lane_warp();
         static mut WARP_SUMS: SharedArray<f32, WARP_SUM_SLOTS> = SharedArray::UNINIT;
         let mut local = 0.0;
-        let mut chunk = thread::threadIdx_x();
+        let mut chunk = thread;
 
         while chunk < chunk_count {
             local += chunk_sums[chunk as usize];

@@ -2,8 +2,9 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 
 use super::args::{
     ARGMAX_THREADS_PER_BLOCK, ARGMAX_WARPS_PER_BLOCK, FULL_WARP_MASK, LOGITS_TOP_K,
-    LogitsArgmaxParams, LogitsTopKParams, TOPK_CANDIDATES, TOPK_THREADS_PER_BLOCK, WARP_SIZE,
+    LogitsArgmaxParams, LogitsTopKParams, TOPK_CANDIDATES, TOPK_THREADS_PER_BLOCK,
 };
+use crate::warp_reduce::thread_lane_warp;
 
 #[allow(static_mut_refs)]
 #[cuda_module]
@@ -21,9 +22,7 @@ pub mod kernels {
         static mut INDICES: SharedArray<u32, { ARGMAX_WARPS_PER_BLOCK as usize }> =
             SharedArray::UNINIT;
 
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / WARP_SIZE;
+        let (thread, lane, warp_in_block) = thread_lane_warp();
         let row_base = params.row as usize * params.vocab_size as usize;
         let mut best_value = f32::NEG_INFINITY;
         let mut best_index = u32::MAX;
