@@ -136,23 +136,11 @@ fn reference_layer_norm(
     row_count: usize,
     epsilon: f32,
 ) -> Vec<f32> {
-    let mut out = vec![0.0f32; row_count * ROW_SIZE];
+    let mut out = reference_layer_norm_rows(x, row_count, ROW_SIZE, epsilon);
     for row in 0..row_count {
         let base = row * ROW_SIZE;
-        let mean = x[base..base + ROW_SIZE].iter().sum::<f32>() / ROW_SIZE as f32;
-        let variance = x[base..base + ROW_SIZE]
-            .iter()
-            .map(|value| {
-                let centered = value - mean;
-                centered * centered
-            })
-            .sum::<f32>()
-            / ROW_SIZE as f32;
-        let inv_std = 1.0 / (variance + epsilon).sqrt();
-
         for col in 0..ROW_SIZE {
-            let centered = x[base + col] - mean;
-            out[base + col] = (centered * inv_std).mul_add(gamma[col], beta[col]);
+            out[base + col] = out[base + col].mul_add(gamma[col], beta[col]);
         }
     }
     out
