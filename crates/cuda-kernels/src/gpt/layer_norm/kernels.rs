@@ -12,6 +12,7 @@ const ROW_SIZE_F32: f32 = ROW_SIZE as f32;
 pub use module::{LoadedModule, from_module};
 
 #[allow(static_mut_refs)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 mod module {
     use super::*;
@@ -46,7 +47,6 @@ mod module {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn gpt_layer_norm_kernel(
         residual: &[f32],
         weight_bytes: &[u8],
@@ -83,7 +83,6 @@ mod module {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn gpt_layer_norm_save_residual_f16_kernel(
         residual: &[f32],
         weight_bytes: &[u8],

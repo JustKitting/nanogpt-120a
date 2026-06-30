@@ -11,12 +11,12 @@ use crate::mma::{
 pub(super) const RELU2_THREADS_PER_BLOCK: u32 = 256;
 
 #[allow(static_mut_refs)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 mod module {
     use super::*;
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn mlp_projection_kernel(
         input_bytes: &[u8],
         input_scales: &[u8],
@@ -53,7 +53,6 @@ mod module {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn mlp_projection_relu2_kernel(
         input_bytes: &[u8],
         input_scales: &[u8],

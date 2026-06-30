@@ -11,6 +11,7 @@ const ROWS_PER_THREAD: u32 = 4;
 const UNROLLED_ROW_STRIDE: u32 = PARAM_THREADS_PER_BLOCK * ROWS_PER_THREAD;
 
 #[allow(static_mut_refs)]
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 pub(super) mod kernels {
     use super::*;
@@ -91,7 +92,6 @@ pub(super) mod kernels {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn layer_norm_backward_params_kernel(
         residual: &[u16],
         d_normalized: &[f32],
@@ -110,7 +110,6 @@ pub(super) mod kernels {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn layer_norm_backward_params_f32_kernel(
         residual: &[f32],
         d_normalized: &[f32],
