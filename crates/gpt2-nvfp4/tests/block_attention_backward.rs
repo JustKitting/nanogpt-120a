@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use cuda_core::CudaContext;
 use gpt2_nvfp4::{
     AttentionBackwardModules, BlockAttentionBackwardArgs, BlockAttentionBackwardModules,
     BlockAttentionBackwardSeeds, Gpt2Rng, attention_side_backward,
@@ -24,14 +23,12 @@ mod data;
 #[path = "block_attention_backward/scratch.rs"]
 mod scratch;
 
-use common::{assert_nonzero_finite, gpu_device_index, ptx_path};
+use common::{assert_nonzero_finite, cuda_test_context};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn block_attention_side_backward_runs_full_chain() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(ptx_path().as_str())?;
+    let (_, stream, ptx) = cuda_test_context()?;
     let saved = buffers::SavedBuffers::new(&stream)?;
     let weights = buffers::WeightBuffers::new(&stream)?;
     let mut grads = buffers::GradBuffers::new(&stream)?;

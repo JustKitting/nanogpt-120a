@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
     AttentionCoreBackwardArgs, GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, GPT2_SEQ_LEN,
     GPT2_TOKEN_ROWS, HiddenState, QkvActivation,
@@ -15,14 +15,12 @@ mod common;
 #[path = "attention_core_backward/data.rs"]
 mod data;
 
-use common::{gpu_device_index, ptx_path};
+use common::cuda_test_context;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(ptx_path().as_str())?;
+    let (_, stream, ptx) = cuda_test_context()?;
     let module = AttentionModule::from_module(ptx.clone())?;
     let tc_module = F16TcMatmulModule::from_module(ptx)?;
 

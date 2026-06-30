@@ -1,4 +1,4 @@
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
     AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, Gpt2, Gpt2ForwardArgs,
     HiddenState, HiddenStateNvfp4, Logits, MlpActivation, MlpActivationNvfp4, MlpDownTensors,
@@ -16,15 +16,13 @@ mod common;
 #[path = "common/upload.rs"]
 mod upload_common;
 
-use common::{gpu_device_index, ptx_path};
+use common::cuda_test_context;
 use upload_common::{TestResult, upload_block, upload_layer_norm, upload_nvfp4};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
-    let ctx = CudaContext::new(gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = ctx.load_module_from_file(ptx_path().as_str())?;
+    let (_, stream, module) = cuda_test_context()?;
     let embedding_module = EmbeddingModule::from_module(module.clone())?;
     let attention_module = AttentionModule::from_module(module.clone())?;
     let attention_tc_module = F16TcMatmulModule::from_module(module.clone())?;

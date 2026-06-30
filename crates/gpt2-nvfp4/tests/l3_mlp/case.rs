@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use cuda_core::CudaContext;
 use gpt2_nvfp4::{
     GPT2_CONTEXT_LEN, HiddenStateDevice, HiddenStateNvfp4, MlpActivationNvfp4,
     MlpProjectionTensors, MlpScratch, MlpWeights,
@@ -10,14 +9,12 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use crate::assertions::{assert_down_projection_residual_add, assert_relu2_samples};
 use crate::buffers::ScratchBuffers;
-use crate::common::{gpu_device_index, ptx_path};
+use crate::common::cuda_test_context;
 use crate::data::{normalized_input, residual_input};
 use crate::weights::WeightBuffers;
 
 pub fn run() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = ctx.load_module_from_file(ptx_path().as_str())?;
+    let (_, stream, module) = cuda_test_context()?;
     let mlp_module = MlpModule::from_module(module.clone())?;
     let quant_module = Nvfp4QuantModule::from_module(module)?;
 

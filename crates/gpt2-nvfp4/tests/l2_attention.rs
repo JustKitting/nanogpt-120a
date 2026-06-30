@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
     AttentionLogSumExp, AttentionProjectionTensors, AttentionWeights, GPT2_CONTEXT_LEN,
     GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, HiddenState, HiddenStateDevice, HiddenStateNvfp4,
@@ -19,7 +19,7 @@ mod f16_common;
 #[path = "common/nvfp4.rs"]
 mod nvfp4_common;
 
-use common::{gpu_device_index, ptx_path};
+use common::cuda_test_context;
 use f16_common::tc_f16;
 use nvfp4_common::repeating_identity_bytes;
 
@@ -32,9 +32,7 @@ const RESIDUAL_TOLERANCE: f32 = 1.0e-7;
 #[test]
 fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result<(), Box<dyn Error>>
 {
-    let ctx = CudaContext::new(gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = ctx.load_module_from_file(ptx_path().as_str())?;
+    let (_, stream, module) = cuda_test_context()?;
     let attention_module = AttentionModule::from_module(module.clone())?;
     let tc_module = F16TcMatmulModule::from_module(module.clone())?;
     let quant_module = Nvfp4QuantModule::from_module(module)?;

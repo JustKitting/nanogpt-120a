@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, HiddenState, Nvfp4Shape, TokenEmbeddingShape};
 use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
@@ -9,7 +9,7 @@ mod common;
 #[path = "common/nvfp4.rs"]
 mod nvfp4_common;
 
-use common::{gpu_device_index, ptx_path};
+use common::cuda_test_context;
 use nvfp4_common::set_e2m1_one;
 
 const E4M3_ONE: u8 = 0x38;
@@ -18,9 +18,8 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn embedding_forward_decodes_token_embeddings_to_residual_only() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = EmbeddingModule::from_module(ctx.load_module_from_file(ptx_path().as_str())?)?;
+    let (_, stream, ptx) = cuda_test_context()?;
+    let module = EmbeddingModule::from_module(ptx)?;
 
     let mut tokens = vec![0_u32; GPT2_CONTEXT_LEN];
     tokens[0] = 7;

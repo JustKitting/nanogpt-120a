@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub fn set_e2m1_one(bytes: &mut [u8], element: usize) {
     let byte = &mut bytes[element / 2];
     if element & 1 == 0 {

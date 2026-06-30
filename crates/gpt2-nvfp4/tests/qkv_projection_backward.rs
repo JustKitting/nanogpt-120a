@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
     AttentionBackwardModules, AttentionProjectionTensors, AttentionQkvBackwardArgs, GPT2_N_EMBD,
     GPT2_QKV, HiddenState, qkv_projection_backward,
@@ -17,14 +17,12 @@ mod data;
 #[path = "qkv_projection_backward/scratch.rs"]
 mod scratch;
 
-use common::{assert_nonzero_finite, gpu_device_index, ptx_path};
+use common::{assert_nonzero_finite, cuda_test_context};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(ptx_path().as_str())?;
+    let (_, stream, ptx) = cuda_test_context()?;
     let transpose = TransposeModule::from_module(ptx.clone())?;
     let decode = Nvfp4DecodeModule::from_module(ptx.clone())?;
     let linear = LinearBackwardModule::from_module(ptx.clone())?;
