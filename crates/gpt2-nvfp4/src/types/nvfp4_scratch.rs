@@ -1,5 +1,6 @@
-use cuda_core::DeviceBuffer;
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
+use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantModule, Nvfp4QuantRowwiseArgs};
 
 pub struct RowwiseNvfp4Scratch<'a> {
     pub bytes: &'a mut DeviceBuffer<u8>,
@@ -8,6 +9,27 @@ pub struct RowwiseNvfp4Scratch<'a> {
 }
 
 impl<'a> RowwiseNvfp4Scratch<'a> {
+    pub(crate) fn quantize_precomputed_amax(
+        &mut self,
+        quant_module: &Nvfp4QuantModule,
+        stream: &CudaStream,
+        input: &DeviceBuffer<f32>,
+        amax: &DeviceBuffer<f32>,
+        row_count: u32,
+        row_len: u32,
+    ) -> Result<(), DriverError> {
+        quant_module.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
+            stream,
+            x: input,
+            amax,
+            out_fp4: self.bytes,
+            out_scales: self.scales,
+            out_global_scale: self.global_scales,
+            group_count: row_count * row_len / 16,
+            row_len,
+        })
+    }
+
     pub fn device(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
         Nvfp4RowwiseDeviceTensor {
             bytes: &*self.bytes,

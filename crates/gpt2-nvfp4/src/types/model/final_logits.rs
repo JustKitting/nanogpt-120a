@@ -2,7 +2,7 @@ use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::lm_head::{LmHeadArgs, LmHeadModule};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantModule, Nvfp4QuantRowwiseArgs};
+use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use crate::types::{
     Gpt2ForwardTape, HiddenStateDevice, HiddenStateNvfp4, LayerNormTensors, LayerNormWeights,
@@ -24,7 +24,7 @@ pub(super) struct FinalForwardArgs<'a, 'w> {
 pub(super) fn finish_forward<'a>(
     args: FinalForwardArgs<'a, '_>,
 ) -> Result<HiddenStateDevice<'a>, DriverError> {
-    let hidden_nvfp4 = args.hidden_nvfp4;
+    let mut hidden_nvfp4 = args.hidden_nvfp4;
     let mut tape = args.tape;
     let ln_f = LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_f, args.hidden);
     let hidden = if let Some(tape) = tape.as_mut() {
@@ -50,17 +50,14 @@ pub(super) fn finish_forward<'a>(
         inv_std,
     } = hidden;
 
-    args.quant_module
-        .fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
-            stream,
-            x: normalized,
-            amax: normalized_amax,
-            out_fp4: &mut *hidden_nvfp4.bytes,
-            out_scales: &mut *hidden_nvfp4.scales,
-            out_global_scale: &mut *hidden_nvfp4.global_scales,
-            group_count: row_count * crate::GPT2_N_EMBD as u32 / 16,
-            row_len: crate::GPT2_N_EMBD as u32,
-        })?;
+    hidden_nvfp4.quantize_precomputed_amax(
+        args.quant_module,
+        stream,
+        normalized,
+        normalized_amax,
+        row_count,
+        crate::GPT2_N_EMBD as u32,
+    )?;
 
     let input = hidden_nvfp4.device();
     if let Some(tape) = tape.as_mut() {

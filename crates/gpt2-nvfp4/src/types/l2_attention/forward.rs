@@ -2,7 +2,6 @@ use cuda_core::DriverError;
 use rust_kernels_cuda::attention::{
     ApplyRopeArgs, CProjArgs, CausalAttentionTcArgs, QkvProjectionArgs,
 };
-use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantRowwiseArgs;
 
 use super::quantize::requantize_attention;
 use super::tensors::AttentionForwardArgs;
@@ -30,17 +29,14 @@ pub(super) fn forward<'a, 'scratch>(
         inv_std,
     } = args.hidden;
 
-    args.quant_module
-        .fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
-            stream,
-            x: normalized,
-            amax: normalized_amax,
-            out_fp4: &mut *input_nvfp4.bytes,
-            out_scales: &mut *input_nvfp4.scales,
-            out_global_scale: &mut *input_nvfp4.global_scales,
-            group_count: row_count * crate::GPT2_N_EMBD as u32 / 16,
-            row_len: crate::GPT2_N_EMBD as u32,
-        })?;
+    input_nvfp4.quantize_precomputed_amax(
+        args.quant_module,
+        stream,
+        normalized,
+        normalized_amax,
+        row_count,
+        crate::GPT2_N_EMBD as u32,
+    )?;
 
     let input = input_nvfp4.device();
     if let Some(tape) = tape.as_mut() {
