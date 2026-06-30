@@ -1,8 +1,7 @@
-const NORM_SAFETY: f32 = 1.01;
-const NORM_EPS: f32 = 1.0e-7;
-
 use crate::polar_coefficients::coefficients;
-use crate::polar_reference::round_f16_to_f32;
+use crate::polar_reference::{matmul_f16, polar_next};
+
+pub use crate::polar_reference::normalized_polar_source;
 
 pub fn first_iteration_update(
     grad: &[f32],
@@ -38,10 +37,10 @@ pub fn first_iteration_update(
 
 pub fn standard_polar(mut x: Vec<f32>, rows: usize, cols: usize, iterations: usize) -> Vec<f32> {
     for iter in 0..iterations {
-        let gram = matmul(&x, &x, rows, rows, cols, true);
-        let ax = matmul(&gram, &x, rows, cols, rows, false);
-        let aax = matmul(&gram, &ax, rows, cols, rows, false);
-        x = combine_next(&x, &ax, &aax, iter);
+        let gram = matmul_f16(&x, &x, rows, rows, cols, true);
+        let ax = matmul_f16(&gram, &x, rows, cols, rows, false);
+        let aax = matmul_f16(&gram, &ax, rows, cols, rows, false);
+        x = polar_next(&x, &ax, &aax, iter);
     }
     x
 }
@@ -53,12 +52,12 @@ pub fn stabilized_gram_ns(
     iterations: usize,
     resets: &[usize],
 ) -> Vec<f32> {
-    let mut r = matmul(&x, &x, rows, rows, cols, true);
+    let mut r = matmul_f16(&x, &x, rows, rows, cols, true);
     let mut q: Option<Vec<f32>> = None;
 
     for iter in 0..iterations {
         if iter != 0 && resets.contains(&iter) {
-            x = matmul(
+            x = matmul_f16(
                 q.as_ref().expect("restart needs accumulated Q"),
                 &x,
                 rows,
@@ -66,31 +65,31 @@ pub fn stabilized_gram_ns(
                 rows,
                 false,
             );
-            r = matmul(&x, &x, rows, rows, cols, true);
+            r = matmul_f16(&x, &x, rows, rows, cols, true);
             q = None;
         }
 
         let (a, b, c) = coefficients(iter);
-        let r2 = matmul(&r, &r, rows, rows, rows, false);
+        let r2 = matmul_f16(&r, &r, rows, rows, rows, false);
         let z = linear2(&r, b, &r2, c);
 
         q = Some(if q.is_none() {
             add_scaled_identity(&z, a, rows)
         } else {
             let q_ref = q.as_ref().expect("Q is set");
-            let qz = matmul(q_ref, &z, rows, rows, rows, false);
+            let qz = matmul_f16(q_ref, &z, rows, rows, rows, false);
             linear2(&qz, 1.0, q_ref, a)
         });
 
         if iter + 1 < iterations && !resets.contains(&(iter + 1)) {
-            let rz_product = matmul(&r, &z, rows, rows, rows, false);
+            let rz_product = matmul_f16(&r, &z, rows, rows, rows, false);
             let rz = linear2(&rz_product, 1.0, &r, a);
-            let next_r_product = matmul(&z, &rz, rows, rows, rows, false);
+            let next_r_product = matmul_f16(&z, &rz, rows, rows, rows, false);
             r = linear2(&next_r_product, 1.0, &rz, a);
         }
     }
 
-    matmul(
+    matmul_f16(
         q.as_ref().expect("final Q is set"),
         &x,
         rows,
@@ -98,22 +97,6 @@ pub fn stabilized_gram_ns(
         rows,
         false,
     )
-}
-
-pub fn normalized_polar_source(source: &[f32], rows: usize, cols: usize) -> Vec<f32> {
-    let inv_norm =
-        1.0 / (source.iter().map(|v| v * v).sum::<f32>().sqrt() * NORM_SAFETY + NORM_EPS);
-    if rows > cols {
-        let mut out = vec![0.0; source.len()];
-        for row in 0..rows {
-            for col in 0..cols {
-                out[col * rows + row] = source[row * cols + col] * inv_norm;
-            }
-        }
-        out
-    } else {
-        source.iter().map(|v| v * inv_norm).collect()
-    }
 }
 
 pub fn standard_cost(iterations: usize, aspect_ratio: usize) -> ProductCost {
@@ -172,34 +155,6 @@ pub fn relative_l2(actual: &[f32], expected: &[f32]) -> f32 {
             (diff.mul_add(diff, err), b.mul_add(*b, norm))
         });
     (err / norm).sqrt()
-}
-
-fn combine_next(x: &[f32], ax: &[f32], aax: &[f32], iter: usize) -> Vec<f32> {
-    let (a, b, c) = coefficients(iter);
-    x.iter()
-        .zip(ax)
-        .zip(aax)
-        .map(|((x, ax), aax)| c.mul_add(*aax, a.mul_add(*x, b * *ax)))
-        .collect()
-}
-
-fn matmul(a: &[f32], b: &[f32], rows: usize, cols: usize, k_len: usize, rhs_t: bool) -> Vec<f32> {
-    let mut out = vec![0.0; rows * cols];
-    for row in 0..rows {
-        for col in 0..cols {
-            let mut sum = 0.0;
-            for k in 0..k_len {
-                let bv = if rhs_t {
-                    b[col * k_len + k]
-                } else {
-                    b[k * cols + col]
-                };
-                sum += round_f16_to_f32(a[row * k_len + k]) * round_f16_to_f32(bv);
-            }
-            out[row * cols + col] = sum;
-        }
-    }
-    out
 }
 
 fn linear2(a: &[f32], a_scale: f32, b: &[f32], b_scale: f32) -> Vec<f32> {

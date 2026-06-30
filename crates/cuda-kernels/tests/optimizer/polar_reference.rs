@@ -1,3 +1,8 @@
+use crate::polar_coefficients::coefficients;
+
+const NORM_SAFETY: f32 = 1.01;
+const NORM_EPS: f32 = 1.0e-7;
+
 pub fn polar_first_iteration_scalar(x: f32, rows: usize, cols: usize) -> f32 {
     let (rows, cols) = if rows >= cols {
         (rows, cols)
@@ -14,6 +19,57 @@ pub fn polar_first_iteration_scalar(x: f32, rows: usize, cols: usize) -> f32 {
         (17.300_388 / 1.051_010_1_f32).mul_add(gram2, (-23.595_886 / 1.030_301_f32) * gram);
     let diag = off_diag + 8.287_212 / 1.01_f32;
     xh * (round_f16_to_f32(diag) + (cols as f32 - 1.0) * round_f16_to_f32(off_diag))
+}
+
+pub fn normalized_polar_source(source: &[f32], rows: usize, cols: usize) -> Vec<f32> {
+    let inv_norm =
+        1.0 / (source.iter().map(|v| v * v).sum::<f32>().sqrt() * NORM_SAFETY + NORM_EPS);
+    if rows > cols {
+        let mut out = vec![0.0; source.len()];
+        for row in 0..rows {
+            for col in 0..cols {
+                out[col * rows + row] = source[row * cols + col] * inv_norm;
+            }
+        }
+        out
+    } else {
+        source.iter().map(|v| v * inv_norm).collect()
+    }
+}
+
+pub fn polar_next(x: &[f32], ax: &[f32], aax: &[f32], iter: usize) -> Vec<f32> {
+    let (a, b, c) = coefficients(iter);
+    x.iter()
+        .zip(ax)
+        .zip(aax)
+        .map(|((x, ax), aax)| c.mul_add(*aax, a.mul_add(*x, b * *ax)))
+        .collect()
+}
+
+pub fn matmul_f16(
+    a: &[f32],
+    b: &[f32],
+    rows: usize,
+    cols: usize,
+    k_len: usize,
+    rhs_t: bool,
+) -> Vec<f32> {
+    let mut out = vec![0.0; rows * cols];
+    for row in 0..rows {
+        for col in 0..cols {
+            let mut sum = 0.0;
+            for k in 0..k_len {
+                let bv = if rhs_t {
+                    b[col * k_len + k]
+                } else {
+                    b[k * cols + col]
+                };
+                sum += round_f16_to_f32(a[row * k_len + k]) * round_f16_to_f32(bv);
+            }
+            out[row * cols + col] = sum;
+        }
+    }
+    out
 }
 
 pub fn round_f16_to_f32(value: f32) -> f32 {
