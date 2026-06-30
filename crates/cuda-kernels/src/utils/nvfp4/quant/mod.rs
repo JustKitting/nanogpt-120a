@@ -6,6 +6,8 @@ mod global_scale;
 pub(crate) mod kernels;
 mod launcher;
 mod ms_eden;
+mod ms_eden_pair;
+mod ms_eden_transpose;
 mod shape;
 
 pub use args::{
