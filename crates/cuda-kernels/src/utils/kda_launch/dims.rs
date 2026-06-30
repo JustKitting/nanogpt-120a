@@ -3,8 +3,6 @@ use cuda_core::LaunchConfig;
 use crate::launch::{launch_config, linear_config as linear_launch_config};
 
 pub(crate) const KDA_HEAD_DIM: u32 = 64;
-pub(crate) const KDA_CHUNK_SIZE: u32 = 64;
-pub(crate) const KDA_DECAY_SCALE: f32 = 0.01;
 
 #[derive(Clone, Copy)]
 pub(crate) struct LaunchDims {

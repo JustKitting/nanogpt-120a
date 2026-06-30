@@ -4,7 +4,7 @@ use super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use super::types::CausalAttentionTcArgs;
 use crate::attention::{AttentionModule, CausalAttentionParams};
 use crate::f16_tc_matmul::F16ConvertArgs;
-use crate::kda_launch::{self, KDA_CHUNK_SIZE, KDA_DECAY_SCALE, KDA_HEAD_DIM};
+use crate::kda_launch::{self, KDA_HEAD_DIM};
 
 impl AttentionModule {
     pub fn kda_attention_tc(
@@ -15,18 +15,15 @@ impl AttentionModule {
             args.head_dim, KDA_HEAD_DIM,
             "KDA path currently expects head_dim=64"
         );
-        let params = CausalAttentionParams {
-            row_count: args.row_count,
-            seq_len: args.seq_len,
-            batch_size: args.batch_size,
-            embedding_dim: args.embedding_dim,
-            qkv_dim: args.qkv_dim,
-            head_count: args.head_count,
-            head_dim: args.head_dim,
-            scale: 1.0 / (args.head_dim as f32).sqrt(),
-            chunk_size: KDA_CHUNK_SIZE,
-            decay_scale: KDA_DECAY_SCALE,
-        };
+        let params = CausalAttentionParams::new(
+            args.row_count,
+            args.seq_len,
+            args.batch_size,
+            args.embedding_dim,
+            args.qkv_dim,
+            args.head_count,
+            args.head_dim,
+        );
         let dims = kda_launch::LaunchDims::new(
             args.batch_size,
             args.head_count,

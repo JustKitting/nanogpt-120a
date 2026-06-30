@@ -1,11 +1,11 @@
 use cuda_core::DriverError;
 
-use super::launch_config::{attention_config, linear_config, tc_params};
+use super::launch_config::{attention_config, linear_config};
 use super::launch_grads::run_grad_matmuls;
 use super::launch_scores::run_pair_scores;
 use super::matmul::AttentionTcMatmulContext;
 use super::types::CausalAttentionBackwardTcArgs;
-use crate::attention::AttentionModule;
+use crate::attention::{AttentionModule, CausalAttentionParams};
 
 impl AttentionModule {
     pub fn causal_attention_backward_tc(
@@ -30,7 +30,7 @@ impl AttentionModule {
             head_count,
             head_dim,
         } = args;
-        let params = tc_params(
+        let params = CausalAttentionParams::new(
             row_count,
             seq_len,
             batch_size,

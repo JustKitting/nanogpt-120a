@@ -1,9 +1,9 @@
 use cuda_core::DriverError;
 
 use super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
-use super::launch_config::{linear_config, tc_params};
+use super::launch_config::linear_config;
 use super::types::{CausalAttentionBackwardTcArgs, CausalAttentionBackwardTcScratch};
-use crate::attention::AttentionModule;
+use crate::attention::{AttentionModule, CausalAttentionParams};
 use crate::kda_launch::{self, KDA_HEAD_DIM};
 
 impl AttentionModule {
@@ -33,7 +33,7 @@ impl AttentionModule {
             head_count,
             head_dim,
         } = args;
-        let params = tc_params(
+        let params = CausalAttentionParams::new(
             row_count,
             seq_len,
             batch_size,

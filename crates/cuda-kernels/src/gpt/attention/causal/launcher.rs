@@ -30,18 +30,15 @@ impl AttentionModule {
             args.qkv,
             args.out,
             args.log_sum_exp,
-            CausalAttentionParams {
-                row_count: args.row_count,
-                seq_len: args.seq_len,
-                batch_size: args.batch_size,
-                embedding_dim: args.embedding_dim,
-                qkv_dim: args.qkv_dim,
-                head_count: args.head_count,
-                head_dim: args.head_dim,
-                scale: 1.0 / (args.head_dim as f32).sqrt(),
-                chunk_size: 64,
-                decay_scale: 0.01,
-            },
+            CausalAttentionParams::new(
+                args.row_count,
+                args.seq_len,
+                args.batch_size,
+                args.embedding_dim,
+                args.qkv_dim,
+                args.head_count,
+                args.head_dim,
+            ),
         )
     }
 }

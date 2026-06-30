@@ -4,7 +4,6 @@ use super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use super::types::CausalAttentionTcArgs;
 use crate::attention::{AttentionModule, CausalAttentionParams};
 use crate::f16_tc_matmul::{F16TcMatmulF32Args, F16TcMatmulF32RhsArgs};
-use crate::kda_launch::{KDA_CHUNK_SIZE, KDA_DECAY_SCALE};
 use crate::launch::{launch_config, linear_config};
 
 impl AttentionModule {
@@ -12,18 +11,15 @@ impl AttentionModule {
         &self,
         args: CausalAttentionTcArgs<'_, '_, '_>,
     ) -> Result<(), DriverError> {
-        let params = CausalAttentionParams {
-            row_count: args.row_count,
-            seq_len: args.seq_len,
-            batch_size: args.batch_size,
-            embedding_dim: args.embedding_dim,
-            qkv_dim: args.qkv_dim,
-            head_count: args.head_count,
-            head_dim: args.head_dim,
-            scale: 1.0 / (args.head_dim as f32).sqrt(),
-            chunk_size: KDA_CHUNK_SIZE,
-            decay_scale: KDA_DECAY_SCALE,
-        };
+        let params = CausalAttentionParams::new(
+            args.row_count,
+            args.seq_len,
+            args.batch_size,
+            args.embedding_dim,
+            args.qkv_dim,
+            args.head_count,
+            args.head_dim,
+        );
         let batch_head = args.batch_size * args.head_count;
         let scratch = args.scratch;
 
