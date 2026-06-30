@@ -1,8 +1,8 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError};
+use cuda_core::DriverError;
 use rust_kernels_cuda::linear_backward::{
     LinearBackwardInputTranspose, LinearBackwardWeightTranspose,
 };
-use rust_kernels_cuda::loss::{CrossEntropyArgs, LossModule};
+use rust_kernels_cuda::loss::CrossEntropyArgs;
 
 use super::args::FinalHeadBackwardArgs;
 use crate::backward::linear::{LinearBackwardCall, run_linear_backward};
@@ -25,16 +25,16 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         seeds,
     } = args;
 
-    run_loss(
-        modules.loss,
+    modules.loss.cross_entropy(CrossEntropyArgs {
         stream,
         logits,
         targets,
         losses,
         dlogits,
-        &mut *scratch.linear.e_h.chunk_amax,
-        row_count,
-    )?;
+        dlogits_row_amax: &mut *scratch.linear.e_h.chunk_amax,
+        token_count: row_count,
+        vocab_size: GPT2_VOCAB_SIZE as u32,
+    })?;
     run_linear_backward(LinearBackwardCall {
         stream,
         module: modules.linear,
@@ -52,27 +52,5 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         sign_seed: seeds.sign,
         scale_seed: seeds.scale,
         precomputed_e_amax_chunks: Some(row_count),
-    })
-}
-
-fn run_loss(
-    module: &LossModule,
-    stream: &CudaStream,
-    logits: &DeviceBuffer<f32>,
-    targets: &DeviceBuffer<u32>,
-    losses: &mut DeviceBuffer<f32>,
-    dlogits: &mut DeviceBuffer<f32>,
-    dlogits_row_amax: &mut DeviceBuffer<f32>,
-    row_count: u32,
-) -> Result<(), DriverError> {
-    module.cross_entropy(CrossEntropyArgs {
-        stream,
-        logits,
-        targets,
-        losses,
-        dlogits,
-        dlogits_row_amax,
-        token_count: row_count,
-        vocab_size: GPT2_VOCAB_SIZE as u32,
     })
 }

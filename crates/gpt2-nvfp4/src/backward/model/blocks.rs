@@ -1,4 +1,4 @@
-use cuda_core::{DeviceBuffer, DriverError};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use super::types::{Gpt2BackwardModules, Gpt2BackwardSeeds, Gpt2BackwardWeights};
 use crate::backward::{
@@ -8,35 +8,37 @@ use crate::backward::{
 use crate::types::{BlockBackwardGrads, Gpt2ForwardSaved};
 use crate::{GPT2_N_LAYER, uses_full_attention};
 
-pub(super) fn run_blocks<'a, 'scratch, 'out>(
-    stream: &'a cuda_core::CudaStream,
-    modules: Gpt2BackwardModules<'a>,
-    saved: Gpt2ForwardSaved<'a>,
-    weights: Gpt2BackwardWeights<'a>,
-    blocks: &mut [BlockBackwardGrads<'out>; GPT2_N_LAYER],
-    d_embedding_residual: &'out mut DeviceBuffer<f32>,
-    attention_scratch: &mut BlockAttentionBackwardScratch<'scratch>,
-    mlp_scratch: &mut MlpBackwardScratch<'scratch>,
-    seeds: Gpt2BackwardSeeds,
-) -> Result<(), DriverError> {
+pub(super) struct BlocksBackwardRun<'ctx, 'a, 'scratch, 'out> {
+    pub stream: &'a CudaStream,
+    pub modules: Gpt2BackwardModules<'a>,
+    pub saved: Gpt2ForwardSaved<'a>,
+    pub weights: Gpt2BackwardWeights<'a>,
+    pub blocks: &'ctx mut [BlockBackwardGrads<'out>; GPT2_N_LAYER],
+    pub d_embedding_residual: &'ctx mut DeviceBuffer<f32>,
+    pub attention_scratch: &'ctx mut BlockAttentionBackwardScratch<'scratch>,
+    pub mlp_scratch: &'ctx mut MlpBackwardScratch<'scratch>,
+    pub seeds: Gpt2BackwardSeeds,
+}
+
+pub(super) fn run_blocks(args: BlocksBackwardRun<'_, '_, '_, '_>) -> Result<(), DriverError> {
     for block_index in (0..GPT2_N_LAYER).rev() {
-        let (lower_blocks, current_and_after) = blocks.split_at_mut(block_index);
+        let (lower_blocks, current_and_after) = args.blocks.split_at_mut(block_index);
         let current = &mut current_and_after[0];
         let d_residual_in = if block_index == 0 {
-            &mut *d_embedding_residual
+            &mut *args.d_embedding_residual
         } else {
             &mut *lower_blocks[block_index - 1].d_residual_out
         };
         run_block(
-            stream,
-            modules,
-            saved,
-            weights,
+            args.stream,
+            args.modules,
+            args.saved,
+            args.weights,
             current,
             d_residual_in,
-            attention_scratch,
-            mlp_scratch,
-            seeds,
+            &mut *args.attention_scratch,
+            &mut *args.mlp_scratch,
+            args.seeds,
             block_index,
         )?;
     }

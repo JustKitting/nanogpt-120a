@@ -1,6 +1,6 @@
 use cuda_core::DriverError;
 
-use super::blocks::run_blocks;
+use super::blocks::{BlocksBackwardRun, run_blocks};
 use super::final_head::run_final_head;
 use super::types::Gpt2BackwardArgs;
 use crate::backward::{Gpt2LayerNormBackwardArgs, layer_norm_backward};
@@ -72,15 +72,15 @@ pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
             d_bias: d_final_bias,
         },
     })?;
-    run_blocks(
+    run_blocks(BlocksBackwardRun {
         stream,
         modules,
         saved,
         weights,
-        &mut blocks,
+        blocks: &mut blocks,
         d_embedding_residual,
-        &mut attention_scratch,
-        &mut mlp_scratch,
+        attention_scratch: &mut attention_scratch,
+        mlp_scratch: &mut mlp_scratch,
         seeds,
-    )
+    })
 }
