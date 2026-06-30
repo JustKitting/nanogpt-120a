@@ -1,4 +1,5 @@
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
+use crate::kda_common::{KDA_MATRIX_ELEMS, KDA_STATE_ELEMS};
 
 macro_rules! tc_stage_loop {
     ($tile:expr, $a_tile:expr, $b_tile:expr, $acc:expr; $k_base:ident < $limit:expr;
@@ -37,6 +38,8 @@ pub(crate) use for_acc_fragments;
 
 pub(crate) type CtaATile = cuda_device::SharedArray<u16, CTA_A_ELEMS>;
 pub(crate) type CtaBTile = cuda_device::SharedArray<u16, CTA_B_ELEMS>;
+pub(crate) type KdaMatrixTile = cuda_device::SharedArray<f32, KDA_MATRIX_ELEMS>;
+pub(crate) type KdaStateTile = cuda_device::SharedArray<f32, KDA_STATE_ELEMS>;
 
 macro_rules! with_tc_ab_tiles {
     ($body:ident; $($arg:expr),* $(,)?) => { with_tc_ab_tiles!(@call $body; [$($arg),*]; []) };
@@ -48,7 +51,29 @@ macro_rules! with_tc_ab_tiles {
     }};
 }
 
-pub(crate) use with_tc_ab_tiles;
+macro_rules! with_kda_tiles {
+    (inv $body:ident; $($arg:expr),* $(,)?) => {{
+        static mut RAW: $crate::kda_tc::KdaMatrixTile = cuda_device::SharedArray::UNINIT;
+        static mut INV: $crate::kda_tc::KdaMatrixTile = cuda_device::SharedArray::UNINIT;
+        $body($($arg,)* unsafe { &mut RAW }, unsafe { &mut INV });
+    }};
+    (state $body:ident; $($arg:expr),* $(,)?) => {{
+        static mut STATE: $crate::kda_tc::KdaStateTile = cuda_device::SharedArray::UNINIT;
+        static mut A_TILE: $crate::kda_tc::CtaATile = cuda_device::SharedArray::UNINIT;
+        static mut B_TILE: $crate::kda_tc::CtaBTile = cuda_device::SharedArray::UNINIT;
+        $body($($arg,)* unsafe { &mut STATE }, unsafe { &mut A_TILE }, unsafe { &mut B_TILE });
+    }};
+    (backward $body:ident; $($arg:expr),* $(,)?) => {{
+        static mut STATE: $crate::kda_tc::KdaStateTile = cuda_device::SharedArray::UNINIT;
+        static mut D_H_NEXT: $crate::kda_tc::KdaStateTile = cuda_device::SharedArray::UNINIT;
+        static mut D_H: $crate::kda_tc::KdaStateTile = cuda_device::SharedArray::UNINIT;
+        static mut A_TILE: $crate::kda_tc::CtaATile = cuda_device::SharedArray::UNINIT;
+        static mut B_TILE: $crate::kda_tc::CtaBTile = cuda_device::SharedArray::UNINIT;
+        $body($($arg,)* unsafe { &mut STATE }, unsafe { &mut D_H_NEXT }, unsafe { &mut D_H }, unsafe { &mut A_TILE }, unsafe { &mut B_TILE });
+    }};
+}
+
+pub(crate) use {with_kda_tiles, with_tc_ab_tiles};
 
 #[path = "kda_tc/context.rs"]
 mod context;

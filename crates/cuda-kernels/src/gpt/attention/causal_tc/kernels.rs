@@ -9,31 +9,12 @@ use super::kda::{
 use super::scatter::{scatter_output_body, scatter_output_save_f16_body};
 use super::softmax::softmax_body;
 use crate::attention::CausalAttentionParams;
-use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
-use crate::kda_common::{KDA_MATRIX_ELEMS, KDA_STATE_ELEMS};
-use crate::kda_tc::with_tc_ab_tiles;
+use crate::kda_tc::{with_kda_tiles, with_tc_ab_tiles};
 
 #[allow(static_mut_refs)]
 #[cuda_module]
 pub(super) mod module {
     use super::*;
-
-    macro_rules! with_inv_tiles {
-        ($body:ident; $($arg:expr),* $(,)?) => {{
-            static mut RAW: SharedArray<f32, KDA_MATRIX_ELEMS> = SharedArray::UNINIT;
-            static mut INV: SharedArray<f32, KDA_MATRIX_ELEMS> = SharedArray::UNINIT;
-            $body($($arg,)* unsafe { &mut RAW }, unsafe { &mut INV });
-        }};
-    }
-
-    macro_rules! with_state_ab_tiles {
-        ($body:ident; $($arg:expr),* $(,)?) => {{
-            static mut STATE: SharedArray<f32, KDA_STATE_ELEMS> = SharedArray::UNINIT;
-            static mut A_TILE: SharedArray<u16, CTA_A_ELEMS> = SharedArray::UNINIT;
-            static mut B_TILE: SharedArray<u16, CTA_B_ELEMS> = SharedArray::UNINIT;
-            $body($($arg,)* unsafe { &mut STATE }, unsafe { &mut A_TILE }, unsafe { &mut B_TILE });
-        }};
-    }
 
     #[kernel]
     pub fn gather_qkv_forward_kernel(
@@ -123,7 +104,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn solve_kda_akk_inv_kernel(akk: DisjointSlice<f32>, params: CausalAttentionParams) {
-        with_inv_tiles!(solve_akk_inv_body; akk, params);
+        with_kda_tiles!(inv solve_akk_inv_body; akk, params);
     }
 
     #[kernel]
@@ -136,7 +117,7 @@ pub(super) mod module {
         chunk_states: DisjointSlice<u16>,
         params: CausalAttentionParams,
     ) {
-        with_state_ab_tiles!(chunk_kda_state_save_body; kg, v_new, w, u, chunk_g_last, chunk_states, params);
+        with_kda_tiles!(state chunk_kda_state_save_body; kg, v_new, w, u, chunk_g_last, chunk_states, params);
     }
 
     #[kernel]
