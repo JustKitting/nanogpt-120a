@@ -9,6 +9,7 @@ mod ms_eden;
 mod ms_eden_pair;
 mod ms_eden_quartet;
 mod ms_eden_transpose;
+mod ms_eden_transpose_rowwise;
 mod shape;
 
 pub use args::{
