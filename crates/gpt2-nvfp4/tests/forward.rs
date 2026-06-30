@@ -1,8 +1,9 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, Gpt2, Gpt2ForwardArgs,
-    HiddenState, HiddenStateNvfp4, Logits, MlpActivation, MlpActivationNvfp4, MlpDownTensors,
-    MlpUpTensors, QkvActivation, TokenEmbeddingArgs,
+    AttentionLogSumExp, AttentionProjectionTensors, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    Gpt2, Gpt2ForwardArgs, HiddenState, HiddenStateNvfp4, Logits, MlpActivation,
+    MlpActivationNvfp4, MlpDownTensors, MlpProjectionTensors, MlpUpTensors, QkvActivation,
+    TokenEmbeddingArgs,
 };
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionTcScratch};
 use rust_kernels_cuda::embedding::EmbeddingModule;
@@ -115,19 +116,23 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
             scales: &mut mlp_activation_scales_dev,
             global_scales: &mut mlp_activation_global_scales_dev,
         },
-        attention_qkv_weights: std::array::from_fn(|i| blocks[i].attn_qkv.weight.mma()),
-        attention_qkv_biases: std::array::from_fn(|i| blocks[i].attn_qkv.bias.device()),
-        attention_c_proj_weights: std::array::from_fn(|i| blocks[i].attn_c_proj.weight.mma()),
-        attention_c_proj_biases: std::array::from_fn(|i| blocks[i].attn_c_proj.bias.device()),
+        attention: std::array::from_fn(|i| AttentionProjectionTensors {
+            qkv_weight: blocks[i].attn_qkv.weight.mma(),
+            qkv_bias: blocks[i].attn_qkv.bias.device(),
+            c_proj_weight: blocks[i].attn_c_proj.weight.mma(),
+            c_proj_bias: blocks[i].attn_c_proj.bias.device(),
+        }),
         block_ln_1: std::array::from_fn(|i| blocks[i].ln_1.tensors()),
         block_ln_2: std::array::from_fn(|i| blocks[i].ln_2.tensors()),
-        mlp_up: std::array::from_fn(|i| MlpUpTensors {
-            weight: blocks[i].mlp_up.weight.mma(),
-            bias: blocks[i].mlp_up.bias.device(),
-        }),
-        mlp_down: std::array::from_fn(|i| MlpDownTensors {
-            weight: blocks[i].mlp_down.weight.mma(),
-            bias: blocks[i].mlp_down.bias.device(),
+        mlp: std::array::from_fn(|i| MlpProjectionTensors {
+            up: MlpUpTensors {
+                weight: blocks[i].mlp_up.weight.mma(),
+                bias: blocks[i].mlp_up.bias.device(),
+            },
+            down: MlpDownTensors {
+                weight: blocks[i].mlp_down.weight.mma(),
+                bias: blocks[i].mlp_down.bias.device(),
+            },
         }),
         ln_f: ln_f.tensors(),
         attention_qkv: &mut qkv_dev,
@@ -139,8 +144,7 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
     })?;
 
     let logits = logits_dev.to_host_vec(&stream)?;
-    assert!(logits.iter().all(|value| value.is_finite()));
-    assert!(logits.iter().any(|value| value.abs() > 0.0));
+    common::assert_nonzero_finite(&logits);
     Ok(())
 }
 

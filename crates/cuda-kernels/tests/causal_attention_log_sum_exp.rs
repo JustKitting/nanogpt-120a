@@ -63,24 +63,12 @@ fn causal_attention_batch_isolation() -> Result<(), Box<dyn Error>> {
     let sample0_out_len = TOKEN_COUNT * EMBEDDING_DIM;
     let sample0_log_sum_exp_len = HEAD_COUNT * TOKEN_COUNT;
     assert_eq!(
-        first.out[..sample0_out_len]
-            .iter()
-            .map(|value| value.to_bits())
-            .collect::<Vec<_>>(),
-        second.out[..sample0_out_len]
-            .iter()
-            .map(|value| value.to_bits())
-            .collect::<Vec<_>>()
+        bits(&first.out[..sample0_out_len]),
+        bits(&second.out[..sample0_out_len])
     );
     assert_eq!(
-        first.log_sum_exp[..sample0_log_sum_exp_len]
-            .iter()
-            .map(|value| value.to_bits())
-            .collect::<Vec<_>>(),
-        second.log_sum_exp[..sample0_log_sum_exp_len]
-            .iter()
-            .map(|value| value.to_bits())
-            .collect::<Vec<_>>()
+        bits(&first.log_sum_exp[..sample0_log_sum_exp_len]),
+        bits(&second.log_sum_exp[..sample0_log_sum_exp_len])
     );
 
     Ok(())
@@ -143,4 +131,8 @@ fn fill_sample(qkv: &mut [f32], batch: usize, scale: f32) {
             }
         }
     }
+}
+
+fn bits(values: &[f32]) -> Vec<u32> {
+    values.iter().map(|value| value.to_bits()).collect()
 }
