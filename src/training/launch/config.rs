@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use super::super::SamplingConfig;
+pub(in crate::training) use crate::training::env::{env_bool, env_nonempty};
+use crate::training::env::{env_f32, env_f64, env_u64, env_usize};
 
 const DEFAULT_SEED: u64 = 0x4750_5432;
 const DEFAULT_TRAIN_MAX_SECONDS: f64 = 900.0;
@@ -63,49 +65,9 @@ pub(super) fn should_eval_step(step: usize, step_cap: usize, eval_interval: Opti
     eval_interval.is_some_and(|interval| step == 0 || step + 1 == step_cap || step % interval == 0)
 }
 
-pub(in crate::training) fn env_nonempty(name: &str) -> Option<String> {
-    std::env::var(name).ok().filter(|value| !value.is_empty())
-}
-
-pub(in crate::training) fn env_bool(name: &str) -> Option<bool> {
-    let value = std::env::var(name).ok()?;
-    match value.to_ascii_lowercase().as_str() {
-        "1" | "true" | "yes" | "on" => Some(true),
-        "0" | "false" | "no" | "off" => Some(false),
-        _ => None,
-    }
-}
-
 fn default_generate_prompt(dataset: &str) -> &'static str {
     match dataset {
         "shakespeare" => DEFAULT_SHAKESPEARE_PROMPT,
         _ => DEFAULT_SYNTH_PROMPT,
     }
-}
-
-fn env_usize(name: &str) -> Option<usize> {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse().ok())
-}
-
-fn env_u64(name: &str) -> Option<u64> {
-    let value = std::env::var(name).ok()?;
-    value
-        .strip_prefix("0x")
-        .or_else(|| value.strip_prefix("0X"))
-        .map(|hex| u64::from_str_radix(hex, 16).ok())
-        .unwrap_or_else(|| value.parse().ok())
-}
-
-fn env_f32(name: &str) -> Option<f32> {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse().ok())
-}
-
-fn env_f64(name: &str) -> Option<f64> {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse().ok())
 }

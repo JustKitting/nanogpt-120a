@@ -70,6 +70,7 @@ mod buffers;
 mod data;
 mod debug_metrics;
 mod diagnostics;
+mod env;
 mod eval;
 mod forward;
 mod generate;

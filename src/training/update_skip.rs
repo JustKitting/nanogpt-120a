@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use super::env::{env_bool, env_f32, env_usize};
+
 const ENABLED_ENV: &str = "TRAIN_SKIP_UNSTABLE_UPDATES";
 const ROLLING_INTERVAL_ENV: &str = "TRAIN_SKIP_ROLLING_INTERVAL";
 const SIGMA_FACTOR_ENV: &str = "TRAIN_SKIP_SIGMA_FACTOR";
@@ -104,11 +106,16 @@ impl UpdateSkipState {
 impl UpdateSkipConfig {
     fn from_env() -> Self {
         Self {
-            enabled: env_bool(ENABLED_ENV, DEFAULT_ENABLED),
-            rolling_interval: env_usize(ROLLING_INTERVAL_ENV, DEFAULT_ROLLING_INTERVAL).max(2),
-            sigma_factor: env_f32(SIGMA_FACTOR_ENV, DEFAULT_SIGMA_FACTOR).max(0.0),
-            use_loss: env_bool(USE_LOSS_ENV, true),
-            use_grad_norm: env_bool(USE_GRAD_NORM_ENV, true),
+            enabled: env_bool(ENABLED_ENV).unwrap_or(DEFAULT_ENABLED),
+            rolling_interval: env_usize(ROLLING_INTERVAL_ENV)
+                .unwrap_or(DEFAULT_ROLLING_INTERVAL)
+                .max(2),
+            sigma_factor: env_f32(SIGMA_FACTOR_ENV)
+                .filter(|value| value.is_finite())
+                .unwrap_or(DEFAULT_SIGMA_FACTOR)
+                .max(0.0),
+            use_loss: env_bool(USE_LOSS_ENV).unwrap_or(true),
+            use_grad_norm: env_bool(USE_GRAD_NORM_ENV).unwrap_or(true),
         }
     }
 }
@@ -118,33 +125,6 @@ fn push_history(history: &mut VecDeque<f32>, value: f32, max_len: usize) {
     while history.len() > max_len {
         history.pop_front();
     }
-}
-
-fn env_bool(name: &str, default: bool) -> bool {
-    match std::env::var(name)
-        .ok()
-        .map(|value| value.trim().to_ascii_lowercase())
-        .as_deref()
-    {
-        Some("1" | "true" | "yes" | "on") => true,
-        Some("0" | "false" | "no" | "off") => false,
-        _ => default,
-    }
-}
-
-fn env_usize(name: &str, default: usize) -> usize {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(default)
-}
-
-fn env_f32(name: &str, default: f32) -> f32 {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .filter(|value: &f32| value.is_finite())
-        .unwrap_or(default)
 }
 
 #[cfg(test)]
