@@ -1,7 +1,5 @@
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 
-use burn::data::dataloader::Progress;
 use burn::train::{
     EventProcessorTraining, Interrupter, Learner, LearnerEvent, SupervisedLearningStrategy,
     SupervisedTrainingEventProcessor, TrainLoader, TrainingComponents, TrainingItem, TrainingModel,
@@ -12,14 +10,19 @@ use super::config::{
     generate_prompt, generate_tokens, load_model_path, sampling_config, should_eval_step,
     should_log_step,
 };
-use super::data_loader::CudaValidationInput;
-use super::metrics::{CudaTrainOutput, CudaValidOutput};
+use super::metrics::CudaTrainOutput;
 use super::output::{RunOutput, ensure_parent, save_model_path, write_generated_text};
 use super::{CudaLearningComponents, TrainConfig};
 use crate::AppResult;
 use crate::training::{Trainer, debug_metrics};
 
-const TRAIN_EPOCH: usize = 1;
+mod budget;
+mod progress;
+mod validation;
+
+use budget::WallClockBudget;
+use progress::{TRAIN_EPOCH, epoch_progress};
+use validation::{process_validation, validation_input};
 
 pub(super) struct CudaTrainingStrategy {
     dataset: String,
@@ -167,66 +170,5 @@ impl CudaTrainingStrategy {
         }
 
         Ok(())
-    }
-}
-
-fn process_validation(
-    trainer: &mut Trainer,
-    processor: &mut SupervisedTrainingEventProcessor<CudaLearningComponents>,
-    validation: &CudaValidationInput,
-    step: usize,
-    completed_steps: usize,
-) -> AppResult<CudaValidOutput> {
-    let eval_start = Instant::now();
-    let val_loss = trainer.eval_loss_windows(&validation.tokens, validation.window_count)?;
-    let output = CudaValidOutput {
-        val_loss,
-        eval_elapsed_s: eval_start.elapsed().as_secs_f64(),
-        window_count: validation.window_count,
-        completed_steps,
-    };
-    processor.process_valid(LearnerEvent::ProcessedItem(TrainingItem::new(
-        output.clone(),
-        Progress::new(validation.window_count, validation.window_count),
-        epoch_progress(),
-        Some(step),
-        None,
-    )));
-    Ok(output)
-}
-
-fn validation_input(
-    dataloader_valid: ValidLoader<CudaLearningComponents>,
-) -> AppResult<CudaValidationInput> {
-    match dataloader_valid.iter().next() {
-        Some(Ok(input)) => Ok(input),
-        Some(Err(err)) => Err(format!("validation dataloader failed: {err}").into()),
-        None => Err("validation dataloader produced no windows".into()),
-    }
-}
-
-fn epoch_progress() -> Progress {
-    Progress::new(TRAIN_EPOCH, TRAIN_EPOCH)
-}
-
-struct WallClockBudget {
-    start: Instant,
-    max: Duration,
-}
-
-impl WallClockBudget {
-    fn new(max_seconds: f64) -> Self {
-        Self {
-            start: Instant::now(),
-            max: Duration::from_secs_f64(max_seconds),
-        }
-    }
-
-    fn elapsed_seconds(&self) -> f64 {
-        self.start.elapsed().as_secs_f64()
-    }
-
-    fn expired(&self) -> bool {
-        self.start.elapsed() >= self.max
     }
 }
