@@ -1,4 +1,4 @@
-use super::factors::{FEATURE_COUNT, FEATURE_NAMES};
+use super::super::features::{FEATURE_COUNT, FEATURE_NAMES};
 use super::stats::{EPS, mean, stddev};
 
 #[derive(Clone, Copy, Debug)]

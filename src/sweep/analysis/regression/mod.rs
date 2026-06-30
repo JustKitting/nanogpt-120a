@@ -3,8 +3,8 @@ mod features;
 mod linear;
 
 use super::super::candidate::Candidate;
+use super::super::features::{FEATURE_COUNT, regression_features};
 use super::design;
-use super::factors::{FEATURE_COUNT, candidate_features};
 use super::stats::{EPS, mean, stddev};
 
 const MIN_ROWS: usize = 3;
@@ -52,7 +52,7 @@ pub fn fit(rows: Vec<(Candidate, f64)>) -> Option<Model> {
 
     let base_rows = rows
         .iter()
-        .map(|(candidate, _)| candidate_features(candidate))
+        .map(|(candidate, _)| regression_features(candidate))
         .collect::<Vec<_>>();
     let base_stats = design::base_stats(&base_rows);
     let terms = design::terms();

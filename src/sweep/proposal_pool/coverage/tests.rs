@@ -1,9 +1,9 @@
-use super::{coverage_score, features};
+use super::{coverage_score, unit_features};
 use crate::sweep::candidate::Candidate;
 
 #[test]
 fn coverage_score_prefers_uncovered_region() {
-    let observed = [features(&candidate(4, 4, 0.5, 0.5, 5, 0.0, 0.2, 0.5))];
+    let observed = [unit_features(&candidate(4, 4, 0.5, 0.5, 5, 0.0, 0.2, 0.5))];
     let near = candidate(4, 4, 0.55, 0.55, 8, 0.02, 0.22, 0.55);
     let far = candidate(16, 8, 2.5, 2.5, 100, 0.2, 0.6, 1.0);
 

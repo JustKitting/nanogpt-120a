@@ -1,6 +1,5 @@
 mod beliefs;
 mod design;
-mod factors;
 mod log_files;
 mod logs;
 mod regression;

@@ -1,7 +1,7 @@
+use super::super::features::{FEATURE_COUNT, regression_features};
 use super::super::{candidate::Candidate, config::SweepConfig};
 use super::{
     BinaryPrior, ResponseModel, SweepAnalysis,
-    factors::{FEATURE_COUNT, candidate_features},
     regression::Prediction,
     stats::{EPS, normal_cdf, normal_pdf},
 };
@@ -24,7 +24,7 @@ pub fn score_candidate(
     config: &SweepConfig,
     candidate: &Candidate,
 ) -> CandidateScore {
-    let features = candidate_features(candidate);
+    let features = regression_features(candidate);
     let predicted_quality_model =
         best_prediction(analysis, &features, &["screen_quality", "full_quality"]);
     let predicted_quality = predicted_quality_model.map(|(_, prediction)| prediction);
