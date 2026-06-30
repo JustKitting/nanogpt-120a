@@ -1,6 +1,6 @@
 use std::{fs, io, path::Path};
 
-use super::{analysis::CandidateScore, parse::RunResult};
+use super::{analysis::CandidateScore, fmt, parse::RunResult};
 
 #[cfg(test)]
 mod tests;
@@ -43,14 +43,11 @@ pub fn write(path: &Path, decision: &Decision) -> io::Result<()> {
             "PASS={}\nREASON={}\nSCREEN_LOSS={}\nBASELINE_SCREEN_LOSS={}\nEXPECTED_QUALITY={}\nSURVIVAL_PRIOR={}\nCOMPLETED_STEPS={}\n",
             decision.pass,
             decision.reason,
-            fmt_f64(decision.screen_loss),
-            fmt_f64(decision.baseline_loss),
-            fmt_f64(decision.expected_quality),
-            fmt_f64(decision.survival_prior),
-            decision
-                .completed_steps
-                .map(|v| v.to_string())
-                .unwrap_or_default(),
+            fmt::optional_f64_6(decision.screen_loss),
+            fmt::optional_f64_6(decision.baseline_loss),
+            fmt::optional_f64_6(decision.expected_quality),
+            fmt::optional_f64_6(decision.survival_prior),
+            fmt::optional_usize(decision.completed_steps),
         ),
     )
 }
@@ -71,8 +68,4 @@ fn decision(
         survival_prior: score.map(|score| score.survival_prior),
         completed_steps: result.completed_steps,
     }
-}
-
-fn fmt_f64(value: Option<f64>) -> String {
-    value.map(|value| format!("{value:.6}")).unwrap_or_default()
 }

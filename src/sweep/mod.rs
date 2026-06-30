@@ -5,6 +5,7 @@ mod candidate_space;
 mod chain;
 mod config;
 mod features;
+mod fmt;
 mod history;
 mod optimizer;
 mod parse;

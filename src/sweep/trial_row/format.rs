@@ -1,3 +1,4 @@
+use super::super::fmt;
 use super::super::history::Trial;
 
 pub(super) fn header() -> &'static str {
@@ -9,11 +10,11 @@ pub(super) fn format_trial(trial: &Trial) -> String {
     format!(
         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}",
         trial.status,
-        trial.val_loss.map(fmt).unwrap_or_else(|| "NaN".to_string()),
         trial
-            .completed_steps
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
+            .val_loss
+            .map(fmt::f64_6)
+            .unwrap_or_else(|| "NaN".to_string()),
+        fmt::optional_usize(trial.completed_steps),
         c.batch_size,
         c.n_layer,
         c.n_embd,
@@ -28,17 +29,10 @@ pub(super) fn format_trial(trial: &Trial) -> String {
         c.amuse_beta1,
         c.amuse_rho,
         trial.log_path.display(),
-        trial.elapsed_s.map(fmt).unwrap_or_default(),
-        trial.screen_val_loss.map(fmt).unwrap_or_default(),
-        trial
-            .screen_completed_steps
-            .map(|value| value.to_string())
-            .unwrap_or_default(),
-        trial.screen_elapsed_s.map(fmt).unwrap_or_default(),
+        fmt::optional_f64_6(trial.elapsed_s),
+        fmt::optional_f64_6(trial.screen_val_loss),
+        fmt::optional_usize(trial.screen_completed_steps),
+        fmt::optional_f64_6(trial.screen_elapsed_s),
         trial.screen_reason.as_deref().unwrap_or_default()
     )
-}
-
-fn fmt(value: f64) -> String {
-    format!("{value:.6}")
 }

@@ -6,7 +6,7 @@ use std::{
 
 use time::OffsetDateTime;
 
-use super::{candidate::Candidate, parse::RunResult};
+use super::{candidate::Candidate, fmt, parse::RunResult};
 
 pub fn record(
     sweep_dir: &Path,
@@ -48,11 +48,11 @@ fn write_status(
         timestamp(),
         candidate.key(),
         trial_dir.display(),
-        fmt_usize(result.completed_steps),
-        fmt_usize(result.last_step),
-        fmt_f64(result.last_elapsed_s),
-        fmt_f64(result.last_train_loss),
-        fmt_f64(result.val_loss),
+        fmt::optional_usize(result.completed_steps),
+        fmt::optional_usize(result.last_step),
+        fmt::optional_f64_6(result.last_elapsed_s),
+        fmt::optional_f64_6(result.last_train_loss),
+        fmt::optional_f64_6(result.val_loss),
         result.saw_nan,
     );
     fs::write(path, text)
@@ -83,11 +83,11 @@ fn append_event(
         trial_index,
         candidate.key(),
         trial_dir.display(),
-        fmt_usize(result.completed_steps),
-        fmt_usize(result.last_step),
-        fmt_f64(result.last_elapsed_s),
-        fmt_f64(result.last_train_loss),
-        fmt_f64(result.val_loss),
+        fmt::optional_usize(result.completed_steps),
+        fmt::optional_usize(result.last_step),
+        fmt::optional_f64_6(result.last_elapsed_s),
+        fmt::optional_f64_6(result.last_train_loss),
+        fmt::optional_f64_6(result.val_loss),
         result.saw_nan,
     )
 }
@@ -103,12 +103,4 @@ fn timestamp() -> String {
         now.minute(),
         now.second()
     )
-}
-
-fn fmt_f64(value: Option<f64>) -> String {
-    value.map(|value| format!("{value:.6}")).unwrap_or_default()
-}
-
-fn fmt_usize(value: Option<usize>) -> String {
-    value.map(|value| value.to_string()).unwrap_or_default()
 }
