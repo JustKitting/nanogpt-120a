@@ -36,38 +36,22 @@ impl LinearScratch {
     }
 
     pub fn attention(&mut self) -> AttentionCProjScratch<'_> {
-        let Self {
-            error_t,
-            weight_t,
-            input_t,
-            e,
-            weight_t_h,
-            e_t,
-            input_t_h,
-        } = self;
+        let (error_t, weight_t, input_t, linear) = self.parts();
         AttentionCProjScratch {
             error_t,
             weight_t,
             input_t,
-            linear: ms_eden(e, weight_t_h, e_t, input_t_h),
+            linear,
         }
     }
 
     pub fn final_head(&mut self) -> FinalHeadBackwardScratch<'_> {
-        let Self {
-            error_t,
-            weight_t,
-            input_t,
-            e,
-            weight_t_h,
-            e_t,
-            input_t_h,
-        } = self;
+        let (error_t, weight_t, input_t, linear) = self.parts();
         FinalHeadBackwardScratch {
             dlogits_t: error_t,
             lm_head_weight_t: weight_t,
             final_normalized_t: input_t,
-            linear: ms_eden(e, weight_t_h, e_t, input_t_h),
+            linear,
         }
     }
 
