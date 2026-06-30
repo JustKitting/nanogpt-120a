@@ -70,10 +70,11 @@ impl<'a> Nvfp4Polar<'a> {
                     cols,
                     iter,
                     period <= 1 || iter % period == 0,
+                    1.0,
                     &mut stale_defect,
                     &mut stats,
                 )?,
-                GramCorrectionMode::StaleScaled { period, scale } => self.corrected_gram_scaled(
+                GramCorrectionMode::StaleScaled { period, scale } => self.corrected_gram(
                     &source,
                     rows,
                     cols,
@@ -115,6 +116,7 @@ impl<'a> Nvfp4Polar<'a> {
                             cols,
                             iter,
                             iter == exact_steps || (iter - exact_steps) % period == 0,
+                            1.0,
                             &mut stale_defect,
                             &mut stats,
                         )?
@@ -131,6 +133,7 @@ impl<'a> Nvfp4Polar<'a> {
                     period <= 1
                         || iter % period == 0
                         || stats.last_relative_defect > max_relative_defect,
+                    1.0,
                     &mut stale_defect,
                     &mut stats,
                 )?,
@@ -225,6 +228,7 @@ impl<'a> Nvfp4Polar<'a> {
                             cols,
                             iter,
                             refresh,
+                            1.0,
                             &mut stale_defect,
                             &mut stats,
                         )?,
@@ -235,7 +239,7 @@ impl<'a> Nvfp4Polar<'a> {
                 GramCorrectionMode::StaleScaled { period, scale } => {
                     let refresh = period <= 1 || iter % period == 0;
                     (
-                        self.corrected_gram_scaled(
+                        self.corrected_gram(
                             &source,
                             rows,
                             cols,
@@ -287,6 +291,7 @@ impl<'a> Nvfp4Polar<'a> {
                                 cols,
                                 iter,
                                 refresh,
+                                1.0,
                                 &mut stale_defect,
                                 &mut stats,
                             )?,
@@ -309,6 +314,7 @@ impl<'a> Nvfp4Polar<'a> {
                             cols,
                             iter,
                             refresh,
+                            1.0,
                             &mut stale_defect,
                             &mut stats,
                         )?,

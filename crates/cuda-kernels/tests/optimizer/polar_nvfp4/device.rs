@@ -38,7 +38,7 @@ impl<'a> Nvfp4Polar<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn corrected_gram_scaled(
+    fn corrected_gram(
         &self,
         source: &[f32],
         rows: usize,
@@ -82,36 +82,6 @@ impl<'a> Nvfp4Polar<'a> {
         let ax_t = transpose(&ax, rows, cols);
         let aax = self.product(&gram, &ax_t, rows, cols, rows, iter, 2)?;
         Ok(combine_next(source, &ax, &aax, iter))
-    }
-
-    fn corrected_gram(
-        &self,
-        source: &[f32],
-        rows: usize,
-        cols: usize,
-        iter: usize,
-        refresh: bool,
-        stale_defect: &mut [f32],
-        stats: &mut CorrectionStats,
-    ) -> Result<Vec<f32>, Box<dyn Error>> {
-        stats.nvfp4_gram_count += 1;
-        let gram_q = self.product(source, source, rows, rows, cols, iter, 0)?;
-        if refresh {
-            stats.high_precision_gram_count += 1;
-            let gram_hi = self.f16_product(source, source, rows, rows, cols)?;
-            for ((defect, q), hi) in stale_defect.iter_mut().zip(&gram_q).zip(&gram_hi) {
-                *defect = q - hi;
-            }
-            stats.last_relative_defect = relative_l2(&gram_q, &gram_hi);
-            stats.max_relative_defect = stats.max_relative_defect.max(stats.last_relative_defect);
-            Ok(gram_hi)
-        } else {
-            Ok(gram_q
-                .iter()
-                .zip(stale_defect)
-                .map(|(q, defect)| *q - *defect)
-                .collect())
-        }
     }
 
     fn step_from_gram(
