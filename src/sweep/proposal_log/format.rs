@@ -1,5 +1,5 @@
 use super::super::{
-    analysis::{CandidateScore, Prediction},
+    analysis::Prediction,
     optimizer::{Proposal, ScoredCandidate},
 };
 
@@ -10,21 +10,24 @@ mod tests;
 pub(super) use sources::sources_tsv;
 
 pub(super) fn selected_text(proposal: &Proposal) -> String {
-    let (source, selected) = selected_score(proposal);
+    let selected = proposal
+        .selected_scored()
+        .expect("proposal must have at least one ranked candidate");
+    let score = &selected.score;
     format!(
         "candidate={}\nreason={}\nsource={}\nscore={:.6}\nexpected_quality={:.6}\nsurvival_prior={:.6}\nprobability_improvement={:.6}\nexpected_improvement={:.6}\nuncertainty={:.6}\nexploration={:.6}\nquality={}\nstability={}\n",
         proposal.candidate.key(),
         proposal.reason,
-        source,
-        selected.score,
-        selected.expected_quality,
-        selected.survival_prior,
-        selected.probability_improvement,
-        selected.expected_improvement,
-        selected.uncertainty,
-        selected.exploration,
-        fmt_prediction(selected.predicted_quality),
-        fmt_prediction(selected.predicted_stability)
+        selected.source,
+        score.score,
+        score.expected_quality,
+        score.survival_prior,
+        score.probability_improvement,
+        score.expected_improvement,
+        score.uncertainty,
+        score.exploration,
+        fmt_prediction(score.predicted_quality),
+        fmt_prediction(score.predicted_stability)
     )
 }
 
@@ -66,15 +69,6 @@ fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, sel
         standard_score(stability),
         uncertainty(stability)
     ));
-}
-
-fn selected_score(proposal: &Proposal) -> (&'static str, &CandidateScore) {
-    proposal
-        .ranked
-        .iter()
-        .find(|scored| scored.candidate.key() == proposal.candidate.key())
-        .map(|scored| (scored.source, &scored.score))
-        .unwrap_or((proposal.ranked[0].source, &proposal.ranked[0].score))
 }
 
 fn fmt_prediction(value: Option<Prediction>) -> String {

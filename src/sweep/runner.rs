@@ -47,7 +47,9 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             baseline.candidate(),
         );
         proposal_log::write(&sweep_dir, index, &proposal)?;
-        let screen_score = selected_score(&proposal);
+        let screen_score = proposal
+            .selected_scored()
+            .map(|scored| scored.score.clone());
         let candidate = proposal.candidate;
         let trial_dir = sweep_dir.join(format!("trial_{index:04}"));
         println!("sweep_trial_begin index={index} key={}", candidate.key());
@@ -109,14 +111,6 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
         analysis::write(&sweep_dir, &sweep_analysis, &config)?;
     }
     Ok(())
-}
-
-fn selected_score(proposal: &optimizer::Proposal) -> Option<analysis::CandidateScore> {
-    proposal
-        .ranked
-        .iter()
-        .find(|scored| scored.candidate.key() == proposal.candidate.key())
-        .map(|scored| scored.score.clone())
 }
 
 fn default_sweep_dir() -> PathBuf {

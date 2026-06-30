@@ -31,6 +31,16 @@ pub struct ScoredCandidate {
     pub score: CandidateScore,
 }
 
+impl Proposal {
+    pub fn selected_scored(&self) -> Option<&ScoredCandidate> {
+        let selected_key = self.candidate.key();
+        self.ranked
+            .iter()
+            .find(|scored| scored.candidate.key() == selected_key)
+            .or_else(|| self.ranked.first())
+    }
+}
+
 pub fn propose(
     trials: &[Trial],
     seen: &HashSet<String>,
