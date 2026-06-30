@@ -3,7 +3,7 @@ use cuda_device::{DisjointSlice, cuda_module, kernel, thread, warp};
 use super::convert::cvt_rn_satfinite_e2m1x2_f32;
 
 #[path = "four_six/helpers.rs"]
-mod helpers;
+pub(crate) mod helpers;
 
 #[cuda_module]
 pub(crate) mod module {

@@ -3,19 +3,15 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 use crate::amax::{amax4_f32, max4_f32};
 use crate::block_reduce::block_max_leader_f32;
 use crate::float_ptx::abs_f32;
-use crate::nvfp4_quant::kernels::convert::{
-    candidate_error, cvt_rn_satfinite_e2m1x2_f32, local_scale_bits, nonzero_global_scale,
-    nvfp4_inv_scale, scale_value,
+use crate::nvfp4_quant::kernels::convert::cvt_rn_satfinite_e2m1x2_f32;
+use crate::nvfp4_quant::kernels::four_six::helpers::{
+    GROUP_SIZE, four_six_global_scale, four_six_group_scale,
 };
-use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32};
 
 use super::threads::WARPS_PER_BLOCK;
 
-const GROUP_SIZE: usize = 16;
 const TENSOR_AMAX_VALUES_PER_BLOCK: u32 =
     crate::nvfp4_quant::kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK;
-const FP4_MAX: f32 = 6.0;
-const FP8_MAX_FOUR_SIX: f32 = 256.0;
 const SCALE_OVERRIDE: f32 = 1.0;
 
 #[allow(static_mut_refs)]
@@ -95,25 +91,24 @@ pub(super) mod module {
         if group < out_scales.len() {
             let base = group * GROUP_SIZE;
             let tensor_amax = amax[0];
-            let global_scale = if tensor_amax == 0.0 {
-                1.0
-            } else {
-                tensor_amax * SCALE_OVERRIDE / (FP8_MAX_FOUR_SIX * FP4_MAX)
-            };
+            let global_scale = four_six_global_scale(tensor_amax, SCALE_OVERRIDE);
             unsafe {
                 if group == 0 && lane_in_group == 0 {
                     *out_global_scale.get_unchecked_mut(0) = global_scale;
                 }
 
                 let value = schedule_value(z_master, x_master, beta, (base + lane_in_group) as u32);
-                let group_amax = half_warp_max_f32(abs_f32(value), group_mask);
-                let (scale_bits, scale) =
-                    scale_for_group(group_amax, value, global_scale, group_mask, group_leader);
-                let global_scale = nonzero_global_scale(global_scale);
-                let inv_scale = nvfp4_inv_scale(scale, global_scale);
+                let (scale_bits, inv_scale) = four_six_group_scale(
+                    value,
+                    global_scale,
+                    SCALE_OVERRIDE,
+                    group_mask,
+                    group_leader,
+                    lane_in_group,
+                );
 
                 if lane_in_group == 0 {
-                    *out_scales.get_unchecked_mut(group) = scale_bits as u8;
+                    *out_scales.get_unchecked_mut(group) = scale_bits;
                 }
                 if lane_in_group < GROUP_SIZE / 2 {
                     let pair = lane_in_group * 2;
@@ -125,40 +120,6 @@ pub(super) mod module {
                         cvt_rn_satfinite_e2m1x2_f32(lo, hi);
                 }
             }
-        }
-    }
-
-    #[inline(always)]
-    fn scale_for_group(
-        group_amax: f32,
-        value: f32,
-        global_scale: f32,
-        group_mask: u32,
-        group_leader: u32,
-    ) -> (u16, f32) {
-        let lane_in_group = warp::lane_id() & 0x0f;
-        let mut bits_six = 0u16;
-        let mut bits_four = 0u16;
-        let mut scale_six = 0.0;
-        let mut scale_four = 0.0;
-        if lane_in_group == 0 {
-            bits_six = local_scale_bits(group_amax, global_scale, SCALE_OVERRIDE, 6.0);
-            bits_four = local_scale_bits(group_amax, global_scale, SCALE_OVERRIDE, 4.0);
-            scale_six = scale_value(bits_six);
-            scale_four = scale_value(bits_four);
-        }
-        bits_six = warp::shuffle_sync(group_mask, bits_six as u32, group_leader) as u16;
-        bits_four = warp::shuffle_sync(group_mask, bits_four as u32, group_leader) as u16;
-        scale_six = warp::shuffle_f32_sync(group_mask, scale_six, group_leader);
-        scale_four = warp::shuffle_f32_sync(group_mask, scale_four, group_leader);
-        let err_six =
-            half_warp_sum_f32(candidate_error(value, scale_six, global_scale), group_mask);
-        let err_four =
-            half_warp_sum_f32(candidate_error(value, scale_four, global_scale), group_mask);
-        if err_six <= err_four {
-            (bits_six, scale_six)
-        } else {
-            (bits_four, scale_four)
         }
     }
 

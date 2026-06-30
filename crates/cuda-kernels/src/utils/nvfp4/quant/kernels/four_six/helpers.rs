@@ -7,13 +7,13 @@ use super::super::convert::{
     candidate_error, local_scale_bits, nonzero_global_scale, nvfp4_inv_scale, scale_value,
 };
 
-pub(super) const GROUP_SIZE: usize = 16;
+pub(crate) const GROUP_SIZE: usize = 16;
 
 const FP4_MAX: f32 = 6.0;
 const FP8_MAX_FOUR_SIX: f32 = 256.0;
 
 #[inline(always)]
-pub(super) fn four_six_global_scale(tensor_amax: f32, scale_override: f32) -> f32 {
+pub(crate) fn four_six_global_scale(tensor_amax: f32, scale_override: f32) -> f32 {
     nonzero_global_scale(if tensor_amax == 0.0 {
         1.0
     } else {
@@ -22,7 +22,7 @@ pub(super) fn four_six_global_scale(tensor_amax: f32, scale_override: f32) -> f3
 }
 
 #[inline(always)]
-pub(super) fn four_six_group_scale(
+pub(crate) fn four_six_group_scale(
     value: f32,
     global_scale: f32,
     scale_override: f32,
