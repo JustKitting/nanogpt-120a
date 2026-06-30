@@ -39,6 +39,21 @@ pub struct UploadedNvfp4 {
 }
 
 impl UploadedNvfp4 {
+    pub(crate) fn from_host(
+        stream: &CudaStream,
+        bytes: &[u8],
+        scales: &[u8],
+        global_scale: f32,
+        len: usize,
+    ) -> AppResult<Self> {
+        Ok(Self {
+            bytes: DeviceBuffer::from_host(stream, bytes)?,
+            scales: DeviceBuffer::from_host(stream, scales)?,
+            global_scale: DeviceBuffer::from_host(stream, &[global_scale])?,
+            len,
+        })
+    }
+
     pub(crate) fn global_scale_to_host(&self, stream: &CudaStream) -> AppResult<f32> {
         Ok(self.global_scale.to_host_vec(stream)?[0])
     }
@@ -74,10 +89,11 @@ pub(super) fn upload_nvfp4<S: Nvfp4Shape>(
     stream: &CudaStream,
     tensor: &Nvfp4Tensor<S>,
 ) -> AppResult<UploadedNvfp4> {
-    Ok(UploadedNvfp4 {
-        bytes: DeviceBuffer::from_host(stream, tensor.bytes.as_ref())?,
-        scales: DeviceBuffer::from_host(stream, tensor.scales.as_ref())?,
-        global_scale: DeviceBuffer::from_host(stream, &[tensor.global_scale])?,
-        len: tensor.len(),
-    })
+    UploadedNvfp4::from_host(
+        stream,
+        tensor.bytes.as_ref(),
+        tensor.scales.as_ref(),
+        tensor.global_scale,
+        tensor.len(),
+    )
 }

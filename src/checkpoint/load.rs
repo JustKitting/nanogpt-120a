@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use cuda_core::{CudaStream, DeviceBuffer};
+use cuda_core::CudaStream;
 use gpt2_nvfp4::GPT2_N_LAYER;
 
 use super::{
@@ -104,30 +104,24 @@ fn take_uploaded_tensor(
         .remove(name)
         .ok_or_else(|| format!("checkpoint is missing tensor {name}"))?;
     validate_tensor(name, &tensor)?;
-    Ok(UploadedNvfp4 {
-        bytes: DeviceBuffer::from_host(stream, &tensor.bytes)?,
-        scales: DeviceBuffer::from_host(stream, &tensor.scales)?,
-        global_scale: DeviceBuffer::from_host(stream, &[tensor.global_scale])?,
-        len: tensor.len,
-    })
+    UploadedNvfp4::from_host(
+        stream,
+        &tensor.bytes,
+        &tensor.scales,
+        tensor.global_scale,
+        tensor.len,
+    )
 }
 
 fn validate_tensor(name: &str, tensor: &CheckpointTensor) -> AppResult {
-    if tensor.bytes.len() != tensor.len / 2 {
-        return Err(format!(
-            "{name} has {} bytes; expected {}",
-            tensor.bytes.len(),
-            tensor.len / 2
-        )
-        .into());
+    validate_tensor_len(name, "bytes", tensor.bytes.len(), tensor.len / 2)?;
+    validate_tensor_len(name, "scales", tensor.scales.len(), tensor.len / 16)
+}
+
+fn validate_tensor_len(name: &str, field: &str, actual: usize, expected: usize) -> AppResult {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!("{name} has {actual} {field}; expected {expected}").into())
     }
-    if tensor.scales.len() != tensor.len / 16 {
-        return Err(format!(
-            "{name} has {} scales; expected {}",
-            tensor.scales.len(),
-            tensor.len / 16
-        )
-        .into());
-    }
-    Ok(())
 }
