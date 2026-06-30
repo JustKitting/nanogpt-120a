@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::{CudaContext, CudaStream, DeviceBuffer};
 use rust_kernels_cuda::nvfp4::{
     Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4RowwiseDecodeTransposeArgs,
 };
@@ -17,6 +17,35 @@ mod common;
 mod support;
 
 use support::*;
+
+fn rowwise_quant(
+    stream: &CudaStream,
+    quant: &Nvfp4QuantModule,
+    x: &DeviceBuffer<f32>,
+    source: &mut RowwiseSourceScratch,
+    rows: usize,
+    cols: usize,
+) -> Result<(), Box<dyn Error>> {
+    let mut row_amax = DeviceBuffer::<f32>::zeroed(stream, rows)?;
+    quant.row_amax_f32(RowAmaxArgs {
+        stream,
+        x,
+        out: &mut row_amax,
+        row_count: rows as u32,
+        row_len: cols as u32,
+    })?;
+    quant.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
+        stream,
+        x,
+        amax: &row_amax,
+        out_fp4: &mut source.bytes,
+        out_scales: &mut source.scales,
+        out_global_scale: &mut source.global_scales,
+        group_count: (rows * cols / 16) as u32,
+        row_len: cols as u32,
+    })?;
+    Ok(())
+}
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -90,28 +119,11 @@ fn rowwise_nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), B
     let x = input_matrix();
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let mut source = RowwiseSourceScratch::new(&stream)?;
-    let mut row_amax = DeviceBuffer::<f32>::zeroed(&stream, ROWS)?;
     let mut x_t_dev = DeviceBuffer::<f32>::zeroed(&stream, ROWS * COLS)?;
     let mut materialized = QuantScratch::new(&stream)?;
     let mut direct = QuantScratch::new(&stream)?;
 
-    quant.row_amax_f32(RowAmaxArgs {
-        stream: &stream,
-        x: &x_dev,
-        out: &mut row_amax,
-        row_count: ROWS as u32,
-        row_len: COLS as u32,
-    })?;
-    quant.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
-        stream: &stream,
-        x: &x_dev,
-        amax: &row_amax,
-        out_fp4: &mut source.bytes,
-        out_scales: &mut source.scales,
-        out_global_scale: &mut source.global_scales,
-        group_count: (ROWS * COLS / 16) as u32,
-        row_len: COLS as u32,
-    })?;
+    rowwise_quant(&stream, &quant, &x_dev, &mut source, ROWS, COLS)?;
 
     let source_tensor = source.tensor();
     decode.decode_rowwise_transpose_f32(Nvfp4RowwiseDecodeTransposeArgs {
@@ -179,29 +191,12 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
         })
         .collect::<Vec<_>>();
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
-    let mut row_amax = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_ROWS)?;
     let mut source = RowwiseSourceScratch::new_for_shape(&stream, LOCAL_ROWS, LOCAL_COLS)?;
     let mut x_t_dev = DeviceBuffer::<f32>::zeroed(&stream, x.len())?;
     let mut materialized = QuantScratch::new_exact(&stream, LOCAL_COLS, LOCAL_ROWS)?;
     let mut direct = QuantScratch::new_exact(&stream, LOCAL_COLS, LOCAL_ROWS)?;
 
-    quant.row_amax_f32(RowAmaxArgs {
-        stream: &stream,
-        x: &x_dev,
-        out: &mut row_amax,
-        row_count: LOCAL_ROWS as u32,
-        row_len: LOCAL_COLS as u32,
-    })?;
-    quant.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
-        stream: &stream,
-        x: &x_dev,
-        amax: &row_amax,
-        out_fp4: &mut source.bytes,
-        out_scales: &mut source.scales,
-        out_global_scale: &mut source.global_scales,
-        group_count: (LOCAL_ROWS * LOCAL_COLS / 16) as u32,
-        row_len: LOCAL_COLS as u32,
-    })?;
+    rowwise_quant(&stream, &quant, &x_dev, &mut source, LOCAL_ROWS, LOCAL_COLS)?;
 
     let source_tensor = source.tensor();
     decode.decode_rowwise_transpose_f32(Nvfp4RowwiseDecodeTransposeArgs {
