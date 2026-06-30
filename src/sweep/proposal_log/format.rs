@@ -1,12 +1,13 @@
-use std::collections::BTreeMap;
-
 use super::super::{
     analysis::{CandidateScore, Prediction},
     optimizer::{Proposal, ScoredCandidate},
 };
 
+mod sources;
 #[cfg(test)]
 mod tests;
+
+pub(super) use sources::sources_tsv;
 
 pub(super) fn selected_text(proposal: &Proposal) -> String {
     let (source, selected) = selected_score(proposal);
@@ -38,53 +39,6 @@ pub(super) fn ranked_tsv(proposal: &Proposal) -> String {
             scored,
             scored.candidate.key() == proposal.candidate.key(),
         );
-    }
-    text
-}
-
-#[derive(Clone, Debug)]
-struct SourceSummary<'a> {
-    count: usize,
-    selected: bool,
-    best_rank: usize,
-    best: &'a CandidateScore,
-}
-
-pub(super) fn sources_tsv(proposal: &Proposal) -> String {
-    let mut summaries = BTreeMap::<&'static str, SourceSummary<'_>>::new();
-    for (rank, scored) in proposal.ranked.iter().enumerate() {
-        let selected = scored.candidate.key() == proposal.candidate.key();
-        summaries
-            .entry(scored.source)
-            .and_modify(|summary| {
-                summary.count += 1;
-                summary.selected |= selected;
-            })
-            .or_insert(SourceSummary {
-                count: 1,
-                selected,
-                best_rank: rank,
-                best: &scored.score,
-            });
-    }
-
-    let mut text = String::from(
-        "source\tcount\tselected\tbest_rank\tbest_score\tbest_expected_quality\tbest_survival_prior\tbest_probability_improvement\tbest_expected_improvement\tbest_uncertainty\n",
-    );
-    for (source, summary) in summaries {
-        text.push_str(&format!(
-            "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
-            source,
-            summary.count,
-            summary.selected,
-            summary.best_rank,
-            summary.best.score,
-            summary.best.expected_quality,
-            summary.best.survival_prior,
-            summary.best.probability_improvement,
-            summary.best.expected_improvement,
-            summary.best.uncertainty
-        ));
     }
     text
 }
