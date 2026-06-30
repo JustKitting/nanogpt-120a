@@ -1,7 +1,6 @@
-use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
+use cuda_core::DeviceCopy;
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
-use super::AttentionModule;
 use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32, safe_positive_denom};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
@@ -25,53 +24,9 @@ pub struct CausalAttentionParams {
 
 unsafe impl DeviceCopy for CausalAttentionParams {}
 
-pub struct CausalAttentionArgs<'a, 'out> {
-    pub stream: &'a CudaStream,
-    pub qkv: &'a DeviceBuffer<f32>,
-    pub out: &'out mut DeviceBuffer<f32>,
-    pub log_sum_exp: &'out mut DeviceBuffer<f32>,
-    pub row_count: u32,
-    pub seq_len: u32,
-    pub batch_size: u32,
-    pub embedding_dim: u32,
-    pub qkv_dim: u32,
-    pub head_count: u32,
-    pub head_dim: u32,
-}
-
-impl AttentionModule {
-    pub fn causal_attention(&self, args: CausalAttentionArgs<'_, '_>) -> Result<(), DriverError> {
-        self.causal_attention.causal_attention_kernel(
-            args.stream,
-            LaunchConfig {
-                grid_dim: (args.seq_len, args.head_count, args.batch_size),
-                block_dim: (causal_attention_threads(args.head_dim), 1, 1),
-                shared_mem_bytes: 0,
-            },
-            args.qkv,
-            args.out,
-            args.log_sum_exp,
-            CausalAttentionParams {
-                row_count: args.row_count,
-                seq_len: args.seq_len,
-                batch_size: args.batch_size,
-                embedding_dim: args.embedding_dim,
-                qkv_dim: args.qkv_dim,
-                head_count: args.head_count,
-                head_dim: args.head_dim,
-                scale: 1.0 / (args.head_dim as f32).sqrt(),
-                chunk_size: 64,
-                decay_scale: 0.01,
-            },
-        )
-    }
-}
-
-fn causal_attention_threads(head_dim: u32) -> u32 {
-    let threads = head_dim.div_ceil(32) * 32;
-    assert!(threads <= CAUSAL_ATTENTION_MAX_THREADS_PER_BLOCK);
-    threads.max(32)
-}
+#[path = "causal/launcher.rs"]
+mod launcher;
+pub use launcher::CausalAttentionArgs;
 
 #[allow(static_mut_refs)]
 #[cuda_module]
