@@ -80,57 +80,17 @@ pub(super) fn gram_correction_modes() -> [(&'static str, Mode); 18] {
 pub(super) fn gram_form_correction_modes() -> [(&'static str, Mode); 34] {
     [
         ("high_precision", Mode::HighPrecision),
-        safety(
-            "high_precision_extra_safety101",
-            1.01,
-            SafetyKind::HighPrecision,
-        ),
-        safety(
-            "high_precision_extra_safety103",
-            1.03,
-            SafetyKind::HighPrecision,
-        ),
-        safety(
-            "high_precision_extra_safety104",
-            1.04,
-            SafetyKind::HighPrecision,
-        ),
-        safety(
-            "high_precision_extra_safety1045",
-            1.045,
-            SafetyKind::HighPrecision,
-        ),
-        safety(
-            "high_precision_extra_safety105",
-            1.05,
-            SafetyKind::HighPrecision,
-        ),
+        high_precision_safety("high_precision_extra_safety101", 1.01),
+        high_precision_safety("high_precision_extra_safety103", 1.03),
+        high_precision_safety("high_precision_extra_safety104", 1.04),
+        high_precision_safety("high_precision_extra_safety1045", 1.045),
+        high_precision_safety("high_precision_extra_safety105", 1.05),
         ("nvfp4_gram_only", Mode::Nvfp4GramOnly),
-        safety(
-            "nvfp4_gram_only_extra_safety101",
-            1.01,
-            SafetyKind::Nvfp4Only,
-        ),
-        safety(
-            "nvfp4_gram_only_extra_safety103",
-            1.03,
-            SafetyKind::Nvfp4Only,
-        ),
-        safety(
-            "nvfp4_gram_only_extra_safety104",
-            1.04,
-            SafetyKind::Nvfp4Only,
-        ),
-        safety(
-            "nvfp4_gram_only_extra_safety1045",
-            1.045,
-            SafetyKind::Nvfp4Only,
-        ),
-        safety(
-            "nvfp4_gram_only_extra_safety105",
-            1.05,
-            SafetyKind::Nvfp4Only,
-        ),
+        nvfp4_only_safety("nvfp4_gram_only_extra_safety101", 1.01),
+        nvfp4_only_safety("nvfp4_gram_only_extra_safety103", 1.03),
+        nvfp4_only_safety("nvfp4_gram_only_extra_safety104", 1.04),
+        nvfp4_only_safety("nvfp4_gram_only_extra_safety1045", 1.045),
+        nvfp4_only_safety("nvfp4_gram_only_extra_safety105", 1.05),
         late_safety("nvfp4_gram_only_late4_safety1045", 4, 1.045),
         late_safety("nvfp4_gram_only_late4_safety105", 4, 1.05),
         late_safety("nvfp4_gram_only_late3_safety1045", 3, 1.045),
@@ -143,27 +103,9 @@ pub(super) fn gram_form_correction_modes() -> [(&'static str, Mode); 34] {
         stale_reject_safety("stale_reject_p2_extra_safety101", 1.01),
         stale_reject_safety("stale_reject_p2_extra_safety103", 1.03),
         stale_reject_safety("stale_reject_p2_extra_safety105", 1.05),
-        (
-            "stale_scaled25_period2",
-            Mode::StaleScaled {
-                period: 2,
-                scale: 0.25,
-            },
-        ),
-        (
-            "stale_scaled50_period2",
-            Mode::StaleScaled {
-                period: 2,
-                scale: 0.50,
-            },
-        ),
-        (
-            "stale_scaled75_period2",
-            Mode::StaleScaled {
-                period: 2,
-                scale: 0.75,
-            },
-        ),
+        stale_scaled("stale_scaled25_period2", 0.25),
+        stale_scaled("stale_scaled50_period2", 0.50),
+        stale_scaled("stale_scaled75_period2", 0.75),
         exact_prefix_stale_reject("prefix2_stale_reject2", 2),
         exact_prefix_stale_reject("prefix3_stale_reject2", 3),
         exact_prefix_stale_reject_safety("prefix3_stale_reject2_extra_safety101", 1.01),
@@ -174,21 +116,15 @@ pub(super) fn gram_form_correction_modes() -> [(&'static str, Mode); 34] {
     ]
 }
 
-#[derive(Clone, Copy)]
-enum SafetyKind {
-    HighPrecision,
-    Nvfp4Only,
-}
-
-const fn safety(
+const fn high_precision_safety(
     name: &'static str,
     coefficient_safety: f32,
-    kind: SafetyKind,
 ) -> (&'static str, Mode) {
-    match kind {
-        SafetyKind::HighPrecision => (name, Mode::HighPrecisionSafety { coefficient_safety }),
-        SafetyKind::Nvfp4Only => (name, Mode::Nvfp4GramOnlySafety { coefficient_safety }),
-    }
+    (name, Mode::HighPrecisionSafety { coefficient_safety })
+}
+
+const fn nvfp4_only_safety(name: &'static str, coefficient_safety: f32) -> (&'static str, Mode) {
+    (name, Mode::Nvfp4GramOnlySafety { coefficient_safety })
 }
 
 const fn late_safety(
@@ -203,6 +139,10 @@ const fn late_safety(
             coefficient_safety,
         },
     )
+}
+
+const fn stale_scaled(name: &'static str, scale: f32) -> (&'static str, Mode) {
+    (name, Mode::StaleScaled { period: 2, scale })
 }
 
 const fn stale_reject_safety(name: &'static str, coefficient_safety: f32) -> (&'static str, Mode) {
