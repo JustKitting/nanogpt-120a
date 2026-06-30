@@ -103,8 +103,7 @@ impl<'a, 'scratch> AdamUpdate<'a, 'scratch> {
             beta2_correction: 1.0 - ADAM_BETA2.powi(self.step as i32),
             eps: ADAM_EPS,
             average_coefficient: self.average_coefficient,
-        })?;
-        Ok(())
+        })
     }
 }
 

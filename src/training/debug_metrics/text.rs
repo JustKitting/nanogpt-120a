@@ -6,12 +6,6 @@ use burn::train::metric::{Metric, MetricMetadata, MetricName, SerializedEntry};
 use super::super::launch::{CudaLearningComponents, CudaTrainOutput};
 
 #[derive(Clone, Copy)]
-struct DebugTextMetricSpec {
-    name: &'static str,
-    field: DebugTextField,
-}
-
-#[derive(Clone, Copy)]
 enum DebugTextField {
     TokenEmbeddingHashBefore,
     TokenEmbeddingHashAfter,
@@ -25,20 +19,11 @@ const DEBUG_TEXT_FIELDS: &[DebugTextField] = &[
 ];
 
 impl DebugTextField {
-    const fn spec(self) -> DebugTextMetricSpec {
+    const fn name(self) -> &'static str {
         match self {
-            Self::TokenEmbeddingHashBefore => DebugTextMetricSpec {
-                name: "Diagnostic token embedding hash before",
-                field: self,
-            },
-            Self::TokenEmbeddingHashAfter => DebugTextMetricSpec {
-                name: "Diagnostic token embedding hash after",
-                field: self,
-            },
-            Self::TensorNames => DebugTextMetricSpec {
-                name: "Diagnostic tensor names",
-                field: self,
-            },
+            Self::TokenEmbeddingHashBefore => "Diagnostic token embedding hash before",
+            Self::TokenEmbeddingHashAfter => "Diagnostic token embedding hash after",
+            Self::TensorNames => "Diagnostic tensor names",
         }
     }
 
@@ -66,12 +51,12 @@ impl DebugTextField {
 
 #[derive(Clone)]
 struct CudaDebugTextMetric {
-    spec: DebugTextMetricSpec,
+    field: DebugTextField,
 }
 
 impl CudaDebugTextMetric {
-    fn new(spec: DebugTextMetricSpec) -> Self {
-        Self { spec }
+    fn new(field: DebugTextField) -> Self {
+        Self { field }
     }
 }
 
@@ -79,11 +64,11 @@ impl Metric for CudaDebugTextMetric {
     type Input = CudaTrainOutput;
 
     fn name(&self) -> MetricName {
-        Arc::new(self.spec.name.to_string())
+        Arc::new(self.field.name().to_string())
     }
 
     fn update(&mut self, item: &Self::Input, _metadata: &MetricMetadata) -> SerializedEntry {
-        let value = self.spec.field.value(item);
+        let value = self.field.value(item);
         SerializedEntry {
             formatted: value.clone(),
             serialized: value,
@@ -97,7 +82,7 @@ pub(super) fn register_text_metrics(
     mut training: SupervisedTraining<CudaLearningComponents>,
 ) -> SupervisedTraining<CudaLearningComponents> {
     for field in DEBUG_TEXT_FIELDS {
-        training = training.metric_train(CudaDebugTextMetric::new(field.spec()));
+        training = training.metric_train(CudaDebugTextMetric::new(*field));
     }
     training
 }
