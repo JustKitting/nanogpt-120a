@@ -5,6 +5,7 @@ pub mod final_head;
 mod layer_norm;
 mod mlp;
 mod model;
+mod residual;
 mod scratch_reborrow;
 
 pub use attention::{

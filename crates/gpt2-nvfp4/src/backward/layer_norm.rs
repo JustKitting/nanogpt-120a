@@ -65,27 +65,22 @@ pub fn layer_norm_backward_params(
 }
 
 pub fn layer_norm_backward(args: Gpt2LayerNormBackwardArgs<'_, '_>) -> Result<(), DriverError> {
-    let LayerNormGrads {
-        d_residual,
-        d_normalized,
-        d_weight,
-        d_bias,
-    } = args.grads;
+    let grads = args.grads;
 
     layer_norm_backward_params(Gpt2LayerNormBackwardParamArgs {
         stream: args.stream,
         module: args.module,
         saved: args.saved,
-        d_normalized,
-        d_weight,
-        d_bias,
+        d_normalized: &*grads.d_normalized,
+        d_weight: grads.d_weight,
+        d_bias: grads.d_bias,
     })?;
     layer_norm_backward_input(Gpt2LayerNormBackwardInputArgs {
         stream: args.stream,
         module: args.module,
         saved: args.saved,
         weights: args.weights,
-        d_normalized,
-        d_residual,
+        d_normalized: &*grads.d_normalized,
+        d_residual: grads.d_residual,
     })
 }
