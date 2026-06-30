@@ -15,6 +15,83 @@ const UNROLLED_ROW_STRIDE: u32 = PARAM_THREADS_PER_BLOCK * ROWS_PER_THREAD;
 pub(super) mod kernels {
     use super::*;
 
+    macro_rules! layer_norm_backward_params_body {
+        (
+            $residual_column:path;
+            $residual:ident $d_normalized:ident $mean:ident $inv_std:ident;
+            $d_weight:ident $d_bias:ident $row_count:ident $embedding_dim:ident
+        ) => {{
+            static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> =
+                SharedArray::UNINIT;
+
+            let col = thread::blockIdx_x();
+            let tid = thread::threadIdx_x();
+            let lane = warp::lane_id();
+            let warp_in_block = tid / WARP_SIZE;
+
+            if col < $embedding_dim {
+                let mut weight_local = 0.0f32;
+                let mut bias_local = 0.0f32;
+                let mut row = tid;
+
+                macro_rules! accumulate_param_grad {
+                    ($weight:ident, $bias:ident, $row:expr) => {{
+                        let row = $row;
+                        let offset = row as usize * $embedding_dim as usize + col as usize;
+                        let grad = $d_normalized[offset];
+                        let row_base = row as usize * $embedding_dim as usize;
+                        let xhat = ($residual_column($residual, row_base, col, $embedding_dim)
+                            - $mean[row as usize])
+                            * $inv_std[row as usize];
+                        $weight += grad * xhat;
+                        $bias += grad;
+                    }};
+                }
+
+                while row + PARAM_THREADS_PER_BLOCK * 3 < $row_count {
+                    accumulate_param_grad!(weight_local, bias_local, row);
+                    accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK);
+                    accumulate_param_grad!(
+                        weight_local,
+                        bias_local,
+                        row + PARAM_THREADS_PER_BLOCK * 2
+                    );
+                    accumulate_param_grad!(
+                        weight_local,
+                        bias_local,
+                        row + PARAM_THREADS_PER_BLOCK * 3
+                    );
+                    row += UNROLLED_ROW_STRIDE;
+                }
+
+                while row < $row_count {
+                    accumulate_param_grad!(weight_local, bias_local, row);
+                    row += PARAM_THREADS_PER_BLOCK;
+                }
+
+                let weight_sum = layer_norm_block_reduce!(
+                    WARP_SUMS,
+                    WARPS_PER_BLOCK,
+                    weight_local,
+                    lane,
+                    warp_in_block,
+                    warp_sum_f32
+                );
+                let bias_sum = layer_norm_block_reduce!(
+                    WARP_SUMS,
+                    WARPS_PER_BLOCK,
+                    bias_local,
+                    lane,
+                    warp_in_block,
+                    warp_sum_f32
+                );
+
+                layer_norm_store_row!(&mut $d_weight, col, lane, warp_in_block, weight_sum);
+                layer_norm_store_row!(&mut $d_bias, col, lane, warp_in_block, bias_sum);
+            }
+        }};
+    }
+
     #[kernel]
     #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn layer_norm_backward_params_kernel(
@@ -27,65 +104,11 @@ pub(super) mod kernels {
         row_count: u32,
         embedding_dim: u32,
     ) {
-        static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
-
-        let col = thread::blockIdx_x();
-        let tid = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = tid / WARP_SIZE;
-
-        if col < embedding_dim {
-            let mut weight_local = 0.0f32;
-            let mut bias_local = 0.0f32;
-            let mut row = tid;
-
-            macro_rules! accumulate_param_grad {
-                ($weight:ident, $bias:ident, $row:expr) => {{
-                    let row = $row;
-                    let offset = row as usize * embedding_dim as usize + col as usize;
-                    let grad = d_normalized[offset];
-                    let row_base = row as usize * embedding_dim as usize;
-                    let xhat = (f16_column(residual, row_base, col, embedding_dim)
-                        - mean[row as usize])
-                        * inv_std[row as usize];
-                    $weight += grad * xhat;
-                    $bias += grad;
-                }};
-            }
-
-            while row + PARAM_THREADS_PER_BLOCK * 3 < row_count {
-                accumulate_param_grad!(weight_local, bias_local, row);
-                accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK);
-                accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK * 2);
-                accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK * 3);
-                row += UNROLLED_ROW_STRIDE;
-            }
-
-            while row < row_count {
-                accumulate_param_grad!(weight_local, bias_local, row);
-                row += PARAM_THREADS_PER_BLOCK;
-            }
-
-            let weight_sum = layer_norm_block_reduce!(
-                WARP_SUMS,
-                WARPS_PER_BLOCK,
-                weight_local,
-                lane,
-                warp_in_block,
-                warp_sum_f32
-            );
-            let bias_sum = layer_norm_block_reduce!(
-                WARP_SUMS,
-                WARPS_PER_BLOCK,
-                bias_local,
-                lane,
-                warp_in_block,
-                warp_sum_f32
-            );
-
-            layer_norm_store_row!(&mut d_weight, col, lane, warp_in_block, weight_sum);
-            layer_norm_store_row!(&mut d_bias, col, lane, warp_in_block, bias_sum);
-        }
+        layer_norm_backward_params_body!(
+            f16_column;
+            residual d_normalized mean inv_std;
+            d_weight d_bias row_count embedding_dim
+        );
     }
 
     #[kernel]
@@ -100,64 +123,10 @@ pub(super) mod kernels {
         row_count: u32,
         embedding_dim: u32,
     ) {
-        static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
-
-        let col = thread::blockIdx_x();
-        let tid = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = tid / WARP_SIZE;
-
-        if col < embedding_dim {
-            let mut weight_local = 0.0f32;
-            let mut bias_local = 0.0f32;
-            let mut row = tid;
-
-            macro_rules! accumulate_param_grad {
-                ($weight:ident, $bias:ident, $row:expr) => {{
-                    let row = $row;
-                    let offset = row as usize * embedding_dim as usize + col as usize;
-                    let grad = d_normalized[offset];
-                    let row_base = row as usize * embedding_dim as usize;
-                    let xhat = (f32_column(residual, row_base, col, embedding_dim)
-                        - mean[row as usize])
-                        * inv_std[row as usize];
-                    $weight += grad * xhat;
-                    $bias += grad;
-                }};
-            }
-
-            while row + PARAM_THREADS_PER_BLOCK * 3 < row_count {
-                accumulate_param_grad!(weight_local, bias_local, row);
-                accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK);
-                accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK * 2);
-                accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK * 3);
-                row += UNROLLED_ROW_STRIDE;
-            }
-
-            while row < row_count {
-                accumulate_param_grad!(weight_local, bias_local, row);
-                row += PARAM_THREADS_PER_BLOCK;
-            }
-
-            let weight_sum = layer_norm_block_reduce!(
-                WARP_SUMS,
-                WARPS_PER_BLOCK,
-                weight_local,
-                lane,
-                warp_in_block,
-                warp_sum_f32
-            );
-            let bias_sum = layer_norm_block_reduce!(
-                WARP_SUMS,
-                WARPS_PER_BLOCK,
-                bias_local,
-                lane,
-                warp_in_block,
-                warp_sum_f32
-            );
-
-            layer_norm_store_row!(&mut d_weight, col, lane, warp_in_block, weight_sum);
-            layer_norm_store_row!(&mut d_bias, col, lane, warp_in_block, bias_sum);
-        }
+        layer_norm_backward_params_body!(
+            f32_column;
+            residual d_normalized mean inv_std;
+            d_weight d_bias row_count embedding_dim
+        );
     }
 }

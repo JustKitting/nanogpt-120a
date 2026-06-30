@@ -16,6 +16,71 @@ const WARPS_PER_BLOCK: u32 = THREADS_PER_BLOCK / WARP_SIZE;
 pub(super) mod kernels {
     use super::*;
 
+    macro_rules! layer_norm_backward_input_body {
+        (
+            $residual_column:path;
+            $residual:ident $d_normalized:ident $mean:ident $inv_std:ident;
+            $weight_bytes:ident $weight_scales:ident $weight_global_scale:ident;
+            $d_residual:ident $row_count:ident $embedding_dim:ident
+        ) => {{
+            static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> =
+                SharedArray::UNINIT;
+
+            let row = thread::blockIdx_x();
+            let thread = thread::threadIdx_x();
+            let lane = warp::lane_id();
+            let warp_in_block = thread / WARP_SIZE;
+
+            if row < $row_count {
+                let row_base = row as usize * $embedding_dim as usize;
+                let cols = layer_norm_columns3!(thread, THREADS_PER_BLOCK);
+                let row_mean = $mean[row as usize];
+                let row_inv_std = $inv_std[row as usize];
+                let xhat = layer_norm_map3!(cols, |col| {
+                    ($residual_column($residual, row_base, col, $embedding_dim) - row_mean)
+                        * row_inv_std
+                });
+                let dxhat = layer_norm_map3!(cols, |col| {
+                    let grad = f32_column($d_normalized, row_base, col, $embedding_dim);
+                    let weight = nvfp4_column(
+                        $weight_bytes,
+                        $weight_scales,
+                        $weight_global_scale[0],
+                        0,
+                        col,
+                        $embedding_dim,
+                    );
+                    grad * weight
+                });
+                let dxhat_sum = layer_norm_block_reduce!(
+                    WARP_SUMS,
+                    WARPS_PER_BLOCK,
+                    layer_norm_sum3!(dxhat),
+                    lane,
+                    warp_in_block,
+                    warp_sum_f32
+                );
+                let xhat_dxhat =
+                    layer_norm_map3_indexed!(xhat, |index, value| value * dxhat[index]);
+                let xhat_dxhat_sum = layer_norm_block_reduce!(
+                    WARP_SUMS,
+                    WARPS_PER_BLOCK,
+                    layer_norm_sum3!(xhat_dxhat),
+                    lane,
+                    warp_in_block,
+                    warp_sum_f32
+                );
+                let inv_dim = 1.0 / $embedding_dim as f32;
+                let dx = layer_norm_map3_indexed!(dxhat, |index, value| {
+                    (value - dxhat_sum * inv_dim - xhat[index] * xhat_dxhat_sum * inv_dim)
+                        * row_inv_std
+                });
+
+                layer_norm_store3!(&mut $d_residual, row_base, cols, $embedding_dim, dx);
+            }
+        }};
+    }
+
     #[kernel]
     #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn layer_norm_backward_input_kernel(
@@ -30,57 +95,12 @@ pub(super) mod kernels {
         row_count: u32,
         embedding_dim: u32,
     ) {
-        static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
-
-        let row = thread::blockIdx_x();
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / WARP_SIZE;
-
-        if row < row_count {
-            let row_base = row as usize * embedding_dim as usize;
-            let cols = layer_norm_columns3!(thread, THREADS_PER_BLOCK);
-            let row_mean = mean[row as usize];
-            let row_inv_std = inv_std[row as usize];
-            let xhat = layer_norm_map3!(cols, |col| {
-                (f16_column(residual, row_base, col, embedding_dim) - row_mean) * row_inv_std
-            });
-            let dxhat = layer_norm_map3!(cols, |col| {
-                let grad = f32_column(d_normalized, row_base, col, embedding_dim);
-                let weight = nvfp4_column(
-                    weight_bytes,
-                    weight_scales,
-                    weight_global_scale[0],
-                    0,
-                    col,
-                    embedding_dim,
-                );
-                grad * weight
-            });
-            let dxhat_sum = layer_norm_block_reduce!(
-                WARP_SUMS,
-                WARPS_PER_BLOCK,
-                layer_norm_sum3!(dxhat),
-                lane,
-                warp_in_block,
-                warp_sum_f32
-            );
-            let xhat_dxhat = layer_norm_map3_indexed!(xhat, |index, value| value * dxhat[index]);
-            let xhat_dxhat_sum = layer_norm_block_reduce!(
-                WARP_SUMS,
-                WARPS_PER_BLOCK,
-                layer_norm_sum3!(xhat_dxhat),
-                lane,
-                warp_in_block,
-                warp_sum_f32
-            );
-            let inv_dim = 1.0 / embedding_dim as f32;
-            let dx = layer_norm_map3_indexed!(dxhat, |index, value| {
-                (value - dxhat_sum * inv_dim - xhat[index] * xhat_dxhat_sum * inv_dim) * row_inv_std
-            });
-
-            layer_norm_store3!(&mut d_residual, row_base, cols, embedding_dim, dx);
-        }
+        layer_norm_backward_input_body!(
+            f16_column;
+            residual d_normalized mean inv_std;
+            weight_bytes weight_scales weight_global_scale;
+            d_residual row_count embedding_dim
+        );
     }
 
     #[kernel]
@@ -97,56 +117,11 @@ pub(super) mod kernels {
         row_count: u32,
         embedding_dim: u32,
     ) {
-        static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
-
-        let row = thread::blockIdx_x();
-        let thread = thread::threadIdx_x();
-        let lane = warp::lane_id();
-        let warp_in_block = thread / WARP_SIZE;
-
-        if row < row_count {
-            let row_base = row as usize * embedding_dim as usize;
-            let cols = layer_norm_columns3!(thread, THREADS_PER_BLOCK);
-            let row_mean = mean[row as usize];
-            let row_inv_std = inv_std[row as usize];
-            let xhat = layer_norm_map3!(cols, |col| {
-                (f32_column(residual, row_base, col, embedding_dim) - row_mean) * row_inv_std
-            });
-            let dxhat = layer_norm_map3!(cols, |col| {
-                let grad = f32_column(d_normalized, row_base, col, embedding_dim);
-                let weight = nvfp4_column(
-                    weight_bytes,
-                    weight_scales,
-                    weight_global_scale[0],
-                    0,
-                    col,
-                    embedding_dim,
-                );
-                grad * weight
-            });
-            let dxhat_sum = layer_norm_block_reduce!(
-                WARP_SUMS,
-                WARPS_PER_BLOCK,
-                layer_norm_sum3!(dxhat),
-                lane,
-                warp_in_block,
-                warp_sum_f32
-            );
-            let xhat_dxhat = layer_norm_map3_indexed!(xhat, |index, value| value * dxhat[index]);
-            let xhat_dxhat_sum = layer_norm_block_reduce!(
-                WARP_SUMS,
-                WARPS_PER_BLOCK,
-                layer_norm_sum3!(xhat_dxhat),
-                lane,
-                warp_in_block,
-                warp_sum_f32
-            );
-            let inv_dim = 1.0 / embedding_dim as f32;
-            let dx = layer_norm_map3_indexed!(dxhat, |index, value| {
-                (value - dxhat_sum * inv_dim - xhat[index] * xhat_dxhat_sum * inv_dim) * row_inv_std
-            });
-
-            layer_norm_store3!(&mut d_residual, row_base, cols, embedding_dim, dx);
-        }
+        layer_norm_backward_input_body!(
+            f32_column;
+            residual d_normalized mean inv_std;
+            weight_bytes weight_scales weight_global_scale;
+            d_residual row_count embedding_dim
+        );
     }
 }
