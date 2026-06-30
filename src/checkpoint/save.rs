@@ -4,7 +4,7 @@ use std::path::Path;
 
 use cuda_core::CudaStream;
 
-use super::format::CheckpointWriter;
+use super::{format::CheckpointWriter, schema};
 use crate::AppResult;
 use crate::upload::{
     UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4,
@@ -20,7 +20,7 @@ pub fn save_uploaded_model(stream: &CudaStream, model: &UploadedModel, path: &Pa
 
     let file = File::create(path)?;
     let mut writer = CheckpointWriter::new(BufWriter::new(file));
-    writer.write_header(tensor_count(model))?;
+    writer.write_header(schema::tensor_count(model.blocks.len()))?;
     write_tensor(
         &mut writer,
         stream,
@@ -133,8 +133,4 @@ fn write_tensor(
         &tensor.bytes.to_host_vec(stream)?,
         &tensor.scales.to_host_vec(stream)?,
     )
-}
-
-fn tensor_count(model: &UploadedModel) -> u32 {
-    1 + 2 + 8 + model.blocks.len() as u32 * 12
 }

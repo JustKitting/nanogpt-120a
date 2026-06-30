@@ -6,7 +6,10 @@ use std::path::Path;
 use cuda_core::{CudaStream, DeviceBuffer};
 use gpt2_nvfp4::GPT2_N_LAYER;
 
-use super::format::{CheckpointReader, CheckpointTensor};
+use super::{
+    format::{CheckpointReader, CheckpointTensor},
+    schema,
+};
 use crate::AppResult;
 use crate::upload::{
     UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4,
@@ -16,10 +19,10 @@ pub fn load_uploaded_model(stream: &CudaStream, path: &Path) -> AppResult<Upload
     let file = File::open(path)?;
     let mut reader = CheckpointReader::new(BufReader::new(file));
     let tensor_count = reader.read_header()?;
-    if tensor_count != expected_tensor_count() {
+    let expected_tensor_count = schema::tensor_count(GPT2_N_LAYER);
+    if tensor_count != expected_tensor_count {
         return Err(format!(
-            "checkpoint has {tensor_count} tensors; expected {}",
-            expected_tensor_count()
+            "checkpoint has {tensor_count} tensors; expected {expected_tensor_count}",
         )
         .into());
     }
@@ -38,10 +41,6 @@ pub fn load_uploaded_model(stream: &CudaStream, path: &Path) -> AppResult<Upload
         ln_f: load_layer_norm(stream, &mut tensors, "ln_f")?,
         next_latent: load_next_latent(stream, &mut tensors)?,
     })
-}
-
-fn expected_tensor_count() -> u32 {
-    1 + 2 + 8 + GPT2_N_LAYER as u32 * 12
 }
 
 fn load_blocks(
