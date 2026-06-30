@@ -3,6 +3,22 @@ use crate::polar_reference::round_f16_to_f32;
 
 pub use crate::polar_reference::{cosine, max_abs_error, relative_l2};
 
+pub fn error_metrics(actual: &[f32], expected: &[f32]) -> (f32, f32, f32) {
+    (
+        cosine(actual, expected),
+        relative_l2(actual, expected),
+        max_abs_error(actual, expected),
+    )
+}
+
+pub fn finite_error_metrics(actual: &[f32], expected: &[f32], finite: bool) -> (f32, f32, f32) {
+    if finite {
+        error_metrics(actual, expected)
+    } else {
+        (cosine(actual, expected), f32::INFINITY, f32::INFINITY)
+    }
+}
+
 pub fn gradient(rows: usize, cols: usize) -> Vec<f32> {
     (0..rows * cols)
         .map(|i| ((i % 41) as f32 - 20.0) * 0.0007 + ((i / cols) as f32) * 0.00003)

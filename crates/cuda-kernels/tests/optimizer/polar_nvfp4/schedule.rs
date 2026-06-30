@@ -228,21 +228,14 @@ pub(super) fn evaluate_mode(
         mode,
     )?;
     let finite = actual.iter().all(|value| value.is_finite());
+    let (cosine, rel_l2, max_abs) = math::finite_error_metrics(&actual, eval.expected, finite);
     Ok(ScheduleResult {
         name: name.to_owned(),
         schedule,
         finite,
-        cosine: math::cosine(&actual, eval.expected),
-        rel_l2: if finite {
-            math::relative_l2(&actual, eval.expected)
-        } else {
-            f32::INFINITY
-        },
-        max_abs: if finite {
-            math::max_abs_error(&actual, eval.expected)
-        } else {
-            f32::INFINITY
-        },
+        cosine,
+        rel_l2,
+        max_abs,
         nvfp4_grams: stats.nvfp4_gram_count,
         hi_grams: stats.high_precision_gram_count,
         rejected: stats.rejected_stale_steps,
