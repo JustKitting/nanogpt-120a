@@ -1,4 +1,5 @@
 mod checkpoint;
+mod fs_utils;
 mod training;
 mod upload;
 

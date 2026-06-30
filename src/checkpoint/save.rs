@@ -1,23 +1,17 @@
-use std::fs::{File, create_dir_all};
+use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 
 use cuda_core::CudaStream;
 
 use super::{format::CheckpointWriter, schema};
-use crate::AppResult;
 use crate::upload::{
     UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4,
 };
+use crate::{AppResult, fs_utils::ensure_parent};
 
 pub fn save_uploaded_model(stream: &CudaStream, model: &UploadedModel, path: &Path) -> AppResult {
-    if let Some(parent) = path
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-    {
-        create_dir_all(parent)?;
-    }
-
+    ensure_parent(path)?;
     let file = File::create(path)?;
     let mut writer = CheckpointWriter::new(BufWriter::new(file));
     writer.write_header(schema::tensor_count(model.blocks.len()))?;

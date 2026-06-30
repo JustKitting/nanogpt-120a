@@ -1,20 +1,8 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use time::OffsetDateTime;
 
-use crate::AppResult;
-
 const RUNS_DIR: &str = "target/runs";
-
-pub(in crate::training::launch) fn ensure_parent(path: &Path) -> AppResult {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    Ok(())
-}
 
 pub(super) fn default_run_dir(dataset: &str, label: &str) -> PathBuf {
     PathBuf::from(RUNS_DIR).join(format!(

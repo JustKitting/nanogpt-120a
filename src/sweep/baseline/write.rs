@@ -5,14 +5,12 @@ use std::{
 };
 
 use super::record::Record;
+use crate::fs_utils::ensure_parent;
 
 const DEFAULT_SEQ_LEN: usize = 4096;
 
 pub(super) fn record(path: &Path, record: &Record) -> io::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
+    ensure_parent(path)?;
     let mut file = fs::File::create(path)?;
     writeln!(file, "VAL_LOSS={:.6}", record.val_loss)?;
     if let Some(steps) = record.completed_steps {

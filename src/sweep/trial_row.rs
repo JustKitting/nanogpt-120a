@@ -5,6 +5,7 @@ use std::{
 };
 
 use super::history::Trial;
+use crate::fs_utils::ensure_parent;
 
 mod format;
 mod parse;
@@ -22,9 +23,7 @@ pub fn read_trials(path: &Path) -> Vec<Trial> {
 }
 
 pub fn append(path: &Path, trial: &Trial) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
+    ensure_parent(path)?;
     let new_file = !path.exists();
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
     if new_file {

@@ -7,9 +7,9 @@ use crate::AppResult;
 mod info;
 mod paths;
 
+pub(super) use crate::fs_utils::ensure_parent;
 pub(super) use info::build_run_info;
 use paths::default_run_dir;
-pub(super) use paths::ensure_parent;
 
 #[derive(Clone)]
 pub(super) struct RunOutput {
