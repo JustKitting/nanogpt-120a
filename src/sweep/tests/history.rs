@@ -54,7 +54,7 @@ fn syncs_local_real_trials_to_shared_history_once() {
     let mut shared = History::load(path.clone()).unwrap();
     let trial = trial("success", Some(4.2), candidate(8, 4, 1.0));
 
-    chain::sync_shared_history(&mut shared, &[trial.clone()], false).unwrap();
+    chain::sync_shared_history(&mut shared, std::slice::from_ref(&trial), false).unwrap();
     chain::sync_shared_history(&mut shared, &[trial], false).unwrap();
 
     let persisted = trial_row::read_trials(&path);

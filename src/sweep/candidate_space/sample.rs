@@ -31,7 +31,9 @@ pub(in crate::sweep) fn random(rng: &mut SweepRng) -> Candidate {
 pub(in crate::sweep) fn valid_aurora_phases(slots: usize, blocks: usize) -> Vec<usize> {
     AURORA_PHASES
         .into_iter()
-        .filter(|phase| slots % phase == 0 && cooperative_blocks(slots, *phase, blocks) <= 360)
+        .filter(|phase| {
+            slots.is_multiple_of(*phase) && cooperative_blocks(slots, *phase, blocks) <= 360
+        })
         .collect()
 }
 

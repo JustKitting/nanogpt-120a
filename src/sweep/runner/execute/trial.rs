@@ -51,12 +51,8 @@ pub(in crate::sweep::runner) fn run_trial(
         return Ok(trial_with_log(
             candidate,
             "rejected_screen",
-            None,
-            screen_result.completed_steps,
-            screen_result.last_elapsed_s,
-            screen_result.val_loss,
-            screen_result.completed_steps,
-            screen_result.last_elapsed_s,
+            RunResult::default(),
+            screen_result,
             Some(screen_decision.reason),
             trial_dir,
             "screen.log",
@@ -75,12 +71,8 @@ pub(in crate::sweep::runner) fn run_trial(
     Ok(trial(
         candidate,
         status_name,
-        run_result.val_loss,
-        run_result.completed_steps,
-        run_result.last_elapsed_s,
-        screen_result.val_loss,
-        screen_result.completed_steps,
-        screen_result.last_elapsed_s,
+        run_result,
+        screen_result,
         Some(screen_decision.reason),
         trial_dir,
     ))
@@ -88,6 +80,11 @@ pub(in crate::sweep::runner) fn run_trial(
 
 fn empty_trial(candidate: Candidate, status: &'static str, trial_dir: &Path) -> Trial {
     trial(
-        candidate, status, None, None, None, None, None, None, None, trial_dir,
+        candidate,
+        status,
+        RunResult::default(),
+        RunResult::default(),
+        None,
+        trial_dir,
     )
 }

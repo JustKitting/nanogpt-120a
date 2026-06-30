@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::sweep::candidate::Candidate;
 use crate::sweep::history::Trial;
+use crate::sweep::parse::RunResult;
 
 #[cfg(test)]
 mod tests;
@@ -17,24 +18,16 @@ pub(super) fn current_baseline_trial(
 pub(super) fn trial(
     candidate: Candidate,
     status: &str,
-    val_loss: Option<f64>,
-    completed_steps: Option<usize>,
-    elapsed_s: Option<f64>,
-    screen_val_loss: Option<f64>,
-    screen_completed_steps: Option<usize>,
-    screen_elapsed_s: Option<f64>,
+    train: RunResult,
+    screen: RunResult,
     screen_reason: Option<&str>,
     trial_dir: &Path,
 ) -> Trial {
     trial_with_log(
         candidate,
         status,
-        val_loss,
-        completed_steps,
-        elapsed_s,
-        screen_val_loss,
-        screen_completed_steps,
-        screen_elapsed_s,
+        train,
+        screen,
         screen_reason,
         trial_dir,
         "train.log",
@@ -44,12 +37,8 @@ pub(super) fn trial(
 pub(super) fn trial_with_log(
     candidate: Candidate,
     status: &str,
-    val_loss: Option<f64>,
-    completed_steps: Option<usize>,
-    elapsed_s: Option<f64>,
-    screen_val_loss: Option<f64>,
-    screen_completed_steps: Option<usize>,
-    screen_elapsed_s: Option<f64>,
+    train: RunResult,
+    screen: RunResult,
     screen_reason: Option<&str>,
     trial_dir: &Path,
     log_name: &str,
@@ -57,13 +46,13 @@ pub(super) fn trial_with_log(
     Trial {
         candidate,
         status: status.to_string(),
-        val_loss,
-        completed_steps,
+        val_loss: train.val_loss,
+        completed_steps: train.completed_steps,
         log_path: PathBuf::from(trial_dir).join(log_name),
-        elapsed_s,
-        screen_val_loss,
-        screen_completed_steps,
-        screen_elapsed_s,
+        elapsed_s: train.last_elapsed_s,
+        screen_val_loss: screen.val_loss,
+        screen_completed_steps: screen.completed_steps,
+        screen_elapsed_s: screen.last_elapsed_s,
         screen_reason: screen_reason.map(ToString::to_string),
     }
 }

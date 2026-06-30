@@ -23,12 +23,12 @@ pub const NEXTLAT_HIDDEN: usize = NEXTLAT_INPUT;
 pub const KIMI_FULL_ATTENTION_PERIOD: usize = 4;
 
 const fn align_up(value: usize, alignment: usize) -> usize {
-    ((value + alignment - 1) / alignment) * alignment
+    value.div_ceil(alignment) * alignment
 }
 
 const fn align_kda_qkv(value: usize) -> usize {
     let mut aligned = align_up(value, 32);
-    while align_up(aligned, 64) % 128 != 0 {
+    while !align_up(aligned, 64).is_multiple_of(128) {
         aligned += 32;
     }
     aligned

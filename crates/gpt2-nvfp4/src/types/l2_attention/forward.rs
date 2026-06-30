@@ -22,8 +22,8 @@ pub(super) fn forward<'a, 'scratch>(
     input_nvfp4.quantize_precomputed_amax(
         args.quant_module,
         hidden.stream,
-        &mut *hidden.normalized,
-        &mut *hidden.normalized_amax,
+        &*hidden.normalized,
+        &*hidden.normalized_amax,
         hidden.row_count,
         crate::GPT2_N_EMBD as u32,
     )?;
@@ -92,7 +92,7 @@ pub(super) fn forward<'a, 'scratch>(
         args.quant_module,
         hidden.stream,
         input_nvfp4.reborrow(),
-        &mut *hidden.normalized,
+        &*hidden.normalized,
         &mut *hidden.normalized_amax,
         hidden.row_count,
     )?;

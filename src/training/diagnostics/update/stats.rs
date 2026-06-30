@@ -78,21 +78,14 @@ pub(super) fn tensor_update_stats(
     let delta_rms = rms(delta_sum_sq, len);
     let predicted_delta_rms = rms(predicted_delta_sum_sq, len);
     let quant_error_rms = rms(quant_error_sum_sq, len);
-    let update_to_weight_rms = (weight_rms_before > 0.0)
-        .then_some(delta_rms / weight_rms_before)
-        .unwrap_or(0.0);
-    let quant_error_to_predicted_delta_rms = (predicted_delta_rms > 0.0)
-        .then_some(quant_error_rms / predicted_delta_rms)
-        .unwrap_or(0.0);
-    let delta_grad_cos = (grad_sum_sq > 0.0 && delta_sum_sq > 0.0)
-        .then_some((grad_dot_delta / (grad_sum_sq.sqrt() * delta_sum_sq.sqrt())) as f32)
-        .unwrap_or(0.0);
-    let predicted_delta_grad_cos = (grad_sum_sq > 0.0 && predicted_delta_sum_sq > 0.0)
-        .then_some(
-            (grad_dot_predicted_delta / (grad_sum_sq.sqrt() * predicted_delta_sum_sq.sqrt()))
-                as f32,
-        )
-        .unwrap_or(0.0);
+    let update_to_weight_rms = ratio_or_zero(delta_rms, weight_rms_before);
+    let quant_error_to_predicted_delta_rms = ratio_or_zero(quant_error_rms, predicted_delta_rms);
+    let delta_grad_cos = cosine_or_zero(grad_dot_delta, grad_sum_sq, delta_sum_sq);
+    let predicted_delta_grad_cos = cosine_or_zero(
+        grad_dot_predicted_delta,
+        grad_sum_sq,
+        predicted_delta_sum_sq,
+    );
 
     TensorUpdateDiagnostics {
         name: pending.name,
@@ -122,4 +115,20 @@ pub(super) fn tensor_update_stats(
 
 fn rms(sum_sq: f64, len: f64) -> f32 {
     (sum_sq / len).sqrt() as f32
+}
+
+fn ratio_or_zero(numerator: f32, denominator: f32) -> f32 {
+    if denominator > 0.0 {
+        numerator / denominator
+    } else {
+        0.0
+    }
+}
+
+fn cosine_or_zero(dot: f64, lhs_sum_sq: f64, rhs_sum_sq: f64) -> f32 {
+    if lhs_sum_sq > 0.0 && rhs_sum_sq > 0.0 {
+        (dot / (lhs_sum_sq.sqrt() * rhs_sum_sq.sqrt())) as f32
+    } else {
+        0.0
+    }
 }
