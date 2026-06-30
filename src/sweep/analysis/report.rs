@@ -1,6 +1,6 @@
 use std::{fs, io, path::Path};
 
-use super::{super::config::SweepConfig, SweepAnalysis, beliefs};
+use super::{super::config::SweepConfig, SweepAnalysis, beliefs, regression::Effect};
 
 pub fn write(sweep_dir: &Path, analysis: &SweepAnalysis, config: &SweepConfig) -> io::Result<()> {
     fs::write(sweep_dir.join("analysis_summary.md"), summary(analysis))?;
@@ -43,14 +43,7 @@ fn response_summary(text: &mut String, response: &super::ResponseModel) {
         response.model.best_value,
         response.model.best_standard_score
     ));
-    text.push_str("| factor | coefficient | stderr | t | p_positive |\n");
-    text.push_str("|---|---:|---:|---:|---:|\n");
-    for effect in response.model.effects.iter().take(12) {
-        text.push_str(&format!(
-            "| {} | {:.6} | {:.6} | {:.3} | {:.3} |\n",
-            effect.name, effect.coefficient, effect.stderr, effect.t, effect.p_positive
-        ));
-    }
+    effect_markdown_table(text, "factor", response.model.effects.iter().take(12));
     text.push('\n');
     interaction_summary(text, response);
 }
@@ -68,44 +61,47 @@ fn interaction_summary(text: &mut String, response: &super::ResponseModel) {
     }
 
     text.push_str("Top pairwise standardized product effects:\n\n");
-    text.push_str("| interaction | coefficient | stderr | t | p_positive |\n");
+    effect_markdown_table(text, "interaction", interactions.into_iter());
+    text.push('\n');
+}
+
+fn effect_markdown_table<'a>(
+    text: &mut String,
+    column: &str,
+    effects: impl Iterator<Item = &'a Effect>,
+) {
+    text.push_str(&format!(
+        "| {column} | coefficient | stderr | t | p_positive |\n"
+    ));
     text.push_str("|---|---:|---:|---:|---:|\n");
-    for effect in interactions {
+    for effect in effects {
         text.push_str(&format!(
             "| {} | {:.6} | {:.6} | {:.3} | {:.3} |\n",
             effect.name, effect.coefficient, effect.stderr, effect.t, effect.p_positive
         ));
     }
-    text.push('\n');
 }
 
 fn effects_tsv(analysis: &SweepAnalysis) -> String {
-    let mut text = String::from("response\tn\tfactor\tcoefficient\tstderr\tt\tp_positive\n");
-    for response in &analysis.models {
-        for effect in &response.model.effects {
-            text.push_str(&format!(
-                "{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
-                response.name,
-                response.model.n,
-                effect.name,
-                effect.coefficient,
-                effect.stderr,
-                effect.t,
-                effect.p_positive
-            ));
-        }
-    }
-    text
+    filtered_effects_tsv(analysis, "factor", |_| true)
 }
 
 fn interactions_tsv(analysis: &SweepAnalysis) -> String {
-    let mut text = String::from("response\tn\tinteraction\tcoefficient\tstderr\tt\tp_positive\n");
+    filtered_effects_tsv(analysis, "interaction", |effect| effect.name.contains('*'))
+}
+
+fn filtered_effects_tsv(
+    analysis: &SweepAnalysis,
+    value_column: &str,
+    include: impl Fn(&Effect) -> bool,
+) -> String {
+    let mut text = format!("response\tn\t{value_column}\tcoefficient\tstderr\tt\tp_positive\n");
     for response in &analysis.models {
         for effect in response
             .model
             .effects
             .iter()
-            .filter(|effect| effect.name.contains('*'))
+            .filter(|effect| include(effect))
         {
             text.push_str(&format!(
                 "{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
