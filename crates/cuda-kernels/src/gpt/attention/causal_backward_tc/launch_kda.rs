@@ -1,10 +1,10 @@
 use cuda_core::DriverError;
 
 use super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
-use super::launch_config::linear_config;
 use super::types::{CausalAttentionBackwardTcArgs, CausalAttentionBackwardTcScratch};
 use crate::attention::{AttentionModule, CausalAttentionParams};
 use crate::kda_launch::{self, KDA_HEAD_DIM};
+use crate::launch::{grid_x_config, linear_config};
 
 impl AttentionModule {
     pub fn kda_attention_backward_tc(
@@ -75,12 +75,12 @@ impl AttentionModule {
         let bwd = &self.causal_attention_backward_tc;
         let fwd = &self.causal_attention_tc;
         let threads = TC_BACKWARD_THREADS_PER_BLOCK;
-        let batch_cfg = kda_launch::batch_head_config(dims.batch_head, threads);
+        let batch_cfg = grid_x_config(dims.batch_head, threads);
         let chunk_cfg = kda_launch::chunk_dim_config(dims.batch_head, dims.chunks, threads);
-        let matrix_cfg = kda_launch::matrix_config(dims.chunk_batch, threads);
+        let matrix_cfg = grid_x_config(dims.chunk_batch, threads);
         macro_rules! bwd_linear {
             ($kernel:ident, $n:expr; $($arg:expr),* $(,)?) => {
-                bwd.$kernel(stream, linear_config($n), $($arg,)* params)?;
+                bwd.$kernel(stream, linear_config($n, threads), $($arg,)* params)?;
             };
         }
         macro_rules! bwd_chunk {
@@ -95,7 +95,7 @@ impl AttentionModule {
         }
         macro_rules! fwd_linear {
             ($kernel:ident, $n:expr; $($arg:expr),* $(,)?) => {
-                fwd.$kernel(stream, linear_config($n), $($arg,)* params)?;
+                fwd.$kernel(stream, linear_config($n, threads), $($arg,)* params)?;
             };
         }
         macro_rules! fwd_matrix {

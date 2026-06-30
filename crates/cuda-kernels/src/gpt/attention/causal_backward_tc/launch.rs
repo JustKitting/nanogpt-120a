@@ -1,11 +1,13 @@
 use cuda_core::DriverError;
 
-use super::launch_config::{attention_config, linear_config};
+use super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
+use super::launch_config::attention_config;
 use super::launch_grads::run_grad_matmuls;
 use super::launch_scores::run_pair_scores;
 use super::matmul::AttentionTcMatmulContext;
 use super::types::CausalAttentionBackwardTcArgs;
 use crate::attention::{AttentionModule, CausalAttentionParams};
+use crate::launch::linear_config;
 
 impl AttentionModule {
     pub fn causal_attention_backward_tc(
@@ -48,6 +50,7 @@ impl AttentionModule {
             head_dim,
         };
         let mut scratch = scratch;
+        let linear = |n| linear_config(n, TC_BACKWARD_THREADS_PER_BLOCK);
 
         self.causal_attention_backward_tc.softmax_d_f16_kernel(
             stream,
@@ -59,7 +62,7 @@ impl AttentionModule {
         )?;
         self.causal_attention_backward_tc.gather_qkv_dout_kernel(
             stream,
-            linear_config(batch_head * seq_len * head_dim),
+            linear(batch_head * seq_len * head_dim),
             qkv,
             d_out,
             scratch.q,
@@ -71,7 +74,7 @@ impl AttentionModule {
         run_pair_scores(&tc_ctx, &mut scratch)?;
         self.causal_attention_backward_tc.attention_prob_ds_kernel(
             stream,
-            linear_config(batch_head * seq_len * seq_len),
+            linear(batch_head * seq_len * seq_len),
             scratch.scores,
             scratch.dot,
             log_sum_exp,
@@ -83,7 +86,7 @@ impl AttentionModule {
         run_grad_matmuls(&tc_ctx, &mut scratch)?;
         self.causal_attention_backward_tc.scatter_dqkv_kernel(
             stream,
-            linear_config(batch_head * seq_len * head_dim),
+            linear(batch_head * seq_len * head_dim),
             scratch.d_q,
             scratch.d_k,
             scratch.d_v,

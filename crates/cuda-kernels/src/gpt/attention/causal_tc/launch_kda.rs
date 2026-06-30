@@ -5,6 +5,7 @@ use super::types::CausalAttentionTcArgs;
 use crate::attention::{AttentionModule, CausalAttentionParams};
 use crate::f16_tc_matmul::F16ConvertArgs;
 use crate::kda_launch::{self, KDA_HEAD_DIM};
+use crate::launch::{grid_x_config, linear_config};
 
 impl AttentionModule {
     pub fn kda_attention_tc(
@@ -36,10 +37,10 @@ impl AttentionModule {
         let kda = &self.causal_attention_tc;
         let stream = args.stream;
         let threads = TC_FORWARD_THREADS_PER_BLOCK;
-        let linear = |n| kda_launch::linear_config(n, threads);
-        let batch_cfg = kda_launch::batch_head_config(dims.batch_head, threads);
+        let linear = |n| linear_config(n, threads);
+        let batch_cfg = grid_x_config(dims.batch_head, threads);
         let chunk_cfg = kda_launch::chunk_dim_config(dims.batch_head, dims.chunks, threads);
-        let matrix_cfg = kda_launch::matrix_config(dims.chunk_batch, threads);
+        let matrix_cfg = grid_x_config(dims.chunk_batch, threads);
         macro_rules! kda_linear {
             ($kernel:ident, $n:expr; $($arg:expr),* $(,)?) => {
                 kda.$kernel(stream, linear($n), $($arg,)* params)?;
