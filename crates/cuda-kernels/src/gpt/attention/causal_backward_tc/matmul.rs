@@ -1,3 +1,5 @@
+#![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use crate::f16_tc_matmul::{
@@ -13,7 +15,6 @@ pub(super) struct AttentionTcMatmulContext<'a> {
     pub head_dim: u32,
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn run_tc_matmul(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,
@@ -37,7 +38,6 @@ pub(super) fn run_tc_matmul(
     })
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn run_tc_matmul_rhs(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,
@@ -61,7 +61,6 @@ pub(super) fn run_tc_matmul_rhs(
     })
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn run_tc_matmul_a_transposed_rhs(
     stream: &CudaStream,
     tc_module: &F16TcMatmulModule,

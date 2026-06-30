@@ -1,3 +1,5 @@
+#![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+
 use cuda_device::{SharedArray, thread};
 
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_M, CtaTile};
@@ -28,7 +30,6 @@ pub(crate) fn run_symmetric_tiles(
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(crate) fn run_symmetric_polynomial_tiles(
     source: *const f32,
     base: *const f32,
@@ -69,7 +70,6 @@ fn upper_triangle_tile(index: u32, tile_dim: u32) -> (u32, u32) {
     (row, col)
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 fn run_tile(
     source: *const f32,
     out: *mut f32,
@@ -95,7 +95,6 @@ fn run_tile(
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 fn run_polynomial_tile(
     source: *const f32,
     base: *const f32,

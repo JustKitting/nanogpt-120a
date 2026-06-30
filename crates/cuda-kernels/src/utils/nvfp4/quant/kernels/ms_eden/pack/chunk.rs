@@ -1,3 +1,5 @@
+#![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+
 use cuda_device::{DisjointSlice, thread, warp};
 
 use crate::float_ptx::abs_f32;
@@ -7,7 +9,6 @@ use super::super::{AMAX_WARPS_PER_BLOCK, HADAMARD_DIM};
 use super::hadamard::hadamard_transform_lane;
 use super::payload::ms_eden_pack_payload;
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub(in super::super) fn ms_eden_pack_chunk(
     input: f32,
@@ -42,7 +43,6 @@ pub(in super::super) fn ms_eden_pack_chunk(
     );
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub(in super::super) fn ms_eden_pack_chunk_no_chunk_amax(
     input: f32,
@@ -68,7 +68,6 @@ pub(in super::super) fn ms_eden_pack_chunk_no_chunk_amax(
     );
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub(in super::super) fn ms_eden_pack_chunk_no_chunk_amax_row(
     input: f32,

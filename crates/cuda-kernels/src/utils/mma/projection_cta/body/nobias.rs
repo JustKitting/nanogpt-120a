@@ -1,3 +1,5 @@
+#![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+
 use cuda_device::{DisjointSlice, SharedArray, thread};
 
 use crate::mma::projection::Nvfp4ProjectionParams;
@@ -12,7 +14,6 @@ use crate::mma::projection_cta::tile::{
 
 macro_rules! nobias_body_at_fn {
     ($name:ident, $accumulator:ident, $store:ident) => {
-        #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
         pub fn $name(
             input_bytes: &[u8],
             input_scales: &[u8],
@@ -45,7 +46,6 @@ macro_rules! nobias_body_at_fn {
     };
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn nvfp4_projection_cta_nobias_kernel_body(
     input_bytes: &[u8],
     input_scales: &[u8],
@@ -92,7 +92,6 @@ nobias_body_at_fn!(
     store_accumulator_aligned
 );
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
     input_bytes: &[u8],
     input_scales: &[u8],

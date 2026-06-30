@@ -1,3 +1,5 @@
+#![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+
 use cuda_device::{DisjointSlice, warp};
 
 use super::HADAMARD_DIM;
@@ -11,7 +13,6 @@ use super::pack::{
 
 macro_rules! ms_eden_padded_body {
     ($name:ident, $input_fn:ident, [$($input_arg:ident),+], $dst_row_len:ident, chunk_amax) => {
-        #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
         #[inline(always)]
         pub(super) fn $name(
             x: &[f32],
@@ -45,7 +46,6 @@ macro_rules! ms_eden_padded_body {
         }
     };
     ($name:ident, $input_fn:ident, [$($input_arg:ident),+], $dst_row_len:ident, no_chunk_amax) => {
-        #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
         #[inline(always)]
         pub(super) fn $name(
             x: &[f32],
@@ -80,7 +80,6 @@ macro_rules! ms_eden_padded_body {
 
 macro_rules! ms_eden_row_body {
     ($name:ident, $input_fn:ident, $row_len_arg:ident, $chunks_arg:ident) => {
-        #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
         #[inline(always)]
         pub(super) fn $name(
             x: &[f32],

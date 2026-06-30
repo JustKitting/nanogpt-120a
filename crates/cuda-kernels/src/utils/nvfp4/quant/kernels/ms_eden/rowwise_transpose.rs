@@ -13,12 +13,12 @@ use super::pack::{
 use super::random::random_sign;
 use super::transpose_kernels::pack_padded_transpose_chunk;
 
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 pub(crate) mod module {
     use super::*;
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -54,7 +54,6 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -84,7 +83,6 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -112,7 +110,6 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
         bytes: &[u8],
         scales: &[u8],
@@ -154,7 +151,6 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     pub fn rowwise_nvfp4_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_source_cols_pow2_kernel(
         bytes: &[u8],
         scales: &[u8],
