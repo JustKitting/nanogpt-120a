@@ -85,15 +85,7 @@ impl LinearBackwardModule {
             args.weight_t_h.scales,
             args.weight_t_h.global_scale,
             args.dinput,
-            Nvfp4ProjectionParams {
-                token_count: args.token_count,
-                input_dim: dinput_k,
-                output_dim: args.input_dim,
-                weight_global_scale: 1.0,
-                bias_global_scale: 0.0,
-                residual_add: 0,
-                activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-            },
+            linear_backward_projection_params(args.token_count, dinput_k, args.input_dim),
         )?;
 
         self.module.linear_backward_projection_device_scale_kernel(
@@ -110,15 +102,7 @@ impl LinearBackwardModule {
             args.input_t_h.scales,
             args.input_t_h.global_scale,
             args.dweight,
-            Nvfp4ProjectionParams {
-                token_count: args.output_dim,
-                input_dim: dweight_k,
-                output_dim: args.input_dim,
-                weight_global_scale: 1.0,
-                bias_global_scale: 0.0,
-                residual_add: 0,
-                activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-            },
+            linear_backward_projection_params(args.output_dim, dweight_k, args.input_dim),
         )
     }
 
@@ -167,24 +151,24 @@ impl LinearBackwardModule {
                 args.dweight,
                 dweight_grid.0 - 1,
                 dweight_grid.0.trailing_zeros(),
-                Nvfp4ProjectionParams {
-                    token_count: args.token_count,
-                    input_dim: dinput_k,
-                    output_dim: args.input_dim,
-                    weight_global_scale: 1.0,
-                    bias_global_scale: 0.0,
-                    residual_add: 0,
-                    activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-                },
-                Nvfp4ProjectionParams {
-                    token_count: args.output_dim,
-                    input_dim: dweight_k,
-                    output_dim: args.input_dim,
-                    weight_global_scale: 1.0,
-                    bias_global_scale: 0.0,
-                    residual_add: 0,
-                    activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-                },
+                linear_backward_projection_params(args.token_count, dinput_k, args.input_dim),
+                linear_backward_projection_params(args.output_dim, dweight_k, args.input_dim),
             )
+    }
+}
+
+fn linear_backward_projection_params(
+    token_count: u32,
+    input_dim: u32,
+    output_dim: u32,
+) -> Nvfp4ProjectionParams {
+    Nvfp4ProjectionParams {
+        token_count,
+        input_dim,
+        output_dim,
+        weight_global_scale: 1.0,
+        bias_global_scale: 0.0,
+        residual_add: 0,
+        activation: NVFP4_PROJECTION_ACTIVATION_NONE,
     }
 }
