@@ -1,8 +1,8 @@
 use super::sources_tsv;
 use crate::sweep::{
     analysis::CandidateScore,
-    candidate::Candidate,
     optimizer::{Proposal, ScoredCandidate},
+    test_fixtures::basic_candidate,
 };
 
 #[test]
@@ -23,7 +23,11 @@ fn source_summary_counts_ranked_candidate_sources() {
     assert!(text.contains("variance\t1\tfalse\t1\t1.00000000"));
 }
 
-fn scored(source: &'static str, candidate: Candidate, score: f64) -> ScoredCandidate {
+fn scored(
+    source: &'static str,
+    candidate: crate::sweep::candidate::Candidate,
+    score: f64,
+) -> ScoredCandidate {
     ScoredCandidate {
         candidate,
         source,
@@ -41,20 +45,6 @@ fn scored(source: &'static str, candidate: Candidate, score: f64) -> ScoredCandi
     }
 }
 
-fn candidate(batch_size: usize) -> Candidate {
-    Candidate {
-        batch_size,
-        n_layer: 4,
-        n_embd: 1024,
-        n_head: 16,
-        aurora_phases: 4,
-        aurora_blocks: 80,
-        lr_scale: 1.0,
-        adam_lr_scale: 1.0,
-        nextlat_lr_scale: 1.0,
-        warmup_steps: 20,
-        start_ratio: 0.1,
-        amuse_beta1: 0.4,
-        amuse_rho: 0.8,
-    }
+fn candidate(batch_size: usize) -> crate::sweep::candidate::Candidate {
+    basic_candidate(batch_size, 4)
 }

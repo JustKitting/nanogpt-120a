@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
-use crate::sweep::candidate::Candidate;
 use crate::sweep::history::Trial;
+use crate::sweep::test_fixtures::basic_candidate;
 
 use super::{current_baseline_trial, promoted_screen_loss};
 
@@ -60,20 +60,6 @@ fn current_screened_baseline_replaces_stale_baseline_screen_metrics() {
     );
 }
 
-fn candidate() -> Candidate {
-    Candidate {
-        batch_size: 8,
-        n_layer: 4,
-        n_embd: 1024,
-        n_head: 16,
-        aurora_phases: 4,
-        aurora_blocks: 80,
-        lr_scale: 1.0,
-        adam_lr_scale: 1.0,
-        nextlat_lr_scale: 1.0,
-        warmup_steps: 20,
-        start_ratio: 0.1,
-        amuse_beta1: 0.4,
-        amuse_rho: 0.8,
-    }
+fn candidate() -> crate::sweep::candidate::Candidate {
+    basic_candidate(8, 4)
 }

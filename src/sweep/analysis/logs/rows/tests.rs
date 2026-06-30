@@ -1,5 +1,5 @@
 use crate::sweep::analysis::logs::Observation;
-use crate::sweep::candidate::Candidate;
+use crate::sweep::test_fixtures::basic_candidate;
 
 #[test]
 fn screen_quality_uses_persisted_screen_loss_when_log_is_missing() {
@@ -78,20 +78,6 @@ fn stability_keeps_worse_screen_loss_as_survived() {
     assert_eq!(rows[0].1, 1.0);
 }
 
-fn candidate() -> Candidate {
-    Candidate {
-        batch_size: 8,
-        n_layer: 4,
-        n_embd: 1024,
-        n_head: 16,
-        aurora_phases: 4,
-        aurora_blocks: 80,
-        lr_scale: 1.0,
-        adam_lr_scale: 1.0,
-        nextlat_lr_scale: 1.0,
-        warmup_steps: 20,
-        start_ratio: 0.1,
-        amuse_beta1: 0.4,
-        amuse_rho: 0.8,
-    }
+fn candidate() -> crate::sweep::candidate::Candidate {
+    basic_candidate(8, 4)
 }
