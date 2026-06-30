@@ -45,18 +45,8 @@ struct SourceWeights {
 
 fn source_weights(analysis: &SweepAnalysis, config: &SweepConfig) -> SourceWeights {
     let beliefs = analysis::factor_beliefs(analysis, config);
-    let confidence = if beliefs.is_empty() {
-        0.0
-    } else {
-        beliefs.iter().map(|belief| belief.confidence).sum::<f64>() / beliefs.len() as f64
-    }
-    .clamp(0.0, 1.0);
-    let variance = if beliefs.is_empty() {
-        1.0
-    } else {
-        beliefs.iter().map(|belief| belief.variance).sum::<f64>() / beliefs.len() as f64
-    }
-    .clamp(0.0, 1.0);
+    let confidence = mean_or(&beliefs, 0.0, |belief| belief.confidence).clamp(0.0, 1.0);
+    let variance = mean_or(&beliefs, 1.0, |belief| belief.variance).clamp(0.0, 1.0);
     let model_maturity =
         (analysis.trial_count as f64 / (analysis.trial_count as f64 + 12.0)).clamp(0.0, 1.0);
     let has_response_model = analysis
@@ -81,6 +71,14 @@ fn source_weights(analysis: &SweepAnalysis, config: &SweepConfig) -> SourceWeigh
         variance: 0.2 + 0.35 * uncertainty,
         coverage: 0.15 + 0.3 * (1.0 - model_maturity),
         random: 0.1 + 0.2 * (1.0 - model_maturity),
+    }
+}
+
+fn mean_or<T>(items: &[T], empty: f64, value: impl Fn(&T) -> f64) -> f64 {
+    if items.is_empty() {
+        empty
+    } else {
+        items.iter().map(value).sum::<f64>() / items.len() as f64
     }
 }
 
