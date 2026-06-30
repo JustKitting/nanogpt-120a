@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::sweep::{candidate::Candidate, config::SweepConfig, history::Trial, rng::SweepRng};
+use super::{candidate::Candidate, config::SweepConfig, history::Trial, rng::SweepRng};
 
-pub(super) fn trial(status: &str, val_loss: Option<f64>, candidate: Candidate) -> Trial {
+pub(in crate::sweep) fn trial(status: &str, val_loss: Option<f64>, candidate: Candidate) -> Trial {
     Trial {
         candidate,
         status: status.to_string(),
@@ -17,7 +17,32 @@ pub(super) fn trial(status: &str, val_loss: Option<f64>, candidate: Candidate) -
     }
 }
 
-pub(super) fn candidate(batch_size: usize, n_layer: usize, lr_scale: f64) -> Candidate {
+pub(in crate::sweep) fn success_trial(candidate: Candidate, val_loss: f64) -> Trial {
+    trial("success", Some(val_loss), candidate)
+}
+
+pub(in crate::sweep) fn trial_with_losses(
+    candidate: Candidate,
+    val_loss: f64,
+    screen_loss: f64,
+) -> Trial {
+    Trial {
+        screen_val_loss: Some(screen_loss),
+        ..success_trial(candidate, val_loss)
+    }
+}
+
+pub(in crate::sweep) fn trial_with_status(candidate: Candidate, status: &str) -> Trial {
+    Trial {
+        screen_val_loss: None,
+        screen_completed_steps: None,
+        screen_elapsed_s: None,
+        screen_reason: None,
+        ..trial(status, None, candidate)
+    }
+}
+
+pub(in crate::sweep) fn candidate(batch_size: usize, n_layer: usize, lr_scale: f64) -> Candidate {
     Candidate {
         batch_size,
         n_layer,
@@ -35,7 +60,25 @@ pub(super) fn candidate(batch_size: usize, n_layer: usize, lr_scale: f64) -> Can
     }
 }
 
-pub(super) fn config(random_trials: usize, candidate_samples: usize) -> SweepConfig {
+pub(in crate::sweep) fn basic_candidate(batch_size: usize, n_layer: usize) -> Candidate {
+    Candidate {
+        batch_size,
+        n_layer,
+        n_embd: 1024,
+        n_head: 16,
+        aurora_phases: 4,
+        aurora_blocks: 80,
+        lr_scale: 1.0,
+        adam_lr_scale: 1.0,
+        nextlat_lr_scale: 1.0,
+        warmup_steps: 20,
+        start_ratio: 0.1,
+        amuse_beta1: 0.4,
+        amuse_rho: 0.8,
+    }
+}
+
+pub(in crate::sweep) fn config(random_trials: usize, candidate_samples: usize) -> SweepConfig {
     SweepConfig {
         trials: 4,
         random_trials,
@@ -57,7 +100,15 @@ pub(super) fn config(random_trials: usize, candidate_samples: usize) -> SweepCon
     }
 }
 
-pub(super) fn measured_candidate() -> Candidate {
+pub(in crate::sweep) fn quality_config(candidate_samples: usize) -> SweepConfig {
+    SweepConfig {
+        sweep_stability_weight: 0.0,
+        sweep_exploration_weight: 0.0,
+        ..config(0, candidate_samples)
+    }
+}
+
+pub(in crate::sweep) fn measured_candidate() -> Candidate {
     Candidate {
         batch_size: 8,
         n_layer: 2,
@@ -75,13 +126,13 @@ pub(super) fn measured_candidate() -> Candidate {
     }
 }
 
-pub(super) fn temp_path(name: &str) -> PathBuf {
+pub(in crate::sweep) fn temp_path(name: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     path.push(format!("{}-{}-{name}", std::process::id(), nanos()));
     path
 }
 
-pub(super) fn rng() -> SweepRng {
+pub(in crate::sweep) fn rng() -> SweepRng {
     SweepRng::new(0x4750_5432)
 }
 

@@ -1,6 +1,7 @@
-use std::path::PathBuf;
-
-use super::super::{candidate::Candidate, config::SweepConfig, history::Trial};
+use super::super::test_fixtures::{
+    basic_candidate as candidate, quality_config, success_trial as trial, trial_with_losses,
+    trial_with_status,
+};
 
 #[test]
 fn scoring_uses_pairwise_interaction_signal() {
@@ -143,76 +144,6 @@ fn scoring_uses_stability_prior_when_stability_model_is_constant_failure() {
     assert!(score.expected_quality < -3.0);
 }
 
-fn trial(candidate: Candidate, val_loss: f64) -> Trial {
-    trial_with_losses(candidate, val_loss, val_loss + 1.0)
-}
-
-fn trial_with_losses(candidate: Candidate, val_loss: f64, screen_loss: f64) -> Trial {
-    Trial {
-        candidate,
-        status: "success".to_string(),
-        val_loss: Some(val_loss),
-        completed_steps: Some(10),
-        elapsed_s: Some(900.0),
-        screen_val_loss: Some(screen_loss),
-        screen_completed_steps: Some(10),
-        screen_elapsed_s: Some(30.0),
-        screen_reason: Some("screen_loss_improved".to_string()),
-        log_path: PathBuf::from("train.log"),
-    }
-}
-
-fn trial_with_status(candidate: Candidate, status: &str) -> Trial {
-    Trial {
-        candidate,
-        status: status.to_string(),
-        val_loss: None,
-        completed_steps: Some(10),
-        elapsed_s: Some(900.0),
-        screen_val_loss: None,
-        screen_completed_steps: None,
-        screen_elapsed_s: None,
-        screen_reason: None,
-        log_path: PathBuf::from("train.log"),
-    }
-}
-
-fn candidate(batch_size: usize, n_layer: usize) -> Candidate {
-    Candidate {
-        batch_size,
-        n_layer,
-        n_embd: 1024,
-        n_head: 16,
-        aurora_phases: 4,
-        aurora_blocks: 80,
-        lr_scale: 1.0,
-        adam_lr_scale: 1.0,
-        nextlat_lr_scale: 1.0,
-        warmup_steps: 20,
-        start_ratio: 0.1,
-        amuse_beta1: 0.4,
-        amuse_rho: 0.8,
-    }
-}
-
-fn config() -> SweepConfig {
-    SweepConfig {
-        trials: 4,
-        random_trials: 0,
-        candidate_samples: 16,
-        max_seconds: 900.0,
-        screen_max_seconds: 30.0,
-        sweep_quality_weight: 1.0,
-        sweep_stability_weight: 0.0,
-        sweep_exploration_weight: 0.0,
-        log_interval: 500,
-        dataset: "synth".to_string(),
-        arch: "sm_120a".to_string(),
-        cuda_device: None,
-        sweep_dir: None,
-        seed_history: PathBuf::from("notes/sweep_seed_current.tsv"),
-        baseline: PathBuf::from("notes/sweep_baseline.env"),
-        seed: 0x4750_5432,
-        dry_run: false,
-    }
+fn config() -> super::super::config::SweepConfig {
+    quality_config(16)
 }

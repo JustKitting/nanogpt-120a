@@ -1,6 +1,10 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::collections::HashSet;
 
-use super::super::{analysis, candidate::Candidate, config::SweepConfig, history::Trial};
+use super::super::{
+    analysis,
+    candidate::Candidate,
+    test_fixtures::{basic_candidate as candidate, quality_config, success_trial as trial},
+};
 
 #[test]
 fn guided_pool_uses_main_effect_direction() {
@@ -145,39 +149,6 @@ fn source_budget_moves_toward_guided_when_model_matures() {
     assert!(mature_budget.guided >= mature_budget.coverage);
 }
 
-fn trial(candidate: Candidate, val_loss: f64) -> Trial {
-    Trial {
-        candidate,
-        status: "success".to_string(),
-        val_loss: Some(val_loss),
-        completed_steps: Some(10),
-        elapsed_s: Some(900.0),
-        screen_val_loss: Some(val_loss + 1.0),
-        screen_completed_steps: Some(10),
-        screen_elapsed_s: Some(30.0),
-        screen_reason: Some("screen_loss_improved".to_string()),
-        log_path: PathBuf::from("train.log"),
-    }
-}
-
-fn candidate(batch_size: usize, n_layer: usize) -> Candidate {
-    Candidate {
-        batch_size,
-        n_layer,
-        n_embd: 1024,
-        n_head: 16,
-        aurora_phases: 4,
-        aurora_blocks: 80,
-        lr_scale: 1.0,
-        adam_lr_scale: 1.0,
-        nextlat_lr_scale: 1.0,
-        warmup_steps: 20,
-        start_ratio: 0.1,
-        amuse_beta1: 0.4,
-        amuse_rho: 0.8,
-    }
-}
-
 fn changed_factors(left: &Candidate, right: &Candidate) -> usize {
     usize::from(left.batch_size != right.batch_size)
         + usize::from(left.n_layer != right.n_layer)
@@ -211,24 +182,6 @@ fn wide_candidate(i: usize) -> Candidate {
     }
 }
 
-fn config() -> SweepConfig {
-    SweepConfig {
-        trials: 4,
-        random_trials: 0,
-        candidate_samples: 8,
-        max_seconds: 900.0,
-        screen_max_seconds: 30.0,
-        sweep_quality_weight: 1.0,
-        sweep_stability_weight: 0.0,
-        sweep_exploration_weight: 0.0,
-        log_interval: 500,
-        dataset: "synth".to_string(),
-        arch: "sm_120a".to_string(),
-        cuda_device: None,
-        sweep_dir: None,
-        seed_history: PathBuf::from("notes/sweep_seed_current.tsv"),
-        baseline: PathBuf::from("notes/sweep_baseline.env"),
-        seed: 0x4750_5432,
-        dry_run: false,
-    }
+fn config() -> super::super::config::SweepConfig {
+    quality_config(8)
 }

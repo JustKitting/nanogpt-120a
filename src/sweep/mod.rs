@@ -15,6 +15,8 @@ mod run_train;
 mod runner;
 mod screen_gate;
 mod status;
+#[cfg(test)]
+mod test_fixtures;
 mod trial_row;
 
 #[cfg(test)]
