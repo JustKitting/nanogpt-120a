@@ -2,6 +2,7 @@ mod budget;
 mod coverage;
 mod direction;
 mod factorial;
+mod fill;
 mod guided;
 mod local;
 mod variance;
@@ -42,9 +43,9 @@ pub fn sample(
             + budget.random,
         target
     );
-    push_guided(&mut pool, &mut used, rng, &direction, budget.guided);
-    push_local(&mut pool, &mut used, rng, center, budget.local);
-    push_factorial(
+    fill::push_guided(&mut pool, &mut used, rng, &direction, budget.guided);
+    fill::push_local(&mut pool, &mut used, rng, center, budget.local);
+    fill::push_factorial(
         &mut pool,
         &mut used,
         rng,
@@ -53,108 +54,8 @@ pub fn sample(
         center,
         budget.factorial,
     );
-    push_variance(&mut pool, &mut used, rng, config, analysis, budget.variance);
-    push_coverage(&mut pool, &mut used, rng, config, observed, budget.coverage);
-    push_random(&mut pool, &mut used, rng, target);
+    fill::push_variance(&mut pool, &mut used, rng, config, analysis, budget.variance);
+    fill::push_coverage(&mut pool, &mut used, rng, config, observed, budget.coverage);
+    fill::push_random(&mut pool, &mut used, rng, target);
     pool
-}
-
-fn push_guided(
-    pool: &mut Vec<PooledCandidate>,
-    used: &mut HashSet<String>,
-    rng: &mut SweepRng,
-    direction: &direction::Direction,
-    count: usize,
-) {
-    let target = pool.len() + count;
-    let mut attempts = 0;
-    while pool.len() < target && attempts < count.saturating_mul(32).max(32) {
-        let jitter = attempts > 0;
-        push_unique(
-            pool,
-            used,
-            guided::candidate(rng, direction, jitter),
-            "guided",
-        );
-        attempts += 1;
-    }
-}
-
-fn push_local(
-    pool: &mut Vec<PooledCandidate>,
-    used: &mut HashSet<String>,
-    rng: &mut SweepRng,
-    center: Option<&Candidate>,
-    count: usize,
-) {
-    let target = (pool.len() + count).min(pool.capacity().max(1));
-    for candidate in local::candidates(used, rng, center, target - pool.len()) {
-        push_unique(pool, used, candidate, "local");
-    }
-}
-
-fn push_variance(
-    pool: &mut Vec<PooledCandidate>,
-    used: &mut HashSet<String>,
-    rng: &mut SweepRng,
-    config: &SweepConfig,
-    analysis: &SweepAnalysis,
-    count: usize,
-) {
-    let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    for candidate in variance::candidates(used, rng, config, analysis, target - pool.len()) {
-        push_unique(pool, used, candidate, "variance");
-    }
-}
-
-fn push_coverage(
-    pool: &mut Vec<PooledCandidate>,
-    used: &mut HashSet<String>,
-    rng: &mut SweepRng,
-    config: &SweepConfig,
-    observed: &[Candidate],
-    count: usize,
-) {
-    let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    for candidate in coverage::candidates(used, rng, config, observed, target - pool.len()) {
-        push_unique(pool, used, candidate, "coverage");
-    }
-}
-
-fn push_factorial(
-    pool: &mut Vec<PooledCandidate>,
-    used: &mut HashSet<String>,
-    rng: &mut SweepRng,
-    config: &SweepConfig,
-    analysis: &SweepAnalysis,
-    center: Option<&Candidate>,
-    count: usize,
-) {
-    let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    for candidate in factorial::candidates(used, rng, config, analysis, center, target - pool.len())
-    {
-        push_unique(pool, used, candidate, "factorial");
-    }
-}
-
-fn push_random(
-    pool: &mut Vec<PooledCandidate>,
-    used: &mut HashSet<String>,
-    rng: &mut SweepRng,
-    target: usize,
-) {
-    while pool.len() < target {
-        push_unique(pool, used, Candidate::random(rng), "random");
-    }
-}
-
-fn push_unique(
-    pool: &mut Vec<PooledCandidate>,
-    used: &mut HashSet<String>,
-    candidate: Candidate,
-    source: &'static str,
-) {
-    if used.insert(candidate.key()) {
-        pool.push(PooledCandidate { candidate, source });
-    }
 }
