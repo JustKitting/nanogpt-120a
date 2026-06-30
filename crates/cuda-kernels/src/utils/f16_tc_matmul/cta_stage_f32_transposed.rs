@@ -51,30 +51,5 @@ fn stage_a_transposed(
     }
 }
 
-macro_rules! stage_rhs_fn {
-    ($name:ident, $rhs_ty:ty, |$rhs:ident, $index:ident| $value:expr) => {
-        fn $name(
-            $rhs: &[$rhs_ty],
-            b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-            tile: CtaTile,
-            n: u32,
-            k: u32,
-            k_base: u32,
-        ) {
-            let mut offset = thread::threadIdx_x();
-            while offset < CTA_B_ELEMS as u32 {
-                let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
-                b_tile[offset as usize] = if global_row < n && global_col < k {
-                    let $index = ((tile.batch * k + global_col) * n + global_row) as usize;
-                    $value
-                } else {
-                    0
-                };
-                offset += CTA_THREADS;
-            }
-        }
-    };
-}
-
-stage_rhs_fn!(stage_rhs, f32, |rhs, index| cvt_rn_f16_f32(rhs[index]));
-stage_rhs_fn!(stage_half_rhs, u16, |rhs, index| rhs[index]);
+cta_stage_transposed_rhs_fn!(stage_rhs, f32, |rhs, index| cvt_rn_f16_f32(rhs[index]));
+cta_stage_transposed_rhs_fn!(stage_half_rhs, u16, |rhs, index| rhs[index]);
