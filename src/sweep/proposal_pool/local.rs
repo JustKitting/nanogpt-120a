@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::super::{
     candidate::{Candidate, valid_aurora_phases},
-    candidate_space,
+    candidate_space as space,
     rng::SweepRng,
 };
 
@@ -24,31 +24,16 @@ pub fn candidates(
             candidate.batch_size = nearby_batch(center.batch_size, rng);
         }
         if attempts % 8 == 7 {
-            candidate.aurora_blocks = rng.choose(&candidate_space::AURORA_BLOCKS);
+            candidate.aurora_blocks = rng.choose(&space::AURORA_BLOCKS);
             candidate.aurora_phases = nearby_phase(&candidate, rng);
         }
         candidate.lr_scale = jitter_log(center.lr_scale, rng, 0.35);
         candidate.adam_lr_scale = jitter_log(center.adam_lr_scale, rng, 0.35);
         candidate.nextlat_lr_scale = jitter_log(center.nextlat_lr_scale, rng, 0.35);
         candidate.warmup_steps = jitter_usize(center.warmup_steps, rng, 24);
-        candidate.start_ratio = jitter_f64(
-            center.start_ratio,
-            rng,
-            0.06,
-            candidate_space::START_RATIO_RANGE,
-        );
-        candidate.amuse_beta1 = jitter_f64(
-            center.amuse_beta1,
-            rng,
-            0.08,
-            candidate_space::AMUSE_BETA1_RANGE,
-        );
-        candidate.amuse_rho = jitter_f64(
-            center.amuse_rho,
-            rng,
-            0.12,
-            candidate_space::AMUSE_RHO_RANGE,
-        );
+        candidate.start_ratio = jitter_f64(center.start_ratio, rng, 0.06, space::START_RATIO_RANGE);
+        candidate.amuse_beta1 = jitter_f64(center.amuse_beta1, rng, 0.08, space::AMUSE_BETA1_RANGE);
+        candidate.amuse_rho = jitter_f64(center.amuse_rho, rng, 0.12, space::AMUSE_RHO_RANGE);
 
         if seen.insert(candidate.key()) {
             out.push(candidate);
@@ -59,7 +44,7 @@ pub fn candidates(
 }
 
 fn nearby_batch(center: usize, rng: &mut SweepRng) -> usize {
-    let values = candidate_space::BATCH_SIZE;
+    let values = space::BATCH_SIZE;
     let Some(index) = values.iter().position(|value| *value == center) else {
         return rng.choose(&values);
     };
@@ -86,18 +71,15 @@ fn nearby_phase(candidate: &Candidate, rng: &mut SweepRng) -> usize {
 
 fn jitter_log(value: f64, rng: &mut SweepRng, radius: f64) -> f64 {
     let offset = (rng.f64() - 0.5) * 2.0 * radius;
-    (value * offset.exp()).clamp(
-        candidate_space::LR_SCALE_RANGE.0,
-        candidate_space::LR_SCALE_RANGE.1,
-    )
+    (value * offset.exp()).clamp(space::LR_SCALE_RANGE.0, space::LR_SCALE_RANGE.1)
 }
 
 fn jitter_usize(value: usize, rng: &mut SweepRng, radius: usize) -> usize {
     let span = radius * 2 + 1;
     let offset = rng.usize(span) as isize - radius as isize;
     (value as isize + offset).clamp(
-        candidate_space::WARMUP_STEPS_RANGE.0 as isize,
-        candidate_space::WARMUP_STEPS_RANGE.1 as isize,
+        space::WARMUP_STEPS_RANGE.0 as isize,
+        space::WARMUP_STEPS_RANGE.1 as isize,
     ) as usize
 }
 
