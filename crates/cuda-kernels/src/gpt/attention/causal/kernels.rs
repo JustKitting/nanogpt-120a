@@ -2,6 +2,7 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 
 use super::{CAUSAL_MAX_WARPS_PER_BLOCK, CausalAttentionParams};
 use crate::attention::layout::batched_qkv_index;
+use crate::block_reduce::block_reduce_f32;
 use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32, safe_positive_denom};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
@@ -63,26 +64,16 @@ pub mod module {
             } else {
                 0.0
             };
-            let warp_dot = warp_sum_f32(local_dot);
-
-            if lane == 0 {
-                unsafe {
-                    REDUCE[warp_in_block as usize] = warp_dot;
-                }
-            }
-
-            thread::sync_threads();
-
+            let dot = block_reduce_f32!(
+                REDUCE,
+                thread::blockDim_x() / 32,
+                local_dot,
+                lane,
+                warp_in_block,
+                warp_sum_f32,
+                0.0
+            );
             if thread_index == 0 {
-                let mut dot = 0.0;
-                let mut warp_index = 0;
-                while warp_index < thread::blockDim_x() / 32 {
-                    unsafe {
-                        dot += REDUCE[warp_index as usize];
-                    }
-                    warp_index += 1;
-                }
-
                 unsafe {
                     SCORES[key as usize] = dot * params.scale;
                 }
@@ -139,7 +130,6 @@ pub mod module {
         let lane = warp::lane_id();
         let warp_in_block = thread_index / 32;
         let block_threads = thread::blockDim_x();
-        let warp_count = block_threads / 32;
         let mut local_max = NEG_INFINITY;
         let mut key = thread_index;
 
@@ -149,33 +139,15 @@ pub mod module {
             }
             key += block_threads;
         }
-        let warp_max = warp_max_f32(local_max);
-
-        if lane == 0 {
-            unsafe {
-                REDUCE[warp_in_block as usize] = warp_max;
-            }
-        }
-
-        thread::sync_threads();
-
-        if thread_index == 0 {
-            let mut block_max = NEG_INFINITY;
-            let mut warp_index = 0;
-            while warp_index < warp_count {
-                unsafe {
-                    block_max = max_f32(block_max, REDUCE[warp_index as usize]);
-                }
-                warp_index += 1;
-            }
-            unsafe {
-                REDUCE[0] = block_max;
-            }
-        }
-
-        thread::sync_threads();
-
-        unsafe { REDUCE[0] }
+        block_reduce_f32!(
+            REDUCE,
+            block_threads / 32,
+            local_max,
+            lane,
+            warp_in_block,
+            warp_max_f32,
+            NEG_INFINITY
+        )
     }
 
     #[inline(always)]
@@ -183,7 +155,6 @@ pub mod module {
         let lane = warp::lane_id();
         let warp_in_block = thread_index / 32;
         let block_threads = thread::blockDim_x();
-        let warp_count = block_threads / 32;
         let mut local_sum = 0.0;
         let mut key = thread_index;
 
@@ -193,33 +164,15 @@ pub mod module {
             }
             key += block_threads;
         }
-        let warp_total = warp_sum_f32(local_sum);
-
-        if lane == 0 {
-            unsafe {
-                REDUCE[warp_in_block as usize] = warp_total;
-            }
-        }
-
-        thread::sync_threads();
-
-        if thread_index == 0 {
-            let mut denom = 0.0;
-            let mut warp_index = 0;
-            while warp_index < warp_count {
-                unsafe {
-                    denom += REDUCE[warp_index as usize];
-                }
-                warp_index += 1;
-            }
-            unsafe {
-                REDUCE[0] = denom;
-            }
-        }
-
-        thread::sync_threads();
-
-        unsafe { REDUCE[0] }
+        block_reduce_f32!(
+            REDUCE,
+            block_threads / 32,
+            local_sum,
+            lane,
+            warp_in_block,
+            warp_sum_f32,
+            0.0
+        )
     }
 
     #[inline(always)]
