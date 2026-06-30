@@ -14,10 +14,13 @@ use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 mod common;
+#[path = "common/f16.rs"]
+mod f16_common;
 #[path = "common/nvfp4.rs"]
 mod nvfp4_common;
 
-use common::{f16::tc_f16, gpu_device_index, ptx_path};
+use common::{gpu_device_index, ptx_path};
+use f16_common::tc_f16;
 use nvfp4_common::set_e2m1_one;
 
 const E4M3_ONE: u8 = 0x38;

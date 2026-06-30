@@ -1,11 +1,8 @@
-use std::error::Error;
-
-use cuda_core::{CudaContext, CudaStream, DeviceBuffer};
+use cuda_core::{CudaContext, DeviceBuffer};
 use gpt2_nvfp4::{
-    AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, Gpt2, Gpt2BlockWeights,
-    Gpt2ForwardArgs, HiddenState, HiddenStateNvfp4, LayerNormTensors, LayerNormWeights, Logits,
-    MlpActivation, MlpActivationNvfp4, MlpDownTensors, MlpUpTensors, Nvfp4Shape, Nvfp4Tensor,
-    QkvActivation, TokenEmbeddingArgs,
+    AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, Gpt2, Gpt2ForwardArgs,
+    HiddenState, HiddenStateNvfp4, Logits, MlpActivation, MlpActivationNvfp4, MlpDownTensors,
+    MlpUpTensors, QkvActivation, TokenEmbeddingArgs,
 };
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionTcScratch};
 use rust_kernels_cuda::embedding::EmbeddingModule;
@@ -13,23 +10,18 @@ use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::lm_head::LmHeadModule;
 use rust_kernels_cuda::mlp::MlpModule;
-use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 mod common;
+#[path = "common/upload.rs"]
+mod upload_common;
 
 use common::{gpu_device_index, ptx_path};
-
-type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
+use upload_common::{TestResult, upload_block, upload_layer_norm, upload_nvfp4};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
-    run_forward()
-}
-
-fn run_forward() -> TestResult {
     let ctx = CudaContext::new(gpu_device_index())?;
     let stream = ctx.new_stream()?;
     let module = ctx.load_module_from_file(ptx_path().as_str())?;
@@ -156,98 +148,4 @@ fn run_forward() -> TestResult {
 
 fn token_ids() -> Vec<u32> {
     (0..GPT2_TOKEN_ROWS).map(|i| (i % 127) as u32).collect()
-}
-
-struct UploadedNvfp4 {
-    bytes: DeviceBuffer<u8>,
-    scales: DeviceBuffer<u8>,
-    global_scale: DeviceBuffer<f32>,
-}
-
-impl UploadedNvfp4 {
-    fn device(&self) -> Nvfp4DeviceTensor<'_> {
-        Nvfp4DeviceTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scale: &self.global_scale,
-        }
-    }
-
-    fn mma(&self) -> Nvfp4FourSixMmaWeightTensor<'_> {
-        Nvfp4FourSixMmaWeightTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scale: &self.global_scale,
-        }
-    }
-}
-
-struct UploadedLinear {
-    weight: UploadedNvfp4,
-    bias: UploadedNvfp4,
-}
-
-struct UploadedLayerNorm {
-    weight: UploadedNvfp4,
-    bias: UploadedNvfp4,
-}
-
-impl UploadedLayerNorm {
-    fn tensors(&self) -> LayerNormTensors<'_> {
-        LayerNormTensors {
-            weight: self.weight.device(),
-            bias: self.bias.device(),
-        }
-    }
-}
-
-struct UploadedBlock {
-    ln_1: UploadedLayerNorm,
-    attn_qkv: UploadedLinear,
-    attn_c_proj: UploadedLinear,
-    ln_2: UploadedLayerNorm,
-    mlp_up: UploadedLinear,
-    mlp_down: UploadedLinear,
-}
-
-fn upload_block(stream: &CudaStream, block: &Gpt2BlockWeights) -> TestResult<UploadedBlock> {
-    Ok(UploadedBlock {
-        ln_1: upload_layer_norm(stream, &block.ln_1)?,
-        attn_qkv: upload_linear(stream, &block.attn.c_attn)?,
-        attn_c_proj: upload_linear(stream, &block.attn.c_proj)?,
-        ln_2: upload_layer_norm(stream, &block.ln_2)?,
-        mlp_up: upload_linear(stream, &block.mlp.c_fc)?,
-        mlp_down: upload_linear(stream, &block.mlp.c_proj)?,
-    })
-}
-
-fn upload_layer_norm(
-    stream: &CudaStream,
-    layer_norm: &LayerNormWeights,
-) -> TestResult<UploadedLayerNorm> {
-    Ok(UploadedLayerNorm {
-        weight: upload_nvfp4(stream, &layer_norm.weight)?,
-        bias: upload_nvfp4(stream, &layer_norm.bias)?,
-    })
-}
-
-fn upload_linear<W: Nvfp4Shape, B: Nvfp4Shape>(
-    stream: &CudaStream,
-    linear: &gpt2_nvfp4::LinearWeights<W, B>,
-) -> TestResult<UploadedLinear> {
-    Ok(UploadedLinear {
-        weight: upload_nvfp4(stream, &linear.weight)?,
-        bias: upload_nvfp4(stream, &linear.bias)?,
-    })
-}
-
-fn upload_nvfp4<S: Nvfp4Shape>(
-    stream: &CudaStream,
-    tensor: &Nvfp4Tensor<S>,
-) -> TestResult<UploadedNvfp4> {
-    Ok(UploadedNvfp4 {
-        bytes: DeviceBuffer::from_host(stream, tensor.bytes.as_ref())?,
-        scales: DeviceBuffer::from_host(stream, tensor.scales.as_ref())?,
-        global_scale: DeviceBuffer::from_host(stream, &[tensor.global_scale])?,
-    })
 }

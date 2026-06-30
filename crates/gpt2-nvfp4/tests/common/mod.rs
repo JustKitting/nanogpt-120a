@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-pub mod f16;
-
 pub fn gpu_device_index() -> usize {
     std::env::var("CUDA_DEVICE_INDEX")
         .ok()
