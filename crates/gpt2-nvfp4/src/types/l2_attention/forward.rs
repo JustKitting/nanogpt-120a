@@ -2,7 +2,6 @@ use cuda_core::DriverError;
 use rust_kernels_cuda::attention::{
     ApplyRopeArgs, CProjArgs, CausalAttentionTcArgs, QkvProjectionArgs,
 };
-use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantRowwiseArgs;
 
 use super::quantize::requantize_attention;
@@ -43,11 +42,7 @@ pub(super) fn forward<'a, 'scratch>(
             row_len: crate::GPT2_N_EMBD as u32,
         })?;
 
-    let input = Nvfp4RowwiseDeviceTensor {
-        bytes: &*input_nvfp4.bytes,
-        scales: &*input_nvfp4.scales,
-        global_scales: &*input_nvfp4.global_scales,
-    };
+    let input = input_nvfp4.device();
     if let Some(tape) = tape.as_mut() {
         tape.save_qkv_input(stream, input)?;
     }
@@ -116,11 +111,7 @@ pub(super) fn forward<'a, 'scratch>(
         row_count,
     )?;
 
-    let input = Nvfp4RowwiseDeviceTensor {
-        bytes: &*input_nvfp4.bytes,
-        scales: &*input_nvfp4.scales,
-        global_scales: &*input_nvfp4.global_scales,
-    };
+    let input = input_nvfp4.device();
     if let Some(tape) = tape.as_mut() {
         tape.save_c_proj_input(stream, input)?;
     }

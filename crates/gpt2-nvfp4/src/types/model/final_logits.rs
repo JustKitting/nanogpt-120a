@@ -2,7 +2,6 @@ use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::lm_head::{LmHeadArgs, LmHeadModule};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::{Nvfp4QuantModule, Nvfp4QuantRowwiseArgs};
 
 use crate::types::{
@@ -63,11 +62,7 @@ pub(super) fn finish_forward<'a>(
             row_len: crate::GPT2_N_EMBD as u32,
         })?;
 
-    let input = Nvfp4RowwiseDeviceTensor {
-        bytes: &*hidden_nvfp4.bytes,
-        scales: &*hidden_nvfp4.scales,
-        global_scales: &*hidden_nvfp4.global_scales,
-    };
+    let input = hidden_nvfp4.device();
     if let Some(tape) = tape.as_mut() {
         tape.lm_head_input_nvfp4.save(stream, input)?;
     }
