@@ -5,6 +5,7 @@ mod four_six;
 mod global_scale;
 pub(crate) mod kernels;
 mod launcher;
+mod ms_eden;
 mod shape;
 
 pub use args::{
