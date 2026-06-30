@@ -67,25 +67,9 @@ impl<'a> Nvfp4Polar<'a> {
                         self.averaged_nvfp4_gram(&source, rows, cols, iter, samples, &mut stats)?
                     }
                 }
-                GramCorrectionMode::Stale { period } => self.corrected_gram(
-                    &source,
-                    rows,
-                    cols,
-                    iter,
-                    period <= 1 || iter % period == 0,
-                    &mut stale_defect,
-                    &mut stats,
-                )?,
-                GramCorrectionMode::StaleReject { period } => self.corrected_gram(
-                    &source,
-                    rows,
-                    cols,
-                    iter,
-                    period <= 1 || iter % period == 0,
-                    &mut stale_defect,
-                    &mut stats,
-                )?,
-                GramCorrectionMode::StaleRejectSafety { period, .. } => self.corrected_gram(
+                GramCorrectionMode::Stale { period }
+                | GramCorrectionMode::StaleReject { period }
+                | GramCorrectionMode::StaleRejectSafety { period, .. } => self.corrected_gram(
                     &source,
                     rows,
                     cols,
@@ -107,82 +91,22 @@ impl<'a> Nvfp4Polar<'a> {
                 GramCorrectionMode::ExactPrefixThenStale {
                     exact_steps,
                     period,
-                } => {
-                    if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        self.f16_product(&source, &source, rows, rows, cols)?
-                    } else {
-                        self.corrected_gram(
-                            &source,
-                            rows,
-                            cols,
-                            iter,
-                            iter == exact_steps || (iter - exact_steps) % period == 0,
-                            &mut stale_defect,
-                            &mut stats,
-                        )?
-                    }
                 }
-                GramCorrectionMode::ExactPrefixThenStaleReject {
+                | GramCorrectionMode::ExactPrefixThenStaleReject {
                     exact_steps,
                     period,
-                } => {
-                    if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        self.f16_product(&source, &source, rows, rows, cols)?
-                    } else {
-                        self.corrected_gram(
-                            &source,
-                            rows,
-                            cols,
-                            iter,
-                            iter == exact_steps || (iter - exact_steps) % period == 0,
-                            &mut stale_defect,
-                            &mut stats,
-                        )?
-                    }
                 }
-                GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
+                | GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
                     exact_steps,
                     period,
                     ..
-                } => {
-                    if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        self.f16_product(&source, &source, rows, rows, cols)?
-                    } else {
-                        self.corrected_gram(
-                            &source,
-                            rows,
-                            cols,
-                            iter,
-                            iter == exact_steps || (iter - exact_steps) % period == 0,
-                            &mut stale_defect,
-                            &mut stats,
-                        )?
-                    }
                 }
-                GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety {
+                | GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety {
                     exact_steps,
                     period,
                     ..
-                } => {
-                    if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        self.f16_product(&source, &source, rows, rows, cols)?
-                    } else {
-                        self.corrected_gram(
-                            &source,
-                            rows,
-                            cols,
-                            iter,
-                            iter == exact_steps || (iter - exact_steps) % period == 0,
-                            &mut stale_defect,
-                            &mut stats,
-                        )?
-                    }
                 }
-                GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+                | GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
                     exact_steps,
                     period,
                     ..
@@ -320,23 +244,8 @@ impl<'a> Nvfp4Polar<'a> {
                         refresh,
                     )
                 }
-                GramCorrectionMode::StaleReject { period } => {
-                    let refresh = period <= 1 || iter % period == 0;
-                    (
-                        self.corrected_gram(
-                            &source,
-                            rows,
-                            cols,
-                            iter,
-                            refresh,
-                            &mut stale_defect,
-                            &mut stats,
-                        )?,
-                        !refresh,
-                        refresh,
-                    )
-                }
-                GramCorrectionMode::StaleRejectSafety { period, .. } => {
+                GramCorrectionMode::StaleReject { period }
+                | GramCorrectionMode::StaleRejectSafety { period, .. } => {
                     let refresh = period <= 1 || iter % period == 0;
                     (
                         self.corrected_gram(
@@ -400,90 +309,18 @@ impl<'a> Nvfp4Polar<'a> {
                 GramCorrectionMode::ExactPrefixThenStaleReject {
                     exact_steps,
                     period,
-                } => {
-                    if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        (
-                            self.f16_product(&source, &source, rows, rows, cols)?,
-                            false,
-                            true,
-                        )
-                    } else {
-                        let refresh = iter == exact_steps || (iter - exact_steps) % period == 0;
-                        (
-                            self.corrected_gram(
-                                &source,
-                                rows,
-                                cols,
-                                iter,
-                                refresh,
-                                &mut stale_defect,
-                                &mut stats,
-                            )?,
-                            !refresh,
-                            refresh,
-                        )
-                    }
                 }
-                GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
+                | GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
                     exact_steps,
                     period,
                     ..
-                } => {
-                    if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        (
-                            self.f16_product(&source, &source, rows, rows, cols)?,
-                            false,
-                            true,
-                        )
-                    } else {
-                        let refresh = iter == exact_steps || (iter - exact_steps) % period == 0;
-                        (
-                            self.corrected_gram(
-                                &source,
-                                rows,
-                                cols,
-                                iter,
-                                refresh,
-                                &mut stale_defect,
-                                &mut stats,
-                            )?,
-                            !refresh,
-                            refresh,
-                        )
-                    }
                 }
-                GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety {
+                | GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety {
                     exact_steps,
                     period,
                     ..
-                } => {
-                    if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        (
-                            self.f16_product(&source, &source, rows, rows, cols)?,
-                            false,
-                            true,
-                        )
-                    } else {
-                        let refresh = iter == exact_steps || (iter - exact_steps) % period == 0;
-                        (
-                            self.corrected_gram(
-                                &source,
-                                rows,
-                                cols,
-                                iter,
-                                refresh,
-                                &mut stale_defect,
-                                &mut stats,
-                            )?,
-                            !refresh,
-                            refresh,
-                        )
-                    }
                 }
-                GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+                | GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
                     exact_steps,
                     period,
                     ..
