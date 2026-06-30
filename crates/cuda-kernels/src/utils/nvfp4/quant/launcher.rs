@@ -12,7 +12,7 @@ pub struct Nvfp4QuantModule {
     pub(super) ms_eden_fp32_pair: kernels::ms_eden::fp32_pair::module::LoadedModule,
     pub(super) ms_eden_fp32_transpose: kernels::ms_eden::fp32_transpose::module::LoadedModule,
     pub(super) ms_eden_nvfp4_transpose: kernels::ms_eden::nvfp4_transpose::module::LoadedModule,
-    pub(super) ms_eden_rowwise_transpose: kernels::ms_eden::rowwise_transpose::module::LoadedModule,
+    pub(super) ms_eden_rowwise_transpose: kernels::ms_eden::rowwise_transpose::LoadedModule,
 }
 
 impl Nvfp4QuantModule {
@@ -29,9 +29,7 @@ impl Nvfp4QuantModule {
             ms_eden_nvfp4_transpose: kernels::ms_eden::nvfp4_transpose::module::from_module(
                 module.clone(),
             )?,
-            ms_eden_rowwise_transpose: kernels::ms_eden::rowwise_transpose::module::from_module(
-                module,
-            )?,
+            ms_eden_rowwise_transpose: kernels::ms_eden::rowwise_transpose::from_module(module)?,
         })
     }
 }
