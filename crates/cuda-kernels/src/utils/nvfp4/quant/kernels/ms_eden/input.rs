@@ -38,10 +38,7 @@ pub(super) fn nvfp4_transposed_hadamard_input(
     dst_row_len: u32,
     seed: u32,
 ) -> f32 {
-    let row = chunk_base / dst_row_len;
-    let row_base = row * dst_row_len;
-    let chunk_in_row = chunk_base - row_base;
-    let input_col = chunk_in_row + lane;
+    let (row, input_col) = padded_chunk_position(chunk_base, lane, dst_row_len);
     let input = if input_col < source_rows {
         let source_index = input_col * source_cols + row;
         nvfp4_value_at(bytes, scales, global_scale, source_index)
@@ -122,10 +119,7 @@ pub(super) fn rowwise_transposed_hadamard_input(
     dst_row_len: u32,
     seed: u32,
 ) -> f32 {
-    let row = chunk_base / dst_row_len;
-    let row_base = row * dst_row_len;
-    let chunk_in_row = chunk_base - row_base;
-    let input_col = chunk_in_row + lane;
+    let (row, input_col) = padded_chunk_position(chunk_base, lane, dst_row_len);
     let input = if input_col < source_rows {
         nvfp4_rowwise_value(
             bytes,
@@ -150,10 +144,7 @@ pub(super) fn hadamard_input(
     dst_row_len: u32,
     seed: u32,
 ) -> f32 {
-    let row = chunk_base / dst_row_len;
-    let row_base = row * dst_row_len;
-    let chunk_in_row = chunk_base - row_base;
-    let input_col = chunk_in_row + lane;
+    let (row, input_col) = padded_chunk_position(chunk_base, lane, dst_row_len);
     let input = if input_col < src_row_len {
         let index = row * src_row_len + input_col;
         x[index as usize]
@@ -173,10 +164,7 @@ pub(super) fn transposed_hadamard_input(
     source_cols: u32,
     seed: u32,
 ) -> f32 {
-    let row = chunk_base / dst_row_len;
-    let row_base = row * dst_row_len;
-    let chunk_in_row = chunk_base - row_base;
-    let input_col = chunk_in_row + lane;
+    let (row, input_col) = padded_chunk_position(chunk_base, lane, dst_row_len);
     let input = if input_col < source_rows {
         let index = input_col * source_cols + row;
         x[index as usize]
@@ -195,16 +183,8 @@ pub(super) fn hadamard_input_no_pad_pow2(
     chunks_per_row_shift: u32,
     seed: u32,
 ) -> (f32, u32, bool) {
-    let chunk_in_row_mask = (1u32 << chunks_per_row_shift) - 1;
-    let row = chunk >> chunks_per_row_shift;
-    let chunk_in_row = (chunk & chunk_in_row_mask) * HADAMARD_DIM;
-    let input_col = chunk_in_row + lane;
-    let index = row * src_row_len + input_col;
-    (
-        x[index as usize] * random_sign(seed, input_col),
-        row,
-        chunk_in_row == 0,
-    )
+    let pos = no_pad_pow2_chunk_position(chunk, lane, chunks_per_row_shift);
+    no_pad_result(x, pos.0 * src_row_len + pos.1, seed, pos)
 }
 
 #[inline(always)]
@@ -216,16 +196,8 @@ pub(super) fn transposed_hadamard_input_no_pad_pow2(
     chunks_per_row_shift: u32,
     seed: u32,
 ) -> (f32, u32, bool) {
-    let chunk_in_row_mask = (1u32 << chunks_per_row_shift) - 1;
-    let row = chunk >> chunks_per_row_shift;
-    let chunk_in_row = (chunk & chunk_in_row_mask) * HADAMARD_DIM;
-    let input_col = chunk_in_row + lane;
-    let index = input_col * source_cols + row;
-    (
-        x[index as usize] * random_sign(seed, input_col),
-        row,
-        chunk_in_row == 0,
-    )
+    let pos = no_pad_pow2_chunk_position(chunk, lane, chunks_per_row_shift);
+    no_pad_result(x, pos.1 * source_cols + pos.0, seed, pos)
 }
 
 #[inline(always)]
@@ -237,15 +209,8 @@ pub(super) fn hadamard_input_no_pad(
     chunks_per_row: u32,
     seed: u32,
 ) -> (f32, u32, bool) {
-    let row = chunk / chunks_per_row;
-    let chunk_in_row = (chunk - row * chunks_per_row) * HADAMARD_DIM;
-    let input_col = chunk_in_row + lane;
-    let index = row * src_row_len + input_col;
-    (
-        x[index as usize] * random_sign(seed, input_col),
-        row,
-        chunk_in_row == 0,
-    )
+    let pos = no_pad_chunk_position(chunk, lane, chunks_per_row);
+    no_pad_result(x, pos.0 * src_row_len + pos.1, seed, pos)
 }
 
 #[inline(always)]
@@ -257,13 +222,43 @@ pub(super) fn transposed_hadamard_input_no_pad(
     chunks_per_row: u32,
     seed: u32,
 ) -> (f32, u32, bool) {
+    let pos = no_pad_chunk_position(chunk, lane, chunks_per_row);
+    no_pad_result(x, pos.1 * source_cols + pos.0, seed, pos)
+}
+
+#[inline(always)]
+fn padded_chunk_position(chunk_base: u32, lane: u32, dst_row_len: u32) -> (u32, u32) {
+    let row = chunk_base / dst_row_len;
+    let row_base = row * dst_row_len;
+    let chunk_in_row = chunk_base - row_base;
+    (row, chunk_in_row + lane)
+}
+
+#[inline(always)]
+fn no_pad_pow2_chunk_position(
+    chunk: u32,
+    lane: u32,
+    chunks_per_row_shift: u32,
+) -> (u32, u32, bool) {
+    let chunk_in_row_mask = (1u32 << chunks_per_row_shift) - 1;
+    let row = chunk >> chunks_per_row_shift;
+    let chunk_in_row = (chunk & chunk_in_row_mask) * HADAMARD_DIM;
+    (row, chunk_in_row + lane, chunk_in_row == 0)
+}
+
+#[inline(always)]
+fn no_pad_chunk_position(chunk: u32, lane: u32, chunks_per_row: u32) -> (u32, u32, bool) {
     let row = chunk / chunks_per_row;
     let chunk_in_row = (chunk - row * chunks_per_row) * HADAMARD_DIM;
-    let input_col = chunk_in_row + lane;
-    let index = input_col * source_cols + row;
+    (row, chunk_in_row + lane, chunk_in_row == 0)
+}
+
+#[inline(always)]
+fn no_pad_result(x: &[f32], index: u32, seed: u32, position: (u32, u32, bool)) -> (f32, u32, bool) {
+    let (row, input_col, first_chunk_in_row) = position;
     (
         x[index as usize] * random_sign(seed, input_col),
         row,
-        chunk_in_row == 0,
+        first_chunk_in_row,
     )
 }
