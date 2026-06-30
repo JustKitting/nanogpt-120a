@@ -62,39 +62,48 @@ fn set_factor(candidate: &mut Candidate, name: &str, high: bool) {
             candidate.n_embd = n_embd;
             candidate.n_head = n_head;
         }
-        "aurora_blocks" => {
-            candidate.aurora_blocks = level(&candidate_space::AURORA_BLOCKS, high);
-        }
+        "aurora_blocks" => candidate.aurora_blocks = level(&candidate_space::AURORA_BLOCKS, high),
         "aurora_phases" => set_phase(candidate, high),
-        "ln_lr_scale" => {
-            candidate.lr_scale = range_f64(candidate_space::LR_SCALE_RANGE, high, true);
-        }
+        "ln_lr_scale" => candidate.lr_scale = log_level(candidate_space::LR_SCALE_RANGE, high),
         "ln_adam_lr_scale" => {
-            candidate.adam_lr_scale = range_f64(candidate_space::LR_SCALE_RANGE, high, true);
+            candidate.adam_lr_scale = log_level(candidate_space::LR_SCALE_RANGE, high);
         }
         "ln_nextlat_lr_scale" => {
-            candidate.nextlat_lr_scale = range_f64(candidate_space::LR_SCALE_RANGE, high, true);
+            candidate.nextlat_lr_scale = log_level(candidate_space::LR_SCALE_RANGE, high);
         }
         "ln_warmup_steps" => {
-            candidate.warmup_steps = range_usize(candidate_space::WARMUP_STEPS_RANGE, high);
+            candidate.warmup_steps = usize_level(candidate_space::WARMUP_STEPS_RANGE, high);
         }
         "start_ratio" => {
-            candidate.start_ratio = range_f64(candidate_space::START_RATIO_RANGE, high, false);
+            candidate.start_ratio = f64_level(candidate_space::START_RATIO_RANGE, high);
         }
         "amuse_beta1" => {
-            candidate.amuse_beta1 = range_f64(candidate_space::AMUSE_BETA1_RANGE, high, false);
+            candidate.amuse_beta1 = f64_level(candidate_space::AMUSE_BETA1_RANGE, high);
         }
-        "amuse_rho" => {
-            candidate.amuse_rho = range_f64(candidate_space::AMUSE_RHO_RANGE, high, false);
-        }
+        "amuse_rho" => candidate.amuse_rho = f64_level(candidate_space::AMUSE_RHO_RANGE, high),
         _ => {}
     }
 }
-fn level<T: Copy>(values: &[T], high: bool) -> T {
-    values[if high { values.len() - 1 } else { 0 }]
-}
 fn high_level(row: usize, factor: usize) -> bool {
     ((row + 1) & (factor + 1)).count_ones() & 1 == 0
+}
+fn level<T: Copy>(values: &[T], high: bool) -> T {
+    candidate_space::choose_unit(values, endpoint(high))
+}
+fn log_level(range: (f64, f64), high: bool) -> f64 {
+    candidate_space::log_lerp(range, unit(high))
+}
+fn f64_level(range: (f64, f64), high: bool) -> f64 {
+    candidate_space::range_f64(range, unit(high))
+}
+fn usize_level(range: (usize, usize), high: bool) -> usize {
+    candidate_space::range_usize(range, unit(high))
+}
+fn unit(high: bool) -> f64 {
+    if high { 0.875 } else { 0.125 }
+}
+fn endpoint(high: bool) -> f64 {
+    if high { 1.0 } else { 0.0 }
 }
 fn set_phase(candidate: &mut Candidate, high: bool) {
     let phases =
@@ -113,15 +122,4 @@ fn fix_phase(candidate: &mut Candidate, rng: &mut SweepRng) {
     if !phases.contains(&candidate.aurora_phases) && !phases.is_empty() {
         candidate.aurora_phases = rng.choose(&phases);
     }
-}
-fn range_f64(range: (f64, f64), high: bool, log_scale: bool) -> f64 {
-    let t = if high { 0.875 } else { 0.125 };
-    if log_scale {
-        return (range.0.ln() + (range.1.ln() - range.0.ln()) * t).exp();
-    }
-    range.0 + (range.1 - range.0) * t
-}
-fn range_usize(range: (usize, usize), high: bool) -> usize {
-    let t = if high { 0.875 } else { 0.125 };
-    range.0 + (((range.1 - range.0) as f64) * t).round() as usize
 }

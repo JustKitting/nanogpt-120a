@@ -79,22 +79,22 @@ fn random_usize_range(rng: &mut SweepRng, range: (usize, usize)) -> usize {
     range.0 + rng.usize(range.1 - range.0 + 1)
 }
 
-fn choose_unit<T: Copy>(values: &[T], unit: f64) -> T {
+pub(in crate::sweep) fn choose_unit<T: Copy>(values: &[T], unit: f64) -> T {
     let index = (unit.clamp(0.0, 1.0) * values.len() as f64).floor() as usize;
     values[index.min(values.len() - 1)]
 }
 
-fn log_lerp(range: (f64, f64), unit: f64) -> f64 {
+pub(in crate::sweep) fn log_lerp(range: (f64, f64), unit: f64) -> f64 {
     let lo = range.0.ln();
     let hi = range.1.ln();
     (lo + (hi - lo) * unit.clamp(0.0, 1.0)).exp()
 }
 
-fn range_f64(range: (f64, f64), unit: f64) -> f64 {
+pub(in crate::sweep) fn range_f64(range: (f64, f64), unit: f64) -> f64 {
     range.0 + (range.1 - range.0) * unit.clamp(0.0, 1.0)
 }
 
-fn range_usize(range: (usize, usize), unit: f64) -> usize {
+pub(in crate::sweep) fn range_usize(range: (usize, usize), unit: f64) -> usize {
     let span = (range.1 - range.0) as f64;
     range.0 + (span * unit.clamp(0.0, 1.0)).round() as usize
 }

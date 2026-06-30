@@ -83,8 +83,7 @@ fn pick<T: Copy>(values: &[T], direction: f64, rng: &mut SweepRng, jitter: bool)
     if jitter && rng.f64() < 0.25 {
         return rng.choose(values);
     }
-    let index = (directed_unit(direction) * values.len() as f64).floor() as usize;
-    values[index]
+    candidate_space::choose_unit(values, directed_unit(direction))
 }
 
 fn pick_f64(
@@ -96,16 +95,13 @@ fn pick_f64(
 ) -> f64 {
     let t = pick_unit(direction, rng, jitter);
     if log_scale {
-        let lo = range.0.ln();
-        let hi = range.1.ln();
-        return (lo + (hi - lo) * t).exp();
+        return candidate_space::log_lerp(range, t);
     }
-    range.0 + (range.1 - range.0) * t
+    candidate_space::range_f64(range, t)
 }
 
 fn pick_usize(range: (usize, usize), direction: f64, rng: &mut SweepRng, jitter: bool) -> usize {
-    let span = (range.1 - range.0) as f64;
-    range.0 + (span * pick_unit(direction, rng, jitter)).round() as usize
+    candidate_space::range_usize(range, pick_unit(direction, rng, jitter))
 }
 
 fn pick_unit(direction: f64, rng: &mut SweepRng, jitter: bool) -> f64 {
