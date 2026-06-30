@@ -20,6 +20,7 @@ mod learning_rate;
 mod linear_scratch;
 mod metric_accumulator;
 mod next_latent;
+mod numeric_metric;
 mod operand_scratch;
 mod optimizer;
 mod optimizer_apply;
