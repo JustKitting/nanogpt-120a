@@ -1,9 +1,9 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
-use crate::block_reduce::block_reduce_f32;
+use crate::block_reduce::block_sum_shared_f32;
 use crate::device_ptr::{read_f32, write_f32};
 use crate::float_ptx::sqrt_f32;
-use crate::warp_reduce::{thread_lane_warp, warp_sum_f32};
+use crate::warp_reduce::thread_lane_warp;
 
 const THREADS_PER_BLOCK: u32 = 256;
 const WARPS_PER_BLOCK: u32 = 8;
@@ -48,15 +48,7 @@ pub(super) mod module {
             offset += THREADS_PER_BLOCK;
         }
 
-        let sum = block_reduce_f32!(
-            WARP_SUMS,
-            WARPS_PER_BLOCK,
-            local,
-            lane,
-            warp,
-            warp_sum_f32,
-            0.0
-        );
+        let sum = unsafe { block_sum_shared_f32(&mut WARP_SUMS, local, lane, warp) };
         if thread::threadIdx_x() == 0 {
             write_f32(chunk_sums.as_mut_ptr(), chunk, sum);
         }
@@ -80,15 +72,7 @@ pub(super) mod module {
             chunk += THREADS_PER_BLOCK;
         }
 
-        let sum = block_reduce_f32!(
-            WARP_SUMS,
-            WARPS_PER_BLOCK,
-            local,
-            lane,
-            warp,
-            warp_sum_f32,
-            0.0
-        );
+        let sum = unsafe { block_sum_shared_f32(&mut WARP_SUMS, local, lane, warp) };
         if thread::threadIdx_x() == 0 {
             let norm = sqrt_f32(sum);
             let value = if norm > max_norm {
