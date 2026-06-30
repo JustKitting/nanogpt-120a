@@ -4,7 +4,7 @@ use crate::float_ptx::max_f32;
 use crate::mma::projection::Nvfp4ProjectionParams;
 
 use super::super::tile::Nvfp4ProjectionCtaTile;
-use super::common::{affine_value, affine_value_scaled, row_col};
+use super::common::{affine_pair_scaled, affine_value, row_col};
 
 struct Relu2StoreArgs<'a, 'pre, 'out> {
     input_global_scales: &'a [f32],
@@ -103,20 +103,11 @@ fn store_pair_aligned(
     scale: f32,
     args: &mut Relu2StoreArgs<'_, '_, '_>,
 ) {
-    let pre0 = affine_value_scaled(
-        acc0,
+    let (pre0, pre1) = affine_pair_scaled(
+        (acc0, acc1),
         scale,
         col0,
-        args.bias_bytes,
-        args.bias_scales,
-        args.params,
-    );
-    let pre1 = affine_value_scaled(
-        acc1,
-        scale,
-        col0 + 1,
-        args.bias_bytes,
-        args.bias_scales,
+        (args.bias_bytes, args.bias_scales),
         args.params,
     );
     let relu0 = max_f32(pre0, 0.0);

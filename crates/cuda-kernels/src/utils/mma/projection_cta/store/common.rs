@@ -37,6 +37,20 @@ pub fn affine_value_scaled(
 }
 
 #[inline(always)]
+pub fn affine_pair_scaled(
+    acc: (f32, f32),
+    scale: f32,
+    col0: u32,
+    bias: (&[u8], &[u8]),
+    params: &Nvfp4ProjectionParams,
+) -> (f32, f32) {
+    (
+        affine_value_scaled(acc.0, scale, col0, bias.0, bias.1, params),
+        affine_value_scaled(acc.1, scale, col0 + 1, bias.0, bias.1, params),
+    )
+}
+
+#[inline(always)]
 pub fn row_col(tile: Nvfp4ProjectionCtaTile, index: u32) -> (u32, u32) {
     let row = tile.mma_row_base() + tile.group + if index < 2 { 0 } else { 8 };
     let col = tile.mma_col_base() + tile.thread_in_group * 2 + (index & 1);

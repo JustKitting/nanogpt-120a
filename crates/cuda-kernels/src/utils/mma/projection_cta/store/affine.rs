@@ -3,7 +3,7 @@ use cuda_device::DisjointSlice;
 use crate::mma::projection::Nvfp4ProjectionParams;
 
 use super::super::tile::Nvfp4ProjectionCtaTile;
-use super::common::{affine_value, affine_value_scaled, row_col};
+use super::common::{affine_pair_scaled, affine_value, row_col};
 
 struct AffineStoreArgs<'a> {
     input_global_scales: &'a [f32],
@@ -96,20 +96,11 @@ fn store_pair_aligned(
     out: &mut DisjointSlice<'_, f32>,
     args: &AffineStoreArgs<'_>,
 ) {
-    let value0 = affine_value_scaled(
-        acc0,
+    let (value0, value1) = affine_pair_scaled(
+        (acc0, acc1),
         scale,
         col0,
-        args.bias_bytes,
-        args.bias_scales,
-        args.params,
-    );
-    let value1 = affine_value_scaled(
-        acc1,
-        scale,
-        col0 + 1,
-        args.bias_bytes,
-        args.bias_scales,
+        (args.bias_bytes, args.bias_scales),
         args.params,
     );
     let offset = row as usize * args.params.output_dim as usize + col0 as usize;
