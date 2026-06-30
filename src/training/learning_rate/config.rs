@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, sync::OnceLock};
+use std::{fs, path::PathBuf, str::FromStr, sync::OnceLock};
 
 const TRAIN_LR_SCALE_ENV: &str = "TRAIN_LR_SCALE";
 const TRAIN_ADAM_LR_SCALE_ENV: &str = "TRAIN_ADAM_LR_SCALE";
@@ -17,57 +17,39 @@ const DEFAULT_AMUSE_BETA1: f32 = 0.2;
 const DEFAULT_AMUSE_RHO: f32 = 0.5;
 
 pub(in crate::training) fn scale() -> f32 {
-    scale_from(TRAIN_LR_SCALE_ENV)
-        .or_else(|| baseline().f32(TRAIN_LR_SCALE_ENV))
-        .unwrap_or(DEFAULT_LR_SCALE)
+    config_value(TRAIN_LR_SCALE_ENV, DEFAULT_LR_SCALE)
 }
 
 pub(in crate::training) fn adam_scale() -> f32 {
-    scale_from(TRAIN_ADAM_LR_SCALE_ENV)
-        .or_else(|| baseline().f32(TRAIN_ADAM_LR_SCALE_ENV))
-        .unwrap_or(DEFAULT_ADAM_LR_SCALE)
+    config_value(TRAIN_ADAM_LR_SCALE_ENV, DEFAULT_ADAM_LR_SCALE)
 }
 
 pub(in crate::training) fn next_latent_scale() -> f32 {
-    scale_from(TRAIN_NEXTLAT_LR_SCALE_ENV)
-        .or_else(|| baseline().f32(TRAIN_NEXTLAT_LR_SCALE_ENV))
-        .unwrap_or(DEFAULT_NEXTLAT_LR_SCALE)
+    config_value(TRAIN_NEXTLAT_LR_SCALE_ENV, DEFAULT_NEXTLAT_LR_SCALE)
 }
 
 pub(in crate::training) fn warmup_steps() -> u32 {
-    std::env::var(TRAIN_LR_WARMUP_STEPS_ENV)
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .or_else(|| baseline().u32(TRAIN_LR_WARMUP_STEPS_ENV))
-        .unwrap_or(DEFAULT_LR_WARMUP_STEPS)
-        .max(1)
+    config_value(TRAIN_LR_WARMUP_STEPS_ENV, DEFAULT_LR_WARMUP_STEPS).max(1)
 }
 
 pub(in crate::training) fn start_ratio() -> f32 {
-    scale_from(TRAIN_LR_START_RATIO_ENV)
-        .or_else(|| baseline().f32(TRAIN_LR_START_RATIO_ENV))
-        .unwrap_or(DEFAULT_LR_START_RATIO)
-        .clamp(0.0, 1.0)
+    config_value(TRAIN_LR_START_RATIO_ENV, DEFAULT_LR_START_RATIO).clamp(0.0, 1.0)
 }
 
 pub(in crate::training) fn amuse_beta1() -> f32 {
-    scale_from(TRAIN_AMUSE_BETA1_ENV)
-        .or_else(|| baseline().f32(TRAIN_AMUSE_BETA1_ENV))
-        .unwrap_or(DEFAULT_AMUSE_BETA1)
-        .clamp(0.0, 1.0)
+    config_value(TRAIN_AMUSE_BETA1_ENV, DEFAULT_AMUSE_BETA1).clamp(0.0, 1.0)
 }
 
 pub(in crate::training) fn amuse_rho() -> f32 {
-    scale_from(TRAIN_AMUSE_RHO_ENV)
-        .or_else(|| baseline().f32(TRAIN_AMUSE_RHO_ENV))
-        .unwrap_or(DEFAULT_AMUSE_RHO)
-        .clamp(0.0, 1.0)
+    config_value(TRAIN_AMUSE_RHO_ENV, DEFAULT_AMUSE_RHO).clamp(0.0, 1.0)
 }
 
-fn scale_from(name: &str) -> Option<f32> {
+fn config_value<T: FromStr>(name: &str, default: T) -> T {
     std::env::var(name)
         .ok()
         .and_then(|value| value.parse().ok())
+        .or_else(|| baseline().parse(name))
+        .unwrap_or(default)
 }
 
 fn baseline() -> &'static Baseline {
@@ -86,11 +68,7 @@ impl Baseline {
         }
     }
 
-    fn f32(&self, name: &str) -> Option<f32> {
-        self.value(name).and_then(|value| value.parse().ok())
-    }
-
-    fn u32(&self, name: &str) -> Option<u32> {
+    fn parse<T: FromStr>(&self, name: &str) -> Option<T> {
         self.value(name).and_then(|value| value.parse().ok())
     }
 
