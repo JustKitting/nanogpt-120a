@@ -2,42 +2,30 @@ use cuda_device::{SharedArray, thread};
 
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
 
-pub(super) fn stage_tiles(
-    a: &[u16],
-    b_t: &[u16],
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-    tile: CtaTile,
-    m: u32,
-    n: u32,
-    k: u32,
-    k_base: u32,
-) {
-    let thread_id = thread::threadIdx_x();
-    let mut offset = thread_id;
-    while offset < CTA_A_ELEMS as u32 {
-        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
-        a_tile[offset as usize] = if global_row < m && global_col < k {
-            a[((tile.batch * m + global_row) * k + global_col) as usize]
-        } else {
-            0
-        };
-        offset += CTA_THREADS;
-    }
-
-    let mut offset = thread_id;
-    while offset < CTA_B_ELEMS as u32 {
-        let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
-        b_tile[offset as usize] = if global_row < n && global_col < k {
-            b_t[((tile.batch * n + global_row) * k + global_col) as usize]
-        } else {
-            0
-        };
-        offset += CTA_THREADS;
-    }
+macro_rules! stage_tiles_fn {
+    ($name:ident, $check_bounds:expr) => {
+        #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+        pub(super) fn $name(
+            a: &[u16],
+            b_t: &[u16],
+            a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+            b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+            tile: CtaTile,
+            m: u32,
+            n: u32,
+            k: u32,
+            k_base: u32,
+        ) {
+            stage_tiles_impl::<$check_bounds>(a, b_t, a_tile, b_tile, tile, m, n, k, k_base);
+        }
+    };
 }
 
-pub(super) fn stage_tiles_aligned(
+stage_tiles_fn!(stage_tiles, true);
+stage_tiles_fn!(stage_tiles_aligned, false);
+
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+fn stage_tiles_impl<const CHECK_BOUNDS: bool>(
     a: &[u16],
     b_t: &[u16],
     a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
@@ -48,18 +36,28 @@ pub(super) fn stage_tiles_aligned(
     k: u32,
     k_base: u32,
 ) {
+    stage_matrix_tile::<CHECK_BOUNDS, CTA_A_ELEMS>(a, a_tile, tile, tile.row_base, m, k, k_base);
+    stage_matrix_tile::<CHECK_BOUNDS, CTA_B_ELEMS>(b_t, b_tile, tile, tile.col_base, n, k, k_base);
+}
+
+fn stage_matrix_tile<const CHECK_BOUNDS: bool, const TILE_ELEMS: usize>(
+    src: &[u16],
+    dst: &mut SharedArray<u16, TILE_ELEMS>,
+    tile: CtaTile,
+    row_base: u32,
+    rows: u32,
+    cols: u32,
+    k_base: u32,
+) {
     let thread_id = thread::threadIdx_x();
     let mut offset = thread_id;
-    while offset < CTA_A_ELEMS as u32 {
-        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
-        a_tile[offset as usize] = a[((tile.batch * m + global_row) * k + global_col) as usize];
-        offset += CTA_THREADS;
-    }
-
-    let mut offset = thread_id;
-    while offset < CTA_B_ELEMS as u32 {
-        let (global_row, global_col) = stage_coords(offset, tile.col_base, k_base);
-        b_tile[offset as usize] = b_t[((tile.batch * n + global_row) * k + global_col) as usize];
+    while offset < TILE_ELEMS as u32 {
+        let (global_row, global_col) = stage_coords(offset, row_base, k_base);
+        dst[offset as usize] = if !CHECK_BOUNDS || (global_row < rows && global_col < cols) {
+            src[((tile.batch * rows + global_row) * cols + global_col) as usize]
+        } else {
+            0
+        };
         offset += CTA_THREADS;
     }
 }
