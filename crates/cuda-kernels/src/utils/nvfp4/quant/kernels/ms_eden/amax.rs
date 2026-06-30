@@ -1,7 +1,7 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use crate::amax::{amax4_f32, max4_f32};
-use crate::block_reduce::block_max_leader_f32;
+use crate::block_reduce::{block_max_leader_f32, block_max_store_f32};
 use crate::float_ptx::max_f32;
 use crate::quartet::quartet_backward_ms_eden_global_scale;
 
@@ -56,13 +56,7 @@ pub(crate) mod module {
             )
         };
 
-        if let Some(block_amax) =
-            unsafe { block_max_leader_f32(&mut AMAX_REDUCE, local_amax, lane, warp_in_block) }
-        {
-            unsafe {
-                *out.get_unchecked_mut(chunk as usize) = block_amax;
-            }
-        }
+        block_max_store_f32!(AMAX_REDUCE, out[chunk], local_amax, lane, warp_in_block);
     }
 
     #[kernel]
@@ -100,13 +94,7 @@ pub(crate) mod module {
             )
         };
 
-        if let Some(block_amax) =
-            unsafe { block_max_leader_f32(&mut AMAX_REDUCE, local_amax, lane, warp_in_block) }
-        {
-            unsafe {
-                *out.get_unchecked_mut(chunk as usize) = block_amax;
-            }
-        }
+        block_max_store_f32!(AMAX_REDUCE, out[chunk], local_amax, lane, warp_in_block);
     }
 
     #[kernel]

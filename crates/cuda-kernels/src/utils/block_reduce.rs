@@ -29,6 +29,20 @@ macro_rules! block_reduce_f32 {
 
 pub(crate) use block_reduce_f32;
 
+macro_rules! block_max_store_f32 {
+    ($storage:ident, $out:ident[$index:expr], $local:expr, $lane:expr, $warp:expr) => {
+        if let Some(block_value) = unsafe {
+            crate::block_reduce::block_max_leader_f32(&mut $storage, $local, $lane, $warp)
+        } {
+            unsafe {
+                *$out.get_unchecked_mut($index as usize) = block_value;
+            }
+        }
+    };
+}
+
+pub(crate) use block_max_store_f32;
+
 use cuda_device::SharedArray;
 
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};

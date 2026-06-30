@@ -120,6 +120,7 @@ fn qkv_index(row: u32, head: u32, dim: u32, section_offset: u32, params: ClipPar
     (row * params.qkv_dim + section_offset + head * params.head_dim + dim) as usize
 }
 
+#[allow(clippy::eq_op)]
 fn clip_factor(score: f32, tau: f32) -> f32 {
     if score == score && score > tau {
         sqrt_f32(tau / (score + KDA_DENOM_EPS))
