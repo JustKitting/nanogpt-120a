@@ -4,15 +4,13 @@ use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
 
 use crate::AppResult;
 
+mod factory;
 mod shakespeare;
 mod source;
 mod synth;
 mod tokens;
 mod validation;
 
-use source::{
-    DATASET_SHAKESPEARE, DATASET_SYNTH, repeat_first_window, token_count_paths, training_dataset,
-};
 use validation::{VALIDATION_WINDOWS, train_end, validation_windows};
 
 pub struct TokenDataLoader {
@@ -38,43 +36,6 @@ pub struct TokenWindowBatch {
 }
 
 impl TokenDataLoader {
-    pub fn training_dataset_name() -> String {
-        training_dataset()
-    }
-
-    pub fn validation_window_count() -> usize {
-        VALIDATION_WINDOWS
-    }
-
-    pub fn from_training_dataset() -> AppResult<Self> {
-        match training_dataset().as_str() {
-            DATASET_SYNTH => Self::from_synth(),
-            DATASET_SHAKESPEARE => Self::from_shakespeare(),
-            dataset => Err(format!(
-                "unknown TRAIN_DATASET={dataset}; expected synth or shakespeare"
-            )
-            .into()),
-        }
-    }
-
-    pub fn from_synth() -> AppResult<Self> {
-        synth::ensure_shards()?;
-        let train_paths = synth::train_shards()?;
-        let validation_path = synth::first_val_shard()?;
-        let validation_tokens = tokens::read_u16_tokens(&validation_path)?;
-        Self::from_train_paths(
-            train_paths,
-            Some((validation_path, validation_tokens)),
-            false,
-            false,
-        )
-    }
-
-    pub fn from_shakespeare() -> AppResult<Self> {
-        let path = shakespeare::ensure_shard()?;
-        Self::from_train_paths(vec![path], None, true, true)
-    }
-
     pub fn next_batch(&mut self) -> AppResult<TokenWindowBatch> {
         let len = GPT2_SEQ_LEN + 1;
         let batch_span = GPT2_BATCH_SIZE * GPT2_SEQ_LEN + 1;
@@ -121,43 +82,6 @@ impl TokenDataLoader {
         let needed = VALIDATION_WINDOWS * (GPT2_SEQ_LEN + 1);
         let start = self.tokens.len().saturating_sub(needed);
         validation_windows(&self.path, &self.tokens, start)
-    }
-
-    fn from_train_paths(
-        train_paths: Vec<PathBuf>,
-        validation: Option<(PathBuf, Vec<u16>)>,
-        wrap_train: bool,
-        reserve_validation_tail: bool,
-    ) -> AppResult<Self> {
-        let path = train_paths
-            .first()
-            .cloned()
-            .ok_or("training dataset has no train shards")?;
-        let tokens = tokens::read_u16_tokens(&path)?;
-        let train_end = if validation.is_some() {
-            tokens.len()
-        } else if reserve_validation_tail {
-            train_end(tokens.len())
-        } else {
-            tokens.len()
-        };
-        let total_train_tokens = token_count_paths(&train_paths)?;
-        let (validation_path, validation_tokens) = validation
-            .map(|(path, tokens)| (Some(path), Some(tokens)))
-            .unwrap_or((None, None));
-        Ok(Self {
-            path,
-            train_paths,
-            train_path_index: 0,
-            tokens,
-            validation_tokens,
-            validation_path,
-            offset: 0,
-            train_end,
-            total_train_tokens,
-            repeat_first_window: repeat_first_window(),
-            wrap_train,
-        })
     }
 
     fn advance_train_shard(&mut self) -> AppResult<()> {
