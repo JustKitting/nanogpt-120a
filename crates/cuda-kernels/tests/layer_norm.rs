@@ -10,18 +10,6 @@ const GPT_EMBEDDING_DIM: usize = 768;
 const E2M1_ONE_PAIR: u8 = 0x22;
 const E4M3_ONE: u8 = 0x38;
 
-const SAMPLE_ROW_0: [f32; ROW_SIZE] = [
-    -3.875, -3.625, -3.375, -3.125, -2.875, -2.625, -2.375, -2.125, -1.875, -1.625, -1.375, -1.125,
-    -0.875, -0.625, -0.375, -0.125, 0.125, 0.375, 0.625, 0.875, 1.125, 1.375, 1.625, 1.875, 2.125,
-    2.375, 2.625, 2.875, 3.125, 3.375, 3.625, 3.875,
-];
-
-const SAMPLE_ROW_1: [f32; ROW_SIZE] = [
-    -5.3125, -4.9375, -4.5625, -4.1875, -3.8125, -3.4375, -3.0625, -2.6875, -2.3125, -1.9375,
-    -1.5625, -1.1875, -0.8125, -0.4375, -0.0625, 0.3125, 0.6875, 1.0625, 1.4375, 1.8125, 2.1875,
-    2.5625, 2.9375, 3.3125, 3.6875, 4.0625, 4.4375, 4.8125, 5.1875, 5.5625, 5.9375, 6.3125,
-];
-
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
@@ -31,10 +19,9 @@ fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let mut gamma = [0.0f32; ROW_SIZE];
     let mut beta = [0.0f32; ROW_SIZE];
 
-    x[..ROW_SIZE].copy_from_slice(&SAMPLE_ROW_0);
-    x[ROW_SIZE..].copy_from_slice(&SAMPLE_ROW_1);
-
     for col in 0..ROW_SIZE {
+        x[col] = sample_row_0(col);
+        x[ROW_SIZE + col] = sample_row_1(col);
         gamma[col] = 0.75 + col as f32 * 0.01;
         beta[col] = -0.125 + col as f32 * 0.005;
     }
@@ -132,6 +119,14 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     assert!(max_abs_error <= 1.0e-7, "max_abs_error={max_abs_error:.8e}");
     assert_row_amax(&out, &amax, row_count, GPT_EMBEDDING_DIM);
     Ok(())
+}
+
+fn sample_row_0(col: usize) -> f32 {
+    -3.875 + col as f32 * 0.25
+}
+
+fn sample_row_1(col: usize) -> f32 {
+    -5.3125 + col as f32 * 0.375
 }
 
 fn reference_layer_norm(
