@@ -11,6 +11,7 @@ use super::pack::{
     ms_eden_pack_chunk_no_chunk_amax_row, pack_chunk,
 };
 use super::random::random_sign;
+use super::transpose_kernels::pack_padded_transpose_chunk;
 
 #[cuda_module]
 pub(crate) mod module {
@@ -35,32 +36,20 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
-        let lane = warp::lane_id();
         guarded_pack_chunk!(chunk, chunk_count);
-
-        let chunk_base = chunk * HADAMARD_DIM;
-        let input = rowwise_transposed_hadamard_input(
-            bytes,
-            scales,
-            source_global_scales,
-            chunk_base,
-            lane,
-            source_rows,
-            source_cols,
-            dst_row_len,
-            sign_seed,
-        );
-        ms_eden_pack_chunk(
-            input,
-            &mut out_fp4,
-            &mut out_scales,
-            &mut out_global_scales,
-            &mut out_chunk_amax,
-            chunk,
-            dst_row_len,
-            global_scale[0],
-            scale_override,
-            scale_seed,
+        pack_padded_transpose_chunk!(
+            chunk_amax,
+            input: rowwise_transposed_hadamard_input(bytes, scales, source_global_scales),
+            chunk: chunk,
+            output: [
+                &mut out_fp4,
+                &mut out_scales,
+                &mut out_global_scales,
+                &mut out_chunk_amax
+            ],
+            dims: [source_rows, source_cols, dst_row_len],
+            scale: [global_scale[0], scale_override, scale_seed],
+            sign_seed: sign_seed,
         );
     }
 
@@ -82,31 +71,15 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
-        let lane = warp::lane_id();
         guarded_pack_chunk!(chunk, chunk_count);
-
-        let chunk_base = chunk * HADAMARD_DIM;
-        let input = rowwise_transposed_hadamard_input(
-            bytes,
-            scales,
-            source_global_scales,
-            chunk_base,
-            lane,
-            source_rows,
-            source_cols,
-            dst_row_len,
-            sign_seed,
-        );
-        ms_eden_pack_chunk_no_chunk_amax(
-            input,
-            &mut out_fp4,
-            &mut out_scales,
-            &mut out_global_scales,
-            chunk,
-            dst_row_len,
-            global_scale[0],
-            scale_override,
-            scale_seed,
+        pack_padded_transpose_chunk!(
+            no_chunk_amax,
+            input: rowwise_transposed_hadamard_input(bytes, scales, source_global_scales),
+            chunk: chunk,
+            output: [&mut out_fp4, &mut out_scales, &mut out_global_scales],
+            dims: [source_rows, source_cols, dst_row_len],
+            scale: [global_scale[0], scale_override, scale_seed],
+            sign_seed: sign_seed,
         );
     }
 
@@ -127,30 +100,14 @@ pub(crate) mod module {
         sign_seed: u32,
         scale_seed: u32,
     ) {
-        let lane = warp::lane_id();
-        let chunk = pack_chunk();
-        let chunk_base = chunk * HADAMARD_DIM;
-        let input = rowwise_transposed_hadamard_input(
-            bytes,
-            scales,
-            source_global_scales,
-            chunk_base,
-            lane,
-            source_rows,
-            source_cols,
-            dst_row_len,
-            sign_seed,
-        );
-        ms_eden_pack_chunk_no_chunk_amax(
-            input,
-            &mut out_fp4,
-            &mut out_scales,
-            &mut out_global_scales,
-            chunk,
-            dst_row_len,
-            global_scale[0],
-            scale_override,
-            scale_seed,
+        pack_padded_transpose_chunk!(
+            no_chunk_amax,
+            input: rowwise_transposed_hadamard_input(bytes, scales, source_global_scales),
+            chunk: pack_chunk(),
+            output: [&mut out_fp4, &mut out_scales, &mut out_global_scales],
+            dims: [source_rows, source_cols, dst_row_len],
+            scale: [global_scale[0], scale_override, scale_seed],
+            sign_seed: sign_seed,
         );
     }
 

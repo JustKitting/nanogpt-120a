@@ -32,3 +32,5 @@ mod pack;
 mod random;
 #[path = "ms_eden/rowwise_transpose.rs"]
 pub(crate) mod rowwise_transpose;
+#[path = "ms_eden/transpose_kernels.rs"]
+mod transpose_kernels;
