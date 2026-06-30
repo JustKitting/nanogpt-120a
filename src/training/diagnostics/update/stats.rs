@@ -78,26 +78,21 @@ pub(super) fn tensor_update_stats(
     let delta_rms = rms(delta_sum_sq, len);
     let predicted_delta_rms = rms(predicted_delta_sum_sq, len);
     let quant_error_rms = rms(quant_error_sum_sq, len);
-    let update_to_weight_rms = if weight_rms_before > 0.0 {
-        delta_rms / weight_rms_before
-    } else {
-        0.0
-    };
-    let quant_error_to_predicted_delta_rms = if predicted_delta_rms > 0.0 {
-        quant_error_rms / predicted_delta_rms
-    } else {
-        0.0
-    };
-    let delta_grad_cos = if grad_sum_sq > 0.0 && delta_sum_sq > 0.0 {
-        (grad_dot_delta / (grad_sum_sq.sqrt() * delta_sum_sq.sqrt())) as f32
-    } else {
-        0.0
-    };
-    let predicted_delta_grad_cos = if grad_sum_sq > 0.0 && predicted_delta_sum_sq > 0.0 {
-        (grad_dot_predicted_delta / (grad_sum_sq.sqrt() * predicted_delta_sum_sq.sqrt())) as f32
-    } else {
-        0.0
-    };
+    let update_to_weight_rms = (weight_rms_before > 0.0)
+        .then_some(delta_rms / weight_rms_before)
+        .unwrap_or(0.0);
+    let quant_error_to_predicted_delta_rms = (predicted_delta_rms > 0.0)
+        .then_some(quant_error_rms / predicted_delta_rms)
+        .unwrap_or(0.0);
+    let delta_grad_cos = (grad_sum_sq > 0.0 && delta_sum_sq > 0.0)
+        .then_some((grad_dot_delta / (grad_sum_sq.sqrt() * delta_sum_sq.sqrt())) as f32)
+        .unwrap_or(0.0);
+    let predicted_delta_grad_cos = (grad_sum_sq > 0.0 && predicted_delta_sum_sq > 0.0)
+        .then_some(
+            (grad_dot_predicted_delta / (grad_sum_sq.sqrt() * predicted_delta_sum_sq.sqrt()))
+                as f32,
+        )
+        .unwrap_or(0.0);
 
     TensorUpdateDiagnostics {
         name: pending.name,
