@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError};
 
 use super::kernel::{THREADS_PER_BLOCK, kernels};
 use super::param::{PARAM_THREADS_PER_BLOCK, kernels as param_kernels};
+use crate::launch::grid_x_config;
 use crate::nvfp4::Nvfp4DeviceTensor;
 
 pub struct LayerNormBackwardInputArgs<'a, 'out> {
@@ -73,11 +74,7 @@ impl LayerNormBackwardModule {
     ) -> Result<(), DriverError> {
         self.module.layer_norm_backward_input_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.row_count, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.row_count, THREADS_PER_BLOCK),
             args.residual,
             args.d_normalized,
             args.mean,
@@ -97,11 +94,7 @@ impl LayerNormBackwardModule {
     ) -> Result<(), DriverError> {
         self.module.layer_norm_backward_input_f32_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.row_count, 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.row_count, THREADS_PER_BLOCK),
             args.residual,
             args.d_normalized,
             args.mean,
@@ -121,11 +114,7 @@ impl LayerNormBackwardModule {
     ) -> Result<(), DriverError> {
         self.param_module.layer_norm_backward_params_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.embedding_dim, 1, 1),
-                block_dim: (PARAM_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.embedding_dim, PARAM_THREADS_PER_BLOCK),
             args.residual,
             args.d_normalized,
             args.mean,
@@ -143,11 +132,7 @@ impl LayerNormBackwardModule {
     ) -> Result<(), DriverError> {
         self.param_module.layer_norm_backward_params_f32_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.embedding_dim, 1, 1),
-                block_dim: (PARAM_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.embedding_dim, PARAM_THREADS_PER_BLOCK),
             args.residual,
             args.d_normalized,
             args.mean,

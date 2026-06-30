@@ -1,7 +1,8 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use super::{ApplyRopeParams, THREADS_PER_BLOCK};
 use crate::attention::AttentionModule;
+use crate::launch::linear_config;
 
 pub struct ApplyRopeArgs<'a, 'out> {
     pub stream: &'a CudaStream,
@@ -19,11 +20,7 @@ pub struct ApplyRopeArgs<'a, 'out> {
 impl AttentionModule {
     pub fn apply_rope(&self, args: ApplyRopeArgs<'_, '_>) -> Result<(), DriverError> {
         let pair_count = args.batch_size * args.seq_len * args.head_count * (args.head_dim / 2);
-        let config = LaunchConfig {
-            grid_dim: (pair_count.div_ceil(THREADS_PER_BLOCK), 1, 1),
-            block_dim: (THREADS_PER_BLOCK, 1, 1),
-            shared_mem_bytes: 0,
-        };
+        let config = linear_config(pair_count, THREADS_PER_BLOCK);
         let params = ApplyRopeParams {
             row_count: args.row_count,
             seq_len: args.seq_len,

@@ -1,5 +1,7 @@
 use cuda_core::LaunchConfig;
 
+use crate::launch::{launch_config, linear_config as linear_launch_config};
+
 pub(crate) const KDA_HEAD_DIM: u32 = 64;
 pub(crate) const KDA_CHUNK_SIZE: u32 = 64;
 pub(crate) const KDA_DECAY_SCALE: f32 = 0.01;
@@ -50,8 +52,7 @@ impl LaunchDims {
 }
 
 pub(crate) fn linear_config(element_count: u32, threads_per_block: u32) -> LaunchConfig {
-    let blocks = element_count.div_ceil(threads_per_block);
-    launch_config((blocks, 1, 1), threads_per_block)
+    linear_launch_config(element_count, threads_per_block)
 }
 
 pub(crate) fn chunk_dim_config(
@@ -68,14 +69,6 @@ pub(crate) fn matrix_config(batch_count: u32, threads_per_block: u32) -> LaunchC
 
 pub(crate) fn batch_head_config(batch_head: u32, threads_per_block: u32) -> LaunchConfig {
     launch_config((batch_head, 1, 1), threads_per_block)
-}
-
-fn launch_config(grid_dim: (u32, u32, u32), threads_per_block: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim,
-        block_dim: (threads_per_block, 1, 1),
-        shared_mem_bytes: 0,
-    }
 }
 
 #[derive(Clone, Copy)]

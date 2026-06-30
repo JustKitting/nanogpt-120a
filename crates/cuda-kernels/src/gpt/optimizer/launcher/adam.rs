@@ -1,8 +1,9 @@
-use cuda_core::{DriverError, LaunchConfig};
+use cuda_core::DriverError;
 
 use super::super::args::AdamWUpdateArgs;
 use super::super::threads::APPLY_THREADS_PER_BLOCK;
 use super::OptimizerModule;
+use crate::launch::linear_config;
 
 impl OptimizerModule {
     pub fn apply_adamw_update(&self, args: AdamWUpdateArgs<'_>) -> Result<(), DriverError> {
@@ -15,11 +16,7 @@ impl OptimizerModule {
 
         self.apply.adam.fp32_adamw_update_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.len.div_ceil(APPLY_THREADS_PER_BLOCK), 1, 1),
-                block_dim: (APPLY_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            linear_config(args.len, APPLY_THREADS_PER_BLOCK),
             args.z_master,
             args.x_master,
             args.grad,

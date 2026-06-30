@@ -1,5 +1,6 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
+use crate::launch::grid_x_config;
 use crate::nvfp4_quant::{
     MsEdenDeviceScaleQuantArgs, MsEdenPairDeviceScaleQuantArgs, Nvfp4QuantModule,
     Nvfp4TransposeMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenDeviceScaleQuantArgs,
@@ -21,11 +22,10 @@ impl LinearBackwardModule {
         if let Some(dbias) = args.dbias {
             self.module.linear_bias_grad_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (bias::grid_dim(args.output_dim), 1, 1),
-                    block_dim: (LINEAR_BIAS_THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_x_config(
+                    bias::grid_dim(args.output_dim),
+                    LINEAR_BIAS_THREADS_PER_BLOCK,
+                ),
                 args.e,
                 dbias,
                 args.token_count,

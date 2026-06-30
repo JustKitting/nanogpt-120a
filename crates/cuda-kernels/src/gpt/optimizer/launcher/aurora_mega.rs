@@ -1,6 +1,7 @@
-use cuda_core::{DriverError, LaunchConfig};
+use cuda_core::DriverError;
 
 use crate::f16_tc_matmul::cta_tile::CTA_THREADS;
+use crate::launch::launch_config;
 
 use super::super::args::AuroraMegaUpdateArgs;
 use super::super::{AURORA_COOPERATIVE_BLOCKS, AURORA_MATRIX_PHASES};
@@ -15,11 +16,10 @@ impl OptimizerModule {
             .mega
             .aurora_mega_update_cooperative_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (AURORA_COOPERATIVE_BLOCKS as u32, matrix_count, 1),
-                    block_dim: (CTA_THREADS, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                launch_config(
+                    (AURORA_COOPERATIVE_BLOCKS as u32, matrix_count, 1),
+                    CTA_THREADS,
+                ),
                 args.slots,
                 args.oriented,
                 args.polar_next,

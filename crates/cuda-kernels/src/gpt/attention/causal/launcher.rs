@@ -1,6 +1,7 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use crate::attention::AttentionModule;
+use crate::launch::launch_config;
 
 use super::{CAUSAL_ATTENTION_MAX_THREADS_PER_BLOCK, CausalAttentionParams};
 
@@ -22,11 +23,10 @@ impl AttentionModule {
     pub fn causal_attention(&self, args: CausalAttentionArgs<'_, '_>) -> Result<(), DriverError> {
         self.causal_attention.causal_attention_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.seq_len, args.head_count, args.batch_size),
-                block_dim: (causal_attention_threads(args.head_dim), 1, 1),
-                shared_mem_bytes: 0,
-            },
+            launch_config(
+                (args.seq_len, args.head_count, args.batch_size),
+                causal_attention_threads(args.head_dim),
+            ),
             args.qkv,
             args.out,
             args.log_sum_exp,

@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError};
 
+use crate::launch::{grid_x_config, launch_config};
 use crate::nvfp4::Nvfp4DeviceTensor;
 
 use super::{GPT_LAYER_NORM_THREADS_PER_BLOCK, THREADS_PER_BLOCK, WARPS_PER_BLOCK, kernels};
@@ -59,11 +60,10 @@ impl LayerNormModule {
     pub fn layer_norm_warp_f32(&self, args: LayerNormArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.layer_norm_warp_f32_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.row_count.div_ceil(WARPS_PER_BLOCK), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            launch_config(
+                (args.row_count.div_ceil(WARPS_PER_BLOCK), 1, 1),
+                THREADS_PER_BLOCK,
+            ),
             args.x,
             args.gamma,
             args.beta,
@@ -76,11 +76,7 @@ impl LayerNormModule {
     pub fn gpt_layer_norm(&self, args: GptLayerNormArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.gpt_layer_norm_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.row_count, 1, 1),
-                block_dim: (GPT_LAYER_NORM_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.row_count, GPT_LAYER_NORM_THREADS_PER_BLOCK),
             args.residual,
             args.weight.bytes,
             args.weight.scales,
@@ -104,11 +100,7 @@ impl LayerNormModule {
     ) -> Result<(), DriverError> {
         self.module.gpt_layer_norm_save_residual_f16_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.row_count, 1, 1),
-                block_dim: (GPT_LAYER_NORM_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.row_count, GPT_LAYER_NORM_THREADS_PER_BLOCK),
             args.residual,
             args.weight.bytes,
             args.weight.scales,

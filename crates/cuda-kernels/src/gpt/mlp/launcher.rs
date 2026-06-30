@@ -4,6 +4,7 @@ use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
 use super::args::{MlpDownResidualArgs, MlpUpRelu2Args, Relu2BackwardArgs, Relu2BackwardF16Args};
 use super::kernels;
+use crate::launch::{launch_config, linear_config};
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams,
     projection_cta_grid_dim, projection_cta_row_pair_grid_dim, projection_cta_shape_aligned,
@@ -60,11 +61,7 @@ impl MlpModule {
     pub fn relu2_backward(&self, args: Relu2BackwardArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.relu2_backward_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.len.div_ceil(kernels::RELU2_THREADS_PER_BLOCK), 1, 1),
-                block_dim: (kernels::RELU2_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            linear_config(args.len, kernels::RELU2_THREADS_PER_BLOCK),
             args.pre_activation,
             args.d_out,
             args.d_pre_activation,
@@ -78,11 +75,7 @@ impl MlpModule {
     ) -> Result<(), DriverError> {
         self.module.relu2_backward_f16_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.len.div_ceil(kernels::RELU2_THREADS_PER_BLOCK), 1, 1),
-                block_dim: (kernels::RELU2_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            linear_config(args.len, kernels::RELU2_THREADS_PER_BLOCK),
             args.pre_activation,
             args.d_out,
             args.d_pre_activation,
@@ -92,15 +85,14 @@ impl MlpModule {
 }
 
 fn aligned_config(token_count: u32, input_dim: u32, output_dim: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim: if projection_cta_shape_aligned(token_count, input_dim, output_dim) {
+    launch_config(
+        if projection_cta_shape_aligned(token_count, input_dim, output_dim) {
             projection_cta_row_pair_grid_dim(token_count, output_dim)
         } else {
             projection_cta_grid_dim(token_count, output_dim)
         },
-        block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
-        shared_mem_bytes: 0,
-    }
+        NVFP4_PROJECTION_CTA_THREADS,
+    )
 }
 
 fn up_params(args: &MlpUpRelu2Args<'_, '_>) -> Nvfp4ProjectionParams {

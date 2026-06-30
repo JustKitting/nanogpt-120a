@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, DriverError};
 
 use super::args::{Nvfp4TcMatmulArgs, nvfp4_tc_matmul_padded_k};
 use super::kernels;
 use super::pad::pad_rows;
 use super::quantize::quantize_operand;
+use crate::launch::launch_config;
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams,
     projection_grid_dim,
@@ -75,11 +76,10 @@ impl Nvfp4TcMatmulModule {
         let a = scratch.a.rowwise();
         self.module.nvfp4_tc_matmul_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: projection_grid_dim(args.m, args.n),
-                block_dim: (NVFP4_PROJECTION_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            launch_config(
+                projection_grid_dim(args.m, args.n),
+                NVFP4_PROJECTION_THREADS_PER_BLOCK,
+            ),
             a.bytes,
             a.scales,
             a.global_scales,

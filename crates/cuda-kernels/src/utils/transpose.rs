@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError};
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
+
+use crate::launch::linear_config;
 
 const TRANSPOSE_THREADS_PER_BLOCK: u32 = 256;
 
@@ -36,17 +38,10 @@ impl TransposeModule {
     pub fn transpose_f32(&self, args: TransposeF32Args<'_, '_>) -> Result<(), DriverError> {
         self.module.transpose_f32_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (
-                    args.rows
-                        .saturating_mul(args.cols)
-                        .div_ceil(TRANSPOSE_THREADS_PER_BLOCK),
-                    1,
-                    1,
-                ),
-                block_dim: (TRANSPOSE_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            linear_config(
+                args.rows.saturating_mul(args.cols),
+                TRANSPOSE_THREADS_PER_BLOCK,
+            ),
             args.input,
             args.output,
             TransposeParams {

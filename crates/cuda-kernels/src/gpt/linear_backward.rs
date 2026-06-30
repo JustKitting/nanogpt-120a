@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, DriverError};
 
+use crate::launch::{grid_x_config, launch_config};
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS,
     NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams, projection_cta_grid_dim,
@@ -73,11 +74,10 @@ impl LinearBackwardModule {
 
         self.module.linear_backward_projection_device_scale_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: projection_grid_dim(args.token_count, args.input_dim),
-                block_dim: (NVFP4_PROJECTION_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            launch_config(
+                projection_grid_dim(args.token_count, args.input_dim),
+                NVFP4_PROJECTION_THREADS_PER_BLOCK,
+            ),
             args.e_h.bytes,
             args.e_h.scales,
             args.e_h.global_scales,
@@ -90,11 +90,10 @@ impl LinearBackwardModule {
 
         self.module.linear_backward_projection_device_scale_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: projection_grid_dim(args.output_dim, args.input_dim),
-                block_dim: (NVFP4_PROJECTION_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            launch_config(
+                projection_grid_dim(args.output_dim, args.input_dim),
+                NVFP4_PROJECTION_THREADS_PER_BLOCK,
+            ),
             args.e_t_h.bytes,
             args.e_t_h.scales,
             args.e_t_h.global_scales,
@@ -127,11 +126,7 @@ impl LinearBackwardModule {
         self.module
             .linear_backward_projection_pair_cta_device_scale_kernel(
                 args.stream,
-                LaunchConfig {
-                    grid_dim: (dinput_tiles + dweight_tiles, 1, 1),
-                    block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
-                    shared_mem_bytes: 0,
-                },
+                grid_x_config(dinput_tiles + dweight_tiles, NVFP4_PROJECTION_CTA_THREADS),
                 args.e_h.bytes,
                 args.e_h.scales,
                 args.e_h.global_scales,

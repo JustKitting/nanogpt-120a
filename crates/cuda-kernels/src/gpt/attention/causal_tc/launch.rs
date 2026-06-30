@@ -1,10 +1,11 @@
-use cuda_core::{DriverError, LaunchConfig};
+use cuda_core::DriverError;
 
 use super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use super::types::CausalAttentionTcArgs;
 use crate::attention::{AttentionModule, CausalAttentionParams};
 use crate::f16_tc_matmul::{F16TcMatmulF32Args, F16TcMatmulF32RhsArgs};
 use crate::kda_launch::{KDA_CHUNK_SIZE, KDA_DECAY_SCALE};
+use crate::launch::{launch_config, linear_config};
 
 impl AttentionModule {
     pub fn causal_attention_tc(
@@ -28,7 +29,10 @@ impl AttentionModule {
 
         self.causal_attention_tc.gather_qkv_forward_kernel(
             args.stream,
-            linear_config(batch_head * args.seq_len * args.head_dim),
+            linear_config(
+                batch_head * args.seq_len * args.head_dim,
+                TC_FORWARD_THREADS_PER_BLOCK,
+            ),
             args.qkv,
             &mut *scratch.q,
             &mut *scratch.k,
@@ -48,7 +52,10 @@ impl AttentionModule {
             })?;
         self.causal_attention_tc.attention_softmax_forward_kernel(
             args.stream,
-            attention_config(args.seq_len, args.head_count, args.batch_size),
+            launch_config(
+                (args.seq_len, args.head_count, args.batch_size),
+                TC_FORWARD_THREADS_PER_BLOCK,
+            ),
             &*scratch.scores,
             &mut *scratch.probs,
             args.log_sum_exp,
@@ -65,7 +72,10 @@ impl AttentionModule {
                 n: args.head_dim,
                 k: args.seq_len,
             })?;
-        let config = linear_config(batch_head * args.seq_len * args.head_dim);
+        let config = linear_config(
+            batch_head * args.seq_len * args.head_dim,
+            TC_FORWARD_THREADS_PER_BLOCK,
+        );
         if let Some(attention_out_f16) = args.attention_out_f16 {
             return self
                 .causal_attention_tc
@@ -86,21 +96,5 @@ impl AttentionModule {
             args.out,
             params,
         )
-    }
-}
-
-fn linear_config(element_count: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim: (element_count.div_ceil(TC_FORWARD_THREADS_PER_BLOCK), 1, 1),
-        block_dim: (TC_FORWARD_THREADS_PER_BLOCK, 1, 1),
-        shared_mem_bytes: 0,
-    }
-}
-
-fn attention_config(seq_len: u32, head_count: u32, batch_size: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim: (seq_len, head_count, batch_size),
-        block_dim: (TC_FORWARD_THREADS_PER_BLOCK, 1, 1),
-        shared_mem_bytes: 0,
     }
 }

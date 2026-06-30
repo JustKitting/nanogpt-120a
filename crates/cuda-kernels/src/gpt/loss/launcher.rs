@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError};
 
 use super::{CROSS_ENTROPY_THREADS_PER_BLOCK, CrossEntropyParams, kernels};
+use crate::launch::grid_x_config;
 
 pub struct CrossEntropyArgs<'a, 'out> {
     pub stream: &'a CudaStream,
@@ -29,11 +30,7 @@ impl LossModule {
     pub fn cross_entropy(&self, args: CrossEntropyArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.cross_entropy_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.token_count, 1, 1),
-                block_dim: (CROSS_ENTROPY_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.token_count, CROSS_ENTROPY_THREADS_PER_BLOCK),
             args.logits,
             args.targets,
             args.losses,

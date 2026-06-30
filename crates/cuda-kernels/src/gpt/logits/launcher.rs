@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, DriverError};
 
 use super::args::{
     ARGMAX_THREADS_PER_BLOCK, LOGITS_TOP_K, LogitsArgmaxArgs, LogitsArgmaxParams, LogitsTopKArgs,
     LogitsTopKParams, TOPK_THREADS_PER_BLOCK,
 };
 use super::kernels::kernels;
+use crate::launch::grid_x_config;
 
 pub struct LogitsModule {
     module: kernels::LoadedModule,
@@ -22,11 +23,7 @@ impl LogitsModule {
     pub fn argmax(&self, args: LogitsArgmaxArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.logits_argmax_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (1, 1, 1),
-                block_dim: (ARGMAX_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(1, ARGMAX_THREADS_PER_BLOCK),
             args.logits,
             args.out_token,
             LogitsArgmaxParams {
@@ -40,11 +37,7 @@ impl LogitsModule {
         let k = args.k.clamp(1, LOGITS_TOP_K as u32);
         self.module.logits_top_k_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (1, 1, 1),
-                block_dim: (TOPK_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(1, TOPK_THREADS_PER_BLOCK),
             args.logits,
             args.out_tokens,
             args.out_values,

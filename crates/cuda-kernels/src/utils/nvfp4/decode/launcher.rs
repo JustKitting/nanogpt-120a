@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, DriverError};
 
 use super::DECODE_THREADS_PER_BLOCK;
 use super::args::{Nvfp4DecodeTransposeArgs, Nvfp4RowwiseDecodeTransposeArgs};
 use super::kernels;
+use crate::launch::linear_config;
 
 pub struct Nvfp4DecodeModule {
     module: kernels::LoadedModule,
@@ -23,7 +24,10 @@ impl Nvfp4DecodeModule {
     ) -> Result<(), DriverError> {
         self.module.nvfp4_decode_transpose_f32_kernel(
             args.stream,
-            config(args.rows, args.cols),
+            linear_config(
+                args.rows.saturating_mul(args.cols),
+                DECODE_THREADS_PER_BLOCK,
+            ),
             args.input.bytes,
             args.input.scales,
             args.input.global_scale,
@@ -39,7 +43,10 @@ impl Nvfp4DecodeModule {
     ) -> Result<(), DriverError> {
         self.module.nvfp4_decode_rowwise_transpose_f32_kernel(
             args.stream,
-            config(args.rows, args.cols),
+            linear_config(
+                args.rows.saturating_mul(args.cols),
+                DECODE_THREADS_PER_BLOCK,
+            ),
             args.input.bytes,
             args.input.scales,
             args.input.global_scales,
@@ -47,17 +54,5 @@ impl Nvfp4DecodeModule {
             args.rows,
             args.cols,
         )
-    }
-}
-
-fn config(rows: u32, cols: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim: (
-            rows.saturating_mul(cols).div_ceil(DECODE_THREADS_PER_BLOCK),
-            1,
-            1,
-        ),
-        block_dim: (DECODE_THREADS_PER_BLOCK, 1, 1),
-        shared_mem_bytes: 0,
     }
 }

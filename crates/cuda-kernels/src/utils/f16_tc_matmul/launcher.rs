@@ -7,6 +7,7 @@ use super::cta_tile::{CTA_M, CTA_N, CTA_THREADS};
 use super::kernels;
 use super::launch_ops::convert;
 use super::prepare::prepare_halves;
+use crate::launch::launch_config;
 
 pub struct F16TcMatmulModule {
     pub(super) module: kernels::module::LoadedModule,
@@ -80,11 +81,10 @@ impl F16TcMatmulModule {
 }
 
 pub(super) fn cta_config(m: u32, n: u32, batch_count: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim: (n.div_ceil(CTA_N), m.div_ceil(CTA_M), batch_count),
-        block_dim: (CTA_THREADS, 1, 1),
-        shared_mem_bytes: 0,
-    }
+    launch_config(
+        (n.div_ceil(CTA_N), m.div_ceil(CTA_M), batch_count),
+        CTA_THREADS,
+    )
 }
 
 pub(super) fn elements(batch_count: u32, rows: u32, cols: u32) -> usize {

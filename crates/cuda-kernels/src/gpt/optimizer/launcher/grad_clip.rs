@@ -1,8 +1,9 @@
-use cuda_core::{DriverError, LaunchConfig};
+use cuda_core::DriverError;
 
 use super::super::args::GradientClipArgs;
 use super::super::grad_clip::GRAD_CLIP_THREADS_PER_BLOCK;
 use super::OptimizerModule;
+use crate::launch::grid_x_config;
 
 impl OptimizerModule {
     pub fn clip_gradients(&self, args: GradientClipArgs<'_>) -> Result<(), DriverError> {
@@ -13,15 +14,9 @@ impl OptimizerModule {
         assert!(!args.scale.is_empty());
         assert!(!args.norm.is_empty());
 
-        let chunk_grid = (args.chunk_count, 1, 1);
-        let chunk_block = (GRAD_CLIP_THREADS_PER_BLOCK, 1, 1);
         self.apply.grad_clip.grad_clip_sumsq_chunks_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: chunk_grid,
-                block_dim: chunk_block,
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.chunk_count, GRAD_CLIP_THREADS_PER_BLOCK),
             args.ptrs,
             args.lens,
             args.chunk_offsets,
@@ -32,11 +27,7 @@ impl OptimizerModule {
 
         self.apply.grad_clip.grad_clip_scale_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (1, 1, 1),
-                block_dim: chunk_block,
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(1, GRAD_CLIP_THREADS_PER_BLOCK),
             args.chunk_sums,
             args.scale,
             args.norm,
@@ -46,11 +37,7 @@ impl OptimizerModule {
 
         self.apply.grad_clip.grad_clip_apply_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: chunk_grid,
-                block_dim: chunk_block,
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.chunk_count, GRAD_CLIP_THREADS_PER_BLOCK),
             args.ptrs,
             args.lens,
             args.chunk_offsets,

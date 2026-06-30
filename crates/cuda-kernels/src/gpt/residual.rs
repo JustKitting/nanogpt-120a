@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError};
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
+
+use crate::launch::linear_config;
 
 const THREADS_PER_BLOCK: u32 = 256;
 
@@ -34,11 +36,7 @@ impl ResidualBackwardModule {
     pub fn grad_add(&self, args: ResidualGradAddArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.residual_grad_add_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.len.div_ceil(THREADS_PER_BLOCK), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            linear_config(args.len, THREADS_PER_BLOCK),
             args.direct,
             args.branch,
             args.out,
@@ -52,11 +50,7 @@ impl ResidualBackwardModule {
     ) -> Result<(), DriverError> {
         self.module.residual_grad_accumulate_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.len.div_ceil(THREADS_PER_BLOCK), 1, 1),
-                block_dim: (THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            linear_config(args.len, THREADS_PER_BLOCK),
             args.branch,
             args.out,
             args.len,

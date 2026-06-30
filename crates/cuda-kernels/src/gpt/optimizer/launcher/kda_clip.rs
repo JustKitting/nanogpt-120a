@@ -1,8 +1,9 @@
-use cuda_core::{DriverError, LaunchConfig};
+use cuda_core::DriverError;
 
 use super::super::args::KdaAuroraClipArgs;
 use super::super::kda_clip::KDA_CLIP_THREADS_PER_BLOCK;
 use super::OptimizerModule;
+use crate::launch::grid_x_config;
 
 impl OptimizerModule {
     pub fn apply_kda_aurora_clip(&self, args: KdaAuroraClipArgs<'_>) -> Result<(), DriverError> {
@@ -18,11 +19,7 @@ impl OptimizerModule {
 
         self.apply.kda_clip.kda_aurora_qk_clip_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.head_count, 1, 1),
-                block_dim: (KDA_CLIP_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(args.head_count, KDA_CLIP_THREADS_PER_BLOCK),
             args.qkv,
             args.z_master,
             args.x_master,

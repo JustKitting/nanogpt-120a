@@ -1,6 +1,7 @@
-use cuda_core::{CudaStream, DeviceBuffer, DriverError, LaunchConfig};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use super::kernels;
+use crate::launch::linear_config;
 
 pub(super) fn pad_rows(
     module: &kernels::module::LoadedModule,
@@ -13,16 +14,10 @@ pub(super) fn pad_rows(
 ) -> Result<(), DriverError> {
     module.fp32_pad_rows_kernel(
         stream,
-        LaunchConfig {
-            grid_dim: (
-                rows.saturating_mul(dst_cols)
-                    .div_ceil(kernels::PAD_THREADS_PER_BLOCK),
-                1,
-                1,
-            ),
-            block_dim: (kernels::PAD_THREADS_PER_BLOCK, 1, 1),
-            shared_mem_bytes: 0,
-        },
+        linear_config(
+            rows.saturating_mul(dst_cols),
+            kernels::PAD_THREADS_PER_BLOCK,
+        ),
         src,
         dst,
         rows,

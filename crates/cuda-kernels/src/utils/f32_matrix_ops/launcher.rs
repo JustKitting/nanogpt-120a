@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, DriverError};
 
 use super::args::{F32AddScaledIdentityArgs, F32Linear2Args};
 use super::kernels;
+use crate::launch::linear_config;
 
 const F32_OPS_THREADS_PER_BLOCK: u32 = 256;
 
@@ -25,7 +26,7 @@ impl F32MatrixOpsModule {
 
         self.module.f32_linear2_kernel(
             args.stream,
-            linear_config(args.len),
+            linear_config(args.len, F32_OPS_THREADS_PER_BLOCK),
             args.a,
             args.b,
             args.out,
@@ -45,19 +46,11 @@ impl F32MatrixOpsModule {
 
         self.module.f32_add_scaled_identity_kernel(
             args.stream,
-            linear_config(len),
+            linear_config(len, F32_OPS_THREADS_PER_BLOCK),
             args.src,
             args.out,
             args.dim,
             args.scale,
         )
-    }
-}
-
-fn linear_config(element_count: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim: (element_count.div_ceil(F32_OPS_THREADS_PER_BLOCK), 1, 1),
-        block_dim: (F32_OPS_THREADS_PER_BLOCK, 1, 1),
-        shared_mem_bytes: 0,
     }
 }

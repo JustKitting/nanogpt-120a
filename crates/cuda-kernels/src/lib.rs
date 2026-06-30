@@ -26,6 +26,8 @@ pub(crate) mod kda_elementwise;
 pub(crate) mod kda_launch;
 #[path = "utils/kda_tc.rs"]
 pub(crate) mod kda_tc;
+#[path = "utils/launch.rs"]
+pub(crate) mod launch;
 #[path = "gpt/layer_norm.rs"]
 pub mod layer_norm;
 #[path = "gpt/layer_norm_backward/mod.rs"]

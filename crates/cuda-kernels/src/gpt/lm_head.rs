@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError};
 
+use crate::launch::launch_config;
 use crate::mma::{
     NVFP4_PROJECTION_CTA_THREADS, Nvfp4FourSixMmaWeightTensor, projection_cta_grid_dim,
     projection_cta_row_pair_grid_dim,
@@ -52,11 +53,7 @@ impl LmHeadModule {
 
         self.module.lm_head_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim,
-                block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            launch_config(grid_dim, NVFP4_PROJECTION_CTA_THREADS),
             args.input.bytes,
             args.input.scales,
             args.input.global_scales,

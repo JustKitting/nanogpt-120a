@@ -1,8 +1,9 @@
-use cuda_core::{DriverError, LaunchConfig};
+use cuda_core::DriverError;
 
 use super::super::args::EmbeddingLookupGradArgs;
 use super::super::threads::EMBEDDING_GRAD_THREADS_PER_BLOCK;
 use super::OptimizerModule;
+use crate::launch::linear_config;
 
 impl OptimizerModule {
     pub fn add_embedding_lookup_grad(
@@ -15,11 +16,7 @@ impl OptimizerModule {
 
         self.apply.embedding.embedding_lookup_grad_add_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (len.div_ceil(EMBEDDING_GRAD_THREADS_PER_BLOCK), 1, 1),
-                block_dim: (EMBEDDING_GRAD_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            linear_config(len, EMBEDDING_GRAD_THREADS_PER_BLOCK),
             args.tokens,
             args.d_embedding_residual,
             args.d_token_embedding,

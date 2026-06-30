@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError};
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
+use crate::launch::grid_x_config;
 use crate::layer_norm_utils::{
     layer_norm_columns3, layer_norm_map3, layer_norm_store3, nvfp4_column,
 };
@@ -42,11 +43,10 @@ impl EmbeddingModule {
     pub fn token_embedding(&self, args: EmbeddingArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.token_embedding_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (args.hidden_len / args.embedding_dim, 1, 1),
-                block_dim: (EMBEDDING_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(
+                args.hidden_len / args.embedding_dim,
+                EMBEDDING_THREADS_PER_BLOCK,
+            ),
             args.tokens,
             args.token_embedding.bytes,
             args.token_embedding.scales,

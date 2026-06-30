@@ -2,6 +2,7 @@ use cuda_core::LaunchConfig;
 
 use super::config::{GROUPS_PER_BLOCK, THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 use super::kernels;
+use crate::launch::grid_x_config;
 
 const MS_EDEN_CHUNK_LEN: u32 = 32;
 
@@ -97,11 +98,7 @@ impl RowwiseTransposeNoPad {
 }
 
 pub(super) fn grid_config(grid_x: u32) -> LaunchConfig {
-    LaunchConfig {
-        grid_dim: (grid_x, 1, 1),
-        block_dim: (THREADS_PER_BLOCK, 1, 1),
-        shared_mem_bytes: 0,
-    }
+    grid_x_config(grid_x, THREADS_PER_BLOCK)
 }
 
 pub(super) fn four_six_grid_config(group_count: u32) -> LaunchConfig {

@@ -1,8 +1,9 @@
-use cuda_core::{DriverError, LaunchConfig};
+use cuda_core::DriverError;
 
 use super::super::args::ScheduleFreeMaterializeArgs;
 use super::super::threads::APPLY_THREADS_PER_BLOCK;
 use super::OptimizerModule;
+use crate::launch::{grid_x_config, launch_config};
 use crate::nvfp4_quant::NVFP4_TENSOR_AMAX_VALUES_PER_BLOCK;
 
 const SCHEDULE_FREE_GROUP_SIZE: u32 = 16;
@@ -21,11 +22,7 @@ impl OptimizerModule {
         let chunk_count = args.len.div_ceil(NVFP4_TENSOR_AMAX_VALUES_PER_BLOCK as u32);
         self.apply.schedule_free.schedule_free_chunk_amax_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: (chunk_count, 1, 1),
-                block_dim: (APPLY_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            grid_x_config(chunk_count, APPLY_THREADS_PER_BLOCK),
             args.z_master,
             args.x_master,
             args.chunk_amax,
@@ -43,11 +40,10 @@ impl OptimizerModule {
         let groups_per_block = APPLY_THREADS_PER_BLOCK / SCHEDULE_FREE_GROUP_SIZE;
         self.apply.schedule_free.schedule_free_four_six_kernel(
             args.stream,
-            LaunchConfig {
-                grid_dim: ((args.len / 16).div_ceil(groups_per_block), 1, 1),
-                block_dim: (APPLY_THREADS_PER_BLOCK, 1, 1),
-                shared_mem_bytes: 0,
-            },
+            launch_config(
+                ((args.len / 16).div_ceil(groups_per_block), 1, 1),
+                APPLY_THREADS_PER_BLOCK,
+            ),
             args.z_master,
             args.x_master,
             &*args.amax,
