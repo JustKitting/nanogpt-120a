@@ -1,9 +1,11 @@
-use cuda_device::{thread, warp};
+use cuda_device::thread;
 
 use crate::device_ptr::read_f32;
 use crate::f16_tc_matmul::cta_tile::CTA_THREADS;
 use crate::nvfp4_quant::kernels::convert::cvt_rn_satfinite_e2m1x2_f32;
-use crate::nvfp4_quant::kernels::four_six::helpers::{GROUP_SIZE, four_six_group_scale};
+use crate::nvfp4_quant::kernels::four_six::helpers::{
+    GROUP_SIZE, four_six_group_scale, four_six_lane,
+};
 
 use super::super::super::super::work_grid::WorkGrid;
 
@@ -36,14 +38,7 @@ fn encode_group(
     global_scale: f32,
     group: u32,
 ) {
-    let lane = warp::lane_id() as usize;
-    let lane_in_group = lane & 0x0f;
-    let group_mask = if lane < GROUP_SIZE {
-        0x0000_ffff
-    } else {
-        0xffff_0000
-    };
-    let group_leader = (lane & !0x0f) as u32;
+    let (lane_in_group, group_mask, group_leader) = four_six_lane();
     let base = group * GROUP_SIZE as u32;
     let value = read_f32(x, base + lane_in_group as u32);
     let (scale_bits, inv_scale) = four_six_group_scale(

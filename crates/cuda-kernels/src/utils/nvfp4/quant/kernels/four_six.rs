@@ -1,4 +1,4 @@
-use cuda_device::{DisjointSlice, cuda_module, kernel, thread, warp};
+use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::convert::cvt_rn_satfinite_e2m1x2_f32;
 
@@ -20,17 +20,8 @@ pub(crate) mod module {
         row_len: u32,
         scale_override: f32,
     ) {
-        let lane = warp::lane_id() as usize;
-        let lane_in_group = lane & 0x0f;
-        let group_mask = if lane < GROUP_SIZE {
-            0x0000_ffff
-        } else {
-            0xffff_0000
-        };
-        let group_leader = (lane & !0x0f) as u32;
-        let groups_per_block = thread::blockDim_x() as usize / GROUP_SIZE;
-        let group = thread::blockIdx_x() as usize * groups_per_block
-            + thread::threadIdx_x() as usize / GROUP_SIZE;
+        let (lane_in_group, group_mask, group_leader) = four_six_lane();
+        let group = four_six_block_group();
 
         if group < out_scales.len() {
             let base = group * GROUP_SIZE;
@@ -86,17 +77,8 @@ pub(crate) mod module {
         row_mask: u32,
         scale_override: f32,
     ) {
-        let lane = warp::lane_id() as usize;
-        let lane_in_group = lane & 0x0f;
-        let group_mask = if lane < GROUP_SIZE {
-            0x0000_ffff
-        } else {
-            0xffff_0000
-        };
-        let group_leader = (lane & !0x0f) as u32;
-        let groups_per_block = thread::blockDim_x() as usize / GROUP_SIZE;
-        let group = thread::blockIdx_x() as usize * groups_per_block
-            + thread::threadIdx_x() as usize / GROUP_SIZE;
+        let (lane_in_group, group_mask, group_leader) = four_six_lane();
+        let group = four_six_block_group();
 
         let base = group * GROUP_SIZE;
         let row = (base as u32 >> row_shift) as usize;

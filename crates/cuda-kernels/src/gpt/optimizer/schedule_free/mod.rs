@@ -1,11 +1,11 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
 use crate::amax::{amax4_f32, max4_f32};
 use crate::block_reduce::block_max_store_f32;
 use crate::float_ptx::abs_f32;
 use crate::nvfp4_quant::kernels::convert::cvt_rn_satfinite_e2m1x2_f32;
 use crate::nvfp4_quant::kernels::four_six::helpers::{
-    GROUP_SIZE, four_six_global_scale, four_six_group_scale,
+    GROUP_SIZE, four_six_block_group, four_six_global_scale, four_six_group_scale, four_six_lane,
 };
 use crate::warp_reduce::thread_lane_warp;
 
@@ -68,17 +68,8 @@ pub(super) mod module {
         mut out_global_scale: DisjointSlice<f32>,
         beta: f32,
     ) {
-        let lane = warp::lane_id() as usize;
-        let lane_in_group = lane & 0x0f;
-        let group_mask = if lane < GROUP_SIZE {
-            0x0000_ffff
-        } else {
-            0xffff_0000
-        };
-        let group_leader = (lane & !0x0f) as u32;
-        let groups_per_block = thread::blockDim_x() as usize / GROUP_SIZE;
-        let group = thread::blockIdx_x() as usize * groups_per_block
-            + thread::threadIdx_x() as usize / GROUP_SIZE;
+        let (lane_in_group, group_mask, group_leader) = four_six_lane();
+        let group = four_six_block_group();
 
         if group < out_scales.len() {
             let base = group * GROUP_SIZE;

@@ -1,4 +1,4 @@
-use cuda_device::warp;
+use cuda_device::{thread, warp};
 
 use crate::float_ptx::abs_f32;
 use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32};
@@ -11,6 +11,23 @@ pub(crate) const GROUP_SIZE: usize = 16;
 
 const FP4_MAX: f32 = 6.0;
 const FP8_MAX_FOUR_SIX: f32 = 256.0;
+
+#[inline(always)]
+pub(crate) fn four_six_lane() -> (usize, u32, u32) {
+    let lane = warp::lane_id() as usize;
+    let group_mask = if lane < GROUP_SIZE {
+        0x0000_ffff
+    } else {
+        0xffff_0000
+    };
+    (lane & 0x0f, group_mask, (lane & !0x0f) as u32)
+}
+
+#[inline(always)]
+pub(crate) fn four_six_block_group() -> usize {
+    let groups_per_block = thread::blockDim_x() as usize / GROUP_SIZE;
+    thread::blockIdx_x() as usize * groups_per_block + thread::threadIdx_x() as usize / GROUP_SIZE
+}
 
 #[inline(always)]
 pub(crate) fn four_six_global_scale(tensor_amax: f32, scale_override: f32) -> f32 {
