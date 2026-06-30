@@ -49,15 +49,10 @@ pub mod kernels {
         thread::sync_threads();
 
         if warp_in_block == 0 {
-            let partial_value = if lane < ARGMAX_WARPS_PER_BLOCK {
-                unsafe { VALUES[lane as usize] }
+            let (partial_value, partial_index) = if lane < ARGMAX_WARPS_PER_BLOCK {
+                unsafe { (VALUES[lane as usize], INDICES[lane as usize]) }
             } else {
-                f32::NEG_INFINITY
-            };
-            let partial_index = if lane < ARGMAX_WARPS_PER_BLOCK {
-                unsafe { INDICES[lane as usize] }
-            } else {
-                u32::MAX
+                (f32::NEG_INFINITY, u32::MAX)
             };
             let (_, index) = warp_argmax(partial_value, partial_index);
             if lane == 0 {
