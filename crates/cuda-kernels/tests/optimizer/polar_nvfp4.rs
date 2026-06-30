@@ -20,9 +20,8 @@ mod scratch;
 
 use mode_cases::{gram_correction_modes, gram_form_correction_modes};
 use schedule::{
-    ScheduleResult, corrected_schedule_candidates, evaluate_mode, evaluate_schedule,
-    evaluate_stale_reject_schedule, production_shape_modes, report_schedule, schedule_name,
-    search_best_corrected_schedule, search_best_raw_schedule, seed_safety_schedules,
+    evaluate_mode, production_shape_modes, report_schedule_search_best, schedule_name,
+    search_best_corrected_schedule, search_best_raw_schedule,
 };
 
 const ROWS: usize = 32;
@@ -186,114 +185,29 @@ fn nvfp4_gram_form_safety_schedule_search() -> Result<(), Box<dyn Error>> {
         let expected =
             math::gram_form_polar_iterations_f16_leaf(source.clone(), ROWS, COLS, MAX_ITERATIONS);
 
-        let mut best = ScheduleResult::missing();
-        for schedule in seed_safety_schedules() {
-            let result = evaluate_schedule(
-                &polar,
-                &source,
-                &expected,
-                &format!("seed_{}", schedule_name(&schedule)),
-                schedule,
-                ROWS,
-                COLS,
-                MAX_ITERATIONS,
-                false,
-            )?;
-            report_schedule(&result);
-            if result.is_better_than(&best) {
-                best = result;
-            }
-        }
+        let best = search_best_raw_schedule(
+            &polar,
+            &source,
+            &expected,
+            ROWS,
+            COLS,
+            MAX_ITERATIONS,
+            "",
+            true,
+        )?;
+        report_schedule_search_best("nvfp4_only", &best);
 
-        let mut greedy = best.schedule;
-        let values = [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08];
-        for pass in 0..2 {
-            for iter in 0..MAX_ITERATIONS {
-                let mut local_best = best.clone();
-                for value in values {
-                    let mut candidate = greedy;
-                    candidate[iter] = value;
-                    let result = evaluate_schedule(
-                        &polar,
-                        &source,
-                        &expected,
-                        &format!("greedy_pass{pass}_iter{iter}_{value:.3}"),
-                        candidate,
-                        ROWS,
-                        COLS,
-                        MAX_ITERATIONS,
-                        false,
-                    )?;
-                    if result.is_better_than(&local_best) {
-                        local_best = result;
-                    }
-                }
-                if local_best.is_better_than(&best) {
-                    report_schedule(&local_best);
-                    best = local_best;
-                    greedy = best.schedule;
-                }
-            }
-        }
-
-        println!(
-            "nvfp4_gram_form_schedule_search_best kind=nvfp4_only name={} finite={} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} rejected={} schedule={}",
-            best.name,
-            best.finite,
-            best.cosine,
-            best.rel_l2,
-            best.max_abs,
-            best.nvfp4_grams,
-            best.hi_grams,
-            best.rejected,
-            schedule_name(&best.schedule)
-        );
-
-        let mut best_corrected = ScheduleResult::missing();
-        for (exact_steps, period) in [
-            (1, 2),
-            (1, 3),
-            (1, 4),
-            (1, 5),
-            (2, 2),
-            (2, 3),
-            (2, 4),
-            (2, 5),
-            (3, 2),
-            (3, 3),
-            (3, 4),
-            (3, 5),
-        ] {
-            for schedule in corrected_schedule_candidates(best.schedule) {
-                let result = evaluate_stale_reject_schedule(
-                    &polar,
-                    &source,
-                    &expected,
-                    exact_steps,
-                    period,
-                    schedule,
-                    ROWS,
-                    COLS,
-                    MAX_ITERATIONS,
-                )?;
-                report_schedule(&result);
-                if result.is_better_than(&best_corrected) {
-                    best_corrected = result;
-                }
-            }
-        }
-        println!(
-            "nvfp4_gram_form_schedule_search_best kind=stale_reject name={} finite={} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} rejected={} schedule={}",
-            best_corrected.name,
-            best_corrected.finite,
-            best_corrected.cosine,
-            best_corrected.rel_l2,
-            best_corrected.max_abs,
-            best_corrected.nvfp4_grams,
-            best_corrected.hi_grams,
-            best_corrected.rejected,
-            schedule_name(&best_corrected.schedule)
-        );
+        let best_corrected = search_best_corrected_schedule(
+            &polar,
+            &source,
+            &expected,
+            ROWS,
+            COLS,
+            MAX_ITERATIONS,
+            best.schedule,
+            true,
+        )?;
+        report_schedule_search_best("stale_reject", &best_corrected);
 
         assert!(
             best.finite,
@@ -339,6 +253,7 @@ fn nvfp4_gram_form_ratio_schedule_search() -> Result<(), Box<dyn Error>> {
                 cols,
                 PRODUCTION_ITERATIONS,
                 name,
+                false,
             )?;
             let best_corrected = search_best_corrected_schedule(
                 &polar,
@@ -348,6 +263,7 @@ fn nvfp4_gram_form_ratio_schedule_search() -> Result<(), Box<dyn Error>> {
                 cols,
                 PRODUCTION_ITERATIONS,
                 best_raw.schedule,
+                false,
             )?;
 
             println!(

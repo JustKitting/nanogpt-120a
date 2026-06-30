@@ -6,8 +6,10 @@ use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 mod common;
+#[path = "common/nvfp4.rs"]
+mod nvfp4_common;
 
-use common::set_e2m1_one;
+use nvfp4_common::set_e2m1_one;
 
 const TOKEN_COUNT: usize = 2;
 const INPUT_DIM: usize = 64;

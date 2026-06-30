@@ -96,20 +96,17 @@ pub(super) fn search_best_raw_schedule(
     cols: usize,
     iterations: usize,
     label: &str,
+    report_progress: bool,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
     let mut best = ScheduleResult::missing();
     for schedule in seed_safety_schedules() {
+        let name = schedule_result_name(label, format!("seed_{}", schedule_name(&schedule)));
         let result = evaluate_schedule(
-            polar,
-            source,
-            expected,
-            &format!("{label}_seed_{}", schedule_name(&schedule)),
-            schedule,
-            rows,
-            cols,
-            iterations,
-            false,
+            polar, source, expected, &name, schedule, rows, cols, iterations, false,
         )?;
+        if report_progress {
+            report_schedule(&result);
+        }
         if result.is_better_than(&best) {
             best = result;
         }
@@ -123,22 +120,19 @@ pub(super) fn search_best_raw_schedule(
             for value in values {
                 let mut candidate = greedy;
                 candidate[iter] = value;
+                let name =
+                    schedule_result_name(label, format!("greedy_pass{pass}_iter{iter}_{value:.3}"));
                 let result = evaluate_schedule(
-                    polar,
-                    source,
-                    expected,
-                    &format!("{label}_greedy_pass{pass}_iter{iter}_{value:.3}"),
-                    candidate,
-                    rows,
-                    cols,
-                    iterations,
-                    false,
+                    polar, source, expected, &name, candidate, rows, cols, iterations, false,
                 )?;
                 if result.is_better_than(&local_best) {
                     local_best = result;
                 }
             }
             if local_best.is_better_than(&best) {
+                if report_progress {
+                    report_schedule(&local_best);
+                }
                 best = local_best;
                 greedy = best.schedule;
             }
@@ -156,6 +150,7 @@ pub(super) fn search_best_corrected_schedule(
     cols: usize,
     iterations: usize,
     raw_schedule: [f32; MAX_ITERATIONS],
+    report_progress: bool,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
     let mut best = ScheduleResult::missing();
     for (exact_steps, period) in [
@@ -184,6 +179,9 @@ pub(super) fn search_best_corrected_schedule(
                 cols,
                 iterations,
             )?;
+            if report_progress {
+                report_schedule(&result);
+            }
             if result.is_better_than(&best) {
                 best = result;
             }
@@ -297,6 +295,29 @@ pub(super) fn report_schedule(result: &ScheduleResult) {
         result.rejected,
         schedule_name(&result.schedule),
     );
+}
+
+pub(super) fn report_schedule_search_best(kind: &str, result: &ScheduleResult) {
+    println!(
+        "nvfp4_gram_form_schedule_search_best kind={kind} name={} finite={} cosine={:.8} rel_l2={:.8e} max_abs={:.8e} nvfp4_grams={} hi_grams={} rejected={} schedule={}",
+        result.name,
+        result.finite,
+        result.cosine,
+        result.rel_l2,
+        result.max_abs,
+        result.nvfp4_grams,
+        result.hi_grams,
+        result.rejected,
+        schedule_name(&result.schedule)
+    );
+}
+
+fn schedule_result_name(label: &str, name: String) -> String {
+    if label.is_empty() {
+        name
+    } else {
+        format!("{label}_{name}")
+    }
 }
 
 pub(super) fn production_shape_modes() -> [(&'static str, device::GramCorrectionMode); 7] {

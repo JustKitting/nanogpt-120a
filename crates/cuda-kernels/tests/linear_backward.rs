@@ -10,8 +10,10 @@ use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 mod common;
+#[path = "common/nvfp4.rs"]
+mod nvfp4_common;
 
-use common::set_e2m1_one;
+use nvfp4_common::set_e2m1_one;
 
 const TOKEN_COUNT: usize = 64;
 const INPUT_DIM: usize = 64;
