@@ -153,37 +153,26 @@ pub(super) fn search_best_corrected_schedule(
     report_progress: bool,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
     let mut best = ScheduleResult::missing();
-    for (exact_steps, period) in [
-        (1, 2),
-        (1, 3),
-        (1, 4),
-        (1, 5),
-        (2, 2),
-        (2, 3),
-        (2, 4),
-        (2, 5),
-        (3, 2),
-        (3, 3),
-        (3, 4),
-        (3, 5),
-    ] {
-        for schedule in corrected_schedule_candidates(raw_schedule) {
-            let result = evaluate_stale_reject_schedule(
-                polar,
-                source,
-                expected,
-                exact_steps,
-                period,
-                schedule,
-                rows,
-                cols,
-                iterations,
-            )?;
-            if report_progress {
-                report_schedule(&result);
-            }
-            if result.is_better_than(&best) {
-                best = result;
+    for exact_steps in 1..=3 {
+        for period in 2..=5 {
+            for schedule in corrected_schedule_candidates(raw_schedule) {
+                let result = evaluate_stale_reject_schedule(
+                    polar,
+                    source,
+                    expected,
+                    exact_steps,
+                    period,
+                    schedule,
+                    rows,
+                    cols,
+                    iterations,
+                )?;
+                if report_progress {
+                    report_schedule(&result);
+                }
+                if result.is_better_than(&best) {
+                    best = result;
+                }
             }
         }
     }
