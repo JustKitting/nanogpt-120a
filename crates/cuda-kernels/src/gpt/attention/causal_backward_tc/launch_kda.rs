@@ -72,7 +72,8 @@ impl AttentionModule {
             kda_d_g: dh_states_or_kneg,
             kda_d_beta: d_beta,
         } = scratch;
-        let bwd = &self.causal_attention_backward_tc;
+        let bwd_elementwise = &self.causal_attention_backward_tc.kda_elementwise;
+        let bwd_tc = &self.causal_attention_backward_tc.kda_tc;
         let fwd = &self.causal_attention_tc;
         let threads = TC_BACKWARD_THREADS_PER_BLOCK;
         let batch_cfg = grid_x_config(dims.batch_head, threads);
@@ -80,17 +81,22 @@ impl AttentionModule {
         let matrix_cfg = grid_x_config(dims.chunk_batch, threads);
         macro_rules! bwd_linear {
             ($kernel:ident, $n:expr; $($arg:expr),* $(,)?) => {
-                bwd.$kernel(stream, linear_config($n, threads), $($arg,)* params)?;
+                bwd_elementwise.$kernel(stream, linear_config($n, threads), $($arg,)* params)?;
             };
         }
         macro_rules! bwd_chunk {
             ($kernel:ident; $($arg:expr),* $(,)?) => {
-                bwd.$kernel(stream, chunk_cfg, $($arg,)* params)?;
+                bwd_tc.$kernel(stream, chunk_cfg, $($arg,)* params)?;
+            };
+        }
+        macro_rules! bwd_elementwise_chunk {
+            ($kernel:ident; $($arg:expr),* $(,)?) => {
+                bwd_elementwise.$kernel(stream, chunk_cfg, $($arg,)* params)?;
             };
         }
         macro_rules! bwd_batch {
             ($kernel:ident; $($arg:expr),* $(,)?) => {
-                bwd.$kernel(stream, batch_cfg, $($arg,)* params)?;
+                bwd_tc.$kernel(stream, batch_cfg, $($arg,)* params)?;
             };
         }
         macro_rules! fwd_linear {
@@ -120,7 +126,7 @@ impl AttentionModule {
         }
 
         bwd_linear!(prepare_kda_backward_inputs_kernel, dims.batch_head * seq_len * 32; qkv, qg, kg, vbeta, g, beta);
-        bwd_chunk!(chunk_cumsum_kda_backward_g_kernel; g);
+        bwd_elementwise_chunk!(chunk_cumsum_kda_backward_g_kernel; g);
         fwd_linear!(make_kda_qg_kneg_kernel, dims.compact_elems; qg, kg, g, kneg_vnew_dqg_dv);
         fwd_linear!(make_kda_kg_kpos_vbeta_kernel, dims.compact_elems; kg, vbeta, g, beta, kpos_u_dw);
         mm_in!(kpos_u_dw, kneg_vnew_dqg_dv, chunk_matrix, dims.cch());

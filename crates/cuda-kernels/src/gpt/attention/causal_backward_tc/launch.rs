@@ -51,8 +51,9 @@ impl AttentionModule {
         };
         let mut scratch = scratch;
         let linear = |n| linear_config(n, TC_BACKWARD_THREADS_PER_BLOCK);
+        let kernels = &self.causal_attention_backward_tc.base;
 
-        self.causal_attention_backward_tc.softmax_d_f16_kernel(
+        kernels.softmax_d_f16_kernel(
             stream,
             attention_config(seq_len, head_count, batch_size),
             attention_out,
@@ -60,7 +61,7 @@ impl AttentionModule {
             softmax_d,
             params,
         )?;
-        self.causal_attention_backward_tc.gather_qkv_dout_kernel(
+        kernels.gather_qkv_dout_kernel(
             stream,
             linear(batch_head * seq_len * head_dim),
             qkv,
@@ -72,7 +73,7 @@ impl AttentionModule {
             params,
         )?;
         run_pair_scores(&tc_ctx, &mut scratch)?;
-        self.causal_attention_backward_tc.attention_prob_ds_kernel(
+        kernels.attention_prob_ds_kernel(
             stream,
             linear(batch_head * seq_len * seq_len),
             scratch.scores,
@@ -84,7 +85,7 @@ impl AttentionModule {
             params,
         )?;
         run_grad_matmuls(&tc_ctx, &mut scratch)?;
-        self.causal_attention_backward_tc.scatter_dqkv_kernel(
+        kernels.scatter_dqkv_kernel(
             stream,
             linear(batch_head * seq_len * head_dim),
             scratch.d_q,
