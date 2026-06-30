@@ -1,7 +1,8 @@
 use cuda_device::{DisjointSlice, thread};
 
-use super::gather::{TC_BACKWARD_THREADS_PER_BLOCK, qkv_index};
+use super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
+use crate::attention::layout::{batched_qkv_index, compact_linear_parts, row_index};
 use crate::float_ptx::{exp_f32, fma_f32, sincos_f32};
 
 pub(super) fn scatter_body(
@@ -17,15 +18,11 @@ pub(super) fn scatter_body(
         return;
     }
 
-    let dim = index % params.head_dim;
-    let token = (index / params.head_dim) % params.seq_len;
-    let batch_head = index / (params.seq_len * params.head_dim);
-    let batch = batch_head / params.head_count;
-    let head = batch_head - batch * params.head_count;
-    let row = batch * params.seq_len + token;
-    let q = qkv_index(batch, token, head, dim, 0, &params);
-    let k = qkv_index(batch, token, head, dim, params.embedding_dim, &params);
-    let v = qkv_index(batch, token, head, dim, params.embedding_dim * 2, &params);
+    let (dim, token, _bh, batch, head) = compact_linear_parts(index, &params);
+    let row = row_index(batch, token, &params);
+    let q = batched_qkv_index(batch, token, head, dim, 0, &params);
+    let k = batched_qkv_index(batch, token, head, dim, params.embedding_dim, &params);
+    let v = batched_qkv_index(batch, token, head, dim, params.embedding_dim * 2, &params);
     if row >= params.row_count {
         unsafe {
             *d_qkv.get_unchecked_mut(q) = 0.0;

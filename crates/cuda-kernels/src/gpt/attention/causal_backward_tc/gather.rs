@@ -1,6 +1,7 @@
 use cuda_device::{DisjointSlice, thread};
 
 use crate::attention::CausalAttentionParams;
+use crate::attention::layout::{batched_qkv_index, compact_linear_parts, hidden_index, row_index};
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 
 pub(super) const TC_BACKWARD_THREADS_PER_BLOCK: u32 = 256;
@@ -20,12 +21,8 @@ pub(super) fn gather_body(
         return;
     }
 
-    let dim = index % params.head_dim;
-    let token = (index / params.head_dim) % params.seq_len;
-    let batch_head = index / (params.seq_len * params.head_dim);
-    let batch = batch_head / params.head_count;
-    let head = batch_head - batch * params.head_count;
-    let row = batch * params.seq_len + token;
+    let (dim, token, _bh, batch, head) = compact_linear_parts(index, &params);
+    let row = row_index(batch, token, &params);
     if row >= params.row_count {
         unsafe {
             *q.get_unchecked_mut(index as usize) = 0;
@@ -64,33 +61,5 @@ fn qkv_value(
     section_offset: u32,
     params: &CausalAttentionParams,
 ) -> u16 {
-    qkv[qkv_index(batch, token, head, dim, section_offset, params)]
-}
-
-#[inline(always)]
-pub(super) fn qkv_index(
-    batch: u32,
-    token: u32,
-    head: u32,
-    dim: u32,
-    section_offset: u32,
-    params: &CausalAttentionParams,
-) -> usize {
-    (batch as usize * params.seq_len as usize + token as usize) * params.qkv_dim as usize
-        + section_offset as usize
-        + head as usize * params.head_dim as usize
-        + dim as usize
-}
-
-#[inline(always)]
-fn hidden_index(
-    batch: u32,
-    token: u32,
-    head: u32,
-    dim: u32,
-    params: &CausalAttentionParams,
-) -> usize {
-    (batch as usize * params.seq_len as usize + token as usize) * params.embedding_dim as usize
-        + head as usize * params.head_dim as usize
-        + dim as usize
+    qkv[batched_qkv_index(batch, token, head, dim, section_offset, params)]
 }

@@ -1,6 +1,7 @@
 use cuda_device::{DisjointSlice, SharedArray, thread, warp};
 
 use crate::attention::CausalAttentionParams;
+use crate::attention::layout::{hidden_index, row_index};
 use crate::f16_tc_matmul::convert::cvt_f32_f16;
 use crate::warp_reduce::warp_sum_f32;
 
@@ -13,10 +14,7 @@ fn value(
     dim: u32,
     params: &CausalAttentionParams,
 ) -> f32 {
-    values[(batch as usize * params.seq_len as usize + token as usize)
-        * params.embedding_dim as usize
-        + head as usize * params.head_dim as usize
-        + dim as usize]
+    values[hidden_index(batch, token, head, dim, params)]
 }
 
 #[inline(always)]
@@ -46,7 +44,7 @@ pub(super) fn softmax_d_f16_body(
     let batch = thread::blockIdx_z();
     let dim = thread::threadIdx_x();
     let lane = warp::lane_id();
-    let row = batch * params.seq_len + token;
+    let row = row_index(batch, token, &params);
     if token >= params.seq_len || head >= params.head_count || row >= params.row_count {
         return;
     }
@@ -78,10 +76,5 @@ fn value_f16(
     dim: u32,
     params: &CausalAttentionParams,
 ) -> f32 {
-    cvt_f32_f16(
-        values[(batch as usize * params.seq_len as usize + token as usize)
-            * params.embedding_dim as usize
-            + head as usize * params.head_dim as usize
-            + dim as usize],
-    )
+    cvt_f32_f16(values[hidden_index(batch, token, head, dim, params)])
 }

@@ -2,6 +2,7 @@ use cuda_device::{DisjointSlice, thread};
 
 use super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
+use crate::attention::layout::{compact_linear_parts, hidden_index, row_index};
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 
 pub(super) fn scatter_output_body(
@@ -15,15 +16,9 @@ pub(super) fn scatter_output_body(
         return;
     }
 
-    let dim = index % params.head_dim;
-    let token = (index / params.head_dim) % params.seq_len;
-    let batch_head = index / (params.seq_len * params.head_dim);
-    let batch = batch_head / params.head_count;
-    let head = batch_head - batch * params.head_count;
-    let row = batch * params.seq_len + token;
-    let out_index = (row as usize * params.embedding_dim as usize)
-        + head as usize * params.head_dim as usize
-        + dim as usize;
+    let (dim, token, _bh, batch, head) = compact_linear_parts(index, &params);
+    let row = row_index(batch, token, &params);
+    let out_index = hidden_index(batch, token, head, dim, &params);
     if row >= params.row_count {
         unsafe {
             *out.get_unchecked_mut(out_index) = 0.0;
@@ -49,15 +44,9 @@ pub(super) fn scatter_output_save_f16_body(
         return;
     }
 
-    let dim = index % params.head_dim;
-    let token = (index / params.head_dim) % params.seq_len;
-    let batch_head = index / (params.seq_len * params.head_dim);
-    let batch = batch_head / params.head_count;
-    let head = batch_head - batch * params.head_count;
-    let row = batch * params.seq_len + token;
-    let out_index = (row as usize * params.embedding_dim as usize)
-        + head as usize * params.head_dim as usize
-        + dim as usize;
+    let (dim, token, _bh, batch, head) = compact_linear_parts(index, &params);
+    let row = row_index(batch, token, &params);
+    let out_index = hidden_index(batch, token, head, dim, &params);
     if row >= params.row_count {
         unsafe {
             *out.get_unchecked_mut(out_index) = 0.0;

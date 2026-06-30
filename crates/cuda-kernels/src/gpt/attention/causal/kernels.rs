@@ -1,6 +1,7 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use super::{CAUSAL_MAX_WARPS_PER_BLOCK, CausalAttentionParams};
+use crate::attention::layout::batched_qkv_index;
 use crate::float_ptx::{exp_f32, fma_f32, ln_f32, max_f32, safe_positive_denom};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
@@ -42,14 +43,23 @@ pub mod module {
         }
 
         let query_value = if thread_index < params.head_dim {
-            q_value(qkv, batch, query, head, thread_index, &params)
+            qkv_value(qkv, batch, query, head, thread_index, 0, &params)
         } else {
             0.0
         };
         let mut key = 0;
         while key <= query {
             let local_dot = if thread_index < params.head_dim {
-                query_value * k_value(qkv, batch, key, head, thread_index, &params)
+                query_value
+                    * qkv_value(
+                        qkv,
+                        batch,
+                        key,
+                        head,
+                        thread_index,
+                        params.embedding_dim,
+                        &params,
+                    )
             } else {
                 0.0
             };
@@ -101,7 +111,15 @@ pub mod module {
                 let weight = exp_f32(score - score_max) / denom;
                 value = fma_f32(
                     weight,
-                    v_value(qkv, batch, key, head, thread_index, &params),
+                    qkv_value(
+                        qkv,
+                        batch,
+                        key,
+                        head,
+                        thread_index,
+                        params.embedding_dim * 2,
+                        &params,
+                    ),
                     value,
                 );
                 key += 1;
@@ -205,53 +223,15 @@ pub mod module {
     }
 
     #[inline(always)]
-    fn q_value(
+    fn qkv_value(
         qkv: &[f32],
-        batch: u32,
-        token: u32,
-        head: u32,
-        dim: u32,
-        params: &CausalAttentionParams,
-    ) -> f32 {
-        qkv[qkv_index(batch, token, head, dim, 0, params)]
-    }
-
-    #[inline(always)]
-    fn k_value(
-        qkv: &[f32],
-        batch: u32,
-        token: u32,
-        head: u32,
-        dim: u32,
-        params: &CausalAttentionParams,
-    ) -> f32 {
-        qkv[qkv_index(batch, token, head, dim, params.embedding_dim, params)]
-    }
-
-    #[inline(always)]
-    fn v_value(
-        qkv: &[f32],
-        batch: u32,
-        token: u32,
-        head: u32,
-        dim: u32,
-        params: &CausalAttentionParams,
-    ) -> f32 {
-        qkv[qkv_index(batch, token, head, dim, params.embedding_dim * 2, params)]
-    }
-
-    #[inline(always)]
-    fn qkv_index(
         batch: u32,
         token: u32,
         head: u32,
         dim: u32,
         section_offset: u32,
         params: &CausalAttentionParams,
-    ) -> usize {
-        (batch as usize * params.seq_len as usize + token as usize) * params.qkv_dim as usize
-            + section_offset as usize
-            + head as usize * params.head_dim as usize
-            + dim as usize
+    ) -> f32 {
+        qkv[batched_qkv_index(batch, token, head, dim, section_offset, params)]
     }
 }

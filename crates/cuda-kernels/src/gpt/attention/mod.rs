@@ -1,6 +1,7 @@
 mod causal;
 mod causal_backward_tc;
 mod causal_tc;
+pub(crate) mod layout;
 mod qkv_projection;
 mod rope;
 

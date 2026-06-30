@@ -1,6 +1,7 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
 use super::{ApplyRopeParams, THREADS_PER_BLOCK};
+use crate::attention::layout::rope_qkv_index;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 use crate::float_ptx::{exp_f32, fma_f32, sincos_f32};
 
@@ -99,8 +100,8 @@ pub mod module {
         section_offset: u32,
         params: &ApplyRopeParams,
     ) -> QkvPair {
-        let even_index = qkv_index(batch, token, head, dim, section_offset, params);
-        let odd_index = qkv_index(batch, token, head, dim + 1, section_offset, params);
+        let even_index = rope_qkv_index(batch, token, head, dim, section_offset, params);
+        let odd_index = rope_qkv_index(batch, token, head, dim + 1, section_offset, params);
         let ptr = qkv.as_mut_ptr();
         let even = unsafe { *ptr.add(even_index) };
         let odd = unsafe { *ptr.add(odd_index) };
@@ -131,8 +132,8 @@ pub mod module {
         section_offset: u32,
         params: &ApplyRopeParams,
     ) -> QkvPair {
-        let even_index = qkv_index(batch, token, head, dim, section_offset, params);
-        let odd_index = qkv_index(batch, token, head, dim + 1, section_offset, params);
+        let even_index = rope_qkv_index(batch, token, head, dim, section_offset, params);
+        let odd_index = rope_qkv_index(batch, token, head, dim + 1, section_offset, params);
         let ptr = qkv.as_mut_ptr();
 
         QkvPair {
@@ -157,21 +158,6 @@ pub mod module {
         even: f32,
         odd_index: usize,
         odd: f32,
-    }
-
-    #[inline(always)]
-    fn qkv_index(
-        batch: u32,
-        token: u32,
-        head: u32,
-        dim: u32,
-        section_offset: u32,
-        params: &ApplyRopeParams,
-    ) -> usize {
-        (batch as usize * params.seq_len as usize + token as usize) * params.qkv_dim as usize
-            + section_offset as usize
-            + head as usize * params.head_dim as usize
-            + dim as usize
     }
 
     #[inline(always)]
