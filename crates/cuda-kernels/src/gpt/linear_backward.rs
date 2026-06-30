@@ -2,18 +2,12 @@ use std::sync::Arc;
 
 use cuda_core::{CudaModule, DriverError};
 
-use crate::launch::{grid_x_config, launch_config};
-use crate::mma::{
-    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS,
-    NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams, projection_cta_grid_dim,
-    projection_cta_row_pair_tile_count, projection_cta_shape_aligned, projection_grid_dim,
-};
-use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
-
 #[path = "linear_backward/args.rs"]
 mod args;
 #[path = "linear_backward/bias.rs"]
 mod bias;
+#[path = "linear_backward/device_scale.rs"]
+mod device_scale;
 #[path = "linear_backward/kernels.rs"]
 mod kernels;
 #[path = "linear_backward/ms_eden.rs"]
@@ -63,107 +57,5 @@ impl LinearBackwardModule {
             input_dim,
             output_dim,
         })
-    }
-
-    pub fn backward_device_scale(
-        &self,
-        args: LinearBackwardDeviceScaleArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
-        let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
-
-        self.module.linear_backward_projection_device_scale_kernel(
-            args.stream,
-            launch_config(
-                projection_grid_dim(args.token_count, args.input_dim),
-                NVFP4_PROJECTION_THREADS_PER_BLOCK,
-            ),
-            args.e_h.bytes,
-            args.e_h.scales,
-            args.e_h.global_scales,
-            args.weight_t_h.bytes,
-            args.weight_t_h.scales,
-            args.weight_t_h.global_scale,
-            args.dinput,
-            linear_backward_projection_params(args.token_count, dinput_k, args.input_dim),
-        )?;
-
-        self.module.linear_backward_projection_device_scale_kernel(
-            args.stream,
-            launch_config(
-                projection_grid_dim(args.output_dim, args.input_dim),
-                NVFP4_PROJECTION_THREADS_PER_BLOCK,
-            ),
-            args.e_t_h.bytes,
-            args.e_t_h.scales,
-            args.e_t_h.global_scales,
-            args.input_t_h.bytes,
-            args.input_t_h.scales,
-            args.input_t_h.global_scale,
-            args.dweight,
-            linear_backward_projection_params(args.output_dim, dweight_k, args.input_dim),
-        )
-    }
-
-    pub fn backward_device_scale_cta(
-        &self,
-        args: LinearBackwardDeviceScaleArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
-        let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
-        if !projection_cta_shape_aligned(args.token_count, dinput_k, args.input_dim)
-            || !projection_cta_shape_aligned(args.output_dim, dweight_k, args.input_dim)
-        {
-            return self.backward_device_scale(args);
-        }
-        let dinput_grid = projection_cta_grid_dim(args.token_count, args.input_dim);
-        let dweight_grid = projection_cta_grid_dim(args.output_dim, args.input_dim);
-        assert!(dinput_grid.0.is_power_of_two());
-        assert!(dweight_grid.0.is_power_of_two());
-        let dinput_tiles = projection_cta_row_pair_tile_count(args.token_count, args.input_dim);
-        let dweight_tiles = projection_cta_row_pair_tile_count(args.output_dim, args.input_dim);
-
-        self.module
-            .linear_backward_projection_pair_cta_device_scale_kernel(
-                args.stream,
-                grid_x_config(dinput_tiles + dweight_tiles, NVFP4_PROJECTION_CTA_THREADS),
-                args.e_h.bytes,
-                args.e_h.scales,
-                args.e_h.global_scales,
-                args.weight_t_h.bytes,
-                args.weight_t_h.scales,
-                args.weight_t_h.global_scale,
-                args.dinput,
-                dinput_grid.0 - 1,
-                dinput_grid.0.trailing_zeros(),
-                dinput_tiles,
-                args.e_t_h.bytes,
-                args.e_t_h.scales,
-                args.e_t_h.global_scales,
-                args.input_t_h.bytes,
-                args.input_t_h.scales,
-                args.input_t_h.global_scale,
-                args.dweight,
-                dweight_grid.0 - 1,
-                dweight_grid.0.trailing_zeros(),
-                linear_backward_projection_params(args.token_count, dinput_k, args.input_dim),
-                linear_backward_projection_params(args.output_dim, dweight_k, args.input_dim),
-            )
-    }
-}
-
-fn linear_backward_projection_params(
-    token_count: u32,
-    input_dim: u32,
-    output_dim: u32,
-) -> Nvfp4ProjectionParams {
-    Nvfp4ProjectionParams {
-        token_count,
-        input_dim,
-        output_dim,
-        weight_global_scale: 1.0,
-        bias_global_scale: 0.0,
-        residual_add: 0,
-        activation: NVFP4_PROJECTION_ACTIVATION_NONE,
     }
 }
