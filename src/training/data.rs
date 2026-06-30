@@ -1,24 +1,17 @@
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
-use llama2_tokenizer::Llama2Tokenizer;
-use synth_prep::synth::SHARDS_DIR;
-use synth_prep::{DATA_DIR, DEFAULT_TRAIN_SHARD_COUNT, SHARD_FILE_PREFIX, SHARD_SIZE};
 
 use crate::AppResult;
+
+mod shakespeare;
+mod synth;
+mod tokens;
 
 const TRAIN_DATASET_ENV: &str = "TRAIN_DATASET";
 const TRAIN_REPEAT_BATCH_ENV: &str = "TRAIN_REPEAT_BATCH";
 const DATASET_SYNTH: &str = "synth";
 const DATASET_SHAKESPEARE: &str = "shakespeare";
-const SHAKESPEARE_URL: &str =
-    "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt";
-const SHAKESPEARE_DIR: &str = "data/shakespeare";
-const SHAKESPEARE_RAW: &str = "input.txt";
-const SHAKESPEARE_SHARD: &str = "shakespeare_llama2_train_000000.bin";
-const SYNTH_EOS_MARKER: &str = ".llama2_eos_boundaries";
 const VALIDATION_WINDOWS: usize = 4;
 
 pub struct TokenDataLoader {
@@ -64,10 +57,10 @@ impl TokenDataLoader {
     }
 
     pub fn from_synth() -> AppResult<Self> {
-        ensure_synth_shards()?;
-        let train_paths = train_shards()?;
-        let validation_path = first_val_shard()?;
-        let validation_tokens = read_u16_tokens(&validation_path)?;
+        synth::ensure_shards()?;
+        let train_paths = synth::train_shards()?;
+        let validation_path = synth::first_val_shard()?;
+        let validation_tokens = tokens::read_u16_tokens(&validation_path)?;
         Self::from_train_paths(
             train_paths,
             Some((validation_path, validation_tokens)),
@@ -77,7 +70,7 @@ impl TokenDataLoader {
     }
 
     pub fn from_shakespeare() -> AppResult<Self> {
-        let path = ensure_shakespeare_shard()?;
+        let path = shakespeare::ensure_shard()?;
         Self::from_train_paths(vec![path], None, true, true)
     }
 
@@ -139,7 +132,7 @@ impl TokenDataLoader {
             .first()
             .cloned()
             .ok_or("training dataset has no train shards")?;
-        let tokens = read_u16_tokens(&path)?;
+        let tokens = tokens::read_u16_tokens(&path)?;
         let train_end = if validation.is_some() {
             tokens.len()
         } else if reserve_validation_tail {
@@ -182,7 +175,7 @@ impl TokenDataLoader {
         }
 
         self.path = self.train_paths[self.train_path_index].clone();
-        self.tokens = read_u16_tokens(&self.path)?;
+        self.tokens = tokens::read_u16_tokens(&self.path)?;
         self.train_end = if self.validation_tokens.is_some() {
             self.tokens.len()
         } else {
@@ -243,161 +236,4 @@ fn training_dataset() -> String {
 fn repeat_first_window() -> bool {
     std::env::var(TRAIN_REPEAT_BATCH_ENV)
         .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
-}
-
-fn train_shards() -> AppResult<Vec<PathBuf>> {
-    let shards = shards_for_split("train")?
-        .into_iter()
-        .filter(|path| is_full_synth_shard(path))
-        .collect::<Vec<_>>();
-    if shards.is_empty() {
-        return Err("no full SYNTH train shards found".into());
-    }
-    Ok(shards)
-}
-
-fn first_val_shard() -> AppResult<PathBuf> {
-    shards_for_split("val")?
-        .into_iter()
-        .next()
-        .ok_or_else(|| format!("no val shards found in {}", synth_shard_dir().display()).into())
-}
-
-fn shards_for_split(split: &str) -> AppResult<Vec<PathBuf>> {
-    let dir = synth_shard_dir();
-    let prefix = format!("{SHARD_FILE_PREFIX}_{split}_");
-    let mut shards = Vec::new();
-
-    if !dir.exists() {
-        return Err(format!("{} does not exist after SYNTH prep", dir.display()).into());
-    }
-
-    for entry in fs::read_dir(&dir)? {
-        let path = entry?.path();
-        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        if file_name.starts_with(&prefix) && file_name.ends_with(".bin") {
-            shards.push(path);
-        }
-    }
-
-    shards.sort();
-    Ok(shards)
-}
-
-fn synth_shard_dir() -> PathBuf {
-    Path::new(DATA_DIR).join(SHARDS_DIR)
-}
-
-fn is_full_synth_shard(path: &Path) -> bool {
-    path.metadata()
-        .is_ok_and(|metadata| metadata.len() == (SHARD_SIZE * 2) as u64)
-}
-
-fn ensure_synth_shards() -> AppResult<()> {
-    if train_shards().is_ok_and(|shards| shards.len() >= DEFAULT_TRAIN_SHARD_COUNT)
-        && first_val_shard().is_ok()
-        && synth_eos_marker().exists()
-    {
-        return Ok(());
-    }
-
-    clear_synth_shards()?;
-    synth_prep::parse_data_for_train_shards(DEFAULT_TRAIN_SHARD_COUNT)?;
-    let train_shard_count = train_shards()?.len();
-    if train_shard_count < DEFAULT_TRAIN_SHARD_COUNT {
-        return Err(format!(
-            "expected {DEFAULT_TRAIN_SHARD_COUNT} full SYNTH train shards, found {train_shard_count}"
-        )
-        .into());
-    }
-    first_val_shard().map(|_| ())
-}
-
-fn synth_eos_marker() -> PathBuf {
-    synth_shard_dir().join(SYNTH_EOS_MARKER)
-}
-
-fn clear_synth_shards() -> AppResult<()> {
-    let dir = synth_shard_dir();
-    if !dir.exists() {
-        return Ok(());
-    }
-
-    for entry in fs::read_dir(&dir)? {
-        let path = entry?.path();
-        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        if (file_name.starts_with(SHARD_FILE_PREFIX) && file_name.ends_with(".bin"))
-            || file_name == SYNTH_EOS_MARKER
-        {
-            fs::remove_file(path)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn ensure_shakespeare_shard() -> AppResult<PathBuf> {
-    let dir = Path::new(SHAKESPEARE_DIR);
-    let shard_dir = dir.join(SHARDS_DIR);
-    let shard_path = shard_dir.join(SHAKESPEARE_SHARD);
-    let tokenizer = Llama2Tokenizer::from_default_assets()?;
-    if shard_path.exists() && shard_contains_token(&shard_path, tokenizer.eos_token())? {
-        return Ok(shard_path);
-    }
-
-    fs::create_dir_all(&shard_dir)?;
-    let raw_path = dir.join(SHAKESPEARE_RAW);
-    if !raw_path.exists() {
-        let text = reqwest::blocking::get(SHAKESPEARE_URL)?
-            .error_for_status()?
-            .text()?;
-        fs::create_dir_all(dir)?;
-        fs::write(&raw_path, text)?;
-    }
-
-    let text = fs::read_to_string(raw_path)?;
-    let mut tokens = Vec::new();
-    tokens.push(u16::try_from(tokenizer.bos_token())?);
-    for id in tokenizer.encode_ordinary(&text)? {
-        tokens.push(u16::try_from(id)?);
-    }
-    tokens.push(u16::try_from(tokenizer.eos_token())?);
-    write_u16_tokens(&shard_path, &tokens)?;
-    Ok(shard_path)
-}
-
-fn shard_contains_token(path: &Path, token: u32) -> AppResult<bool> {
-    let token = u16::try_from(token)?;
-    Ok(read_u16_tokens(path)?.contains(&token))
-}
-
-fn read_u16_tokens(path: &Path) -> AppResult<Vec<u16>> {
-    let bytes = fs::read(path)?;
-    if bytes.len() % 2 != 0 {
-        return Err(format!("{} has odd byte length", path.display()).into());
-    }
-
-    Ok(bytes
-        .chunks_exact(2)
-        .map(|chunk| u16::from_ne_bytes([chunk[0], chunk[1]]))
-        .collect())
-}
-
-fn write_u16_tokens(path: &Path, tokens: &[u16]) -> AppResult<()> {
-    let mut bytes = Vec::with_capacity(tokens.len() * 2);
-    for &token in tokens {
-        bytes.extend_from_slice(&token.to_ne_bytes());
-    }
-
-    fs::write(path, bytes).map_err(|err| {
-        io::Error::new(
-            err.kind(),
-            format!("failed to write {}: {err}", path.display()),
-        )
-        .into()
-    })
 }
