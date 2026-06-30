@@ -34,26 +34,22 @@ impl<'a> Nvfp4Polar<'a> {
             let gram = match mode {
                 GramCorrectionMode::HighPrecision
                 | GramCorrectionMode::HighPrecisionSafety { .. } => {
-                    stats.high_precision_gram_count += 1;
-                    self.f16_product(&source, &source, rows, rows, cols)?
+                    self.high_precision_gram(&source, rows, cols, &mut stats)?
                 }
                 GramCorrectionMode::Nvfp4GramOnly
                 | GramCorrectionMode::Nvfp4GramOnlySafety { .. }
                 | GramCorrectionMode::Nvfp4GramOnlySchedule { .. }
                 | GramCorrectionMode::Nvfp4GramOnlyLateSafety { .. } => {
-                    stats.nvfp4_gram_count += 1;
-                    self.product(&source, &source, rows, rows, cols, iter, 0)?
+                    self.nvfp4_gram(&source, rows, cols, iter, &mut stats)?
                 }
                 GramCorrectionMode::Nvfp4GramAverage { samples } => {
                     self.averaged_nvfp4_gram(&source, rows, cols, iter, samples, &mut stats)?
                 }
                 GramCorrectionMode::ExactPrefixThenNvfp4 { exact_steps } => {
                     if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        self.f16_product(&source, &source, rows, rows, cols)?
+                        self.high_precision_gram(&source, rows, cols, &mut stats)?
                     } else {
-                        stats.nvfp4_gram_count += 1;
-                        self.product(&source, &source, rows, rows, cols, iter, 0)?
+                        self.nvfp4_gram(&source, rows, cols, iter, &mut stats)?
                     }
                 }
                 GramCorrectionMode::ExactPrefixThenNvfp4Average {
@@ -61,8 +57,7 @@ impl<'a> Nvfp4Polar<'a> {
                     samples,
                 } => {
                     if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        self.f16_product(&source, &source, rows, rows, cols)?
+                        self.high_precision_gram(&source, rows, cols, &mut stats)?
                     } else {
                         self.averaged_nvfp4_gram(&source, rows, cols, iter, samples, &mut stats)?
                     }
@@ -112,8 +107,7 @@ impl<'a> Nvfp4Polar<'a> {
                     ..
                 } => {
                     if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        self.f16_product(&source, &source, rows, rows, cols)?
+                        self.high_precision_gram(&source, rows, cols, &mut stats)?
                     } else {
                         self.corrected_gram(
                             &source,
@@ -164,27 +158,22 @@ impl<'a> Nvfp4Polar<'a> {
 
         for iter in 0..iterations {
             let coefficient_safety = mode.coefficient_safety(iter);
+            let rejects_stale_steps = mode.rejects_stale_steps();
             let (gram, stale_reject_candidate, refresh) = match mode {
                 GramCorrectionMode::HighPrecision
-                | GramCorrectionMode::HighPrecisionSafety { .. } => {
-                    stats.high_precision_gram_count += 1;
-                    (
-                        self.f16_product(&source, &source, rows, rows, cols)?,
-                        false,
-                        true,
-                    )
-                }
+                | GramCorrectionMode::HighPrecisionSafety { .. } => (
+                    self.high_precision_gram(&source, rows, cols, &mut stats)?,
+                    false,
+                    true,
+                ),
                 GramCorrectionMode::Nvfp4GramOnly
                 | GramCorrectionMode::Nvfp4GramOnlySafety { .. }
                 | GramCorrectionMode::Nvfp4GramOnlySchedule { .. }
-                | GramCorrectionMode::Nvfp4GramOnlyLateSafety { .. } => {
-                    stats.nvfp4_gram_count += 1;
-                    (
-                        self.product(&source, &source, rows, rows, cols, iter, 0)?,
-                        false,
-                        false,
-                    )
-                }
+                | GramCorrectionMode::Nvfp4GramOnlyLateSafety { .. } => (
+                    self.nvfp4_gram(&source, rows, cols, iter, &mut stats)?,
+                    false,
+                    false,
+                ),
                 GramCorrectionMode::Nvfp4GramAverage { samples } => (
                     self.averaged_nvfp4_gram(&source, rows, cols, iter, samples, &mut stats)?,
                     false,
@@ -192,16 +181,14 @@ impl<'a> Nvfp4Polar<'a> {
                 ),
                 GramCorrectionMode::ExactPrefixThenNvfp4 { exact_steps } => {
                     if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
                         (
-                            self.f16_product(&source, &source, rows, rows, cols)?,
+                            self.high_precision_gram(&source, rows, cols, &mut stats)?,
                             false,
                             true,
                         )
                     } else {
-                        stats.nvfp4_gram_count += 1;
                         (
-                            self.product(&source, &source, rows, rows, cols, iter, 0)?,
+                            self.nvfp4_gram(&source, rows, cols, iter, &mut stats)?,
                             false,
                             false,
                         )
@@ -212,9 +199,8 @@ impl<'a> Nvfp4Polar<'a> {
                     samples,
                 } => {
                     if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
                         (
-                            self.f16_product(&source, &source, rows, rows, cols)?,
+                            self.high_precision_gram(&source, rows, cols, &mut stats)?,
                             false,
                             true,
                         )
@@ -228,23 +214,8 @@ impl<'a> Nvfp4Polar<'a> {
                         )
                     }
                 }
-                GramCorrectionMode::Stale { period } => {
-                    let refresh = period <= 1 || iter % period == 0;
-                    (
-                        self.corrected_gram(
-                            &source,
-                            rows,
-                            cols,
-                            iter,
-                            refresh,
-                            &mut stale_defect,
-                            &mut stats,
-                        )?,
-                        false,
-                        refresh,
-                    )
-                }
-                GramCorrectionMode::StaleReject { period }
+                GramCorrectionMode::Stale { period }
+                | GramCorrectionMode::StaleReject { period }
                 | GramCorrectionMode::StaleRejectSafety { period, .. } => {
                     let refresh = period <= 1 || iter % period == 0;
                     (
@@ -257,7 +228,7 @@ impl<'a> Nvfp4Polar<'a> {
                             &mut stale_defect,
                             &mut stats,
                         )?,
-                        !refresh,
+                        rejects_stale_steps && !refresh,
                         refresh,
                     )
                 }
@@ -281,32 +252,8 @@ impl<'a> Nvfp4Polar<'a> {
                 GramCorrectionMode::ExactPrefixThenStale {
                     exact_steps,
                     period,
-                } => {
-                    if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
-                        (
-                            self.f16_product(&source, &source, rows, rows, cols)?,
-                            false,
-                            true,
-                        )
-                    } else {
-                        let refresh = iter == exact_steps || (iter - exact_steps) % period == 0;
-                        (
-                            self.corrected_gram(
-                                &source,
-                                rows,
-                                cols,
-                                iter,
-                                refresh,
-                                &mut stale_defect,
-                                &mut stats,
-                            )?,
-                            false,
-                            refresh,
-                        )
-                    }
                 }
-                GramCorrectionMode::ExactPrefixThenStaleReject {
+                | GramCorrectionMode::ExactPrefixThenStaleReject {
                     exact_steps,
                     period,
                 }
@@ -326,9 +273,8 @@ impl<'a> Nvfp4Polar<'a> {
                     ..
                 } => {
                     if iter < exact_steps {
-                        stats.high_precision_gram_count += 1;
                         (
-                            self.f16_product(&source, &source, rows, rows, cols)?,
+                            self.high_precision_gram(&source, rows, cols, &mut stats)?,
                             false,
                             true,
                         )
@@ -344,7 +290,7 @@ impl<'a> Nvfp4Polar<'a> {
                                 &mut stale_defect,
                                 &mut stats,
                             )?,
-                            !refresh,
+                            rejects_stale_steps && !refresh,
                             refresh,
                         )
                     }
@@ -394,5 +340,28 @@ impl<'a> Nvfp4Polar<'a> {
         }
 
         Ok((source, stats))
+    }
+
+    fn high_precision_gram(
+        &self,
+        source: &[f32],
+        rows: usize,
+        cols: usize,
+        stats: &mut CorrectionStats,
+    ) -> Result<Vec<f32>, Box<dyn Error>> {
+        stats.high_precision_gram_count += 1;
+        self.f16_product(source, source, rows, rows, cols)
+    }
+
+    fn nvfp4_gram(
+        &self,
+        source: &[f32],
+        rows: usize,
+        cols: usize,
+        iter: usize,
+        stats: &mut CorrectionStats,
+    ) -> Result<Vec<f32>, Box<dyn Error>> {
+        stats.nvfp4_gram_count += 1;
+        self.product(source, source, rows, rows, cols, iter, 0)
     }
 }

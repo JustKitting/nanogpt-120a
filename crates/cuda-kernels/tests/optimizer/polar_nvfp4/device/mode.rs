@@ -102,6 +102,18 @@ impl GramCorrectionMode {
             _ => 1.0,
         }
     }
+
+    pub(super) fn rejects_stale_steps(self) -> bool {
+        matches!(
+            self,
+            GramCorrectionMode::StaleReject { .. }
+                | GramCorrectionMode::StaleRejectSafety { .. }
+                | GramCorrectionMode::ExactPrefixThenStaleReject { .. }
+                | GramCorrectionMode::ExactPrefixThenStaleRejectSafety { .. }
+                | GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety { .. }
+                | GramCorrectionMode::ExactPrefixThenStaleRejectSchedule { .. }
+        )
+    }
 }
 
 #[derive(Default)]
