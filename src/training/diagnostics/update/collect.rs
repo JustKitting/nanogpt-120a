@@ -46,50 +46,41 @@ fn collect_block_updates(
     grad: &BlockGradBuffers,
     state: &BlockState,
 ) -> AppResult {
+    macro_rules! collect_linear {
+        ($name:literal, $linear:ident, $weight_grad:ident, $bias_grad:ident) => {
+            collect_linear_updates(
+                collector,
+                &format!("block{index}.{}", $name),
+                &block.$linear,
+                &grad.$weight_grad,
+                &grad.$bias_grad,
+                &state.$linear,
+            )?;
+        };
+    }
+
     collector.push_layer_norm(
         &format!("block{index}.ln_1"),
         &block.ln_1,
         &grad.ln_1,
         &state.ln_1,
     )?;
-    collect_linear_updates(
-        collector,
-        &format!("block{index}.attn_qkv"),
-        &block.attn_qkv,
-        &grad.d_attn_qkv_weight,
-        &grad.d_attn_qkv_bias,
-        &state.attn_qkv,
-    )?;
-    collect_linear_updates(
-        collector,
-        &format!("block{index}.attn_c_proj"),
-        &block.attn_c_proj,
-        &grad.d_attn_c_proj_weight,
-        &grad.d_attn_c_proj_bias,
-        &state.attn_c_proj,
-    )?;
+    collect_linear!("attn_qkv", attn_qkv, d_attn_qkv_weight, d_attn_qkv_bias);
+    collect_linear!(
+        "attn_c_proj",
+        attn_c_proj,
+        d_attn_c_proj_weight,
+        d_attn_c_proj_bias
+    );
     collector.push_layer_norm(
         &format!("block{index}.ln_2"),
         &block.ln_2,
         &grad.ln_2,
         &state.ln_2,
     )?;
-    collect_linear_updates(
-        collector,
-        &format!("block{index}.mlp_up"),
-        &block.mlp_up,
-        &grad.d_mlp_c_fc_weight,
-        &grad.d_mlp_c_fc_bias,
-        &state.mlp_up,
-    )?;
-    collect_linear_updates(
-        collector,
-        &format!("block{index}.mlp_down"),
-        &block.mlp_down,
-        &grad.d_mlp_c_proj_weight,
-        &grad.d_mlp_c_proj_bias,
-        &state.mlp_down,
-    )
+    collect_linear!("mlp_up", mlp_up, d_mlp_c_fc_weight, d_mlp_c_fc_bias);
+    collect_linear!("mlp_down", mlp_down, d_mlp_c_proj_weight, d_mlp_c_proj_bias);
+    Ok(())
 }
 
 fn collect_linear_updates(
