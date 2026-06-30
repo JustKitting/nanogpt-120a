@@ -1,6 +1,7 @@
 mod amax;
 mod args;
 mod config;
+mod four_six;
 mod global_scale;
 pub(crate) mod kernels;
 mod launcher;

@@ -4,22 +4,17 @@ use cuda_core::{CudaModule, DriverError};
 
 use super::args::{
     MsEdenDeviceScaleQuantArgs, MsEdenPairDeviceScaleQuantArgs, MsEdenQuantArgs,
-    MsEdenTransposeDeviceScaleQuantArgs, Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs,
-    Nvfp4TransposeMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenDeviceScaleQuantArgs,
-    QuartetBackwardMsEdenQuantArgs, RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
+    MsEdenTransposeDeviceScaleQuantArgs, Nvfp4TransposeMsEdenDeviceScaleQuantArgs,
+    QuartetBackwardMsEdenDeviceScaleQuantArgs, QuartetBackwardMsEdenQuantArgs,
+    RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
 };
 use super::kernels;
-use super::shape::{
-    Fp32PairNoPad, MsEdenPackGrid, RowwiseTransposeNoPad, four_six_grid_config,
-    four_six_rowwise_pow2, grid_config,
-};
+use super::shape::{Fp32PairNoPad, MsEdenPackGrid, RowwiseTransposeNoPad, grid_config};
 use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
-
-const SCALE_OVERRIDE: f32 = 1.0;
 
 pub struct Nvfp4QuantModule {
     pub(super) row_amax: kernels::row_amax::module::LoadedModule,
-    four_six: kernels::four_six::module::LoadedModule,
+    pub(super) four_six: kernels::four_six::module::LoadedModule,
     pub(super) ms_eden: kernels::ms_eden::module::LoadedModule,
 }
 
@@ -30,30 +25,6 @@ impl Nvfp4QuantModule {
             four_six: kernels::four_six::module::from_module(module.clone())?,
             ms_eden: kernels::ms_eden::module::from_module(module)?,
         })
-    }
-
-    pub fn fp32_to_nvfp4_four_six(&self, args: Nvfp4QuantArgs<'_, '_>) -> Result<(), DriverError> {
-        self.launch_fp32_to_nvfp4_four_six(Nvfp4QuantRowwiseArgs {
-            stream: args.stream,
-            x: args.x,
-            amax: args.amax,
-            out_fp4: args.out_fp4,
-            out_scales: args.out_scales,
-            out_global_scale: args.out_global_scale,
-            group_count: args.group_count,
-            row_len: 0,
-        })
-    }
-
-    pub fn fp32_to_nvfp4_four_six_rowwise(
-        &self,
-        args: Nvfp4QuantRowwiseArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        if four_six_rowwise_pow2(args.row_len, args.group_count) {
-            return self.launch_fp32_to_nvfp4_four_six_rowwise_pow2(args);
-        }
-
-        self.launch_fp32_to_nvfp4_four_six(args)
     }
 
     pub fn fp32_to_nvfp4_ms_eden(&self, args: MsEdenQuantArgs<'_, '_>) -> Result<(), DriverError> {
@@ -615,40 +586,5 @@ impl Nvfp4QuantModule {
             scale_seed: args.scale_seed,
         })?;
         Ok(global_scale)
-    }
-
-    fn launch_fp32_to_nvfp4_four_six(
-        &self,
-        args: Nvfp4QuantRowwiseArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        self.four_six.fp32_to_nvfp4_four_six_kernel(
-            args.stream,
-            four_six_grid_config(args.group_count),
-            args.x,
-            args.amax,
-            args.out_fp4,
-            args.out_scales,
-            args.out_global_scale,
-            args.row_len,
-            SCALE_OVERRIDE,
-        )
-    }
-
-    fn launch_fp32_to_nvfp4_four_six_rowwise_pow2(
-        &self,
-        args: Nvfp4QuantRowwiseArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        self.four_six.fp32_to_nvfp4_four_six_rowwise_pow2_kernel(
-            args.stream,
-            four_six_grid_config(args.group_count),
-            args.x,
-            args.amax,
-            args.out_fp4,
-            args.out_scales,
-            args.out_global_scale,
-            args.row_len.trailing_zeros(),
-            args.row_len - 1,
-            SCALE_OVERRIDE,
-        )
     }
 }
