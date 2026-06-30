@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use cuda_core::CudaContext;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::nvfp4_tc_matmul::Nvfp4TcMatmulModule;
@@ -32,9 +31,7 @@ const PRODUCTION_ITERATIONS: usize = 5;
 fn with_polar<T>(
     run: impl FnOnce(&device::Nvfp4Polar<'_>) -> Result<T, Box<dyn Error>>,
 ) -> Result<T, Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
     let f16 = F16TcMatmulModule::from_module(ptx.clone())?;
     let matmul = Nvfp4TcMatmulModule::from_module(ptx.clone())?;
     let quant = Nvfp4QuantModule::from_module(ptx)?;

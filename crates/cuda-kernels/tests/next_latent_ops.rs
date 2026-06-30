@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::next_latent::{
     NextLatGeluArgs, NextLatModule, NextLatProjectionArgs, NextLatResidualAddArgs,
@@ -19,10 +19,8 @@ const E4M3_ONE: u8 = 0x38;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nextlat_projection_gelu_and_residual_match_reference() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        NextLatModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = NextLatModule::from_module(ptx)?;
 
     let zeros = vec![0_u8; TOKEN_COUNT * INPUT_DIM / 2];
     let scales = vec![E4M3_ONE; TOKEN_COUNT * INPUT_DIM / 16];

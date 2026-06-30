@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::next_latent::{NextLatConcatBackwardArgs, NextLatModule};
 
 mod common;
@@ -12,10 +12,8 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nextlat_concat_backward_splits_reference() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        NextLatModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = NextLatModule::from_module(ptx)?;
 
     let d_concat = values(ROW_COUNT * EMBED * 2, 0.375);
     let d_predicted = values(ROW_COUNT * EMBED, -0.25);

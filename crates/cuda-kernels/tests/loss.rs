@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::loss::{CrossEntropyArgs, LossModule};
 
 mod common;
@@ -12,9 +12,8 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = LossModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = LossModule::from_module(ptx)?;
 
     let logits = [
         0.0_f32,

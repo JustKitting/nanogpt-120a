@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionBackwardTcArgs};
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 
@@ -23,9 +23,7 @@ const TC_TOLERANCE: f32 = 1.0e-6;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn materialized_tc_backward_matches_reference() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
     let attention = AttentionModule::from_module(ptx.clone())?;
     let tc = F16TcMatmulModule::from_module(ptx)?;
     let case = case::simple_case();

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, CudaStream, DeviceBuffer, DriverError};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::f16_tc_matmul::{
     F16TcMatmulAddArgs, F16TcMatmulAddRhsTransposeBaseArgs, F16TcMatmulModule, F16TcMatmulScratch,
     f16_tc_matmul_elements,
@@ -17,9 +17,8 @@ const TOLERANCE: f32 = 1.0e-6;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn cta_tiled_f16_tc_matmul_add_matches_reference() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = F16TcMatmulModule::from_module(ctx.load_module_from_file(&common::ptx_path())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = F16TcMatmulModule::from_module(ptx)?;
     let a = DeviceBuffer::from_host(&stream, &vec![0.125_f32; BATCH * M * K])?;
     let b = DeviceBuffer::from_host(&stream, &vec![0.25_f32; BATCH * N * K])?;
     let base = DeviceBuffer::from_host(&stream, &vec![0.5_f32; BATCH * M * N])?;
@@ -50,9 +49,8 @@ fn cta_tiled_f16_tc_matmul_add_matches_reference() -> Result<(), Box<dyn Error>>
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn cta_tiled_f16_tc_rhs_transposed_base_matches_reference() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = F16TcMatmulModule::from_module(ctx.load_module_from_file(&common::ptx_path())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = F16TcMatmulModule::from_module(ptx)?;
     let a = DeviceBuffer::from_host(&stream, &vec![0.125_f32; BATCH * M * K])?;
     let rhs = DeviceBuffer::from_host(&stream, &vec![0.25_f32; BATCH * K * N])?;
     let base = DeviceBuffer::from_host(&stream, &vec![0.5_f32; BATCH * M * N])?;

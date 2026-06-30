@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::nvfp4_tc_matmul::{Nvfp4TcMatmulArgs, Nvfp4TcMatmulModule};
@@ -19,9 +19,7 @@ const TOLERANCE: f32 = 1.0e-5;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn fp32_ms_eden_tc_matmul_matches_decoded_operands() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
     let module = Nvfp4TcMatmulModule::from_module(ptx.clone())?;
     let quant = Nvfp4QuantModule::from_module(ptx.clone())?;
     let decode = Nvfp4DecodeModule::from_module(ptx)?;

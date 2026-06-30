@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::layer_norm::{GptLayerNormArgs, LayerNormArgs, LayerNormModule, ROW_SIZE};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
@@ -28,10 +28,8 @@ fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
         beta[col] = -0.125 + col as f32 * 0.005;
     }
 
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        LayerNormModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = LayerNormModule::from_module(ptx)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let gamma_dev = DeviceBuffer::from_host(&stream, &gamma)?;
@@ -74,10 +72,8 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let bias_bytes = vec![0_u8; GPT_EMBEDDING_DIM / 2];
     let bias_scales = vec![E4M3_ONE; GPT_EMBEDDING_DIM / 16];
 
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        LayerNormModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = LayerNormModule::from_module(ptx)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;

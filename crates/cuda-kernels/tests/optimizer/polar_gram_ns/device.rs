@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, CudaStream, DeviceBuffer, DriverError, sys};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError, sys};
 use rust_kernels_cuda::f16_tc_matmul::{
     F16TcMatmulAddRhsTransposeBaseArgs, F16TcMatmulF32Args, F16TcMatmulF32RhsArgs,
     F16TcMatmulModule,
@@ -46,9 +46,7 @@ fn run_iteration_case(
     resets: &[usize],
     label: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (ctx, stream, ptx) = common::cuda_test_context()?;
     let f16 = F16TcMatmulModule::from_module(ptx.clone())?;
     let ops = F32MatrixOpsModule::from_module(ptx)?;
     let source = reference::normalized_polar_source(&reference::gradient(rows, cols), rows, cols);

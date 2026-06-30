@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::lm_head::{LmHeadArgs, LmHeadModule};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
@@ -20,10 +20,8 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        LmHeadModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = LmHeadModule::from_module(ptx)?;
 
     let mut input_bytes = vec![0_u8; TOKEN_COUNT * INPUT_DIM / 2];
     set_e2m1_one(&mut input_bytes, 0);

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, CudaStream, DeviceBuffer};
+use cuda_core::{CudaStream, DeviceBuffer};
 use rust_kernels_cuda::nvfp4::{
     Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4RowwiseDecodeTransposeArgs,
 };
@@ -50,9 +50,7 @@ fn rowwise_quant(
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn fp32_transpose_ms_eden_matches_materialized_transpose() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
     let transpose = TransposeModule::from_module(ptx.clone())?;
     let quant = Nvfp4QuantModule::from_module(ptx)?;
 
@@ -110,9 +108,7 @@ fn fp32_transpose_ms_eden_matches_materialized_transpose() -> Result<(), Box<dyn
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn rowwise_nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
     let decode = Nvfp4DecodeModule::from_module(ptx.clone())?;
     let quant = Nvfp4QuantModule::from_module(ptx)?;
 
@@ -177,9 +173,7 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
     const LOCAL_ROWS: usize = 32;
     const LOCAL_COLS: usize = 16;
 
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
     let decode = Nvfp4DecodeModule::from_module(ptx.clone())?;
     let quant = Nvfp4QuantModule::from_module(ptx)?;
 
@@ -246,9 +240,7 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
     let decode = Nvfp4DecodeModule::from_module(ptx.clone())?;
     let quant = Nvfp4QuantModule::from_module(ptx)?;
 

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::optimizer::{AuroraMegaUpdateArgs, AuroraSlotDescriptor, OptimizerModule};
 
 use crate::assertions::assert_update_matches;
@@ -14,10 +14,8 @@ use buffers::{Scratch, Slots, assert_quantized_slot_matches};
 const SLOT_COUNT: usize = rust_kernels_cuda::optimizer::AURORA_MATRIX_PHASES;
 
 pub fn run_first_iteration_case(row_count: usize, col_count: usize) -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        OptimizerModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = OptimizerModule::from_module(ptx)?;
     let len = row_count * col_count;
     let gram_dim = row_count.min(col_count);
     let mut slots = Slots::new(&stream, len)?;

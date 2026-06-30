@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::nvfp4::{
     Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4DeviceTensor,
     Nvfp4RowwiseDecodeTransposeArgs, Nvfp4RowwiseDeviceTensor,
@@ -16,10 +16,8 @@ const E4M3_ONE: u8 = 0x38;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nvfp4_decode_transpose_writes_fp32_transpose() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        Nvfp4DecodeModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = Nvfp4DecodeModule::from_module(ptx)?;
 
     let bytes = DeviceBuffer::from_host(&stream, &[E2M1_ONE_PAIR; ROWS * COLS / 2])?;
     let scales = DeviceBuffer::from_host(&stream, &[E4M3_ONE; ROWS * COLS / 16])?;

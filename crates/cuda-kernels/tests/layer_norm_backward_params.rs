@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::layer_norm_backward::{
     LayerNormBackwardModule, LayerNormBackwardParamF32Args,
 };
@@ -18,11 +18,8 @@ fn layer_norm_backward_params_match_reference() -> Result<(), Box<dyn Error>> {
     let dy = sample_grad();
     let (mean, inv_std) = reference_stats(&x, epsilon);
 
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = LayerNormBackwardModule::from_module(
-        ctx.load_module_from_file(common::ptx_path().as_str())?,
-    )?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = LayerNormBackwardModule::from_module(ptx)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let dy_dev = DeviceBuffer::from_host(&stream, &dy)?;

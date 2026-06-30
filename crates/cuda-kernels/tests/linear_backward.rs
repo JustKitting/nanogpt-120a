@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::linear_backward::{
     LinearBackwardArgs, LinearBackwardInputTranspose, LinearBackwardModule,
     LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratchBuffers, LinearBackwardWeightTranspose,
@@ -26,10 +26,8 @@ const TOLERANCE: f32 = 1.0e-7;
 #[test]
 fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result<(), Box<dyn Error>>
 {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        LinearBackwardModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = LinearBackwardModule::from_module(ptx)?;
 
     let e_h_bytes = first_col_one_bytes(TOKEN_COUNT, OUTPUT_DIM);
     let e_h_scales = vec![E4M3_ONE; TOKEN_COUNT * OUTPUT_DIM / 16];
@@ -108,9 +106,7 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let ptx = ctx.load_module_from_file(common::ptx_path().as_str())?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
     let module = LinearBackwardModule::from_module(ptx.clone())?;
     let quant_module = Nvfp4QuantModule::from_module(ptx)?;
 

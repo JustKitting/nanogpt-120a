@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionArgs};
 
 mod common;
@@ -15,10 +15,8 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn causal_attention_writes_log_sum_exp() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        AttentionModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = AttentionModule::from_module(ptx)?;
 
     let qkv = DeviceBuffer::from_host(&stream, &vec![0.0_f32; TOKEN_COUNT * QKV_DIM])?;
     let mut out = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * EMBEDDING_DIM)?;
@@ -56,10 +54,8 @@ fn causal_attention_writes_log_sum_exp() -> Result<(), Box<dyn Error>> {
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn causal_attention_batch_isolation() -> Result<(), Box<dyn Error>> {
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module =
-        AttentionModule::from_module(ctx.load_module_from_file(common::ptx_path().as_str())?)?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = AttentionModule::from_module(ptx)?;
 
     let first = run_batched_attention(&stream, &module, sample_qkv(0.25))?;
     let second = run_batched_attention(&stream, &module, sample_qkv(8.0))?;

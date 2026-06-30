@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::residual::{ResidualBackwardModule, ResidualGradAddArgs};
 
 mod common;
@@ -12,11 +12,8 @@ fn residual_grad_add_matches_reference() -> Result<(), Box<dyn Error>> {
     let direct: Vec<f32> = (0..LEN).map(|i| i as f32 * 0.25 - 8.0).collect();
     let branch: Vec<f32> = (0..LEN).map(|i| 3.0 - i as f32 * 0.125).collect();
 
-    let ctx = CudaContext::new(common::gpu_device_index())?;
-    let stream = ctx.new_stream()?;
-    let module = ResidualBackwardModule::from_module(
-        ctx.load_module_from_file(common::ptx_path().as_str())?,
-    )?;
+    let (_, stream, ptx) = common::cuda_test_context()?;
+    let module = ResidualBackwardModule::from_module(ptx)?;
 
     let direct_dev = DeviceBuffer::from_host(&stream, &direct)?;
     let branch_dev = DeviceBuffer::from_host(&stream, &branch)?;
