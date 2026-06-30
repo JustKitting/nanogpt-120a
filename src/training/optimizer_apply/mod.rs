@@ -10,6 +10,7 @@ mod mlp;
 mod next_latent;
 mod qkv;
 mod result;
+mod skip;
 mod utils;
 
 pub(crate) use adam::adam_debug_config;

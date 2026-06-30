@@ -1,4 +1,4 @@
-use super::super::grad_clip::{GradientClipBuffers, first_non_finite_gradient};
+use super::super::grad_clip::GradientClipBuffers;
 use super::super::grads::BackwardBuffers;
 use super::super::next_latent::NextLatGradBuffers;
 use super::super::optimizer::OptimizerScratch;
@@ -14,6 +14,7 @@ use super::block::update_block;
 use super::embedding::add_embedding_lookup_grad;
 use super::kda_clip::apply_kda_aurora_clip;
 use super::result::WeightUpdateResult;
+use super::skip::record_skip_decision;
 use super::utils::elapsed_ms;
 use crate::AppResult;
 use crate::training::runtime::Runtime;
@@ -47,24 +48,14 @@ pub fn apply_weight_updates(
     let grad_norm = grad_clip.clip(stream, optimizer)?;
     trace.grad_norm = grad_norm;
 
-    let skip = state.should_skip_update(observed_loss, grad_norm);
-    trace.update_skipped = skip.skipped;
-    trace.skip_loss_spike = skip.loss_spike;
-    trace.skip_grad_norm_spike = skip.grad_norm_spike;
-    trace.skip_non_finite = skip.non_finite;
-    if skip.non_finite {
-        if let Some(bad) = first_non_finite_gradient(stream, grads, next_latent_grads)? {
-            eprintln!(
-                "non_finite_gradient optimizer_step_candidate={candidate_step} tensor={} index={} value={:.9e}",
-                bad.name, bad.index, bad.value
-            );
-        } else {
-            eprintln!(
-                "non_finite_gradient optimizer_step_candidate={candidate_step} tensor=unknown"
-            );
-        }
-    }
-    if skip.skipped {
+    if record_skip_decision(
+        stream,
+        grads,
+        next_latent_grads,
+        candidate_step,
+        &mut trace,
+        state.should_skip_update(observed_loss, grad_norm),
+    )? {
         return Ok(WeightUpdateResult {
             trace,
             diagnostics: None,
