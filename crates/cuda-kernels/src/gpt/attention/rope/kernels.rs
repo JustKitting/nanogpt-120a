@@ -92,24 +92,21 @@ pub mod module {
         section_offset: u32,
         params: &ApplyRopeParams,
     ) -> QkvPair {
-        let even_index = rope_qkv_index(batch, token, head, dim, section_offset, params);
-        let odd_index = rope_qkv_index(batch, token, head, dim + 1, section_offset, params);
-        let ptr = qkv.as_mut_ptr();
-        let even = unsafe { *ptr.add(even_index) };
-        let odd = unsafe { *ptr.add(odd_index) };
+        let pair = read_pair(qkv, batch, token, head, dim, section_offset, params);
         let (sin, cos) = sincos_f32(token as f32 * rope_inv_freq(dim, params.head_dim));
-        let rotated_even = fma_f32(-odd, sin, even * cos);
-        let rotated_odd = fma_f32(odd, cos, even * sin);
+        let rotated_even = fma_f32(-pair.odd, sin, pair.even * cos);
+        let rotated_odd = fma_f32(pair.odd, cos, pair.even * sin);
 
         unsafe {
-            *ptr.add(even_index) = rotated_even;
-            *ptr.add(odd_index) = rotated_odd;
+            let ptr = qkv.as_mut_ptr();
+            *ptr.add(pair.even_index) = rotated_even;
+            *ptr.add(pair.odd_index) = rotated_odd;
         }
 
         QkvPair {
-            even_index,
+            even_index: pair.even_index,
             even: rotated_even,
-            odd_index,
+            odd_index: pair.odd_index,
             odd: rotated_odd,
         }
     }

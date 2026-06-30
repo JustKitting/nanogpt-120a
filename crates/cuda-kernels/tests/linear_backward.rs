@@ -1,13 +1,15 @@
 use std::error::Error;
 
-use cuda_core::DeviceBuffer;
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::linear_backward::{
     LinearBackwardArgs, LinearBackwardInputTranspose, LinearBackwardModule,
-    LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratchBuffers, LinearBackwardWeightTranspose,
+    LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratch, LinearBackwardWeightTranspose,
+    MsEdenOperandScratchBuffer,
 };
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
+use rust_kernels_cuda::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 
 mod common;
 #[path = "common/nvfp4.rs"]
@@ -21,6 +23,41 @@ const OUTPUT_DIM: usize = 64;
 const E2M1_ONE_PAIR: u8 = 0x22;
 const E4M3_ONE: u8 = 0x38;
 const TOLERANCE: f32 = 1.0e-7;
+
+struct LinearBackwardMsEdenScratchBuffers {
+    e_h: MsEdenOperandScratchBuffer,
+    weight_t_h: MsEdenOperandScratchBuffer,
+    e_t_h: MsEdenOperandScratchBuffer,
+    input_t_h: MsEdenOperandScratchBuffer,
+}
+
+impl LinearBackwardMsEdenScratchBuffers {
+    fn new(
+        stream: &CudaStream,
+        token_count: usize,
+        input_dim: usize,
+        output_dim: usize,
+    ) -> Result<Self, DriverError> {
+        let output_k = nvfp4_tc_matmul_padded_k(output_dim as u32) as usize;
+        let token_k = nvfp4_tc_matmul_padded_k(token_count as u32) as usize;
+
+        Ok(Self {
+            e_h: MsEdenOperandScratchBuffer::new(stream, token_count * output_k, token_count)?,
+            weight_t_h: MsEdenOperandScratchBuffer::new(stream, input_dim * output_k, input_dim)?,
+            e_t_h: MsEdenOperandScratchBuffer::new(stream, output_dim * token_k, output_dim)?,
+            input_t_h: MsEdenOperandScratchBuffer::new(stream, input_dim * token_k, input_dim)?,
+        })
+    }
+
+    fn as_args(&mut self) -> LinearBackwardMsEdenScratch<'_> {
+        LinearBackwardMsEdenScratch {
+            e_h: self.e_h.as_arg(),
+            weight_t_h: self.weight_t_h.as_arg(),
+            e_t_h: self.e_t_h.as_arg(),
+            input_t_h: self.input_t_h.as_arg(),
+        }
+    }
+}
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
