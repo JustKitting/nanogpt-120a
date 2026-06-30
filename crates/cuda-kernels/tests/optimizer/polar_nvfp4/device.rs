@@ -5,7 +5,7 @@ use rust_kernels_cuda::f16_tc_matmul::{F16TcMatmulF32Args, F16TcMatmulModule};
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::nvfp4_tc_matmul::{Nvfp4TcMatmulArgs, Nvfp4TcMatmulModule};
 
-use super::math::{combine_next, transpose};
+use super::math::{combine_next, relative_l2, transpose};
 use super::scratch::{Scratch, global_scale};
 
 #[path = "device/iterations.rs"]
@@ -204,18 +204,6 @@ impl<'a> Nvfp4Polar<'a> {
 
         Ok(out.to_host_vec(self.stream)?)
     }
-}
-
-fn relative_l2(actual: &[f32], expected: &[f32]) -> f32 {
-    let (err, norm) =
-        actual
-            .iter()
-            .zip(expected)
-            .fold((0.0_f32, 0.0_f32), |(err, norm), (actual, expected)| {
-                let diff = actual - expected;
-                (diff.mul_add(diff, err), expected.mul_add(*expected, norm))
-            });
-    (err / norm).sqrt()
 }
 
 fn row_orthogonality_residual(x: &[f32], rows: usize, cols: usize) -> f32 {

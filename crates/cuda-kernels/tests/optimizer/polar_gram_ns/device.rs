@@ -14,26 +14,21 @@ use crate::common;
 use crate::polar_coefficients::coefficients;
 
 const ITERATIONS: usize = 5;
-const RESET_NONE: &[usize] = &[];
-const RESET_2: &[usize] = &[2];
-const RESET_2_4: &[usize] = &[2, 4];
-const RESET_1_3: &[usize] = &[1, 3];
-const RESET_2_3_4: &[usize] = &[2, 3, 4];
-const RESET_EVERY: &[usize] = &[1, 2, 3, 4];
+const RESET_CASES: [(&str, &[usize]); 5] = [
+    ("reset_2", &[2]),
+    ("reset_2_4", &[2, 4]),
+    ("reset_1_3", &[1, 3]),
+    ("reset_2_3_4", &[2, 3, 4]),
+    ("reset_every", &[1, 2, 3, 4]),
+];
 
 pub fn run_timing_case(rows: usize, cols: usize) -> Result<(), Box<dyn Error>> {
     for iterations in 1..ITERATIONS {
-        let resets = if iterations > 2 { RESET_2 } else { RESET_NONE };
+        let resets = if iterations > 2 { &[2][..] } else { &[] };
         run_iteration_case(rows, cols, iterations, resets, "prefix")?;
     }
 
-    for (label, resets) in [
-        ("reset_2", RESET_2),
-        ("reset_2_4", RESET_2_4),
-        ("reset_1_3", RESET_1_3),
-        ("reset_2_3_4", RESET_2_3_4),
-        ("reset_every", RESET_EVERY),
-    ] {
+    for (label, resets) in RESET_CASES {
         run_iteration_case(rows, cols, ITERATIONS, resets, label)?;
     }
     Ok(())
