@@ -162,6 +162,7 @@ mod kernels;
 mod launch_ops;
 mod launcher;
 mod launcher_add;
+mod launcher_f32;
 mod pad;
 mod prepare;
 

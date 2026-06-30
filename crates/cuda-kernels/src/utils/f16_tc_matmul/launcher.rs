@@ -2,11 +2,7 @@ use std::sync::Arc;
 
 use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
-use super::args::{
-    F16ConvertArgs, F16TcMatmulArgs, F16TcMatmulF32ATransposedHalfRhsArgs,
-    F16TcMatmulF32ATransposedRhsArgs, F16TcMatmulF32Args, F16TcMatmulF32HalfRhsArgs,
-    F16TcMatmulF32RhsArgs, F16TcMatmulHalfArgs,
-};
+use super::args::{F16ConvertArgs, F16TcMatmulArgs, F16TcMatmulHalfArgs};
 use super::cta_tile::{CTA_M, CTA_N, CTA_THREADS};
 use super::kernels;
 use super::launch_ops::convert;
@@ -34,7 +30,7 @@ impl F16TcMatmulModule {
     }
 
     pub fn batched_matmul(&self, args: F16TcMatmulArgs<'_, '_, '_>) -> Result<(), DriverError> {
-        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
+        assert!(args.out.len() >= elements(args.batch_count, args.m, args.n));
 
         let (scratch, k) = prepare_halves(
             &self.module,
@@ -61,34 +57,13 @@ impl F16TcMatmulModule {
         )
     }
 
-    pub fn batched_matmul_f32_input(
-        &self,
-        args: F16TcMatmulF32Args<'_, '_>,
-    ) -> Result<(), DriverError> {
-        assert!(args.a.len() >= args.batch_count as usize * args.m as usize * args.k as usize);
-        assert!(args.b_t.len() >= args.batch_count as usize * args.n as usize * args.k as usize);
-        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
-
-        self.module.f16_cta_tc_matmul_f32_kernel(
-            args.stream,
-            cta_config(args.m, args.n, args.batch_count),
-            args.a,
-            args.b_t,
-            args.out,
-            args.batch_count,
-            args.m,
-            args.n,
-            args.k,
-        )
-    }
-
     pub fn batched_matmul_half_input(
         &self,
         args: F16TcMatmulHalfArgs<'_, '_>,
     ) -> Result<(), DriverError> {
-        assert!(args.a.len() >= args.batch_count as usize * args.m as usize * args.k as usize);
-        assert!(args.b_t.len() >= args.batch_count as usize * args.n as usize * args.k as usize);
-        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
+        assert!(args.a.len() >= elements(args.batch_count, args.m, args.k));
+        assert!(args.b_t.len() >= elements(args.batch_count, args.n, args.k));
+        assert!(args.out.len() >= elements(args.batch_count, args.m, args.n));
 
         self.module.f16_cta_tc_matmul_kernel(
             args.stream,
@@ -102,91 +77,6 @@ impl F16TcMatmulModule {
             args.k,
         )
     }
-
-    pub fn batched_matmul_f32_rhs(
-        &self,
-        args: F16TcMatmulF32RhsArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        assert!(args.a.len() >= args.batch_count as usize * args.m as usize * args.k as usize);
-        assert!(args.rhs.len() >= args.batch_count as usize * args.k as usize * args.n as usize);
-        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
-
-        self.module.f16_cta_tc_matmul_f32_rhs_kernel(
-            args.stream,
-            cta_config(args.m, args.n, args.batch_count),
-            args.a,
-            args.rhs,
-            args.out,
-            args.batch_count,
-            args.m,
-            args.n,
-            args.k,
-        )
-    }
-
-    pub fn batched_matmul_f32_half_rhs(
-        &self,
-        args: F16TcMatmulF32HalfRhsArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        assert!(args.a.len() >= args.batch_count as usize * args.m as usize * args.k as usize);
-        assert!(args.rhs.len() >= args.batch_count as usize * args.k as usize * args.n as usize);
-        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
-
-        self.module.f16_cta_tc_matmul_f32_half_rhs_kernel(
-            args.stream,
-            cta_config(args.m, args.n, args.batch_count),
-            args.a,
-            args.rhs,
-            args.out,
-            args.batch_count,
-            args.m,
-            args.n,
-            args.k,
-        )
-    }
-
-    pub fn batched_matmul_f32_a_transposed_rhs(
-        &self,
-        args: F16TcMatmulF32ATransposedRhsArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        assert!(args.a.len() >= args.batch_count as usize * args.k as usize * args.m as usize);
-        assert!(args.rhs.len() >= args.batch_count as usize * args.k as usize * args.n as usize);
-        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
-
-        self.module.f16_cta_tc_matmul_f32_a_transposed_rhs_kernel(
-            args.stream,
-            cta_config(args.m, args.n, args.batch_count),
-            args.a,
-            args.rhs,
-            args.out,
-            args.batch_count,
-            args.m,
-            args.n,
-            args.k,
-        )
-    }
-
-    pub fn batched_matmul_f32_a_transposed_half_rhs(
-        &self,
-        args: F16TcMatmulF32ATransposedHalfRhsArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        assert!(args.a.len() >= args.batch_count as usize * args.k as usize * args.m as usize);
-        assert!(args.rhs.len() >= args.batch_count as usize * args.k as usize * args.n as usize);
-        assert!(args.out.len() >= args.batch_count as usize * args.m as usize * args.n as usize);
-
-        self.module
-            .f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel(
-                args.stream,
-                cta_config(args.m, args.n, args.batch_count),
-                args.a,
-                args.rhs,
-                args.out,
-                args.batch_count,
-                args.m,
-                args.n,
-                args.k,
-            )
-    }
 }
 
 pub(super) fn cta_config(m: u32, n: u32, batch_count: u32) -> LaunchConfig {
@@ -195,4 +85,8 @@ pub(super) fn cta_config(m: u32, n: u32, batch_count: u32) -> LaunchConfig {
         block_dim: (CTA_THREADS, 1, 1),
         shared_mem_bytes: 0,
     }
+}
+
+pub(super) fn elements(batch_count: u32, rows: u32, cols: u32) -> usize {
+    batch_count as usize * rows as usize * cols as usize
 }

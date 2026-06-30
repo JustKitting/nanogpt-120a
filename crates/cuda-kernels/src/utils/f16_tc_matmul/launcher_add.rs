@@ -1,7 +1,7 @@
 use cuda_core::DriverError;
 
 use super::args::{F16TcMatmulAddArgs, F16TcMatmulAddRhsTransposeBaseArgs};
-use super::launcher::{F16TcMatmulModule, cta_config};
+use super::launcher::{F16TcMatmulModule, cta_config, elements};
 
 impl F16TcMatmulModule {
     pub fn batched_matmul_add(
@@ -54,8 +54,4 @@ impl F16TcMatmulModule {
                 args.matmul_scale,
             )
     }
-}
-
-fn elements(batch_count: u32, rows: u32, cols: u32) -> usize {
-    batch_count as usize * rows as usize * cols as usize
 }
