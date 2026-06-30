@@ -1,15 +1,15 @@
-use gpt2_nvfp4::{
-    AttentionProjectionTensors, Gpt2BackwardArgs, Gpt2BackwardSeeds, Gpt2BackwardWeights,
-    MlpDownTensors, MlpProjectionTensors, MlpUpTensors, gpt2_backward,
-};
+use gpt2_nvfp4::{Gpt2BackwardArgs, Gpt2BackwardSeeds, gpt2_backward};
 use rust_kernels_cuda::residual::ResidualGradAccumulateArgs;
 use std::time::Instant;
+
+mod weights;
 
 use super::next_latent::{
     NextLatBackwardArgs, NextLatBackwardSeeds, backward as next_latent_backward,
 };
 use super::{TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
+use weights::backward_weights;
 
 impl Trainer {
     pub fn train_step(&mut self, batch: &TokenBatch, sync_loss: bool) -> AppResult<TrainStats> {
@@ -108,41 +108,5 @@ impl Trainer {
         stats.diagnostics = updates.diagnostics;
 
         Ok(stats)
-    }
-}
-
-fn backward_weights(uploaded: &crate::upload::UploadedModel) -> Gpt2BackwardWeights<'_> {
-    Gpt2BackwardWeights {
-        lm_head_weight: uploaded.token_embedding.device(),
-        ln_f: uploaded.ln_f.tensors(),
-        block_ln_1: std::array::from_fn(|i| uploaded.blocks[i].ln_1.tensors()),
-        block_ln_2: std::array::from_fn(|i| uploaded.blocks[i].ln_2.tensors()),
-        attention: std::array::from_fn(|i| attention_weights(uploaded, i)),
-        mlp: std::array::from_fn(|i| mlp_weights(uploaded, i)),
-    }
-}
-
-fn attention_weights(
-    uploaded: &crate::upload::UploadedModel,
-    i: usize,
-) -> AttentionProjectionTensors<'_> {
-    AttentionProjectionTensors {
-        qkv_weight: uploaded.blocks[i].attn_qkv.weight.mma(),
-        qkv_bias: uploaded.blocks[i].attn_qkv.bias.device(),
-        c_proj_weight: uploaded.blocks[i].attn_c_proj.weight.mma(),
-        c_proj_bias: uploaded.blocks[i].attn_c_proj.bias.device(),
-    }
-}
-
-fn mlp_weights(uploaded: &crate::upload::UploadedModel, i: usize) -> MlpProjectionTensors<'_> {
-    MlpProjectionTensors {
-        up: MlpUpTensors {
-            weight: uploaded.blocks[i].mlp_up.weight.mma(),
-            bias: uploaded.blocks[i].mlp_up.bias.device(),
-        },
-        down: MlpDownTensors {
-            weight: uploaded.blocks[i].mlp_down.weight.mma(),
-            bias: uploaded.blocks[i].mlp_down.bias.device(),
-        },
     }
 }
