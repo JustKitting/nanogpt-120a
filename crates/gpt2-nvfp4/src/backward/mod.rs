@@ -3,6 +3,7 @@ mod block;
 mod block_attention;
 pub mod final_head;
 mod layer_norm;
+mod linear;
 mod mlp;
 mod model;
 mod residual;

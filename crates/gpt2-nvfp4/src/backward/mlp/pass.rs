@@ -1,12 +1,12 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::linear_backward::{
-    LinearBackwardInputTranspose, LinearBackwardMsEdenScratch, LinearBackwardWeightTranspose,
+    LinearBackwardInputTranspose, LinearBackwardMsEdenScratch,
 };
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
+use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use super::args::MlpBackwardModules;
-use super::linear::{MlpLinearBackwardCall, run_linear_backward};
+use crate::backward::linear::{LinearBackwardCall, nvfp4_weight_t, run_linear_backward};
 
 pub(super) struct LinearPass<'a, 'scratch, 'out> {
     pub e: &'a DeviceBuffer<f32>,
@@ -28,28 +28,22 @@ pub(super) fn run_linear_pass(
     stream: &CudaStream,
     pass: LinearPass<'_, '_, '_>,
 ) -> Result<(), DriverError> {
-    let row_count = pass.row_count;
-    run_linear_backward(
-        modules.linear,
-        modules.quant,
+    run_linear_backward(LinearBackwardCall {
         stream,
-        MlpLinearBackwardCall {
-            e: pass.e,
-            weight_t: LinearBackwardWeightTranspose::Nvfp4(Nvfp4DeviceTensor {
-                bytes: pass.weight.bytes,
-                scales: pass.weight.scales,
-                global_scale: pass.weight.global_scale,
-            }),
-            input_t: LinearBackwardInputTranspose::RowwiseNvfp4(pass.saved_input),
-            scratch: pass.linear_scratch,
-            dinput: pass.dinput,
-            dweight: pass.dweight,
-            dbias: pass.dbias,
-            input_dim: pass.input_dim,
-            output_dim: pass.output_dim,
-            token_count: row_count,
-            sign_seed: pass.sign_seed,
-            scale_seed: pass.scale_seed,
-        },
-    )
+        module: modules.linear,
+        quant: modules.quant,
+        e: pass.e,
+        weight_t: nvfp4_weight_t(pass.weight),
+        input_t: LinearBackwardInputTranspose::RowwiseNvfp4(pass.saved_input),
+        scratch: pass.linear_scratch,
+        dinput: pass.dinput,
+        dweight: pass.dweight,
+        dbias: Some(pass.dbias),
+        input_dim: pass.input_dim,
+        output_dim: pass.output_dim,
+        token_count: pass.row_count,
+        sign_seed: pass.sign_seed,
+        scale_seed: pass.scale_seed,
+        precomputed_e_amax_chunks: None,
+    })
 }

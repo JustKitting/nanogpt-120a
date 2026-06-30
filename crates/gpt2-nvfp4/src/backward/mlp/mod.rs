@@ -1,5 +1,4 @@
 mod args;
-mod linear;
 mod pass;
 mod run;
 

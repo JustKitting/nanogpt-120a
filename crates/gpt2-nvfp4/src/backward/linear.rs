@@ -3,44 +3,55 @@ use rust_kernels_cuda::linear_backward::{
     LinearBackwardInputTranspose, LinearBackwardModule, LinearBackwardMsEdenArgs,
     LinearBackwardMsEdenScratch, LinearBackwardWeightTranspose,
 };
+use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
+use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
-pub(super) struct MlpLinearBackwardCall<'a, 'scratch, 'out> {
+pub(super) struct LinearBackwardCall<'a, 'scratch, 'out> {
+    pub stream: &'a CudaStream,
+    pub module: &'a LinearBackwardModule,
+    pub quant: &'a Nvfp4QuantModule,
     pub e: &'a DeviceBuffer<f32>,
     pub weight_t: LinearBackwardWeightTranspose<'a>,
     pub input_t: LinearBackwardInputTranspose<'a>,
     pub scratch: LinearBackwardMsEdenScratch<'scratch>,
     pub dinput: &'out mut DeviceBuffer<f32>,
     pub dweight: &'out mut DeviceBuffer<f32>,
-    pub dbias: &'out mut DeviceBuffer<f32>,
+    pub dbias: Option<&'out mut DeviceBuffer<f32>>,
     pub token_count: u32,
     pub input_dim: u32,
     pub output_dim: u32,
     pub sign_seed: u32,
     pub scale_seed: u32,
+    pub precomputed_e_amax_chunks: Option<u32>,
 }
 
-pub(super) fn run_linear_backward(
-    module: &LinearBackwardModule,
-    quant: &Nvfp4QuantModule,
-    stream: &CudaStream,
-    call: MlpLinearBackwardCall<'_, '_, '_>,
-) -> Result<(), DriverError> {
-    module.backward_ms_eden(LinearBackwardMsEdenArgs {
-        stream,
-        quant_module: quant,
+pub(super) fn nvfp4_weight_t(
+    weight: Nvfp4FourSixMmaWeightTensor<'_>,
+) -> LinearBackwardWeightTranspose<'_> {
+    LinearBackwardWeightTranspose::Nvfp4(Nvfp4DeviceTensor {
+        bytes: weight.bytes,
+        scales: weight.scales,
+        global_scale: weight.global_scale,
+    })
+}
+
+pub(super) fn run_linear_backward(call: LinearBackwardCall<'_, '_, '_>) -> Result<(), DriverError> {
+    call.module.backward_ms_eden(LinearBackwardMsEdenArgs {
+        stream: call.stream,
+        quant_module: call.quant,
         e: call.e,
         weight_t: call.weight_t,
         input_t: call.input_t,
         scratch: call.scratch,
         dinput: call.dinput,
         dweight: call.dweight,
-        dbias: Some(call.dbias),
+        dbias: call.dbias,
         token_count: call.token_count,
         input_dim: call.input_dim,
         output_dim: call.output_dim,
         sign_seed: call.sign_seed,
         scale_seed: call.scale_seed,
-        precomputed_e_amax_chunks: None,
+        precomputed_e_amax_chunks: call.precomputed_e_amax_chunks,
     })
 }

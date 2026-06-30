@@ -1,11 +1,10 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::linear_backward::{
-    LinearBackwardInputTranspose, LinearBackwardMsEdenArgs, LinearBackwardWeightTranspose,
-};
+use rust_kernels_cuda::linear_backward::LinearBackwardInputTranspose;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
+use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use super::types::{AttentionBackwardModules, AttentionLinearScratch};
+use crate::backward::linear::{LinearBackwardCall, nvfp4_weight_t, run_linear_backward};
 
 pub(super) struct AttentionLinearPass<'a, 'scratch, 'out> {
     pub e: &'a DeviceBuffer<f32>,
@@ -27,22 +26,18 @@ pub(super) fn run_attention_linear_pass(
     stream: &CudaStream,
     pass: AttentionLinearPass<'_, '_, '_>,
 ) -> Result<(), DriverError> {
-    let row_count = pass.row_count;
-    modules.linear.backward_ms_eden(LinearBackwardMsEdenArgs {
+    run_linear_backward(LinearBackwardCall {
         stream,
-        quant_module: modules.quant,
+        module: modules.linear,
+        quant: modules.quant,
         e: pass.e,
-        weight_t: LinearBackwardWeightTranspose::Nvfp4(Nvfp4DeviceTensor {
-            bytes: pass.weight.bytes,
-            scales: pass.weight.scales,
-            global_scale: pass.weight.global_scale,
-        }),
+        weight_t: nvfp4_weight_t(pass.weight),
         input_t: LinearBackwardInputTranspose::RowwiseNvfp4(pass.saved_input),
         scratch: pass.scratch.linear,
         dinput: pass.dinput,
         dweight: pass.dweight,
         dbias: Some(pass.dbias),
-        token_count: row_count,
+        token_count: pass.row_count,
         input_dim: pass.input_dim,
         output_dim: pass.output_dim,
         sign_seed: pass.sign_seed,
