@@ -3,8 +3,7 @@ use std::error::Error;
 use cuda_core::{CudaContext, DeviceBuffer};
 use rust_kernels_cuda::linear_backward::{
     LinearBackwardArgs, LinearBackwardInputTranspose, LinearBackwardModule,
-    LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratch, LinearBackwardWeightTranspose,
-    MsEdenOperandScratch,
+    LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratchBuffers, LinearBackwardWeightTranspose,
 };
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
@@ -131,32 +130,8 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
     let e_dev = DeviceBuffer::from_host(&stream, &e)?;
     let weight_t_dev = DeviceBuffer::from_host(&stream, &weight_t)?;
     let input_t_dev = DeviceBuffer::from_host(&stream, &input_t)?;
-
-    let mut e_bytes = DeviceBuffer::<u8>::zeroed(&stream, TOKEN_COUNT * OUTPUT_DIM / 2)?;
-    let mut e_scales = DeviceBuffer::<u8>::zeroed(&stream, TOKEN_COUNT * OUTPUT_DIM / 16)?;
-    let mut e_global_scales = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT)?;
-    let mut e_chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * OUTPUT_DIM / 32)?;
-    let mut e_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
-
-    let mut weight_t_bytes = DeviceBuffer::<u8>::zeroed(&stream, INPUT_DIM * OUTPUT_DIM / 2)?;
-    let mut weight_t_scales = DeviceBuffer::<u8>::zeroed(&stream, INPUT_DIM * OUTPUT_DIM / 16)?;
-    let mut weight_t_global_scales = DeviceBuffer::<f32>::zeroed(&stream, INPUT_DIM)?;
-    let mut weight_t_chunk_amax =
-        DeviceBuffer::<f32>::zeroed(&stream, INPUT_DIM * OUTPUT_DIM / 32)?;
-    let mut weight_t_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
-
-    let mut e_t_bytes = DeviceBuffer::<u8>::zeroed(&stream, OUTPUT_DIM * TOKEN_COUNT / 2)?;
-    let mut e_t_scales = DeviceBuffer::<u8>::zeroed(&stream, OUTPUT_DIM * TOKEN_COUNT / 16)?;
-    let mut e_t_global_scales = DeviceBuffer::<f32>::zeroed(&stream, OUTPUT_DIM)?;
-    let mut e_t_chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, OUTPUT_DIM * TOKEN_COUNT / 32)?;
-    let mut e_t_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
-
-    let mut input_t_bytes = DeviceBuffer::<u8>::zeroed(&stream, INPUT_DIM * TOKEN_COUNT / 2)?;
-    let mut input_t_scales = DeviceBuffer::<u8>::zeroed(&stream, INPUT_DIM * TOKEN_COUNT / 16)?;
-    let mut input_t_global_scales = DeviceBuffer::<f32>::zeroed(&stream, INPUT_DIM)?;
-    let mut input_t_chunk_amax =
-        DeviceBuffer::<f32>::zeroed(&stream, INPUT_DIM * TOKEN_COUNT / 32)?;
-    let mut input_t_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let mut scratch =
+        LinearBackwardMsEdenScratchBuffers::new(&stream, TOKEN_COUNT, INPUT_DIM, OUTPUT_DIM)?;
 
     let mut dinput_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * INPUT_DIM)?;
     let mut dweight_dev = DeviceBuffer::<f32>::zeroed(&stream, OUTPUT_DIM * INPUT_DIM)?;
@@ -168,36 +143,7 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
         e: &e_dev,
         weight_t: LinearBackwardWeightTranspose::Fp32(&weight_t_dev),
         input_t: LinearBackwardInputTranspose::Fp32(&input_t_dev),
-        scratch: LinearBackwardMsEdenScratch {
-            e_h: MsEdenOperandScratch {
-                bytes: &mut e_bytes,
-                scales: &mut e_scales,
-                global_scales: &mut e_global_scales,
-                chunk_amax: &mut e_chunk_amax,
-                global_scale: &mut e_global_scale,
-            },
-            weight_t_h: MsEdenOperandScratch {
-                bytes: &mut weight_t_bytes,
-                scales: &mut weight_t_scales,
-                global_scales: &mut weight_t_global_scales,
-                chunk_amax: &mut weight_t_chunk_amax,
-                global_scale: &mut weight_t_global_scale,
-            },
-            e_t_h: MsEdenOperandScratch {
-                bytes: &mut e_t_bytes,
-                scales: &mut e_t_scales,
-                global_scales: &mut e_t_global_scales,
-                chunk_amax: &mut e_t_chunk_amax,
-                global_scale: &mut e_t_global_scale,
-            },
-            input_t_h: MsEdenOperandScratch {
-                bytes: &mut input_t_bytes,
-                scales: &mut input_t_scales,
-                global_scales: &mut input_t_global_scales,
-                chunk_amax: &mut input_t_chunk_amax,
-                global_scale: &mut input_t_global_scale,
-            },
-        },
+        scratch: scratch.as_args(),
         dinput: &mut dinput_dev,
         dweight: &mut dweight_dev,
         dbias: Some(&mut dbias_dev),
@@ -212,12 +158,12 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
     let dinput = dinput_dev.to_host_vec(&stream)?;
     let dweight = dweight_dev.to_host_vec(&stream)?;
     let dbias = dbias_dev.to_host_vec(&stream)?;
-    let e_quant = e_bytes.to_host_vec(&stream)?;
-    let e_amax = e_chunk_amax.to_host_vec(&stream)?;
+    let e_quant = scratch.e_h.bytes.to_host_vec(&stream)?;
+    let e_amax = scratch.e_h.chunk_amax.to_host_vec(&stream)?;
     let generated_scales = [
-        e_global_scale.to_host_vec(&stream)?[0],
-        weight_t_global_scale.to_host_vec(&stream)?[0],
-        input_t_global_scale.to_host_vec(&stream)?[0],
+        scratch.e_h.global_scale.to_host_vec(&stream)?[0],
+        scratch.weight_t_h.global_scale.to_host_vec(&stream)?[0],
+        scratch.input_t_h.global_scale.to_host_vec(&stream)?[0],
     ];
 
     assert!(dinput.iter().all(|value| value.is_finite()));

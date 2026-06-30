@@ -2,7 +2,7 @@ use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
     AttentionCProjScratch, BlockAttentionBackwardScratch, GPT2_N_EMBD, GPT2_QKV, GPT2_TOKEN_ROWS,
 };
-use rust_kernels_cuda::linear_backward::{LinearBackwardMsEdenScratch, MsEdenOperandScratch};
+use rust_kernels_cuda::linear_backward::LinearBackwardMsEdenScratchBuffers;
 
 use super::attention_core_scratch::AttentionCoreScratchBuffers;
 
@@ -34,10 +34,7 @@ struct LinearScratch {
     error_t: DeviceBuffer<f32>,
     weight_t: DeviceBuffer<f32>,
     input_t: DeviceBuffer<f32>,
-    e: OperandScratch,
-    weight_t_h: OperandScratch,
-    e_t: OperandScratch,
-    input_t_h: OperandScratch,
+    linear: LinearBackwardMsEdenScratchBuffers,
 }
 
 impl LinearScratch {
@@ -46,10 +43,12 @@ impl LinearScratch {
             error_t: DeviceBuffer::zeroed(stream, output_dim * GPT2_TOKEN_ROWS)?,
             weight_t: DeviceBuffer::zeroed(stream, output_dim * input_dim)?,
             input_t: DeviceBuffer::zeroed(stream, input_dim * GPT2_TOKEN_ROWS)?,
-            e: OperandScratch::new(stream, GPT2_TOKEN_ROWS * output_dim, GPT2_TOKEN_ROWS)?,
-            weight_t_h: OperandScratch::new(stream, input_dim * output_dim, input_dim)?,
-            e_t: OperandScratch::new(stream, output_dim * GPT2_TOKEN_ROWS, output_dim)?,
-            input_t_h: OperandScratch::new(stream, input_dim * GPT2_TOKEN_ROWS, input_dim)?,
+            linear: LinearBackwardMsEdenScratchBuffers::new(
+                stream,
+                GPT2_TOKEN_ROWS,
+                input_dim,
+                output_dim,
+            )?,
         })
     }
 
@@ -58,42 +57,7 @@ impl LinearScratch {
             error_t: &mut self.error_t,
             weight_t: &mut self.weight_t,
             input_t: &mut self.input_t,
-            linear: LinearBackwardMsEdenScratch {
-                e_h: self.e.as_operand(),
-                weight_t_h: self.weight_t_h.as_operand(),
-                e_t_h: self.e_t.as_operand(),
-                input_t_h: self.input_t_h.as_operand(),
-            },
-        }
-    }
-}
-
-struct OperandScratch {
-    bytes: DeviceBuffer<u8>,
-    scales: DeviceBuffer<u8>,
-    global_scales: DeviceBuffer<f32>,
-    chunk_amax: DeviceBuffer<f32>,
-    global_scale: DeviceBuffer<f32>,
-}
-
-impl OperandScratch {
-    fn new(stream: &CudaStream, elements: usize, rows: usize) -> Result<Self, DriverError> {
-        Ok(Self {
-            bytes: DeviceBuffer::zeroed(stream, elements / 2)?,
-            scales: DeviceBuffer::zeroed(stream, elements / 16)?,
-            global_scales: DeviceBuffer::zeroed(stream, rows)?,
-            chunk_amax: DeviceBuffer::zeroed(stream, elements / 32)?,
-            global_scale: DeviceBuffer::zeroed(stream, 1)?,
-        })
-    }
-
-    fn as_operand(&mut self) -> MsEdenOperandScratch<'_> {
-        MsEdenOperandScratch {
-            bytes: &mut self.bytes,
-            scales: &mut self.scales,
-            global_scales: &mut self.global_scales,
-            chunk_amax: &mut self.chunk_amax,
-            global_scale: &mut self.global_scale,
+            linear: self.linear.as_args(),
         }
     }
 }
