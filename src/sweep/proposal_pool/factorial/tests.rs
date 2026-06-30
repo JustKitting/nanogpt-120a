@@ -1,4 +1,4 @@
-use super::high_level;
+use super::pattern::high_level;
 
 #[test]
 fn hadamard_levels_are_balanced_per_factor() {
