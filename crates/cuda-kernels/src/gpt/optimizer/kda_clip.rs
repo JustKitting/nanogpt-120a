@@ -121,9 +121,7 @@ fn qkv_index(row: u32, head: u32, dim: u32, section_offset: u32, params: ClipPar
 }
 
 fn clip_factor(score: f32, tau: f32) -> f32 {
-    if score != score {
-        1.0
-    } else if score > tau {
+    if score == score && score > tau {
         sqrt_f32(tau / (score + KDA_DENOM_EPS))
     } else {
         1.0
