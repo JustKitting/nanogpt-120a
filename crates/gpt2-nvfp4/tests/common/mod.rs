@@ -13,3 +13,8 @@ pub fn ptx_path() -> String {
         .to_string_lossy()
         .into_owned()
 }
+
+pub fn assert_nonzero_finite(values: &[f32]) {
+    assert!(values.iter().all(|value| value.is_finite()));
+    assert!(values.iter().any(|value| value.abs() > 0.0));
+}

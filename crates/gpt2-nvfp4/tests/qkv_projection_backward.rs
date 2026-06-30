@@ -17,7 +17,7 @@ mod data;
 #[path = "qkv_projection_backward/scratch.rs"]
 mod scratch;
 
-use common::{gpu_device_index, ptx_path};
+use common::{assert_nonzero_finite, gpu_device_index, ptx_path};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -103,9 +103,4 @@ fn nvfp4_device<'a>(
         scales,
         global_scale,
     }
-}
-
-fn assert_nonzero_finite(values: &[f32]) {
-    assert!(values.iter().all(|value| value.is_finite()));
-    assert!(values.iter().any(|value| value.abs() > 0.0));
 }

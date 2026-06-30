@@ -24,7 +24,7 @@ mod data;
 #[path = "block_attention_backward/scratch.rs"]
 mod scratch;
 
-use common::{gpu_device_index, ptx_path};
+use common::{assert_nonzero_finite, gpu_device_index, ptx_path};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -67,9 +67,4 @@ fn block_attention_side_backward_runs_full_chain() -> Result<(), Box<dyn Error>>
     assert_nonzero_finite(&grads.d_attn_qkv_weight.to_host_vec(&stream)?);
     assert_nonzero_finite(&grads.d_attn_c_proj_weight.to_host_vec(&stream)?);
     Ok(())
-}
-
-fn assert_nonzero_finite(values: &[f32]) {
-    assert!(values.iter().all(|value| value.is_finite()));
-    assert!(values.iter().any(|value| value.abs() > 0.0));
 }
