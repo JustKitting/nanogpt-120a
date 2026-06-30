@@ -235,7 +235,7 @@ fn padded_chunk_position(chunk_base: u32, lane: u32, dst_row_len: u32) -> (u32, 
 }
 
 #[inline(always)]
-fn no_pad_pow2_chunk_position(
+pub(super) fn no_pad_pow2_chunk_position(
     chunk: u32,
     lane: u32,
     chunks_per_row_shift: u32,

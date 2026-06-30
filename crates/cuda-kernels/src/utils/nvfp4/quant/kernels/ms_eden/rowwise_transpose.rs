@@ -3,7 +3,9 @@ use cuda_device::{DisjointSlice, cuda_module, kernel, warp};
 use crate::nvfp4::nvfp4_rowwise_value;
 
 use super::HADAMARD_DIM;
-use super::input::{nvfp4_rowwise_value_at_pow2, rowwise_transposed_hadamard_input};
+use super::input::{
+    no_pad_pow2_chunk_position, nvfp4_rowwise_value_at_pow2, rowwise_transposed_hadamard_input,
+};
 use super::pack::{
     ms_eden_pack_chunk, ms_eden_pack_chunk_no_chunk_amax, ms_eden_pack_chunk_no_chunk_amax_row,
     pack_chunk,
@@ -179,10 +181,8 @@ pub(crate) mod module {
     ) {
         let lane = warp::lane_id();
         let chunk = pack_chunk();
-        let chunk_in_row_mask = (1u32 << chunks_per_row_shift) - 1;
-        let row = chunk >> chunks_per_row_shift;
-        let chunk_in_row = (chunk & chunk_in_row_mask) * HADAMARD_DIM;
-        let input_col = chunk_in_row + lane;
+        let (row, input_col, first_chunk_in_row) =
+            no_pad_pow2_chunk_position(chunk, lane, chunks_per_row_shift);
         let input = nvfp4_rowwise_value(
             bytes,
             scales,
@@ -198,7 +198,7 @@ pub(crate) mod module {
             &mut out_global_scales,
             chunk,
             row,
-            chunk_in_row == 0,
+            first_chunk_in_row,
             global_scale[0],
             scale_override,
             scale_seed,
@@ -223,10 +223,8 @@ pub(crate) mod module {
     ) {
         let lane = warp::lane_id();
         let chunk = pack_chunk();
-        let chunk_in_row_mask = (1u32 << chunks_per_row_shift) - 1;
-        let row = chunk >> chunks_per_row_shift;
-        let chunk_in_row = (chunk & chunk_in_row_mask) * HADAMARD_DIM;
-        let input_col = chunk_in_row + lane;
+        let (row, input_col, first_chunk_in_row) =
+            no_pad_pow2_chunk_position(chunk, lane, chunks_per_row_shift);
         let input = nvfp4_rowwise_value_at_pow2(
             bytes,
             scales,
@@ -242,7 +240,7 @@ pub(crate) mod module {
             &mut out_global_scales,
             chunk,
             row,
-            chunk_in_row == 0,
+            first_chunk_in_row,
             global_scale[0],
             scale_override,
             scale_seed,
