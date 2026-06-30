@@ -1,6 +1,8 @@
 use crate::polar_coefficients::coefficients;
 use crate::polar_reference::round_f16_to_f32;
 
+pub use crate::polar_reference::{cosine, max_abs_error, relative_l2};
+
 pub fn gradient(rows: usize, cols: usize) -> Vec<f32> {
     (0..rows * cols)
         .map(|i| ((i % 41) as f32 - 20.0) * 0.0007 + ((i / cols) as f32) * 0.00003)
@@ -84,35 +86,6 @@ pub fn transpose(x: &[f32], rows: usize, cols: usize) -> Vec<f32> {
         }
     }
     out
-}
-
-pub fn cosine(actual: &[f32], expected: &[f32]) -> f32 {
-    let (dot, aa, bb) = actual
-        .iter()
-        .zip(expected)
-        .fold((0.0, 0.0, 0.0), |(dot, aa, bb), (a, b)| {
-            (a.mul_add(*b, dot), a.mul_add(*a, aa), b.mul_add(*b, bb))
-        });
-    dot / (aa.sqrt() * bb.sqrt())
-}
-
-pub fn relative_l2(actual: &[f32], expected: &[f32]) -> f32 {
-    let (err, norm) = actual
-        .iter()
-        .zip(expected)
-        .fold((0.0, 0.0), |(err, norm), (a, b)| {
-            let diff = a - b;
-            (diff.mul_add(diff, err), b.mul_add(*b, norm))
-        });
-    (err / norm).sqrt()
-}
-
-pub fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
-    actual
-        .iter()
-        .zip(expected)
-        .map(|(a, b)| (a - b).abs())
-        .fold(0.0, f32::max)
 }
 
 pub fn matmul_f16_leaf(a: &[f32], b_t: &[f32], rows: usize, cols: usize, k_len: usize) -> Vec<f32> {

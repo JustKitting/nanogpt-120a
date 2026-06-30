@@ -1,7 +1,7 @@
 use crate::polar_coefficients::coefficients;
 use crate::polar_reference::{matmul_f16, polar_next};
 
-pub use crate::polar_reference::normalized_polar_source;
+pub use crate::polar_reference::{cosine, normalized_polar_source, relative_l2};
 
 pub fn first_iteration_update(
     grad: &[f32],
@@ -134,27 +134,6 @@ pub fn gradient(rows: usize, cols: usize) -> Vec<f32> {
     (0..rows * cols)
         .map(|i| ((i % 37) as f32 - 18.0) * 0.0009 + ((i / cols) as f32) * 0.00002)
         .collect()
-}
-
-pub fn cosine(actual: &[f32], expected: &[f32]) -> f32 {
-    let (dot, aa, bb) = actual
-        .iter()
-        .zip(expected)
-        .fold((0.0, 0.0, 0.0), |(dot, aa, bb), (a, b)| {
-            (a.mul_add(*b, dot), a.mul_add(*a, aa), b.mul_add(*b, bb))
-        });
-    dot / (aa.sqrt() * bb.sqrt())
-}
-
-pub fn relative_l2(actual: &[f32], expected: &[f32]) -> f32 {
-    let (err, norm) = actual
-        .iter()
-        .zip(expected)
-        .fold((0.0, 0.0), |(err, norm), (a, b)| {
-            let diff = a - b;
-            (diff.mul_add(diff, err), b.mul_add(*b, norm))
-        });
-    (err / norm).sqrt()
 }
 
 fn linear2(a: &[f32], a_scale: f32, b: &[f32], b_scale: f32) -> Vec<f32> {
