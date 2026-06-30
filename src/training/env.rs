@@ -12,9 +12,7 @@ pub(in crate::training) fn env_bool(name: &str) -> Option<bool> {
 }
 
 pub(in crate::training) fn env_usize(name: &str) -> Option<usize> {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse().ok())
+    env_parse(name)
 }
 
 pub(in crate::training) fn env_u64(name: &str) -> Option<u64> {
@@ -27,13 +25,13 @@ pub(in crate::training) fn env_u64(name: &str) -> Option<u64> {
 }
 
 pub(in crate::training) fn env_f32(name: &str) -> Option<f32> {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse().ok())
+    env_parse(name)
 }
 
 pub(in crate::training) fn env_f64(name: &str) -> Option<f64> {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse().ok())
+    env_parse(name)
+}
+
+fn env_parse<T: std::str::FromStr>(name: &str) -> Option<T> {
+    std::env::var(name).ok()?.parse().ok()
 }
