@@ -1,0 +1,67 @@
+use std::path::PathBuf;
+
+use crate::sweep::{candidate::Candidate, history::Trial};
+
+use super::{format::format_trial, parse::parse_trial};
+
+#[test]
+fn roundtrips_elapsed_time_in_new_rows() {
+    let trial = Trial {
+        status: "success".to_string(),
+        val_loss: Some(4.25),
+        completed_steps: Some(512),
+        candidate: candidate(),
+        log_path: PathBuf::from("target/train.log"),
+        elapsed_s: Some(123.5),
+        screen_val_loss: Some(6.25),
+        screen_completed_steps: Some(500),
+        screen_elapsed_s: Some(90.25),
+        screen_reason: Some("screen_loss_improved".to_string()),
+    };
+
+    let parsed = parse_trial(&format_trial(&trial)).unwrap();
+    assert_eq!(parsed.elapsed_s, Some(123.5));
+    assert_eq!(parsed.screen_val_loss, Some(6.25));
+    assert_eq!(parsed.screen_completed_steps, Some(500));
+    assert_eq!(parsed.screen_elapsed_s, Some(90.25));
+    assert_eq!(
+        parsed.screen_reason.as_deref(),
+        Some("screen_loss_improved")
+    );
+    assert_eq!(parsed.completed_steps, Some(512));
+    assert_eq!(parsed.candidate.key(), trial.candidate.key());
+}
+
+#[test]
+fn parses_old_rows_without_elapsed_time() {
+    let parsed = parse_trial(
+        "success\t4.250000\t512\t8\t4\t1024\t16\t4\t80\t1.000000\t1.000000\t20\t0.100000\t0.400000\t0.800000\ttarget/train.log",
+    )
+    .unwrap();
+
+    assert_eq!(parsed.elapsed_s, None);
+    assert_eq!(parsed.screen_val_loss, None);
+    assert_eq!(parsed.screen_completed_steps, None);
+    assert_eq!(parsed.screen_elapsed_s, None);
+    assert_eq!(parsed.screen_reason, None);
+    assert_eq!(parsed.completed_steps, Some(512));
+    assert_eq!(parsed.candidate.batch_size, 8);
+}
+
+fn candidate() -> Candidate {
+    Candidate {
+        batch_size: 8,
+        n_layer: 4,
+        n_embd: 1024,
+        n_head: 16,
+        aurora_phases: 4,
+        aurora_blocks: 80,
+        lr_scale: 1.0,
+        adam_lr_scale: 1.0,
+        nextlat_lr_scale: 1.0,
+        warmup_steps: 20,
+        start_ratio: 0.1,
+        amuse_beta1: 0.4,
+        amuse_rho: 0.8,
+    }
+}
