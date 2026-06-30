@@ -10,6 +10,7 @@ pub struct Nvfp4QuantModule {
     pub(super) ms_eden: kernels::ms_eden::module::LoadedModule,
     pub(super) ms_eden_amax: kernels::ms_eden::amax::module::LoadedModule,
     pub(super) ms_eden_fp32: kernels::ms_eden::fp32::module::LoadedModule,
+    pub(super) ms_eden_fp32_pair: kernels::ms_eden::fp32_pair::module::LoadedModule,
     pub(super) ms_eden_fp32_transpose: kernels::ms_eden::fp32_transpose::module::LoadedModule,
 }
 
@@ -21,6 +22,7 @@ impl Nvfp4QuantModule {
             ms_eden: kernels::ms_eden::module::from_module(module.clone())?,
             ms_eden_amax: kernels::ms_eden::amax::module::from_module(module.clone())?,
             ms_eden_fp32: kernels::ms_eden::fp32::module::from_module(module.clone())?,
+            ms_eden_fp32_pair: kernels::ms_eden::fp32_pair::module::from_module(module.clone())?,
             ms_eden_fp32_transpose: kernels::ms_eden::fp32_transpose::module::from_module(module)?,
         })
     }

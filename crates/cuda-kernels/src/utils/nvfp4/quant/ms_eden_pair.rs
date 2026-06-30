@@ -42,7 +42,7 @@ impl Nvfp4QuantModule {
             ) {
                 if let Some(pow2) = no_pad.pow2() {
                     return self
-                        .ms_eden
+                        .ms_eden_fp32_pair
                         .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel(
                             args.stream,
                             grid,
@@ -66,7 +66,7 @@ impl Nvfp4QuantModule {
                 }
 
                 return self
-                    .ms_eden
+                    .ms_eden_fp32_pair
                     .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
                         args.stream,
                         grid,
@@ -90,7 +90,7 @@ impl Nvfp4QuantModule {
             }
 
             return self
-                .ms_eden
+                .ms_eden_fp32_pair
                 .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
                     grid,
