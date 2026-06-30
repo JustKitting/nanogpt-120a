@@ -1,9 +1,15 @@
 use cuda_core::DeviceBuffer;
-use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, GPT2_VOCAB_SIZE, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
+use gpt2_nvfp4::{GPT2_N_EMBD, GPT2_VOCAB_SIZE};
 
 use crate::training::{
     grad_block::LayerNormGradBuffers, grads::BackwardBuffers, next_latent::NextLatGradBuffers,
 };
+
+mod blocks;
+mod next_latent;
+
+use blocks::push_block_views;
+use next_latent::push_next_latent_views;
 
 pub(super) struct HostGradView<'a> {
     pub(super) name: String,
@@ -25,84 +31,9 @@ pub(super) fn parameter_gradient_views<'a>(
     push_layer_norm_views(&mut rows, "final_norm", &grads.final_norm);
 
     for (block_index, block) in grads.blocks.iter().enumerate() {
-        let prefix = format!("blocks.{block_index}");
-        push_layer_norm_views(&mut rows, &format!("{prefix}.ln_1"), &block.ln_1);
-        push_prefixed_views(
-            &mut rows,
-            &prefix,
-            &[
-                (
-                    "attn_qkv.weight",
-                    &block.d_attn_qkv_weight,
-                    GPT2_N_EMBD * GPT2_QKV,
-                ),
-                ("attn_qkv.bias", &block.d_attn_qkv_bias, GPT2_QKV),
-                (
-                    "attn_c_proj.weight",
-                    &block.d_attn_c_proj_weight,
-                    GPT2_N_EMBD * GPT2_N_EMBD,
-                ),
-                ("attn_c_proj.bias", &block.d_attn_c_proj_bias, GPT2_N_EMBD),
-            ],
-        );
-        push_layer_norm_views(&mut rows, &format!("{prefix}.ln_2"), &block.ln_2);
-        push_prefixed_views(
-            &mut rows,
-            &prefix,
-            &[
-                (
-                    "mlp_up.weight",
-                    &block.d_mlp_c_fc_weight,
-                    GPT2_N_EMBD * GPT2_MLP,
-                ),
-                ("mlp_up.bias", &block.d_mlp_c_fc_bias, GPT2_MLP),
-                (
-                    "mlp_down.weight",
-                    &block.d_mlp_c_proj_weight,
-                    GPT2_MLP * GPT2_N_EMBD,
-                ),
-                ("mlp_down.bias", &block.d_mlp_c_proj_bias, GPT2_N_EMBD),
-            ],
-        );
+        push_block_views(&mut rows, block_index, block);
     }
-    push_prefixed_views(
-        &mut rows,
-        "next_latent",
-        &[
-            ("norm.weight", &next_latent.d_norm_weight, NEXTLAT_INPUT),
-            ("norm.bias", &next_latent.d_norm_bias, NEXTLAT_INPUT),
-            (
-                "input_projection.weight",
-                &next_latent.d_input_projection_weight,
-                NEXTLAT_INPUT * NEXTLAT_HIDDEN,
-            ),
-            (
-                "input_projection.bias",
-                &next_latent.d_input_projection_bias,
-                NEXTLAT_HIDDEN,
-            ),
-            (
-                "transition.weight",
-                &next_latent.d_transition_weight,
-                NEXTLAT_HIDDEN * NEXTLAT_HIDDEN,
-            ),
-            (
-                "transition.bias",
-                &next_latent.d_transition_bias,
-                NEXTLAT_HIDDEN,
-            ),
-            (
-                "output_projection.weight",
-                &next_latent.d_output_projection_weight,
-                NEXTLAT_HIDDEN * GPT2_N_EMBD,
-            ),
-            (
-                "output_projection.bias",
-                &next_latent.d_output_projection_bias,
-                GPT2_N_EMBD,
-            ),
-        ],
-    );
+    push_next_latent_views(&mut rows, next_latent);
 
     rows
 }
