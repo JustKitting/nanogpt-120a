@@ -42,7 +42,7 @@ fn cta_tiled_f16_tc_matmul_add_matches_reference() -> Result<(), Box<dyn Error>>
     })?;
 
     for value in out.to_host_vec(&stream)? {
-        assert_close(value, 4.0);
+        common::assert_close(value, 4.0, TOLERANCE);
     }
     Ok(())
 }
@@ -73,7 +73,7 @@ fn cta_tiled_f16_tc_rhs_transposed_base_matches_reference() -> Result<(), Box<dy
     })?;
 
     for value in out.to_host_vec(&stream)? {
-        assert_close(value, 4.0);
+        common::assert_close(value, 4.0, TOLERANCE);
     }
     Ok(())
 }
@@ -103,12 +103,4 @@ impl ScratchBuffers {
             b_t_halves: &mut self.b_t_halves,
         }
     }
-}
-
-fn assert_close(actual: f32, expected: f32) {
-    let error = (actual - expected).abs();
-    assert!(
-        error <= TOLERANCE,
-        "actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
-    );
 }

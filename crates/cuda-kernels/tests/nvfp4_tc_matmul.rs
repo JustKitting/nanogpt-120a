@@ -46,14 +46,6 @@ fn fp32_ms_eden_tc_matmul_matches_decoded_operands() -> Result<(), Box<dyn Error
     })?;
 
     let expected = decoded_dot(&decode, &stream, &scratch)?;
-    assert_close(out.to_host_vec(&stream)?[0], expected);
+    common::assert_close(out.to_host_vec(&stream)?[0], expected, TOLERANCE);
     Ok(())
-}
-
-fn assert_close(actual: f32, expected: f32) {
-    let error = (actual - expected).abs();
-    assert!(
-        error <= TOLERANCE,
-        "actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
-    );
 }

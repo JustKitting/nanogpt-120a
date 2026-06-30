@@ -98,7 +98,7 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
     for row in 0..OUTPUT_DIM {
         for col in 0..INPUT_DIM {
             let expected = if row == 0 { TOKEN_COUNT as f32 } else { 0.0 };
-            assert_close(dweight[row * INPUT_DIM + col], expected);
+            common::assert_close(dweight[row * INPUT_DIM + col], expected, TOLERANCE);
         }
     }
 
@@ -165,7 +165,7 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
         let expected = (0..TOKEN_COUNT)
             .map(|row| e[row * OUTPUT_DIM + col])
             .sum::<f32>();
-        assert_close(dbias[col], expected);
+        common::assert_close(dbias[col], expected, TOLERANCE);
     }
     assert!(e_quant.iter().any(|byte| *byte != 0));
     assert!(e_amax.iter().all(|amax| amax.is_finite()));
@@ -177,14 +177,6 @@ fn linear_backward_ms_eden_quantizes_before_gemms() -> Result<(), Box<dyn Error>
     );
 
     Ok(())
-}
-
-fn assert_close(actual: f32, expected: f32) {
-    let error = (actual - expected).abs();
-    assert!(
-        error <= TOLERANCE,
-        "actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
-    );
 }
 
 fn patterned_matrix(rows: usize, cols: usize, scale: f32) -> Vec<f32> {

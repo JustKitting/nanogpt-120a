@@ -37,7 +37,7 @@ fn batched_f16_tc_matmul_matches_power_of_two_reference() -> Result<(), Box<dyn 
     })?;
 
     for value in out.to_host_vec(&stream)? {
-        assert_close(value, 0.5);
+        common::assert_close(value, 0.5, TOLERANCE);
     }
     Ok(())
 }
@@ -81,12 +81,4 @@ impl ScratchBuffers {
             b_t_halves: &mut self.b_t_halves,
         }
     }
-}
-
-fn assert_close(actual: f32, expected: f32) {
-    let error = (actual - expected).abs();
-    assert!(
-        error <= TOLERANCE,
-        "actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
-    );
 }

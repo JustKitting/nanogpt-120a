@@ -50,11 +50,11 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
     let expected = expected_loss_and_grad(&logits, &targets);
 
     for (actual, expected) in losses.iter().zip(expected.0.iter()) {
-        assert_close(*actual, *expected);
+        common::assert_close(*actual, *expected, TOLERANCE);
     }
 
     for (actual, expected) in dlogits.iter().zip(expected.1.iter()) {
-        assert_close(*actual, *expected);
+        common::assert_close(*actual, *expected, TOLERANCE);
     }
 
     for row in 0..TOKEN_COUNT {
@@ -64,7 +64,7 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
             .copied()
             .map(f32::abs)
             .fold(0.0, f32::max);
-        assert_close(row_amax[row], expected_amax);
+        common::assert_close(row_amax[row], expected_amax, TOLERANCE);
     }
 
     Ok(())
@@ -93,12 +93,4 @@ fn expected_loss_and_grad(logits: &[f32], targets: &[u32]) -> (Vec<f32>, Vec<f32
     }
 
     (losses, grad)
-}
-
-fn assert_close(actual: f32, expected: f32) {
-    let error = (actual - expected).abs();
-    assert!(
-        error <= TOLERANCE,
-        "actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={TOLERANCE:.8e}"
-    );
 }
