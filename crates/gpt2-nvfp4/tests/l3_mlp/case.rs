@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use gpt2_nvfp4::{
-    GPT2_CONTEXT_LEN, HiddenStateDevice, HiddenStateNvfp4, MlpActivationNvfp4,
+    GPT2_CONTEXT_LEN, HiddenStateDevice, HiddenStateNvfp4, MlpActivationNvfp4, MlpForwardArgs,
     MlpProjectionTensors, MlpScratch, MlpWeights,
 };
 use rust_kernels_cuda::mlp::MlpModule;
@@ -24,10 +24,10 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let mut scratch = ScratchBuffers::new(&stream, &normalized, &amax, &residual_before)?;
     let weights = WeightBuffers::new(&stream)?;
 
-    MlpWeights::forward(MlpWeights::input_from_attention(
-        &mlp_module,
-        &quant_module,
-        MlpScratch {
+    MlpWeights::forward(MlpForwardArgs {
+        module: &mlp_module,
+        quant_module: &quant_module,
+        scratch: MlpScratch {
             input_nvfp4: HiddenStateNvfp4 {
                 bytes: &mut scratch.input_bytes,
                 scales: &mut scratch.input_scales,
@@ -41,11 +41,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             pre_activation: &mut scratch.pre_activation,
             activation: &mut scratch.activation,
         },
-        MlpProjectionTensors {
+        projections: MlpProjectionTensors {
             up: weights.up_tensors(),
             down: weights.down_tensors(),
         },
-        HiddenStateDevice {
+        hidden: HiddenStateDevice {
             stream: &stream,
             batch_size: 1,
             seq_len: GPT2_CONTEXT_LEN as u32,
@@ -56,7 +56,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             mean: &mut scratch.mean,
             inv_std: &mut scratch.inv_std,
         },
-    ))?;
+        tape: None,
+    })?;
 
     let activation = scratch.activation.to_host_vec(&stream)?;
     let residual_after = scratch.residual.to_host_vec(&stream)?;

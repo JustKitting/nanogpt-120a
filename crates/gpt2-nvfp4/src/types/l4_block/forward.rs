@@ -5,7 +5,7 @@ use super::args::BlockForwardArgs;
 use super::weights::Gpt2BlockWeights;
 use crate::types::{
     AttentionForwardArgs, AttentionForwardTape, AttentionWeights, HiddenStateDevice,
-    LayerNormForwardArgs, LayerNormTape, LayerNormWeights, MlpScratch, MlpWeights,
+    LayerNormForwardArgs, LayerNormTape, LayerNormWeights, MlpForwardArgs, MlpScratch, MlpWeights,
 };
 
 impl Gpt2BlockWeights {
@@ -59,19 +59,19 @@ impl Gpt2BlockWeights {
             down_input_nvfp4: tape.mlp_down_input_nvfp4.reborrow(),
         });
 
-        let hidden = MlpWeights::forward(MlpWeights::input_from_attention_with_tape(
-            args.mlp_module,
-            args.quant_module,
-            MlpScratch {
+        let hidden = MlpWeights::forward(MlpForwardArgs {
+            module: args.mlp_module,
+            quant_module: args.quant_module,
+            scratch: MlpScratch {
                 input_nvfp4: hidden_nvfp4.reborrow(),
                 activation_nvfp4: args.mlp_activation_nvfp4,
                 pre_activation: &mut *mlp_pre_activation,
                 activation: &mut *mlp_activation,
             },
-            args.mlp,
+            projections: args.mlp,
             hidden,
-            mlp_tape,
-        ))?;
+            tape: mlp_tape,
+        })?;
 
         save_mlp_tape(
             tape.as_mut(),

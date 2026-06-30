@@ -1,8 +1,7 @@
 use cuda_core::DriverError;
 
 use super::forward;
-use super::tape::MlpForwardTape;
-use super::tensors::{MlpForwardArgs, MlpProjectionTensors, MlpScratch};
+use super::tensors::MlpForwardArgs;
 use crate::random::InitRng;
 use crate::types::{HiddenStateDevice, MlpDownLinear, MlpUpLinear};
 
@@ -17,41 +16,6 @@ impl MlpWeights {
         Self {
             c_fc: MlpUpLinear::init(rng),
             c_proj: MlpDownLinear::init_with_weight_scale(rng, residual_projection_scale),
-        }
-    }
-
-    pub fn input_from_attention<'a, 'scratch>(
-        module: &'a rust_kernels_cuda::mlp::MlpModule,
-        quant_module: &'a rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule,
-        scratch: MlpScratch<'scratch>,
-        projections: MlpProjectionTensors<'a>,
-        hidden: HiddenStateDevice<'a>,
-    ) -> MlpForwardArgs<'a, 'scratch> {
-        Self::input_from_attention_with_tape(
-            module,
-            quant_module,
-            scratch,
-            projections,
-            hidden,
-            None,
-        )
-    }
-
-    pub fn input_from_attention_with_tape<'a, 'scratch>(
-        module: &'a rust_kernels_cuda::mlp::MlpModule,
-        quant_module: &'a rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule,
-        scratch: MlpScratch<'scratch>,
-        projections: MlpProjectionTensors<'a>,
-        hidden: HiddenStateDevice<'a>,
-        tape: Option<MlpForwardTape<'scratch>>,
-    ) -> MlpForwardArgs<'a, 'scratch> {
-        MlpForwardArgs {
-            module,
-            quant_module,
-            scratch,
-            projections,
-            hidden,
-            tape,
         }
     }
 
