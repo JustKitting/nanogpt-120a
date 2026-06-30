@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, DriverError, LaunchConfig};
+use cuda_core::{CudaModule, DriverError};
 
 use super::args::{MlpDownResidualArgs, MlpUpRelu2Args, Relu2BackwardArgs, Relu2BackwardF16Args};
 use super::kernels;
 use crate::launch::{launch_config, linear_config};
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams,
-    projection_cta_grid_dim, projection_cta_row_pair_grid_dim, projection_cta_shape_aligned,
+    projection_cta_launch_grid_dim,
 };
 
 pub struct MlpModule {
@@ -24,7 +24,7 @@ impl MlpModule {
     pub fn up_relu2(&self, args: MlpUpRelu2Args<'_, '_>) -> Result<(), DriverError> {
         self.module.mlp_projection_relu2_kernel(
             args.stream,
-            aligned_config(args.token_count, args.input_dim, args.output_dim),
+            projection_config(args.token_count, args.input_dim, args.output_dim),
             args.input.bytes,
             args.input.scales,
             args.input.global_scales,
@@ -43,7 +43,7 @@ impl MlpModule {
     pub fn down_residual(&self, args: MlpDownResidualArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.mlp_projection_kernel(
             args.stream,
-            aligned_config(args.token_count, args.input_dim, args.output_dim),
+            projection_config(args.token_count, args.input_dim, args.output_dim),
             args.input.bytes,
             args.input.scales,
             args.input.global_scales,
@@ -84,13 +84,9 @@ impl MlpModule {
     }
 }
 
-fn aligned_config(token_count: u32, input_dim: u32, output_dim: u32) -> LaunchConfig {
+fn projection_config(token_count: u32, input_dim: u32, output_dim: u32) -> cuda_core::LaunchConfig {
     launch_config(
-        if projection_cta_shape_aligned(token_count, input_dim, output_dim) {
-            projection_cta_row_pair_grid_dim(token_count, output_dim)
-        } else {
-            projection_cta_grid_dim(token_count, output_dim)
-        },
+        projection_cta_launch_grid_dim(token_count, input_dim, output_dim),
         NVFP4_PROJECTION_CTA_THREADS,
     )
 }

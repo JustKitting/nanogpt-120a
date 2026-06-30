@@ -1,10 +1,7 @@
 use super::args::{NextLatProjectionArgs, projection_params};
 use super::launcher::NextLatModule;
 use crate::launch::launch_config;
-use crate::mma::{
-    NVFP4_PROJECTION_CTA_THREADS, projection_cta_grid_dim, projection_cta_row_pair_grid_dim,
-    projection_cta_shape_aligned,
-};
+use crate::mma::{NVFP4_PROJECTION_CTA_THREADS, projection_cta_launch_grid_dim};
 use cuda_core::DriverError;
 
 impl NextLatModule {
@@ -12,11 +9,7 @@ impl NextLatModule {
         self.projection.nextlat_projection_kernel(
             args.stream,
             launch_config(
-                if projection_cta_shape_aligned(args.token_count, args.input_dim, args.output_dim) {
-                    projection_cta_row_pair_grid_dim(args.token_count, args.output_dim)
-                } else {
-                    projection_cta_grid_dim(args.token_count, args.output_dim)
-                },
+                projection_cta_launch_grid_dim(args.token_count, args.input_dim, args.output_dim),
                 NVFP4_PROJECTION_CTA_THREADS,
             ),
             args.input.bytes,

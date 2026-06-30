@@ -4,8 +4,7 @@ use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DeviceCopy, DriverError};
 
 use crate::launch::launch_config;
 use crate::mma::{
-    NVFP4_PROJECTION_CTA_THREADS, Nvfp4FourSixMmaWeightTensor, projection_cta_grid_dim,
-    projection_cta_row_pair_grid_dim,
+    NVFP4_PROJECTION_CTA_THREADS, Nvfp4FourSixMmaWeightTensor, projection_cta_launch_grid_dim,
 };
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
 
@@ -45,15 +44,12 @@ impl LmHeadModule {
     }
 
     pub fn logits(&self, args: LmHeadArgs<'_, '_>) -> Result<(), DriverError> {
-        let grid_dim = if lm_head_cta_aligned(args.token_count, args.input_dim, args.vocab_size) {
-            projection_cta_row_pair_grid_dim(args.token_count, args.vocab_size)
-        } else {
-            projection_cta_grid_dim(args.token_count, args.vocab_size)
-        };
-
         self.module.lm_head_kernel(
             args.stream,
-            launch_config(grid_dim, NVFP4_PROJECTION_CTA_THREADS),
+            launch_config(
+                projection_cta_launch_grid_dim(args.token_count, args.input_dim, args.vocab_size),
+                NVFP4_PROJECTION_CTA_THREADS,
+            ),
             args.input.bytes,
             args.input.scales,
             args.input.global_scales,
@@ -69,12 +65,4 @@ impl LmHeadModule {
             },
         )
     }
-}
-
-fn lm_head_cta_aligned(token_count: u32, input_dim: u32, vocab_size: u32) -> bool {
-    use crate::mma::{NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_M, NVFP4_PROJECTION_CTA_N};
-
-    token_count % NVFP4_PROJECTION_CTA_M == 0
-        && vocab_size % NVFP4_PROJECTION_CTA_N == 0
-        && input_dim % NVFP4_PROJECTION_CTA_K == 0
 }
