@@ -8,7 +8,7 @@ use super::super::grad_block::BlockGradBuffers;
 use super::super::grads::BackwardBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::{BlockState, OptimizerStateBuffers};
-use super::layer_norm::update_layer_norm;
+use super::layer_norm::update_layer_norm_timed;
 use super::mlp::update_mlp_biases;
 use super::qkv::update_qkv_biases;
 use super::timed_ms;
@@ -60,18 +60,16 @@ pub(super) fn update_block(
     trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
     let optimizer = &runtime.optimizer;
-    trace.adam_ms += timed_ms(|| {
-        update_layer_norm(
-            stream,
-            optimizer,
-            &mut block.ln_1,
-            &grad.ln_1,
-            scratch,
-            &mut state.ln_1,
-            step,
-            average_coefficient,
-        )
-    })?;
+    trace.adam_ms += update_layer_norm_timed(
+        stream,
+        optimizer,
+        &mut block.ln_1,
+        &grad.ln_1,
+        scratch,
+        &mut state.ln_1,
+        step,
+        average_coefficient,
+    )?;
 
     update_qkv_biases(
         stream,
@@ -85,18 +83,16 @@ pub(super) fn update_block(
         trace,
     )?;
 
-    trace.adam_ms += timed_ms(|| {
-        update_layer_norm(
-            stream,
-            optimizer,
-            &mut block.ln_2,
-            &grad.ln_2,
-            scratch,
-            &mut state.ln_2,
-            step,
-            average_coefficient,
-        )
-    })?;
+    trace.adam_ms += update_layer_norm_timed(
+        stream,
+        optimizer,
+        &mut block.ln_2,
+        &grad.ln_2,
+        scratch,
+        &mut state.ln_2,
+        step,
+        average_coefficient,
+    )?;
 
     update_mlp_biases(
         stream,

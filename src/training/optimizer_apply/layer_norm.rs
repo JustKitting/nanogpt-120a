@@ -7,8 +7,9 @@ use super::super::grad_block::LayerNormGradBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::LayerNormState;
 use super::adam::AdamUpdate;
+use super::timed_ms;
 
-pub(super) fn update_layer_norm(
+pub(super) fn update_layer_norm_timed(
     stream: &CudaStream,
     optimizer: &OptimizerModule,
     layer_norm: &mut UploadedLayerNorm,
@@ -17,8 +18,10 @@ pub(super) fn update_layer_norm(
     state: &mut LayerNormState,
     step: u32,
     average_coefficient: f32,
-) -> Result<(), DriverError> {
-    let mut adam = AdamUpdate::new(stream, optimizer, scratch, step, average_coefficient);
-    adam.update(&mut layer_norm.weight, &grads.d_weight, &mut state.weight)?;
-    adam.update(&mut layer_norm.bias, &grads.d_bias, &mut state.bias)
+) -> Result<f64, DriverError> {
+    timed_ms(|| {
+        let mut adam = AdamUpdate::new(stream, optimizer, scratch, step, average_coefficient);
+        adam.update(&mut layer_norm.weight, &grads.d_weight, &mut state.weight)?;
+        adam.update(&mut layer_norm.bias, &grads.d_bias, &mut state.bias)
+    })
 }

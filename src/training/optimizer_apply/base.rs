@@ -8,7 +8,7 @@ use crate::training::optimizer_state::OptimizerStateBuffers;
 use crate::upload::UploadedModel;
 
 use super::adam::AdamUpdate;
-use super::layer_norm::update_layer_norm;
+use super::layer_norm::update_layer_norm_timed;
 use super::next_latent::{NextLatUpdateArgs, update_next_latent};
 use super::timed_ms;
 
@@ -44,18 +44,16 @@ pub(super) fn update_base_adam(args: BaseAdamUpdateArgs<'_>) -> Result<BaseAdamT
         &mut args.state.token_embedding,
     )?;
 
-    let final_norm_ms = timed_ms(|| {
-        update_layer_norm(
-            args.stream,
-            args.optimizer,
-            &mut args.uploaded.ln_f,
-            &args.grads.final_norm,
-            args.scratch,
-            &mut args.state.ln_f,
-            args.step,
-            args.average_coefficient,
-        )
-    })?;
+    let final_norm_ms = update_layer_norm_timed(
+        args.stream,
+        args.optimizer,
+        &mut args.uploaded.ln_f,
+        &args.grads.final_norm,
+        args.scratch,
+        &mut args.state.ln_f,
+        args.step,
+        args.average_coefficient,
+    )?;
 
     let next_latent_ms = timed_ms(|| {
         update_next_latent(NextLatUpdateArgs {
