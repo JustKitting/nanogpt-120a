@@ -1,6 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{GPT2_N_LAYER, GPT2_TOKEN_ROWS, Gpt2ForwardSaved, Gpt2ForwardTape, HiddenState};
 
+use super::device_buffer::block_array;
 use super::tape_block::BlockTapeBuffers;
 use super::tape_leaf::{LayerNormTapeBuffers, RowwiseTapeBuffers};
 
@@ -13,7 +14,7 @@ pub struct ForwardTapeBuffers {
 impl ForwardTapeBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            blocks: block_array(|| BlockTapeBuffers::new(stream))?,
+            blocks: block_array(|_| BlockTapeBuffers::new(stream))?,
             final_norm: LayerNormTapeBuffers::new(stream)?,
             lm_head_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
         })
@@ -50,18 +51,5 @@ impl ForwardTapeBuffers {
 
     pub fn block_qkv(&self, index: usize) -> &DeviceBuffer<u16> {
         self.blocks[index].qkv()
-    }
-}
-
-fn block_array<F, T>(mut f: F) -> Result<[T; GPT2_N_LAYER], DriverError>
-where
-    F: FnMut() -> Result<T, DriverError>,
-{
-    let values = (0..GPT2_N_LAYER)
-        .map(|_| f())
-        .collect::<Result<Vec<_>, _>>()?;
-    match values.try_into() {
-        Ok(array) => Ok(array),
-        Err(_) => unreachable!("block array length must match GPT2_N_LAYER"),
     }
 }

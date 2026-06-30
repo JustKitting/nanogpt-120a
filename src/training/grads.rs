@@ -4,7 +4,7 @@ use gpt2_nvfp4::{
     Logits,
 };
 
-use super::device_buffer::zero;
+use super::device_buffer::{block_array, zero};
 use super::grad_block::{BlockGradBuffers, LayerNormGradBuffers};
 
 pub struct BackwardBuffers {
@@ -29,7 +29,7 @@ impl BackwardBuffers {
             d_lm_head_weight: zero(stream, GPT2_VOCAB_SIZE * GPT2_N_EMBD)?,
             dlogits: zero(stream, Logits::LEN)?,
             d_embedding_residual: zero(stream, HiddenState::LEN)?,
-            blocks: block_array(|| BlockGradBuffers::new(stream))?,
+            blocks: block_array(|_| BlockGradBuffers::new(stream))?,
             final_norm: LayerNormGradBuffers::new(stream)?,
         })
     }
@@ -46,18 +46,5 @@ impl BackwardBuffers {
                 final_norm: self.final_norm.grads(),
             },
         }
-    }
-}
-
-fn block_array<F, T>(mut f: F) -> Result<[T; GPT2_N_LAYER], DriverError>
-where
-    F: FnMut() -> Result<T, DriverError>,
-{
-    let values = (0..GPT2_N_LAYER)
-        .map(|_| f())
-        .collect::<Result<Vec<_>, _>>()?;
-    match values.try_into() {
-        Ok(array) => Ok(array),
-        Err(_) => unreachable!("block array length must match GPT2_N_LAYER"),
     }
 }

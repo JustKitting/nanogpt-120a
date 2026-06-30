@@ -31,7 +31,7 @@ const fn grouped(len: usize) -> usize {
 const AURORA_MATRIX_SLOTS: usize = GPT2_N_LAYER * 4 + 3;
 
 const fn active_matrix_slots() -> usize {
-    (AURORA_MATRIX_SLOTS + AURORA_MATRIX_PHASES - 1) / AURORA_MATRIX_PHASES
+    AURORA_MATRIX_SLOTS.div_ceil(AURORA_MATRIX_PHASES)
 }
 
 const fn max_matrix() -> usize {

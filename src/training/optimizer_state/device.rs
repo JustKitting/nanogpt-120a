@@ -1,5 +1,4 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError, memory};
-use gpt2_nvfp4::GPT2_N_LAYER;
 use rust_kernels_cuda::nvfp4::{Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4DeviceTensor};
 
 use crate::upload::UploadedNvfp4;
@@ -41,17 +40,4 @@ pub(super) fn clone_device(
     }
 
     Ok(cloned)
-}
-
-pub(super) fn block_array<F, T>(mut f: F) -> Result<[T; GPT2_N_LAYER], DriverError>
-where
-    F: FnMut(usize) -> Result<T, DriverError>,
-{
-    let values = (0..GPT2_N_LAYER)
-        .map(|i| f(i))
-        .collect::<Result<Vec<_>, _>>()?;
-    match values.try_into() {
-        Ok(array) => Ok(array),
-        Err(_) => unreachable!("block array length must match GPT2_N_LAYER"),
-    }
 }

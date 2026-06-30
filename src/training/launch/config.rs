@@ -58,11 +58,11 @@ pub(super) fn sampling_config() -> SamplingConfig {
 }
 
 pub(super) fn should_log_step(step: usize, step_cap: usize, log_interval: usize) -> bool {
-    step == 0 || step + 1 == step_cap || step % log_interval == 0
+    step == 0 || step + 1 == step_cap || step.is_multiple_of(log_interval)
 }
 
 pub(super) fn should_eval_step(step: usize, step_cap: usize, eval_interval: Option<usize>) -> bool {
-    eval_interval.is_some_and(|interval| step == 0 || step + 1 == step_cap || step % interval == 0)
+    eval_interval.is_some_and(|interval| should_log_step(step, step_cap, interval))
 }
 
 fn default_generate_prompt(dataset: &str) -> &'static str {

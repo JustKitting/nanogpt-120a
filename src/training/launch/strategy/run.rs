@@ -47,7 +47,7 @@ impl CudaTrainingStrategy {
             let window = item.map_err(|err| format!("training dataloader failed: {err}"))?;
             let source = window.source.display().to_string();
             let batch = trainer.upload_default_batch(&mut train_batch, &window.tokens)?;
-            let stats = trainer.train_step(&batch, log_step)?;
+            let stats = trainer.train_step(batch, log_step)?;
             completed_steps = step + 1;
 
             if log_step {

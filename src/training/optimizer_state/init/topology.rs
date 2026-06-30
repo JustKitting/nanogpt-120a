@@ -3,10 +3,10 @@ use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 
 use super::super::{
     AdamState, AuroraState, BlockState, LayerNormState, LinearState, NextLatState,
-    OptimizerStateBuffers, device::block_array,
+    OptimizerStateBuffers,
 };
 use crate::{
-    training::update_skip::UpdateSkipState,
+    training::{device_buffer::block_array, update_skip::UpdateSkipState},
     upload::{UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat},
 };
 
