@@ -36,6 +36,7 @@ mod stats;
 mod tape;
 mod tape_block;
 mod tape_leaf;
+mod text_metric;
 mod trainer;
 mod update_skip;
 
