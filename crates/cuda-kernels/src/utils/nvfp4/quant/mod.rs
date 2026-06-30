@@ -6,6 +6,7 @@ mod global_scale;
 pub(crate) mod kernels;
 mod launcher;
 mod ms_eden;
+mod ms_eden_fp32_transpose;
 mod ms_eden_pair;
 mod ms_eden_quartet;
 mod ms_eden_transpose;
