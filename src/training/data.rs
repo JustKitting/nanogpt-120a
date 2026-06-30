@@ -1,18 +1,19 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
 
 use crate::AppResult;
 
 mod shakespeare;
+mod source;
 mod synth;
 mod tokens;
+mod validation;
 
-const TRAIN_DATASET_ENV: &str = "TRAIN_DATASET";
-const TRAIN_REPEAT_BATCH_ENV: &str = "TRAIN_REPEAT_BATCH";
-const DATASET_SYNTH: &str = "synth";
-const DATASET_SHAKESPEARE: &str = "shakespeare";
-const VALIDATION_WINDOWS: usize = 4;
+use source::{
+    DATASET_SHAKESPEARE, DATASET_SYNTH, repeat_first_window, token_count_paths, training_dataset,
+};
+use validation::{VALIDATION_WINDOWS, train_end, validation_windows};
 
 pub struct TokenDataLoader {
     path: PathBuf,
@@ -184,56 +185,4 @@ impl TokenDataLoader {
         self.offset = 0;
         Ok(())
     }
-}
-
-fn validation_windows(path: &Path, tokens: &[u16], start: usize) -> AppResult<Vec<u16>> {
-    let len = GPT2_SEQ_LEN + 1;
-    if tokens.len() < len {
-        return Err(format!("{} has fewer than {len} tokens", path.display()).into());
-    }
-
-    let needed = VALIDATION_WINDOWS * len;
-    if tokens.len() < start + needed {
-        return Err(format!(
-            "{} has fewer than {} validation tokens",
-            path.display(),
-            start + needed
-        )
-        .into());
-    }
-
-    let mut validation_tokens = Vec::with_capacity(needed);
-    for batch in 0..VALIDATION_WINDOWS {
-        let offset = start + batch * len;
-        validation_tokens.extend_from_slice(&tokens[offset..offset + len]);
-    }
-    Ok(validation_tokens)
-}
-
-fn train_end(token_count: usize) -> usize {
-    let validation_tokens = VALIDATION_WINDOWS * (GPT2_SEQ_LEN + 1);
-    token_count
-        .saturating_sub(validation_tokens)
-        .max(GPT2_SEQ_LEN + 1)
-}
-
-fn token_count_paths(paths: &[PathBuf]) -> AppResult<usize> {
-    let mut total = 0usize;
-    for path in paths {
-        let bytes = path.metadata()?.len();
-        if bytes % 2 != 0 {
-            return Err(format!("{} has odd byte length", path.display()).into());
-        }
-        total += (bytes / 2) as usize;
-    }
-    Ok(total)
-}
-
-fn training_dataset() -> String {
-    std::env::var(TRAIN_DATASET_ENV).unwrap_or_else(|_| DATASET_SYNTH.to_string())
-}
-
-fn repeat_first_window() -> bool {
-    std::env::var(TRAIN_REPEAT_BATCH_ENV)
-        .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
 }
