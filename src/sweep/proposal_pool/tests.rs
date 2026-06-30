@@ -3,6 +3,9 @@ use std::collections::HashSet;
 use super::super::{
     analysis,
     candidate::Candidate,
+    config::SweepConfig,
+    history::Trial,
+    rng::SweepRng,
     test_fixtures::{basic_candidate as candidate, quality_config, success_trial as trial},
 };
 
@@ -15,20 +18,8 @@ fn guided_pool_uses_main_effect_direction() {
         trial(candidate(16, 4), 3.0),
         trial(candidate(16, 8), 1.0),
     ];
-    let analysis = analysis::analyze(&trials, &config);
     let center = candidate(8, 4);
-    let observed = trials
-        .iter()
-        .map(|trial| trial.candidate.clone())
-        .collect::<Vec<_>>();
-    let pool = super::sample(
-        &HashSet::new(),
-        &mut super::super::rng::SweepRng::new(0x1234),
-        &config,
-        &analysis,
-        Some(&center),
-        &observed,
-    );
+    let pool = sample_pool(0x1234, &config, &trials, Some(&center));
 
     assert_eq!(pool[0].source, "guided");
     assert!(pool[0].candidate.batch_size > center.batch_size);
@@ -47,7 +38,6 @@ fn local_pool_refines_near_center_hyperparameters() {
     let trials = (0..32)
         .map(|i| trial(wide_candidate(i), 32.0 - i as f64))
         .collect::<Vec<_>>();
-    let analysis = analysis::analyze(&trials, &config);
     let mut center = candidate(16, 4);
     center.lr_scale = 2.309_529;
     center.adam_lr_scale = 1.626_648;
@@ -56,18 +46,7 @@ fn local_pool_refines_near_center_hyperparameters() {
     center.start_ratio = 0.183_570;
     center.amuse_beta1 = 0.443_495;
     center.amuse_rho = 0.768_398;
-    let observed = trials
-        .iter()
-        .map(|trial| trial.candidate.clone())
-        .collect::<Vec<_>>();
-    let pool = super::sample(
-        &HashSet::new(),
-        &mut super::super::rng::SweepRng::new(0x9933),
-        &config,
-        &analysis,
-        Some(&center),
-        &observed,
-    );
+    let pool = sample_pool(0x9933, &config, &trials, Some(&center));
     let locals = pool
         .iter()
         .filter(|candidate| candidate.source == "local")
@@ -88,20 +67,8 @@ fn factorial_pool_can_probe_more_than_four_supported_factors() {
     let trials = (0..24)
         .map(|i| trial(wide_candidate(i), 24.0 - i as f64))
         .collect::<Vec<_>>();
-    let analysis = analysis::analyze(&trials, &config);
     let center = wide_candidate(0);
-    let observed = trials
-        .iter()
-        .map(|trial| trial.candidate.clone())
-        .collect::<Vec<_>>();
-    let pool = super::sample(
-        &HashSet::new(),
-        &mut super::super::rng::SweepRng::new(0x8822),
-        &config,
-        &analysis,
-        Some(&center),
-        &observed,
-    );
+    let pool = sample_pool(0x8822, &config, &trials, Some(&center));
     let factorial = pool
         .iter()
         .find(|candidate| candidate.source == "factorial")
@@ -162,6 +129,27 @@ fn changed_factors(left: &Candidate, right: &Candidate) -> usize {
         + usize::from(left.start_ratio != right.start_ratio)
         + usize::from(left.amuse_beta1 != right.amuse_beta1)
         + usize::from(left.amuse_rho != right.amuse_rho)
+}
+
+fn sample_pool(
+    seed: u64,
+    config: &SweepConfig,
+    trials: &[Trial],
+    center: Option<&Candidate>,
+) -> Vec<super::PooledCandidate> {
+    let analysis = analysis::analyze(trials, config);
+    let observed = trials
+        .iter()
+        .map(|trial| trial.candidate.clone())
+        .collect::<Vec<_>>();
+    super::sample(
+        &HashSet::new(),
+        &mut SweepRng::new(seed),
+        config,
+        &analysis,
+        center,
+        &observed,
+    )
 }
 
 fn wide_candidate(i: usize) -> Candidate {
