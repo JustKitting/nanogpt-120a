@@ -41,23 +41,15 @@ fn write_next_latent(
     next_latent: &UploadedNextLat,
 ) -> AppResult {
     write_layer_norm(writer, stream, "next_latent.norm", &next_latent.norm)?;
-    write_linear(
+    write_linears(
         writer,
         stream,
-        "next_latent.input_projection",
-        &next_latent.input_projection,
-    )?;
-    write_linear(
-        writer,
-        stream,
-        "next_latent.transition",
-        &next_latent.transition,
-    )?;
-    write_linear(
-        writer,
-        stream,
-        "next_latent.output_projection",
-        &next_latent.output_projection,
+        "next_latent",
+        [
+            ("input_projection", &next_latent.input_projection),
+            ("transition", &next_latent.transition),
+            ("output_projection", &next_latent.output_projection),
+        ],
     )
 }
 
@@ -67,31 +59,23 @@ fn write_block(
     index: usize,
     block: &UploadedBlock,
 ) -> AppResult {
-    write_layer_norm(writer, stream, &format!("blocks.{index}.ln_1"), &block.ln_1)?;
-    write_linear(
+    let prefix = format!("blocks.{index}");
+    write_layer_norm(writer, stream, &format!("{prefix}.ln_1"), &block.ln_1)?;
+    write_linears(
         writer,
         stream,
-        &format!("blocks.{index}.attn_qkv"),
-        &block.attn_qkv,
+        &prefix,
+        [
+            ("attn_qkv", &block.attn_qkv),
+            ("attn_c_proj", &block.attn_c_proj),
+        ],
     )?;
-    write_linear(
+    write_layer_norm(writer, stream, &format!("{prefix}.ln_2"), &block.ln_2)?;
+    write_linears(
         writer,
         stream,
-        &format!("blocks.{index}.attn_c_proj"),
-        &block.attn_c_proj,
-    )?;
-    write_layer_norm(writer, stream, &format!("blocks.{index}.ln_2"), &block.ln_2)?;
-    write_linear(
-        writer,
-        stream,
-        &format!("blocks.{index}.mlp_up"),
-        &block.mlp_up,
-    )?;
-    write_linear(
-        writer,
-        stream,
-        &format!("blocks.{index}.mlp_down"),
-        &block.mlp_down,
+        &prefix,
+        [("mlp_up", &block.mlp_up), ("mlp_down", &block.mlp_down)],
     )
 }
 
@@ -118,6 +102,18 @@ fn write_linear(
 ) -> AppResult {
     write_tensor(writer, stream, &format!("{prefix}.weight"), &linear.weight)?;
     write_tensor(writer, stream, &format!("{prefix}.bias"), &linear.bias)
+}
+
+fn write_linears<const N: usize>(
+    writer: &mut CheckpointWriter<impl std::io::Write>,
+    stream: &CudaStream,
+    prefix: &str,
+    linears: [(&str, &UploadedLinear); N],
+) -> AppResult {
+    for (suffix, linear) in linears {
+        write_linear(writer, stream, &format!("{prefix}.{suffix}"), linear)?;
+    }
+    Ok(())
 }
 
 fn write_tensor(
