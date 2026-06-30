@@ -7,73 +7,19 @@ pub(super) fn gram_correction_modes() -> [(&'static str, Mode); 18] {
         ("nvfp4_avg2", Mode::Nvfp4GramAverage { samples: 2 }),
         ("nvfp4_avg4", Mode::Nvfp4GramAverage { samples: 4 }),
         ("nvfp4_avg8", Mode::Nvfp4GramAverage { samples: 8 }),
-        (
-            "prefix2_nvfp4",
-            Mode::ExactPrefixThenNvfp4 { exact_steps: 2 },
-        ),
-        (
-            "prefix3_nvfp4",
-            Mode::ExactPrefixThenNvfp4 { exact_steps: 3 },
-        ),
-        (
-            "prefix2_avg4",
-            Mode::ExactPrefixThenNvfp4Average {
-                exact_steps: 2,
-                samples: 4,
-            },
-        ),
-        (
-            "prefix3_avg4",
-            Mode::ExactPrefixThenNvfp4Average {
-                exact_steps: 3,
-                samples: 4,
-            },
-        ),
-        ("stale_period1", Mode::Stale { period: 1 }),
-        ("stale_period2", Mode::Stale { period: 2 }),
-        ("stale_period3", Mode::Stale { period: 3 }),
-        (
-            "prefix2_stale2",
-            Mode::ExactPrefixThenStale {
-                exact_steps: 2,
-                period: 2,
-            },
-        ),
-        (
-            "prefix3_stale2",
-            Mode::ExactPrefixThenStale {
-                exact_steps: 3,
-                period: 2,
-            },
-        ),
-        (
-            "prefix4_stale2",
-            Mode::ExactPrefixThenStale {
-                exact_steps: 4,
-                period: 2,
-            },
-        ),
-        (
-            "adaptive_p2_e03",
-            Mode::Adaptive {
-                period: 2,
-                max_relative_defect: 3.0e-2,
-            },
-        ),
-        (
-            "adaptive_p2_e05",
-            Mode::Adaptive {
-                period: 2,
-                max_relative_defect: 5.0e-2,
-            },
-        ),
-        (
-            "adaptive_p3_e05",
-            Mode::Adaptive {
-                period: 3,
-                max_relative_defect: 5.0e-2,
-            },
-        ),
+        exact_prefix_nvfp4("prefix2_nvfp4", 2),
+        exact_prefix_nvfp4("prefix3_nvfp4", 3),
+        exact_prefix_nvfp4_average("prefix2_avg4", 2, 4),
+        exact_prefix_nvfp4_average("prefix3_avg4", 3, 4),
+        stale("stale_period1", 1),
+        stale("stale_period2", 2),
+        stale("stale_period3", 3),
+        exact_prefix_stale("prefix2_stale2", 2),
+        exact_prefix_stale("prefix3_stale2", 3),
+        exact_prefix_stale("prefix4_stale2", 4),
+        adaptive("adaptive_p2_e03", 2, 3.0e-2),
+        adaptive("adaptive_p2_e05", 2, 5.0e-2),
+        adaptive("adaptive_p3_e05", 3, 5.0e-2),
     ]
 }
 
@@ -114,6 +60,52 @@ pub(super) fn gram_form_correction_modes() -> [(&'static str, Mode); 34] {
         exact_prefix_stale_reject_late_safety("prefix3_stale_reject2_late4_safety103", 4),
         exact_prefix_stale_reject_late_safety("prefix3_stale_reject2_late5_safety103", 5),
     ]
+}
+
+const fn exact_prefix_nvfp4(name: &'static str, exact_steps: usize) -> (&'static str, Mode) {
+    (name, Mode::ExactPrefixThenNvfp4 { exact_steps })
+}
+
+const fn exact_prefix_nvfp4_average(
+    name: &'static str,
+    exact_steps: usize,
+    samples: usize,
+) -> (&'static str, Mode) {
+    (
+        name,
+        Mode::ExactPrefixThenNvfp4Average {
+            exact_steps,
+            samples,
+        },
+    )
+}
+
+const fn stale(name: &'static str, period: usize) -> (&'static str, Mode) {
+    (name, Mode::Stale { period })
+}
+
+const fn exact_prefix_stale(name: &'static str, exact_steps: usize) -> (&'static str, Mode) {
+    (
+        name,
+        Mode::ExactPrefixThenStale {
+            exact_steps,
+            period: 2,
+        },
+    )
+}
+
+const fn adaptive(
+    name: &'static str,
+    period: usize,
+    max_relative_defect: f32,
+) -> (&'static str, Mode) {
+    (
+        name,
+        Mode::Adaptive {
+            period,
+            max_relative_defect,
+        },
+    )
 }
 
 const fn high_precision_safety(
