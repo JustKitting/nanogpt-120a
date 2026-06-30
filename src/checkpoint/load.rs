@@ -6,14 +6,12 @@ use std::path::Path;
 use cuda_core::CudaStream;
 use gpt2_nvfp4::GPT2_N_LAYER;
 
-use super::{
-    format::{CheckpointReader, CheckpointTensor},
-    schema,
-};
+mod tensor;
+mod topology;
+
+use super::{format::CheckpointReader, schema};
 use crate::AppResult;
-use crate::upload::{
-    UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4,
-};
+use crate::upload::UploadedModel;
 
 pub fn load_uploaded_model(stream: &CudaStream, path: &Path) -> AppResult<UploadedModel> {
     let file = File::open(path)?;
@@ -35,93 +33,5 @@ pub fn load_uploaded_model(stream: &CudaStream, path: &Path) -> AppResult<Upload
         }
     }
 
-    Ok(UploadedModel {
-        token_embedding: take_uploaded_tensor(stream, &mut tensors, "token_embedding")?,
-        blocks: load_blocks(stream, &mut tensors)?,
-        ln_f: load_layer_norm(stream, &mut tensors, "ln_f")?,
-        next_latent: load_next_latent(stream, &mut tensors)?,
-    })
-}
-
-fn load_blocks(
-    stream: &CudaStream,
-    tensors: &mut HashMap<String, CheckpointTensor>,
-) -> AppResult<Vec<UploadedBlock>> {
-    let mut blocks = Vec::with_capacity(GPT2_N_LAYER);
-    for index in 0..GPT2_N_LAYER {
-        blocks.push(UploadedBlock {
-            ln_1: load_layer_norm(stream, tensors, &format!("blocks.{index}.ln_1"))?,
-            attn_qkv: load_linear(stream, tensors, &format!("blocks.{index}.attn_qkv"))?,
-            attn_c_proj: load_linear(stream, tensors, &format!("blocks.{index}.attn_c_proj"))?,
-            ln_2: load_layer_norm(stream, tensors, &format!("blocks.{index}.ln_2"))?,
-            mlp_up: load_linear(stream, tensors, &format!("blocks.{index}.mlp_up"))?,
-            mlp_down: load_linear(stream, tensors, &format!("blocks.{index}.mlp_down"))?,
-        });
-    }
-    Ok(blocks)
-}
-
-fn load_layer_norm(
-    stream: &CudaStream,
-    tensors: &mut HashMap<String, CheckpointTensor>,
-    prefix: &str,
-) -> AppResult<UploadedLayerNorm> {
-    Ok(UploadedLayerNorm {
-        weight: take_uploaded_tensor(stream, tensors, &format!("{prefix}.weight"))?,
-        bias: take_uploaded_tensor(stream, tensors, &format!("{prefix}.bias"))?,
-    })
-}
-
-fn load_next_latent(
-    stream: &CudaStream,
-    tensors: &mut HashMap<String, CheckpointTensor>,
-) -> AppResult<UploadedNextLat> {
-    Ok(UploadedNextLat {
-        norm: load_layer_norm(stream, tensors, "next_latent.norm")?,
-        input_projection: load_linear(stream, tensors, "next_latent.input_projection")?,
-        transition: load_linear(stream, tensors, "next_latent.transition")?,
-        output_projection: load_linear(stream, tensors, "next_latent.output_projection")?,
-    })
-}
-
-fn load_linear(
-    stream: &CudaStream,
-    tensors: &mut HashMap<String, CheckpointTensor>,
-    prefix: &str,
-) -> AppResult<UploadedLinear> {
-    Ok(UploadedLinear {
-        weight: take_uploaded_tensor(stream, tensors, &format!("{prefix}.weight"))?,
-        bias: take_uploaded_tensor(stream, tensors, &format!("{prefix}.bias"))?,
-    })
-}
-
-fn take_uploaded_tensor(
-    stream: &CudaStream,
-    tensors: &mut HashMap<String, CheckpointTensor>,
-    name: &str,
-) -> AppResult<UploadedNvfp4> {
-    let tensor = tensors
-        .remove(name)
-        .ok_or_else(|| format!("checkpoint is missing tensor {name}"))?;
-    validate_tensor(name, &tensor)?;
-    UploadedNvfp4::from_host(
-        stream,
-        &tensor.bytes,
-        &tensor.scales,
-        tensor.global_scale,
-        tensor.len,
-    )
-}
-
-fn validate_tensor(name: &str, tensor: &CheckpointTensor) -> AppResult {
-    validate_tensor_len(name, "bytes", tensor.bytes.len(), tensor.len / 2)?;
-    validate_tensor_len(name, "scales", tensor.scales.len(), tensor.len / 16)
-}
-
-fn validate_tensor_len(name: &str, field: &str, actual: usize, expected: usize) -> AppResult {
-    if actual == expected {
-        Ok(())
-    } else {
-        Err(format!("{name} has {actual} {field}; expected {expected}").into())
-    }
+    topology::load_model(stream, &mut tensors)
 }
