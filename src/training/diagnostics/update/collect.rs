@@ -1,13 +1,13 @@
-use cuda_core::CudaStream;
+use cuda_core::{CudaStream, DeviceBuffer};
 
 use crate::AppResult;
-use crate::upload::{UploadedBlock, UploadedModel};
+use crate::upload::{UploadedBlock, UploadedLinear, UploadedModel};
 
 use super::record::UpdateSnapshotCollector;
 use super::snapshot::PendingTensorUpdateDiagnostics;
 use crate::training::grad_block::BlockGradBuffers;
 use crate::training::grads::BackwardBuffers;
-use crate::training::optimizer_state::{BlockState, OptimizerStateBuffers};
+use crate::training::optimizer_state::{BlockState, LinearState, OptimizerStateBuffers};
 
 pub(in crate::training::diagnostics) fn collect_update_snapshots(
     stream: &CudaStream,
@@ -52,27 +52,21 @@ fn collect_block_updates(
         &grad.ln_1,
         &state.ln_1,
     )?;
-    collector.push_observed(
-        &format!("block{index}.attn_qkv.weight"),
-        &block.attn_qkv.weight,
+    collect_linear_updates(
+        collector,
+        &format!("block{index}.attn_qkv"),
+        &block.attn_qkv,
         &grad.d_attn_qkv_weight,
-    )?;
-    collector.push_adam(
-        &format!("block{index}.attn_qkv.bias"),
-        &block.attn_qkv.bias,
         &grad.d_attn_qkv_bias,
-        &state.attn_qkv.bias,
+        &state.attn_qkv,
     )?;
-    collector.push_observed(
-        &format!("block{index}.attn_c_proj.weight"),
-        &block.attn_c_proj.weight,
+    collect_linear_updates(
+        collector,
+        &format!("block{index}.attn_c_proj"),
+        &block.attn_c_proj,
         &grad.d_attn_c_proj_weight,
-    )?;
-    collector.push_adam(
-        &format!("block{index}.attn_c_proj.bias"),
-        &block.attn_c_proj.bias,
         &grad.d_attn_c_proj_bias,
-        &state.attn_c_proj.bias,
+        &state.attn_c_proj,
     )?;
     collector.push_layer_norm(
         &format!("block{index}.ln_2"),
@@ -80,26 +74,37 @@ fn collect_block_updates(
         &grad.ln_2,
         &state.ln_2,
     )?;
-    collector.push_observed(
-        &format!("block{index}.mlp_up.weight"),
-        &block.mlp_up.weight,
+    collect_linear_updates(
+        collector,
+        &format!("block{index}.mlp_up"),
+        &block.mlp_up,
         &grad.d_mlp_c_fc_weight,
-    )?;
-    collector.push_adam(
-        &format!("block{index}.mlp_up.bias"),
-        &block.mlp_up.bias,
         &grad.d_mlp_c_fc_bias,
-        &state.mlp_up.bias,
+        &state.mlp_up,
     )?;
-    collector.push_observed(
-        &format!("block{index}.mlp_down.weight"),
-        &block.mlp_down.weight,
+    collect_linear_updates(
+        collector,
+        &format!("block{index}.mlp_down"),
+        &block.mlp_down,
         &grad.d_mlp_c_proj_weight,
-    )?;
-    collector.push_adam(
-        &format!("block{index}.mlp_down.bias"),
-        &block.mlp_down.bias,
         &grad.d_mlp_c_proj_bias,
-        &state.mlp_down.bias,
+        &state.mlp_down,
+    )
+}
+
+fn collect_linear_updates(
+    collector: &mut UpdateSnapshotCollector<'_>,
+    name: &str,
+    linear: &UploadedLinear,
+    weight_grad: &DeviceBuffer<f32>,
+    bias_grad: &DeviceBuffer<f32>,
+    state: &LinearState,
+) -> AppResult {
+    collector.push_observed(&format!("{name}.weight"), &linear.weight, weight_grad)?;
+    collector.push_adam(
+        &format!("{name}.bias"),
+        &linear.bias,
+        bias_grad,
+        &state.bias,
     )
 }
