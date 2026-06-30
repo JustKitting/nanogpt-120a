@@ -29,35 +29,17 @@ impl TokenBatch {
         batch_size: usize,
         seq_len: usize,
     ) -> AppResult<Self> {
-        let window_len = seq_len + 1;
-        let needed = batch_size * window_len;
-        if windows.len() < needed {
-            return Err(format!(
-                "token window has {} tokens, needs {}",
-                windows.len(),
-                needed
-            )
-            .into());
-        }
-
-        let mut tokens = Vec::with_capacity(batch_size * seq_len);
-        let mut targets = Vec::with_capacity(batch_size * seq_len);
-        for batch in 0..batch_size {
-            let base = batch * window_len;
-            tokens.extend(windows[base..base + seq_len].iter().map(|&id| id as u32));
-            targets.extend(
-                windows[base + 1..base + window_len]
-                    .iter()
-                    .map(|&id| id as u32),
-            );
-        }
+        let token_count = batch_size * seq_len;
+        let mut tokens = vec![0; token_count];
+        let mut targets = vec![0; token_count];
+        fill_host_windows(windows, batch_size, seq_len, &mut tokens, &mut targets)?;
 
         Ok(Self {
             tokens: DeviceBuffer::from_host(stream, &tokens)?,
             targets: DeviceBuffer::from_host(stream, &targets)?,
             batch_size,
             seq_len,
-            token_count: batch_size * seq_len,
+            token_count,
         })
     }
 }
