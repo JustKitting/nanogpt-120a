@@ -1,45 +1,19 @@
 use std::collections::HashSet;
 
 use super::{
-    analysis::{self, CandidateScore, SweepAnalysis},
-    candidate::Candidate,
-    config::SweepConfig,
-    history::Trial,
-    proposal_pool,
-    rng::SweepRng,
+    analysis::SweepAnalysis, candidate::Candidate, config::SweepConfig, history::Trial,
+    proposal_pool, rng::SweepRng,
 };
 
+mod proposal;
 mod select;
 #[cfg(test)]
 mod tests;
 mod trial;
 
+pub use proposal::{Proposal, ScoredCandidate};
 use select::{select_candidate, unseen_random};
 use trial::{best_local_center, infeasible_build_shapes, observed_loss};
-
-#[derive(Clone, Debug)]
-pub struct Proposal {
-    pub candidate: Candidate,
-    pub reason: &'static str,
-    pub ranked: Vec<ScoredCandidate>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ScoredCandidate {
-    pub candidate: Candidate,
-    pub source: &'static str,
-    pub score: CandidateScore,
-}
-
-impl Proposal {
-    pub fn selected_scored(&self) -> Option<&ScoredCandidate> {
-        let selected_key = self.candidate.key();
-        self.ranked
-            .iter()
-            .find(|scored| scored.candidate.key() == selected_key)
-            .or_else(|| self.ranked.first())
-    }
-}
 
 pub fn propose(
     trials: &[Trial],
@@ -53,7 +27,7 @@ pub fn propose(
     if let Some(candidate) = baseline {
         let candidate = candidate.with_min_layers();
         if !seen.contains(&candidate.key()) && !infeasible_builds.contains(&candidate.build_key()) {
-            return proposal("baseline", candidate, analysis, config);
+            return Proposal::single("baseline", candidate, analysis, config);
         }
     }
 
@@ -62,7 +36,7 @@ pub fn propose(
         .filter(|trial| observed_loss(trial).is_some())
         .count();
     if completed < config.random_trials {
-        return proposal(
+        return Proposal::single(
             "random",
             unseen_random(seen, rng, &infeasible_builds),
             analysis,
@@ -79,14 +53,7 @@ pub fn propose(
     let mut ranked = proposal_pool::sample(seen, rng, config, analysis, center.as_ref(), &observed)
         .into_iter()
         .filter(|pooled| !infeasible_builds.contains(&pooled.candidate.build_key()))
-        .map(|pooled| {
-            let score = analysis::score_candidate(analysis, config, &pooled.candidate);
-            ScoredCandidate {
-                candidate: pooled.candidate,
-                source: pooled.source,
-                score,
-            }
-        })
+        .map(|pooled| ScoredCandidate::from_pooled(pooled, analysis, config))
         .collect::<Vec<_>>();
     ranked.sort_by(|a, b| b.score.score.total_cmp(&a.score.score));
     let candidate = select_candidate(&ranked, rng)
@@ -96,23 +63,5 @@ pub fn propose(
         candidate,
         reason: "model",
         ranked,
-    }
-}
-
-fn proposal(
-    reason: &'static str,
-    candidate: Candidate,
-    analysis: &SweepAnalysis,
-    config: &SweepConfig,
-) -> Proposal {
-    let score = analysis::score_candidate(analysis, config, &candidate);
-    Proposal {
-        candidate: candidate.clone(),
-        reason,
-        ranked: vec![ScoredCandidate {
-            candidate,
-            source: reason,
-            score,
-        }],
     }
 }
