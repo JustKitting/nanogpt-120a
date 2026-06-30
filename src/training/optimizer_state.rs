@@ -1,5 +1,4 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::GPT2_N_LAYER;
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 
 use crate::upload::{
@@ -9,57 +8,13 @@ use crate::upload::{
 use super::update_skip::{UpdateSkipDecision, UpdateSkipState};
 
 mod device;
+mod types;
 
 use device::{block_array, clone_device, decode_master};
-
-pub struct OptimizerStateBuffers {
-    step: u32,
-    schedule_free_weight_sum: f32,
-    update_skip: UpdateSkipState,
-    pub(super) token_embedding: AdamState,
-    pub(super) ln_f: LayerNormState,
-    pub(super) next_latent: NextLatState,
-    pub(super) blocks: [BlockState; GPT2_N_LAYER],
-}
-
-pub(super) struct BlockState {
-    pub(super) ln_1: LayerNormState,
-    pub(super) attn_qkv: LinearState,
-    pub(super) attn_c_proj: LinearState,
-    pub(super) ln_2: LayerNormState,
-    pub(super) mlp_up: LinearState,
-    pub(super) mlp_down: LinearState,
-}
-
-pub(super) struct NextLatState {
-    pub(super) norm: LayerNormState,
-    pub(super) input_projection: LinearState,
-    pub(super) transition: LinearState,
-    pub(super) output_projection: LinearState,
-}
-
-pub(super) struct LayerNormState {
-    pub(super) weight: AdamState,
-    pub(super) bias: AdamState,
-}
-
-pub(super) struct LinearState {
-    pub(super) weight_aurora: AuroraState,
-    pub(super) bias: AdamState,
-}
-
-pub(super) struct AdamState {
-    pub(super) z_master: DeviceBuffer<f32>,
-    pub(super) x_master: DeviceBuffer<f32>,
-    pub(super) first: DeviceBuffer<f32>,
-    pub(super) second: DeviceBuffer<f32>,
-}
-
-pub(super) struct AuroraState {
-    pub(super) z_master: DeviceBuffer<f32>,
-    pub(super) x_master: DeviceBuffer<f32>,
-    pub(super) momentum: DeviceBuffer<f32>,
-}
+pub use types::OptimizerStateBuffers;
+pub(in crate::training) use types::{
+    AdamState, AuroraState, BlockState, LayerNormState, LinearState, NextLatState,
+};
 
 impl OptimizerStateBuffers {
     pub fn new(
