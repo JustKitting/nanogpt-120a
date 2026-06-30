@@ -1,5 +1,4 @@
 use super::super::output::CudaValidOutput;
-use crate::training::numeric_metric::NumericMetricSpec;
 
 #[derive(Clone, Copy)]
 pub(super) struct ValidMetricSpec {
@@ -18,25 +17,7 @@ metric_fields! {
     }
 }
 
-impl NumericMetricSpec for ValidMetricSpec {
-    type Input = CudaValidOutput;
-
-    fn name(self) -> &'static str {
-        self.name
-    }
-
-    fn unit(self) -> Option<&'static str> {
-        self.unit
-    }
-
-    fn higher_is_better(self) -> bool {
-        self.higher_is_better
-    }
-
-    fn value(self, item: &CudaValidOutput) -> f64 {
-        self.field.value(item)
-    }
-}
+impl_numeric_metric_spec!(ValidMetricSpec, CudaValidOutput, ValidMetricField::value);
 
 pub(super) fn valid_metric_specs() -> impl Iterator<Item = ValidMetricSpec> {
     VALID_METRIC_FIELDS

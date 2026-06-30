@@ -1,5 +1,4 @@
 use super::super::super::launch::CudaTrainOutput;
-use crate::training::numeric_metric::NumericMetricSpec;
 
 mod value;
 
@@ -51,25 +50,7 @@ metric_fields! {
     }
 }
 
-impl NumericMetricSpec for DebugMetricSpec {
-    type Input = CudaTrainOutput;
-
-    fn name(self) -> &'static str {
-        self.name
-    }
-
-    fn unit(self) -> Option<&'static str> {
-        self.unit
-    }
-
-    fn higher_is_better(self) -> bool {
-        self.higher_is_better
-    }
-
-    fn value(self, item: &CudaTrainOutput) -> f64 {
-        value::debug_metric_value(self.field, item)
-    }
-}
+impl_numeric_metric_spec!(DebugMetricSpec, CudaTrainOutput, value::debug_metric_value);
 
 pub(super) fn debug_metric_specs() -> impl Iterator<Item = DebugMetricSpec> {
     DEBUG_METRIC_FIELDS

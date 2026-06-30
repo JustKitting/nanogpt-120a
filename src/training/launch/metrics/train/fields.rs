@@ -1,5 +1,4 @@
 use super::super::output::CudaTrainOutput;
-use crate::training::numeric_metric::NumericMetricSpec;
 
 #[derive(Clone, Copy)]
 pub(super) struct TrainMetricSpec {
@@ -40,25 +39,7 @@ metric_fields! {
     }
 }
 
-impl NumericMetricSpec for TrainMetricSpec {
-    type Input = CudaTrainOutput;
-
-    fn name(self) -> &'static str {
-        self.name
-    }
-
-    fn unit(self) -> Option<&'static str> {
-        self.unit
-    }
-
-    fn higher_is_better(self) -> bool {
-        self.higher_is_better
-    }
-
-    fn value(self, item: &CudaTrainOutput) -> f64 {
-        self.field.value(item)
-    }
-}
+impl_numeric_metric_spec!(TrainMetricSpec, CudaTrainOutput, TrainMetricField::value);
 
 pub(super) fn train_metric_specs() -> impl Iterator<Item = TrainMetricSpec> {
     TRAIN_METRIC_FIELDS

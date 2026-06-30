@@ -33,3 +33,27 @@ macro_rules! metric_fields {
         }
     };
 }
+
+macro_rules! impl_numeric_metric_spec {
+    ($spec_ty:ty, $input_ty:ty, $value:expr $(,)?) => {
+        impl $crate::training::numeric_metric::NumericMetricSpec for $spec_ty {
+            type Input = $input_ty;
+
+            fn name(self) -> &'static str {
+                self.name
+            }
+
+            fn unit(self) -> Option<&'static str> {
+                self.unit
+            }
+
+            fn higher_is_better(self) -> bool {
+                self.higher_is_better
+            }
+
+            fn value(self, item: &Self::Input) -> f64 {
+                $value(self.field, item)
+            }
+        }
+    };
+}
