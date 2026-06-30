@@ -1,10 +1,12 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::optimizer::{AdamWUpdateArgs, OptimizerModule};
+use std::time::Instant;
 
 use crate::upload::UploadedNvfp4;
 
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::AdamState;
+use super::elapsed_ms;
 
 const ADAM_LR: f32 = 2.0e-4;
 const ADAM_WEIGHT_DECAY: f32 = 0.005;
@@ -104,6 +106,17 @@ impl<'a, 'scratch> AdamUpdate<'a, 'scratch> {
             eps: ADAM_EPS,
             average_coefficient: self.average_coefficient,
         })
+    }
+
+    pub(super) fn update_timed(
+        &mut self,
+        tensor: &mut UploadedNvfp4,
+        grad: &DeviceBuffer<f32>,
+        state: &mut AdamState,
+    ) -> Result<f64, DriverError> {
+        let start = Instant::now();
+        self.update(tensor, grad, state)?;
+        Ok(elapsed_ms(start))
     }
 }
 

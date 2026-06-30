@@ -32,20 +32,18 @@ pub(super) struct BaseAdamTrace {
 }
 
 pub(super) fn update_base_adam(args: BaseAdamUpdateArgs<'_>) -> Result<BaseAdamTrace, DriverError> {
-    let token_start = Instant::now();
-    AdamUpdate::new(
+    let token_embedding_ms = AdamUpdate::new(
         args.stream,
         args.optimizer,
         args.scratch,
         args.step,
         args.average_coefficient,
     )
-    .update(
+    .update_timed(
         &mut args.uploaded.token_embedding,
         &args.grads.d_lm_head_weight,
         &mut args.state.token_embedding,
     )?;
-    let token_embedding_ms = elapsed_ms(token_start);
 
     let final_start = Instant::now();
     update_layer_norm(
