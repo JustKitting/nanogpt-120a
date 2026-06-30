@@ -17,51 +17,41 @@ pub(super) fn forward<'a, 'scratch>(
     } else {
         crate::GPT2_QKV
     } as u32;
-    let HiddenStateDevice {
-        stream,
-        batch_size,
-        seq_len,
-        row_count,
-        residual,
-        normalized,
-        normalized_amax,
-        mean,
-        inv_std,
-    } = args.hidden;
+    let hidden = args.hidden;
 
     input_nvfp4.quantize_precomputed_amax(
         args.quant_module,
-        stream,
-        normalized,
-        normalized_amax,
-        row_count,
+        hidden.stream,
+        &mut *hidden.normalized,
+        &mut *hidden.normalized_amax,
+        hidden.row_count,
         crate::GPT2_N_EMBD as u32,
     )?;
 
     let input = input_nvfp4.device();
     if let Some(tape) = tape.as_mut() {
-        tape.save_qkv_input(stream, input)?;
+        tape.save_qkv_input(hidden.stream, input)?;
     }
 
     args.module.qkv_projection(QkvProjectionArgs {
-        stream,
+        stream: hidden.stream,
         input,
         weight: args.projections.qkv_weight,
         bias: args.projections.qkv_bias,
         out: args.qkv,
-        token_count: row_count,
+        token_count: hidden.row_count,
         input_dim: crate::GPT2_N_EMBD as u32,
         output_dim: qkv_dim,
     })?;
 
     if args.use_full_attention {
         args.module.apply_rope(ApplyRopeArgs {
-            stream,
+            stream: hidden.stream,
             qkv: args.qkv,
             qkv_f16: tape.as_mut().map(|tape| &mut *tape.qkv_f16),
-            row_count,
-            seq_len,
-            batch_size,
+            row_count: hidden.row_count,
+            seq_len: hidden.seq_len,
+            batch_size: hidden.batch_size,
             embedding_dim: crate::GPT2_N_EMBD as u32,
             qkv_dim,
             head_count: crate::GPT2_N_HEAD as u32,
@@ -76,17 +66,17 @@ pub(super) fn forward<'a, 'scratch>(
     };
 
     let attention_args = CausalAttentionTcArgs {
-        stream,
+        stream: hidden.stream,
         tc_module: args.tc_module,
         qkv: &*args.qkv,
-        out: normalized,
+        out: &mut *hidden.normalized,
         qkv_f16,
         attention_out_f16,
         log_sum_exp: args.attention_log_sum_exp,
         scratch: args.tc_scratch,
-        row_count,
-        seq_len,
-        batch_size,
+        row_count: hidden.row_count,
+        seq_len: hidden.seq_len,
+        batch_size: hidden.batch_size,
         embedding_dim: crate::GPT2_N_EMBD as u32,
         qkv_dim,
         head_count: crate::GPT2_N_HEAD as u32,
@@ -100,37 +90,27 @@ pub(super) fn forward<'a, 'scratch>(
 
     requantize_attention(
         args.quant_module,
-        stream,
+        hidden.stream,
         input_nvfp4.reborrow(),
-        normalized,
-        normalized_amax,
-        row_count,
+        &mut *hidden.normalized,
+        &mut *hidden.normalized_amax,
+        hidden.row_count,
     )?;
 
     let input = input_nvfp4.device();
     if let Some(tape) = tape.as_mut() {
-        tape.save_c_proj_input(stream, input)?;
+        tape.save_c_proj_input(hidden.stream, input)?;
     }
 
     args.module.c_proj(CProjArgs {
-        stream,
+        stream: hidden.stream,
         input,
         weight: args.projections.c_proj_weight,
         bias: args.projections.c_proj_bias,
-        residual,
-        token_count: row_count,
+        residual: &mut *hidden.residual,
+        token_count: hidden.row_count,
         embedding_dim: crate::GPT2_N_EMBD as u32,
     })?;
 
-    Ok(HiddenStateDevice {
-        stream,
-        batch_size,
-        seq_len,
-        row_count,
-        residual,
-        normalized,
-        normalized_amax,
-        mean,
-        inv_std,
-    })
+    Ok(hidden)
 }

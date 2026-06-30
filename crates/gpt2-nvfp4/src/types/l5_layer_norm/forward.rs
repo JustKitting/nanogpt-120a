@@ -25,43 +25,23 @@ impl LayerNormWeights {
         &self,
         args: LayerNormForwardArgs<'a>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
-        let HiddenStateDevice {
-            stream,
-            batch_size,
-            seq_len,
-            row_count,
-            residual,
-            normalized,
-            normalized_amax,
-            mean,
-            inv_std,
-        } = args.hidden;
+        let hidden = args.hidden;
 
         args.module.gpt_layer_norm(GptLayerNormArgs {
-            stream,
-            residual,
+            stream: hidden.stream,
+            residual: &mut *hidden.residual,
             weight: args.tensors.weight,
             bias: args.tensors.bias,
-            normalized,
-            normalized_amax,
-            mean,
-            inv_std,
-            row_count,
+            normalized: &mut *hidden.normalized,
+            normalized_amax: &mut *hidden.normalized_amax,
+            mean: &mut *hidden.mean,
+            inv_std: &mut *hidden.inv_std,
+            row_count: hidden.row_count,
             embedding_dim: GPT2_N_EMBD as u32,
             epsilon: GPT2_LAYER_NORM_EPSILON,
         })?;
 
-        Ok(HiddenStateDevice {
-            stream,
-            batch_size,
-            seq_len,
-            row_count,
-            residual,
-            normalized,
-            normalized_amax,
-            mean,
-            inv_std,
-        })
+        Ok(hidden)
     }
 
     pub fn forward_save_residual_f16<'a>(
@@ -69,44 +49,24 @@ impl LayerNormWeights {
         args: LayerNormForwardArgs<'a>,
         residual_f16: &mut DeviceBuffer<u16>,
     ) -> Result<HiddenStateDevice<'a>, DriverError> {
-        let HiddenStateDevice {
-            stream,
-            batch_size,
-            seq_len,
-            row_count,
-            residual,
-            normalized,
-            normalized_amax,
-            mean,
-            inv_std,
-        } = args.hidden;
+        let hidden = args.hidden;
 
         args.module
             .gpt_layer_norm_save_residual_f16(GptLayerNormSaveResidualF16Args {
-                stream,
-                residual,
+                stream: hidden.stream,
+                residual: &mut *hidden.residual,
                 weight: args.tensors.weight,
                 bias: args.tensors.bias,
-                normalized,
-                normalized_amax,
-                mean,
-                inv_std,
+                normalized: &mut *hidden.normalized,
+                normalized_amax: &mut *hidden.normalized_amax,
+                mean: &mut *hidden.mean,
+                inv_std: &mut *hidden.inv_std,
                 residual_f16,
-                row_count,
+                row_count: hidden.row_count,
                 embedding_dim: GPT2_N_EMBD as u32,
                 epsilon: GPT2_LAYER_NORM_EPSILON,
             })?;
 
-        Ok(HiddenStateDevice {
-            stream,
-            batch_size,
-            seq_len,
-            row_count,
-            residual,
-            normalized,
-            normalized_amax,
-            mean,
-            inv_std,
-        })
+        Ok(hidden)
     }
 }

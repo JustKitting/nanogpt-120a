@@ -38,51 +38,29 @@ pub(super) fn finish_forward<'a>(
         args.ln_f_weights.forward(ln_f)?
     };
 
-    let HiddenStateDevice {
-        stream,
-        batch_size,
-        seq_len,
-        row_count,
-        residual,
-        normalized,
-        normalized_amax,
-        mean,
-        inv_std,
-    } = hidden;
-
     hidden_nvfp4.quantize_precomputed_amax(
         args.quant_module,
-        stream,
-        normalized,
-        normalized_amax,
-        row_count,
+        hidden.stream,
+        &mut *hidden.normalized,
+        &mut *hidden.normalized_amax,
+        hidden.row_count,
         crate::GPT2_N_EMBD as u32,
     )?;
 
     let input = hidden_nvfp4.device();
     if let Some(tape) = tape.as_mut() {
-        tape.lm_head_input_nvfp4.save(stream, input)?;
+        tape.lm_head_input_nvfp4.save(hidden.stream, input)?;
     }
 
     args.lm_head_module.logits(LmHeadArgs {
-        stream,
+        stream: hidden.stream,
         input,
         weight: args.lm_head_weight,
         logits: &mut *args.logits,
-        token_count: row_count,
+        token_count: hidden.row_count,
         input_dim: crate::GPT2_N_EMBD as u32,
         vocab_size: crate::GPT2_VOCAB_SIZE as u32,
     })?;
 
-    Ok(HiddenStateDevice {
-        stream,
-        batch_size,
-        seq_len,
-        row_count,
-        residual,
-        normalized,
-        normalized_amax,
-        mean,
-        inv_std,
-    })
+    Ok(hidden)
 }
