@@ -9,6 +9,50 @@ use super::body::{
     fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad_pow2,
 };
 
+macro_rules! dispatch_fp32_pair {
+    (
+        row_grid_dim: $row_grid_dim:expr,
+        x: $x:expr,
+        output: [$out_fp4:expr, $out_scales:expr, $out_global_scales:expr],
+        transpose_output: [$transpose_out_fp4:expr, $transpose_out_scales:expr, $transpose_out_global_scales:expr],
+        scale: [$global_scale:expr, $scale_override:expr, $sign_seed:expr, $scale_seed:expr, $transpose_scale_seed:expr],
+        row: $row_body:ident($($row_arg:expr),* $(,)?);
+        transpose: $transpose_body:ident($($transpose_arg:expr),* $(,)?)
+    ) => {{
+        let block = thread::blockIdx_x();
+        let warp_in_block = thread::threadIdx_x() / 32;
+        if block < $row_grid_dim {
+            let chunk = block * AMAX_WARPS_PER_BLOCK + warp_in_block;
+            $row_body(
+                $x,
+                &mut $out_fp4,
+                &mut $out_scales,
+                &mut $out_global_scales,
+                chunk,
+                $($row_arg,)*
+                $global_scale[0],
+                $scale_override,
+                $sign_seed,
+                $scale_seed,
+            );
+        } else {
+            let chunk = (block - $row_grid_dim) * AMAX_WARPS_PER_BLOCK + warp_in_block;
+            $transpose_body(
+                $x,
+                &mut $transpose_out_fp4,
+                &mut $transpose_out_scales,
+                &mut $transpose_out_global_scales,
+                chunk,
+                $($transpose_arg,)*
+                $global_scale[0],
+                $scale_override,
+                $sign_seed,
+                $transpose_scale_seed,
+            );
+        }
+    }};
+}
+
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 pub(crate) mod module {
@@ -34,40 +78,19 @@ pub(crate) mod module {
         scale_seed: u32,
         transpose_scale_seed: u32,
     ) {
-        let block = thread::blockIdx_x();
-        let warp_in_block = thread::threadIdx_x() / 32;
-        if block < row_grid_dim {
-            let chunk = block * AMAX_WARPS_PER_BLOCK + warp_in_block;
-            fp32_to_nvfp4_ms_eden_body_no_chunk_amax(
-                x,
-                &mut out_fp4,
-                &mut out_scales,
-                &mut out_global_scales,
-                chunk,
-                source_cols,
-                dst_row_len,
-                global_scale[0],
-                scale_override,
-                sign_seed,
-                scale_seed,
-            );
-        } else {
-            let chunk = (block - row_grid_dim) * AMAX_WARPS_PER_BLOCK + warp_in_block;
-            fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax(
-                x,
-                &mut transpose_out_fp4,
-                &mut transpose_out_scales,
-                &mut transpose_out_global_scales,
-                chunk,
+        dispatch_fp32_pair!(
+            row_grid_dim: row_grid_dim,
+            x: x,
+            output: [out_fp4, out_scales, out_global_scales],
+            transpose_output: [transpose_out_fp4, transpose_out_scales, transpose_out_global_scales],
+            scale: [global_scale, scale_override, sign_seed, scale_seed, transpose_scale_seed],
+            row: fp32_to_nvfp4_ms_eden_body_no_chunk_amax(source_cols, dst_row_len);
+            transpose: fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax(
                 source_rows,
                 transpose_dst_row_len,
                 source_cols,
-                global_scale[0],
-                scale_override,
-                sign_seed,
-                transpose_scale_seed,
-            );
-        }
+            )
+        );
     }
 
     #[kernel]
@@ -89,39 +112,21 @@ pub(crate) mod module {
         scale_seed: u32,
         transpose_scale_seed: u32,
     ) {
-        let block = thread::blockIdx_x();
-        let warp_in_block = thread::threadIdx_x() / 32;
-        if block < row_grid_dim {
-            let chunk = block * AMAX_WARPS_PER_BLOCK + warp_in_block;
-            fp32_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad_pow2(
-                x,
-                &mut out_fp4,
-                &mut out_scales,
-                &mut out_global_scales,
-                chunk,
+        dispatch_fp32_pair!(
+            row_grid_dim: row_grid_dim,
+            x: x,
+            output: [out_fp4, out_scales, out_global_scales],
+            transpose_output: [transpose_out_fp4, transpose_out_scales, transpose_out_global_scales],
+            scale: [global_scale, scale_override, sign_seed, scale_seed, transpose_scale_seed],
+            row: fp32_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad_pow2(
                 source_cols,
                 row_chunks_per_row_shift,
-                global_scale[0],
-                scale_override,
-                sign_seed,
-                scale_seed,
             );
-        } else {
-            let chunk = (block - row_grid_dim) * AMAX_WARPS_PER_BLOCK + warp_in_block;
-            fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad_pow2(
-                x,
-                &mut transpose_out_fp4,
-                &mut transpose_out_scales,
-                &mut transpose_out_global_scales,
-                chunk,
+            transpose: fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad_pow2(
                 source_cols,
                 transpose_chunks_per_row_shift,
-                global_scale[0],
-                scale_override,
-                sign_seed,
-                transpose_scale_seed,
-            );
-        }
+            )
+        );
     }
 
     #[kernel]
@@ -143,38 +148,17 @@ pub(crate) mod module {
         scale_seed: u32,
         transpose_scale_seed: u32,
     ) {
-        let block = thread::blockIdx_x();
-        let warp_in_block = thread::threadIdx_x() / 32;
-        if block < row_grid_dim {
-            let chunk = block * AMAX_WARPS_PER_BLOCK + warp_in_block;
-            fp32_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
-                x,
-                &mut out_fp4,
-                &mut out_scales,
-                &mut out_global_scales,
-                chunk,
-                source_cols,
-                row_chunks_per_row,
-                global_scale[0],
-                scale_override,
-                sign_seed,
-                scale_seed,
-            );
-        } else {
-            let chunk = (block - row_grid_dim) * AMAX_WARPS_PER_BLOCK + warp_in_block;
-            fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
-                x,
-                &mut transpose_out_fp4,
-                &mut transpose_out_scales,
-                &mut transpose_out_global_scales,
-                chunk,
+        dispatch_fp32_pair!(
+            row_grid_dim: row_grid_dim,
+            x: x,
+            output: [out_fp4, out_scales, out_global_scales],
+            transpose_output: [transpose_out_fp4, transpose_out_scales, transpose_out_global_scales],
+            scale: [global_scale, scale_override, sign_seed, scale_seed, transpose_scale_seed],
+            row: fp32_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(source_cols, row_chunks_per_row);
+            transpose: fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax_no_pad(
                 source_cols,
                 transpose_chunks_per_row,
-                global_scale[0],
-                scale_override,
-                sign_seed,
-                transpose_scale_seed,
-            );
-        }
+            )
+        );
     }
 }
