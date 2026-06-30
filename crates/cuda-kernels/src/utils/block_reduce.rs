@@ -55,7 +55,19 @@ pub(crate) fn block_sum_shared_f32<const WARPS: usize>(
     lane: u32,
     warp: u32,
 ) -> f32 {
-    block_reduce_f32!(storage, WARPS as u32, local, lane, warp, warp_sum_f32, 0.0)
+    block_sum_shared_f32_for_warps(storage, WARPS as u32, local, lane, warp)
+}
+
+#[allow(unused_unsafe)]
+#[inline(always)]
+pub(crate) fn block_sum_shared_f32_for_warps<const WARPS: usize>(
+    storage: &mut SharedArray<f32, WARPS>,
+    active_warps: u32,
+    local: f32,
+    lane: u32,
+    warp: u32,
+) -> f32 {
+    block_reduce_f32!(storage, active_warps, local, lane, warp, warp_sum_f32, 0.0)
 }
 
 #[allow(unused_unsafe)]
@@ -66,7 +78,28 @@ pub(crate) fn block_max_shared_f32<const WARPS: usize>(
     lane: u32,
     warp: u32,
 ) -> f32 {
-    block_reduce_f32!(storage, WARPS as u32, local, lane, warp, warp_max_f32, 0.0)
+    block_max_shared_f32_for_warps(storage, WARPS as u32, local, lane, warp, 0.0)
+}
+
+#[allow(unused_unsafe)]
+#[inline(always)]
+pub(crate) fn block_max_shared_f32_for_warps<const WARPS: usize>(
+    storage: &mut SharedArray<f32, WARPS>,
+    active_warps: u32,
+    local: f32,
+    lane: u32,
+    warp: u32,
+    identity: f32,
+) -> f32 {
+    block_reduce_f32!(
+        storage,
+        active_warps,
+        local,
+        lane,
+        warp,
+        warp_max_f32,
+        identity
+    )
 }
 
 #[allow(unused_unsafe)]
