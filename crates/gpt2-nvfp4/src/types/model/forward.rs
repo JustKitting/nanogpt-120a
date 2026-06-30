@@ -4,7 +4,7 @@ use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use super::args::Gpt2ForwardArgs;
 use super::final_logits::{FinalForwardArgs, finish_forward};
 use super::weights::Gpt2Weights;
-use crate::types::{AttentionProjectionTensors, BlockForwardArgs, HiddenStateDevice};
+use crate::types::{BlockForwardArgs, HiddenStateDevice};
 use crate::uses_full_attention;
 
 pub(super) fn forward<'a>(
@@ -22,14 +22,10 @@ pub(super) fn forward<'a>(
         mut hidden_nvfp4,
         mut attention_tc_scratch,
         mut mlp_activation_nvfp4,
-        attention_qkv_weights,
-        attention_qkv_biases,
-        attention_c_proj_weights,
-        attention_c_proj_biases,
+        attention,
         block_ln_1,
         block_ln_2,
-        mlp_up,
-        mlp_down,
+        mlp,
         ln_f,
         attention_qkv,
         attention_log_sum_exp,
@@ -58,16 +54,10 @@ pub(super) fn forward<'a>(
             hidden_nvfp4: hidden_nvfp4.reborrow(),
             attention_tc_scratch: attention_tc_scratch.reborrow(),
             mlp_activation_nvfp4: mlp_activation_nvfp4.reborrow(),
-            projections: AttentionProjectionTensors {
-                qkv_weight: attention_qkv_weights[block_index],
-                qkv_bias: attention_qkv_biases[block_index],
-                c_proj_weight: attention_c_proj_weights[block_index],
-                c_proj_bias: attention_c_proj_biases[block_index],
-            },
+            projections: attention[block_index],
             ln_1: block_ln_1[block_index],
             ln_2: block_ln_2[block_index],
-            mlp_up: mlp_up[block_index],
-            mlp_down: mlp_down[block_index],
+            mlp: mlp[block_index],
             qkv: &mut *attention_qkv,
             attention_log_sum_exp: &mut *attention_log_sum_exp,
             mlp_pre_activation: &mut *mlp_pre_activation,

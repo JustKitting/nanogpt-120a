@@ -1,7 +1,10 @@
 mod tensor;
 
 use cuda_core::CudaStream;
-use gpt2_nvfp4::{Gpt2BlockWeights, Gpt2Weights, NextLatWeights};
+use gpt2_nvfp4::{
+    AttentionProjectionTensors, Gpt2BlockWeights, Gpt2Weights, MlpDownTensors,
+    MlpProjectionTensors, MlpUpTensors, NextLatWeights,
+};
 
 use crate::AppResult;
 
@@ -70,5 +73,27 @@ impl UploadedBlock {
             mlp_up: upload_linear(stream, &block.mlp.c_fc)?,
             mlp_down: upload_linear(stream, &block.mlp.c_proj)?,
         })
+    }
+
+    pub fn attention_tensors(&self) -> AttentionProjectionTensors<'_> {
+        AttentionProjectionTensors {
+            qkv_weight: self.attn_qkv.weight.mma(),
+            qkv_bias: self.attn_qkv.bias.device(),
+            c_proj_weight: self.attn_c_proj.weight.mma(),
+            c_proj_bias: self.attn_c_proj.bias.device(),
+        }
+    }
+
+    pub fn mlp_tensors(&self) -> MlpProjectionTensors<'_> {
+        MlpProjectionTensors {
+            up: MlpUpTensors {
+                weight: self.mlp_up.weight.mma(),
+                bias: self.mlp_up.bias.device(),
+            },
+            down: MlpDownTensors {
+                weight: self.mlp_down.weight.mma(),
+                bias: self.mlp_down.bias.device(),
+            },
+        }
     }
 }

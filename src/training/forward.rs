@@ -1,6 +1,5 @@
 use gpt2_nvfp4::{
-    GPT2_VOCAB_SIZE, Gpt2ForwardArgs, HiddenStateNvfp4, MlpActivationNvfp4, MlpDownTensors,
-    MlpUpTensors, TokenEmbeddingArgs,
+    GPT2_VOCAB_SIZE, Gpt2ForwardArgs, HiddenStateNvfp4, MlpActivationNvfp4, TokenEmbeddingArgs,
 };
 
 use super::next_latent::{NextLatForwardArgs, forward as next_latent_forward};
@@ -45,28 +44,10 @@ impl Trainer {
                 scales: &mut buffers.mlp_scales,
                 global_scales: &mut buffers.mlp_globals,
             },
-            attention_qkv_weights: std::array::from_fn(|i| {
-                uploaded.blocks[i].attn_qkv.weight.mma()
-            }),
-            attention_qkv_biases: std::array::from_fn(|i| {
-                uploaded.blocks[i].attn_qkv.bias.device()
-            }),
-            attention_c_proj_weights: std::array::from_fn(|i| {
-                uploaded.blocks[i].attn_c_proj.weight.mma()
-            }),
-            attention_c_proj_biases: std::array::from_fn(|i| {
-                uploaded.blocks[i].attn_c_proj.bias.device()
-            }),
+            attention: std::array::from_fn(|i| uploaded.blocks[i].attention_tensors()),
             block_ln_1: std::array::from_fn(|i| uploaded.blocks[i].ln_1.tensors()),
             block_ln_2: std::array::from_fn(|i| uploaded.blocks[i].ln_2.tensors()),
-            mlp_up: std::array::from_fn(|i| MlpUpTensors {
-                weight: uploaded.blocks[i].mlp_up.weight.mma(),
-                bias: uploaded.blocks[i].mlp_up.bias.device(),
-            }),
-            mlp_down: std::array::from_fn(|i| MlpDownTensors {
-                weight: uploaded.blocks[i].mlp_down.weight.mma(),
-                bias: uploaded.blocks[i].mlp_down.bias.device(),
-            }),
+            mlp: std::array::from_fn(|i| uploaded.blocks[i].mlp_tensors()),
             ln_f: uploaded.ln_f.tensors(),
             attention_qkv: &mut buffers.qkv,
             attention_log_sum_exp: &mut buffers.log_sum_exp,

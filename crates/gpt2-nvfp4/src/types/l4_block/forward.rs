@@ -5,7 +5,7 @@ use super::args::BlockForwardArgs;
 use super::weights::Gpt2BlockWeights;
 use crate::types::{
     AttentionForwardTape, AttentionWeights, HiddenStateDevice, LayerNormForwardArgs, LayerNormTape,
-    LayerNormWeights, MlpProjectionTensors, MlpScratch, MlpWeights,
+    LayerNormWeights, MlpScratch, MlpWeights,
 };
 
 impl Gpt2BlockWeights {
@@ -68,10 +68,7 @@ impl Gpt2BlockWeights {
                 pre_activation: &mut *mlp_pre_activation,
                 activation: &mut *mlp_activation,
             },
-            MlpProjectionTensors {
-                up: args.mlp_up,
-                down: args.mlp_down,
-            },
+            args.mlp,
             hidden,
             mlp_tape,
         ))?;

@@ -4,14 +4,12 @@ use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::lm_head::LmHeadModule;
 use rust_kernels_cuda::mlp::MlpModule;
-use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use crate::GPT2_N_LAYER;
 use crate::types::{
-    Gpt2ForwardTape, HiddenStateNvfp4, LayerNormTensors, MlpActivationNvfp4, MlpDownTensors,
-    MlpUpTensors, TokenEmbeddingArgs,
+    AttentionProjectionTensors, Gpt2ForwardTape, HiddenStateNvfp4, LayerNormTensors,
+    MlpActivationNvfp4, MlpProjectionTensors, TokenEmbeddingArgs,
 };
 
 pub struct Gpt2ForwardArgs<'a> {
@@ -25,14 +23,10 @@ pub struct Gpt2ForwardArgs<'a> {
     pub hidden_nvfp4: HiddenStateNvfp4<'a>,
     pub attention_tc_scratch: CausalAttentionTcScratch<'a>,
     pub mlp_activation_nvfp4: MlpActivationNvfp4<'a>,
-    pub attention_qkv_weights: [Nvfp4FourSixMmaWeightTensor<'a>; GPT2_N_LAYER],
-    pub attention_qkv_biases: [Nvfp4DeviceTensor<'a>; GPT2_N_LAYER],
-    pub attention_c_proj_weights: [Nvfp4FourSixMmaWeightTensor<'a>; GPT2_N_LAYER],
-    pub attention_c_proj_biases: [Nvfp4DeviceTensor<'a>; GPT2_N_LAYER],
+    pub attention: [AttentionProjectionTensors<'a>; GPT2_N_LAYER],
     pub block_ln_1: [LayerNormTensors<'a>; GPT2_N_LAYER],
     pub block_ln_2: [LayerNormTensors<'a>; GPT2_N_LAYER],
-    pub mlp_up: [MlpUpTensors<'a>; GPT2_N_LAYER],
-    pub mlp_down: [MlpDownTensors<'a>; GPT2_N_LAYER],
+    pub mlp: [MlpProjectionTensors<'a>; GPT2_N_LAYER],
     pub ln_f: LayerNormTensors<'a>,
     pub attention_qkv: &'a mut DeviceBuffer<f32>,
     pub attention_log_sum_exp: &'a mut DeviceBuffer<f32>,

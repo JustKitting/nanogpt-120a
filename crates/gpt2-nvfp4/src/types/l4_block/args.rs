@@ -7,7 +7,7 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use crate::types::{
     AttentionProjectionTensors, BlockForwardTape, HiddenStateDevice, HiddenStateNvfp4,
-    LayerNormTensors, MlpActivationNvfp4, MlpDownTensors, MlpUpTensors,
+    LayerNormTensors, MlpActivationNvfp4, MlpProjectionTensors,
 };
 
 pub struct BlockForwardArgs<'a, 'scratch> {
@@ -23,8 +23,7 @@ pub struct BlockForwardArgs<'a, 'scratch> {
     pub projections: AttentionProjectionTensors<'a>,
     pub ln_1: LayerNormTensors<'a>,
     pub ln_2: LayerNormTensors<'a>,
-    pub mlp_up: MlpUpTensors<'a>,
-    pub mlp_down: MlpDownTensors<'a>,
+    pub mlp: MlpProjectionTensors<'a>,
     pub qkv: &'scratch mut DeviceBuffer<f32>,
     pub attention_log_sum_exp: &'scratch mut DeviceBuffer<f32>,
     pub mlp_pre_activation: &'scratch mut DeviceBuffer<f32>,
