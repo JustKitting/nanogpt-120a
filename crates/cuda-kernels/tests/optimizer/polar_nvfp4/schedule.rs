@@ -77,11 +77,7 @@ pub(super) fn seed_safety_schedules() -> Vec<[f32; MAX_ITERATIONS]> {
     }
     for start in 0..MAX_ITERATIONS {
         for value in [1.03, 1.04, 1.045, 1.05, 1.06] {
-            let mut schedule = [1.0; MAX_ITERATIONS];
-            for slot in schedule.iter_mut().skip(start) {
-                *slot = value;
-            }
-            schedules.push(schedule);
+            schedules.push(late_safety_schedule(start, value));
         }
     }
     for high in [1.04, 1.045, 1.05, 1.06] {
@@ -106,16 +102,16 @@ pub(super) fn corrected_schedule_candidates(
         [1.03; MAX_ITERATIONS],
         [1.05; MAX_ITERATIONS],
     ];
-    for start in 2..=5 {
-        let mut schedule = [1.0; MAX_ITERATIONS];
-        for slot in schedule.iter_mut().skip(start) {
-            *slot = 1.03;
-        }
-        schedules.push(schedule);
-    }
+    schedules.extend((2..=5).map(|start| late_safety_schedule(start, 1.03)));
     schedules.sort_by_key(schedule_name);
     schedules.dedup();
     schedules
+}
+
+fn late_safety_schedule(start: usize, value: f32) -> [f32; MAX_ITERATIONS] {
+    let mut schedule = [1.0; MAX_ITERATIONS];
+    schedule[start..].fill(value);
+    schedule
 }
 
 pub(super) fn search_best_raw_schedule(
