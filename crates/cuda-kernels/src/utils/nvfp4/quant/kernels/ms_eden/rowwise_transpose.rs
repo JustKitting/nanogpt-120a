@@ -7,23 +7,14 @@ use super::input::{
     no_pad_pow2_chunk_position, nvfp4_rowwise_value_at_pow2, rowwise_transposed_hadamard_input,
 };
 use super::pack::{
-    ms_eden_pack_chunk, ms_eden_pack_chunk_no_chunk_amax, ms_eden_pack_chunk_no_chunk_amax_row,
-    pack_chunk,
+    guarded_pack_chunk, ms_eden_pack_chunk, ms_eden_pack_chunk_no_chunk_amax,
+    ms_eden_pack_chunk_no_chunk_amax_row, pack_chunk,
 };
 use super::random::random_sign;
 
 #[cuda_module]
 pub(crate) mod module {
     use super::*;
-
-    macro_rules! guarded_pack_chunk {
-        ($chunk:ident, $chunk_count:ident) => {
-            let $chunk = pack_chunk();
-            if $chunk >= $chunk_count {
-                return;
-            }
-        };
-    }
 
     #[kernel]
     #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]

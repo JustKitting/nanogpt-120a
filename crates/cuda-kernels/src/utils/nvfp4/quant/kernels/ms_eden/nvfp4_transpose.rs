@@ -2,20 +2,13 @@ use cuda_device::{DisjointSlice, cuda_module, kernel, warp};
 
 use super::HADAMARD_DIM;
 use super::input::nvfp4_transposed_hadamard_input;
-use super::pack::{ms_eden_pack_chunk, ms_eden_pack_chunk_no_chunk_amax, pack_chunk};
+use super::pack::{
+    guarded_pack_chunk, ms_eden_pack_chunk, ms_eden_pack_chunk_no_chunk_amax, pack_chunk,
+};
 
 #[cuda_module]
 pub(crate) mod module {
     use super::*;
-
-    macro_rules! guarded_pack_chunk {
-        ($chunk:ident, $chunk_count:ident) => {
-            let $chunk = pack_chunk();
-            if $chunk >= $chunk_count {
-                return;
-            }
-        };
-    }
 
     #[kernel]
     #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]

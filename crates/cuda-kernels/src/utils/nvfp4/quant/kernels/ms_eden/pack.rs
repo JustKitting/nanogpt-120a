@@ -11,6 +11,17 @@ use super::super::convert::{
 use super::random::random_unit_f32;
 use super::{AMAX_WARPS_PER_BLOCK, FP4_MAX, GROUP_SIZE, HADAMARD_DIM, INV_SQRT_32};
 
+macro_rules! guarded_pack_chunk {
+    ($chunk:ident, $chunk_count:ident) => {
+        let $chunk = $crate::nvfp4_quant::kernels::ms_eden::pack::pack_chunk();
+        if $chunk >= $chunk_count {
+            return;
+        }
+    };
+}
+
+pub(super) use guarded_pack_chunk;
+
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 pub(super) fn ms_eden_pack_chunk(

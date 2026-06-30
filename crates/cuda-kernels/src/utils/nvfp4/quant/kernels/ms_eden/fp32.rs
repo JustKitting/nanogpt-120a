@@ -1,20 +1,11 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::body::{fp32_to_nvfp4_ms_eden_body, fp32_to_nvfp4_ms_eden_body_no_chunk_amax};
-use super::pack::pack_chunk;
+use super::pack::{guarded_pack_chunk, pack_chunk};
 
 #[cuda_module]
 pub(crate) mod module {
     use super::*;
-
-    macro_rules! guarded_pack_chunk {
-        ($chunk:ident, $chunk_count:ident) => {
-            let $chunk = pack_chunk();
-            if $chunk >= $chunk_count {
-                return;
-            }
-        };
-    }
 
     #[kernel]
     #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
