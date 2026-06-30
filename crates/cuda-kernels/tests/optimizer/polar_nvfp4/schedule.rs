@@ -314,37 +314,33 @@ pub(super) fn production_shape_modes() -> [(&'static str, device::GramCorrection
         ),
         (
             "prefix2_stale_reject3_tuned",
-            device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
-                exact_steps: 2,
-                period: 3,
-                coefficient_safety: tuned_schedule,
-            },
+            stale_reject_schedule_mode(2, 3, tuned_schedule),
         ),
         (
             "prefix3_stale_reject2_tuned",
-            device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
-                exact_steps: 3,
-                period: 2,
-                coefficient_safety: tuned_schedule,
-            },
+            stale_reject_schedule_mode(3, 2, tuned_schedule),
         ),
         (
             "prefix3_stale_reject3_tuned",
-            device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
-                exact_steps: 3,
-                period: 3,
-                coefficient_safety: tuned_schedule,
-            },
+            stale_reject_schedule_mode(3, 3, tuned_schedule),
         ),
         (
             "prefix3_stale_reject5_tuned",
-            device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
-                exact_steps: 3,
-                period: 5,
-                coefficient_safety: tuned_schedule,
-            },
+            stale_reject_schedule_mode(3, 5, tuned_schedule),
         ),
     ]
+}
+
+const fn stale_reject_schedule_mode(
+    exact_steps: usize,
+    period: usize,
+    coefficient_safety: [f32; MAX_ITERATIONS],
+) -> device::GramCorrectionMode {
+    device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+        exact_steps,
+        period,
+        coefficient_safety,
+    }
 }
 
 pub(super) fn schedule_name(schedule: &[f32; MAX_ITERATIONS]) -> String {
