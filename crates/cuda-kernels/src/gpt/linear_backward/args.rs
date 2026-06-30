@@ -8,8 +8,7 @@ use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 pub use ms_eden::{
     LinearBackwardInputTranspose, LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratch,
-    LinearBackwardMsEdenScratchBuffers, LinearBackwardWeightTranspose, MsEdenOperandScratch,
-    MsEdenOperandScratchBuffer,
+    LinearBackwardWeightTranspose, MsEdenOperandScratch, MsEdenOperandScratchBuffer,
 };
 
 pub struct LinearBackwardArgs<'a, 'out> {

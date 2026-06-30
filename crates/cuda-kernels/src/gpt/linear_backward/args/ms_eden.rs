@@ -37,38 +37,6 @@ pub struct LinearBackwardMsEdenScratch<'a> {
     pub input_t_h: MsEdenOperandScratch<'a>,
 }
 
-pub struct LinearBackwardMsEdenScratchBuffers {
-    pub e_h: MsEdenOperandScratchBuffer,
-    pub weight_t_h: MsEdenOperandScratchBuffer,
-    pub e_t_h: MsEdenOperandScratchBuffer,
-    pub input_t_h: MsEdenOperandScratchBuffer,
-}
-
-impl LinearBackwardMsEdenScratchBuffers {
-    pub fn new(
-        stream: &CudaStream,
-        token_count: usize,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> Result<Self, DriverError> {
-        Ok(Self {
-            e_h: MsEdenOperandScratchBuffer::new(stream, token_count * output_dim, token_count)?,
-            weight_t_h: MsEdenOperandScratchBuffer::new(stream, input_dim * output_dim, input_dim)?,
-            e_t_h: MsEdenOperandScratchBuffer::new(stream, output_dim * token_count, output_dim)?,
-            input_t_h: MsEdenOperandScratchBuffer::new(stream, input_dim * token_count, input_dim)?,
-        })
-    }
-
-    pub fn as_args(&mut self) -> LinearBackwardMsEdenScratch<'_> {
-        LinearBackwardMsEdenScratch {
-            e_h: self.e_h.as_arg(),
-            weight_t_h: self.weight_t_h.as_arg(),
-            e_t_h: self.e_t_h.as_arg(),
-            input_t_h: self.input_t_h.as_arg(),
-        }
-    }
-}
-
 pub struct MsEdenOperandScratchBuffer {
     pub bytes: DeviceBuffer<u8>,
     pub scales: DeviceBuffer<u8>,
