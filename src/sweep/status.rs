@@ -97,7 +97,7 @@ fn timestamp() -> String {
     format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
         now.year(),
-        now.month() as u8,
+        u8::from(now.month()),
         now.day(),
         now.hour(),
         now.minute(),

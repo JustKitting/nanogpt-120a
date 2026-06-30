@@ -1,11 +1,10 @@
 use std::{fs, path::PathBuf};
 
-use time::OffsetDateTime;
-
 use super::{
     analysis, baseline::Baseline, chain, config::SweepConfig, history::History, optimizer,
     proposal_log,
 };
+use crate::time_utils;
 
 mod execute;
 mod trial_record;
@@ -114,18 +113,5 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn default_sweep_dir() -> PathBuf {
-    PathBuf::from("target/sweeps").join(utc_stamp())
-}
-
-fn utc_stamp() -> String {
-    let now = OffsetDateTime::now_utc();
-    format!(
-        "{:04}{:02}{:02}_{:02}{:02}{:02}Z",
-        now.year(),
-        now.month() as u8,
-        now.day(),
-        now.hour(),
-        now.minute(),
-        now.second()
-    )
+    PathBuf::from("target/sweeps").join(time_utils::utc_compact_stamp())
 }
