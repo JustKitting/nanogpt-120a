@@ -2,10 +2,15 @@ use std::{
     fs::File,
     io::{BufRead, BufReader, Write},
     path::Path,
-    process::{Command, Stdio},
 };
 
 use super::{candidate::Candidate, config::SweepConfig, parse::RunResult, status};
+
+mod command;
+mod stage;
+
+use command::training_command;
+use stage::Stage;
 
 pub fn run_screen_candidate(
     candidate: &Candidate,
@@ -39,35 +44,6 @@ pub fn run_candidate(
         trial_index,
         Stage::Full,
     )
-}
-
-#[derive(Clone, Copy)]
-enum Stage {
-    Screen,
-    Full,
-}
-
-impl Stage {
-    fn event_prefix(self) -> &'static str {
-        match self {
-            Self::Screen => "screen",
-            Self::Full => "training",
-        }
-    }
-
-    fn log_name(self) -> &'static str {
-        match self {
-            Self::Screen => "screen.log",
-            Self::Full => "train.log",
-        }
-    }
-
-    fn max_seconds(self, config: &SweepConfig) -> f64 {
-        match self {
-            Self::Screen => config.screen_max_seconds,
-            Self::Full => config.max_seconds,
-        }
-    }
 }
 
 fn run_candidate_stage(
@@ -119,24 +95,4 @@ fn run_candidate_stage(
     child.wait()?;
     record_stage("exited", &result)?;
     Ok(result)
-}
-
-fn training_command(candidate: &Candidate, config: &SweepConfig, stage: Stage) -> Command {
-    let mut command = Command::new("./target/release/rust-kernels");
-    command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .env("TRAIN_DATASET", &config.dataset)
-        .env(
-            "TRAIN_MAX_SECONDS",
-            format!("{:.3}", stage.max_seconds(config)),
-        )
-        .env("TRAIN_LOG_INTERVAL", config.log_interval.to_string());
-    if let Some(device) = &config.cuda_device {
-        command.env("CUDA_DEVICE_INDEX", device);
-    }
-    for (name, value) in candidate.run_env() {
-        command.env(name, value);
-    }
-    command
 }
