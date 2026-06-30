@@ -5,23 +5,23 @@ use std::time::{Duration, Instant};
 use super::{SamplingConfig, TokenDataLoader, Trainer, debug_metrics};
 use crate::AppResult;
 use burn::data::dataloader::{DataLoader, Progress};
-use burn::module::{EmptyRecord, Module, Param};
-use burn::optim::{GradientsParams, LearningRate, MultiGradientsParams, Optimizer};
-use burn::tensor::Tensor;
-use burn::tensor::backend::Backend;
 use burn::train::logger::FileMetricLogger;
 use burn::train::{
-    EventProcessorTraining, InferenceStep, Interrupter, Learner, LearnerEvent,
-    LearningComponentsMarker, SupervisedLearningStrategy, SupervisedTraining,
-    SupervisedTrainingEventProcessor, TrainLoader, TrainOutput, TrainStep, TrainingComponents,
+    EventProcessorTraining, Interrupter, Learner, LearnerEvent, SupervisedLearningStrategy,
+    SupervisedTraining, SupervisedTrainingEventProcessor, TrainLoader, TrainingComponents,
     TrainingItem, TrainingModel, TrainingStrategy, ValidLoader,
 };
 
+mod burn_shim;
 mod data_loader;
 mod metrics;
 mod output;
 mod render;
 
+pub(super) use burn_shim::CudaLearningComponents;
+use burn_shim::{
+    BurnBackend, BurnInnerBackend, CudaBurnModel, CudaNoopOptimizer, CudaTrainInput, CudaValidInput,
+};
 use data_loader::{CudaTrainDataLoader, CudaValidDataLoader, CudaValidationInput};
 use metrics::register_cuda_metrics;
 pub(super) use metrics::{CudaTrainOutput, CudaValidOutput};
@@ -134,84 +134,6 @@ impl TrainConfig {
                 .filter(|seconds| *seconds > 0.0)
                 .unwrap_or(DEFAULT_TRAIN_MAX_SECONDS),
         }
-    }
-}
-
-type BurnInnerBackend = burn::backend::NdArray;
-type BurnBackend = burn::backend::Autodiff<BurnInnerBackend>;
-type CudaBurnModel = CudaBurnModule<BurnBackend>;
-pub(super) type CudaLearningComponents =
-    LearningComponentsMarker<BurnBackend, LearningRate, CudaBurnModel, CudaNoopOptimizer>;
-type CudaTrainInput = Result<super::data::TokenWindowBatch, String>;
-type CudaValidInput = Result<CudaValidationInput, String>;
-
-#[derive(Module, Debug)]
-pub(super) struct CudaBurnModule<B: Backend> {
-    marker: Param<Tensor<B, 1>>,
-}
-
-impl<B: Backend> CudaBurnModule<B> {
-    fn new(device: &B::Device) -> Self {
-        Self {
-            marker: Param::from_data([0.0_f32], device),
-        }
-    }
-}
-
-impl Default for CudaBurnModule<BurnBackend> {
-    fn default() -> Self {
-        Self::new(&Default::default())
-    }
-}
-
-impl TrainStep for CudaBurnModule<BurnBackend> {
-    type Input = CudaTrainInput;
-    type Output = CudaTrainOutput;
-
-    fn step(&self, _item: Self::Input) -> TrainOutput<Self::Output> {
-        panic!("CudaBurnModel::step must not be called; CudaTrainingStrategy owns training")
-    }
-}
-
-impl InferenceStep for CudaBurnModule<BurnInnerBackend> {
-    type Input = CudaValidInput;
-    type Output = CudaValidOutput;
-
-    fn step(&self, _item: Self::Input) -> Self::Output {
-        panic!("CudaBurnModel::step must not be called; CudaTrainingStrategy owns validation")
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub(super) struct CudaNoopOptimizer;
-
-impl Optimizer<CudaBurnModel, BurnBackend> for CudaNoopOptimizer {
-    type Record = EmptyRecord;
-
-    fn step(
-        &mut self,
-        _lr: LearningRate,
-        module: CudaBurnModel,
-        _grads: GradientsParams,
-    ) -> CudaBurnModel {
-        module
-    }
-
-    fn step_multi(
-        &mut self,
-        _lr: LearningRate,
-        module: CudaBurnModel,
-        _grads: MultiGradientsParams,
-    ) -> CudaBurnModel {
-        module
-    }
-
-    fn to_record(&self) -> Self::Record {
-        EmptyRecord::new()
-    }
-
-    fn load_record(self, _record: Self::Record) -> Self {
-        self
     }
 }
 
