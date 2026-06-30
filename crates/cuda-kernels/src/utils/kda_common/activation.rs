@@ -1,0 +1,77 @@
+use crate::attention::CausalAttentionParams;
+use crate::float_ptx::{exp_f32, ln_f32};
+
+use super::shape::KDA_DENOM_EPS;
+
+const KDA_DECAY_EXP_LIMIT: f32 = 3.0;
+
+#[inline(always)]
+pub(crate) fn silu(x: f32) -> f32 {
+    x * sigmoid(x)
+}
+
+#[inline(always)]
+pub(crate) fn silu_grad(x: f32) -> f32 {
+    let s = sigmoid(x);
+    s * (1.0 + x * (1.0 - s))
+}
+
+#[inline(always)]
+pub(crate) fn sigmoid(x: f32) -> f32 {
+    1.0 / (1.0 + exp_f32(-x))
+}
+
+#[inline(always)]
+pub(crate) fn safe_denom(x: f32) -> f32 {
+    if x >= 0.0 {
+        x + KDA_DENOM_EPS
+    } else {
+        x - KDA_DENOM_EPS
+    }
+}
+
+#[inline(always)]
+pub(crate) fn softplus(x: f32) -> f32 {
+    if x > 20.0 {
+        x
+    } else {
+        ln_f32(1.0 + exp_f32(x))
+    }
+}
+
+#[inline(always)]
+pub(crate) fn kda_decay_exp(x: f32) -> f32 {
+    let x = if x < -KDA_DECAY_EXP_LIMIT {
+        -KDA_DECAY_EXP_LIMIT
+    } else if x > KDA_DECAY_EXP_LIMIT {
+        KDA_DECAY_EXP_LIMIT
+    } else {
+        x
+    };
+    exp_f32(x)
+}
+
+#[inline(always)]
+pub(crate) fn q_offset(_params: &CausalAttentionParams) -> u32 {
+    0
+}
+
+#[inline(always)]
+pub(crate) fn k_offset(params: &CausalAttentionParams) -> u32 {
+    params.embedding_dim
+}
+
+#[inline(always)]
+pub(crate) fn v_offset(params: &CausalAttentionParams) -> u32 {
+    params.embedding_dim * 2
+}
+
+#[inline(always)]
+pub(crate) fn g_offset(params: &CausalAttentionParams) -> u32 {
+    params.embedding_dim * 3
+}
+
+#[inline(always)]
+pub(crate) fn beta_offset(params: &CausalAttentionParams) -> u32 {
+    params.embedding_dim * 4
+}
