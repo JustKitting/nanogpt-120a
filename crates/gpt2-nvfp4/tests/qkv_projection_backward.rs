@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::path::PathBuf;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use gpt2_nvfp4::{
@@ -12,10 +11,13 @@ use rust_kernels_cuda::nvfp4::{Nvfp4DecodeModule, Nvfp4DeviceTensor};
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
+mod common;
 #[path = "qkv_projection_backward/data.rs"]
 mod data;
 #[path = "qkv_projection_backward/scratch.rs"]
 mod scratch;
+
+use common::{gpu_device_index, ptx_path};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -106,18 +108,4 @@ fn nvfp4_device<'a>(
 fn assert_nonzero_finite(values: &[f32]) {
     assert!(values.iter().all(|value| value.is_finite()));
     assert!(values.iter().any(|value| value.abs() > 0.0));
-}
-
-fn gpu_device_index() -> usize {
-    std::env::var("CUDA_DEVICE_INDEX")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
-}
-
-fn ptx_path() -> String {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../rust_kernels_cuda.ptx")
-        .to_string_lossy()
-        .into_owned()
 }

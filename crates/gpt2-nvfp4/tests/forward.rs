@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::path::PathBuf;
 
 use cuda_core::{CudaContext, CudaStream, DeviceBuffer};
 use gpt2_nvfp4::{
@@ -17,6 +16,10 @@ use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
+
+mod common;
+
+use common::{gpu_device_index, ptx_path};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -247,18 +250,4 @@ fn upload_nvfp4<S: Nvfp4Shape>(
         scales: DeviceBuffer::from_host(stream, tensor.scales.as_ref())?,
         global_scale: DeviceBuffer::from_host(stream, &[tensor.global_scale])?,
     })
-}
-
-fn gpu_device_index() -> usize {
-    std::env::var("CUDA_DEVICE_INDEX")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
-}
-
-fn ptx_path() -> String {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../rust_kernels_cuda.ptx")
-        .to_string_lossy()
-        .into_owned()
 }

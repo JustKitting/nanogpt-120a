@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::path::PathBuf;
 
 use cuda_core::CudaContext;
 use gpt2_nvfp4::{
@@ -19,10 +18,13 @@ use rust_kernels_cuda::transpose::TransposeModule;
 mod attention_core_scratch;
 #[path = "block_attention_backward/buffers/mod.rs"]
 mod buffers;
+mod common;
 #[path = "block_attention_backward/data.rs"]
 mod data;
 #[path = "block_attention_backward/scratch.rs"]
 mod scratch;
+
+use common::{gpu_device_index, ptx_path};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -70,18 +72,4 @@ fn block_attention_side_backward_runs_full_chain() -> Result<(), Box<dyn Error>>
 fn assert_nonzero_finite(values: &[f32]) {
     assert!(values.iter().all(|value| value.is_finite()));
     assert!(values.iter().any(|value| value.abs() > 0.0));
-}
-
-fn gpu_device_index() -> usize {
-    std::env::var("CUDA_DEVICE_INDEX")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
-}
-
-fn ptx_path() -> String {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../rust_kernels_cuda.ptx")
-        .to_string_lossy()
-        .into_owned()
 }

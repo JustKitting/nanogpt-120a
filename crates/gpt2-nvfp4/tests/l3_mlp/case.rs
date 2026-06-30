@@ -10,8 +10,8 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 use crate::assertions::{assert_down_projection_residual_add, assert_relu2_samples};
 use crate::buffers::ScratchBuffers;
+use crate::common::{gpu_device_index, ptx_path};
 use crate::data::{normalized_input, residual_input};
-use crate::runtime::{gpu_device_index, ptx_path};
 use crate::weights::WeightBuffers;
 
 pub fn run() -> Result<(), Box<dyn Error>> {

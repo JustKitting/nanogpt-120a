@@ -1,10 +1,16 @@
 use std::error::Error;
-use std::path::PathBuf;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use gpt2_nvfp4::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, HiddenState, Nvfp4Shape, TokenEmbeddingShape};
 use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
+
+mod common;
+#[path = "common/nvfp4.rs"]
+mod nvfp4_common;
+
+use common::{gpu_device_index, ptx_path};
+use nvfp4_common::set_e2m1_one;
 
 const E4M3_ONE: u8 = 0x38;
 const TOLERANCE: f32 = 1.0e-7;
@@ -64,33 +70,10 @@ fn embedding_forward_decodes_token_embeddings_to_residual_only() -> Result<(), B
     Ok(())
 }
 
-fn set_e2m1_one(bytes: &mut [u8], element: usize) {
-    let byte = &mut bytes[element / 2];
-    if element & 1 == 0 {
-        *byte = (*byte & 0xf0) | 0x2;
-    } else {
-        *byte = (*byte & 0x0f) | 0x20;
-    }
-}
-
 fn assert_value(actual: f32, expected: f32) {
     let error = (actual - expected).abs();
     assert!(
         error <= TOLERANCE,
         "actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
     );
-}
-
-fn gpu_device_index() -> usize {
-    std::env::var("CUDA_DEVICE_INDEX")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
-}
-
-fn ptx_path() -> String {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../rust_kernels_cuda.ptx")
-        .to_string_lossy()
-        .into_owned()
 }

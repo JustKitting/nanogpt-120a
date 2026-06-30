@@ -3,6 +3,8 @@ use gpt2_nvfp4::{
     Nvfp4Shape,
 };
 
+use crate::nvfp4_common::set_e2m1_one;
+
 pub fn normalized_input() -> Vec<f32> {
     let mut normalized = vec![0.0_f32; HiddenState::LEN];
     for row in 0..GPT2_CONTEXT_LEN {
@@ -38,13 +40,4 @@ pub fn mlp_down_identity_weight_bytes() -> Vec<u8> {
         set_e2m1_one(&mut bytes, col * GPT2_MLP + col);
     }
     bytes
-}
-
-fn set_e2m1_one(bytes: &mut [u8], element: usize) {
-    let byte = &mut bytes[element / 2];
-    if element & 1 == 0 {
-        *byte = (*byte & 0xf0) | 0x2;
-    } else {
-        *byte = (*byte & 0x0f) | 0x20;
-    }
 }

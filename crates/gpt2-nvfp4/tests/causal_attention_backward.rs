@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::path::PathBuf;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use gpt2_nvfp4::{
@@ -12,8 +11,11 @@ use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 
 #[path = "support/attention_core_scratch.rs"]
 mod attention_core_scratch;
+mod common;
 #[path = "attention_core_backward/data.rs"]
 mod data;
+
+use common::{gpu_device_index, ptx_path};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -95,18 +97,4 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
     );
 
     Ok(())
-}
-
-fn gpu_device_index() -> usize {
-    std::env::var("CUDA_DEVICE_INDEX")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
-}
-
-fn ptx_path() -> String {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../rust_kernels_cuda.ptx")
-        .to_string_lossy()
-        .into_owned()
 }

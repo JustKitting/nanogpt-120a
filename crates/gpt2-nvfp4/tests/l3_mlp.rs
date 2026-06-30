@@ -4,10 +4,11 @@ mod assertions;
 mod buffers;
 #[path = "l3_mlp/case.rs"]
 mod case;
+mod common;
 #[path = "l3_mlp/data.rs"]
 mod data;
-#[path = "l3_mlp/runtime.rs"]
-mod runtime;
+#[path = "common/nvfp4.rs"]
+mod nvfp4_common;
 #[path = "l3_mlp/weights.rs"]
 mod weights;
 

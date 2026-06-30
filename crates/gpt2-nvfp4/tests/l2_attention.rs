@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::path::PathBuf;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use gpt2_nvfp4::{
@@ -13,6 +12,13 @@ use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
+
+mod common;
+#[path = "common/nvfp4.rs"]
+mod nvfp4_common;
+
+use common::{gpu_device_index, ptx_path};
+use nvfp4_common::set_e2m1_one;
 
 const E4M3_ONE: u8 = 0x38;
 const HEAD_DIM: usize = GPT2_N_EMBD / GPT2_N_HEAD;
@@ -176,15 +182,6 @@ fn c_proj_identity_weight_bytes() -> Vec<u8> {
         set_e2m1_one(&mut bytes, col * GPT2_N_EMBD + col);
     }
     bytes
-}
-
-fn set_e2m1_one(bytes: &mut [u8], element: usize) {
-    let byte = &mut bytes[element / 2];
-    if element & 1 == 0 {
-        *byte = (*byte & 0xf0) | 0x2;
-    } else {
-        *byte = (*byte & 0x0f) | 0x20;
-    }
 }
 
 fn assert_qkv_nonzero(qkv: &[f32]) {
@@ -355,18 +352,4 @@ fn assert_c_proj_residual_add(
             "index={index} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
         );
     }
-}
-
-fn gpu_device_index() -> usize {
-    std::env::var("CUDA_DEVICE_INDEX")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
-}
-
-fn ptx_path() -> String {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../rust_kernels_cuda.ptx")
-        .to_string_lossy()
-        .into_owned()
 }
