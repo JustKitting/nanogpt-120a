@@ -1,4 +1,4 @@
-use super::{AdamSnapshot, PendingTensorUpdateDiagnostics, changed_bytes};
+use super::snapshot::{AdamSnapshot, PendingTensorUpdateDiagnostics, changed_bytes};
 use crate::training::diagnostics::TensorUpdateDiagnostics;
 
 pub(super) fn tensor_update_stats(
