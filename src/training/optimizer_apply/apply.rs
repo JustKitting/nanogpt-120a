@@ -75,8 +75,8 @@ pub fn apply_weight_updates(
     debug_assert_eq!(step, candidate_step);
     let average_coefficient = state.schedule_free_average_coefficient(step);
 
-    let diagnostics = if super::super::diagnostics::enabled() {
-        Some(
+    let diagnostics = super::super::diagnostics::enabled()
+        .then(|| {
             super::super::diagnostics::PendingTrainingDiagnostics::collect(
                 stream,
                 uploaded,
@@ -84,11 +84,9 @@ pub fn apply_weight_updates(
                 state,
                 step,
                 average_coefficient,
-            )?,
-        )
-    } else {
-        None
-    };
+            )
+        })
+        .transpose()?;
 
     let base_trace = update_base_adam(BaseAdamUpdateArgs {
         stream,
