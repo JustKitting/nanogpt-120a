@@ -7,93 +7,55 @@ use super::super::super::next_latent::NextLatGradBuffers;
 use super::super::super::optimizer_state::{AuroraState, OptimizerStateBuffers};
 use super::HostPtrs;
 
-pub(super) fn qkv(
-    uploaded: &UploadedModel,
-    grads: &BackwardBuffers,
-    state: &OptimizerStateBuffers,
-    i: usize,
-) -> HostPtrs {
-    linear(
-        &uploaded.blocks[i].attn_qkv.weight,
-        &grads.blocks[i].d_attn_qkv_weight,
-        &state.blocks[i].attn_qkv.weight_aurora,
-    )
+macro_rules! block_linear_ptrs {
+    ($name:ident, $linear:ident, $grad:ident) => {
+        pub(super) fn $name(
+            uploaded: &UploadedModel,
+            grads: &BackwardBuffers,
+            state: &OptimizerStateBuffers,
+            i: usize,
+        ) -> HostPtrs {
+            linear(
+                &uploaded.blocks[i].$linear.weight,
+                &grads.blocks[i].$grad,
+                &state.blocks[i].$linear.weight_aurora,
+            )
+        }
+    };
 }
 
-pub(super) fn c_proj(
-    uploaded: &UploadedModel,
-    grads: &BackwardBuffers,
-    state: &OptimizerStateBuffers,
-    i: usize,
-) -> HostPtrs {
-    linear(
-        &uploaded.blocks[i].attn_c_proj.weight,
-        &grads.blocks[i].d_attn_c_proj_weight,
-        &state.blocks[i].attn_c_proj.weight_aurora,
-    )
+macro_rules! next_latent_linear_ptrs {
+    ($name:ident, $linear:ident, $grad:ident) => {
+        pub(super) fn $name(
+            uploaded: &UploadedModel,
+            grads: &NextLatGradBuffers,
+            state: &OptimizerStateBuffers,
+        ) -> HostPtrs {
+            linear(
+                &uploaded.next_latent.$linear.weight,
+                &grads.$grad,
+                &state.next_latent.$linear.weight_aurora,
+            )
+        }
+    };
 }
 
-pub(super) fn mlp_up(
-    uploaded: &UploadedModel,
-    grads: &BackwardBuffers,
-    state: &OptimizerStateBuffers,
-    i: usize,
-) -> HostPtrs {
-    linear(
-        &uploaded.blocks[i].mlp_up.weight,
-        &grads.blocks[i].d_mlp_c_fc_weight,
-        &state.blocks[i].mlp_up.weight_aurora,
-    )
-}
+block_linear_ptrs!(qkv, attn_qkv, d_attn_qkv_weight);
+block_linear_ptrs!(c_proj, attn_c_proj, d_attn_c_proj_weight);
+block_linear_ptrs!(mlp_up, mlp_up, d_mlp_c_fc_weight);
+block_linear_ptrs!(mlp_down, mlp_down, d_mlp_c_proj_weight);
 
-pub(super) fn mlp_down(
-    uploaded: &UploadedModel,
-    grads: &BackwardBuffers,
-    state: &OptimizerStateBuffers,
-    i: usize,
-) -> HostPtrs {
-    linear(
-        &uploaded.blocks[i].mlp_down.weight,
-        &grads.blocks[i].d_mlp_c_proj_weight,
-        &state.blocks[i].mlp_down.weight_aurora,
-    )
-}
-
-pub(super) fn next_latent_input_projection(
-    uploaded: &UploadedModel,
-    grads: &NextLatGradBuffers,
-    state: &OptimizerStateBuffers,
-) -> HostPtrs {
-    linear(
-        &uploaded.next_latent.input_projection.weight,
-        &grads.d_input_projection_weight,
-        &state.next_latent.input_projection.weight_aurora,
-    )
-}
-
-pub(super) fn next_latent_transition(
-    uploaded: &UploadedModel,
-    grads: &NextLatGradBuffers,
-    state: &OptimizerStateBuffers,
-) -> HostPtrs {
-    linear(
-        &uploaded.next_latent.transition.weight,
-        &grads.d_transition_weight,
-        &state.next_latent.transition.weight_aurora,
-    )
-}
-
-pub(super) fn next_latent_output_projection(
-    uploaded: &UploadedModel,
-    grads: &NextLatGradBuffers,
-    state: &OptimizerStateBuffers,
-) -> HostPtrs {
-    linear(
-        &uploaded.next_latent.output_projection.weight,
-        &grads.d_output_projection_weight,
-        &state.next_latent.output_projection.weight_aurora,
-    )
-}
+next_latent_linear_ptrs!(
+    next_latent_input_projection,
+    input_projection,
+    d_input_projection_weight
+);
+next_latent_linear_ptrs!(next_latent_transition, transition, d_transition_weight);
+next_latent_linear_ptrs!(
+    next_latent_output_projection,
+    output_projection,
+    d_output_projection_weight
+);
 
 fn linear(weight: &UploadedNvfp4, grad: &DeviceBuffer<f32>, state: &AuroraState) -> HostPtrs {
     HostPtrs {
