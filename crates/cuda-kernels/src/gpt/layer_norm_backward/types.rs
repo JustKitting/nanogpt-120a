@@ -1,59 +1,17 @@
+mod args;
+
 use std::sync::Arc;
 
-use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError};
+use cuda_core::{CudaModule, DriverError};
 
 use super::kernel::{THREADS_PER_BLOCK, kernels};
 use super::param::{PARAM_THREADS_PER_BLOCK, kernels as param_kernels};
 use crate::launch::grid_x_config;
-use crate::nvfp4::Nvfp4DeviceTensor;
 
-pub struct LayerNormBackwardInputArgs<'a, 'out> {
-    pub stream: &'a CudaStream,
-    pub residual: &'a DeviceBuffer<u16>,
-    pub d_normalized: &'a DeviceBuffer<f32>,
-    pub mean: &'a DeviceBuffer<f32>,
-    pub inv_std: &'a DeviceBuffer<f32>,
-    pub weight: Nvfp4DeviceTensor<'a>,
-    pub d_residual: &'out mut DeviceBuffer<f32>,
-    pub row_count: u32,
-    pub embedding_dim: u32,
-}
-
-pub struct LayerNormBackwardInputF32Args<'a, 'out> {
-    pub stream: &'a CudaStream,
-    pub residual: &'a DeviceBuffer<f32>,
-    pub d_normalized: &'a DeviceBuffer<f32>,
-    pub mean: &'a DeviceBuffer<f32>,
-    pub inv_std: &'a DeviceBuffer<f32>,
-    pub weight: Nvfp4DeviceTensor<'a>,
-    pub d_residual: &'out mut DeviceBuffer<f32>,
-    pub row_count: u32,
-    pub embedding_dim: u32,
-}
-
-pub struct LayerNormBackwardParamArgs<'a, 'out> {
-    pub stream: &'a CudaStream,
-    pub residual: &'a DeviceBuffer<u16>,
-    pub d_normalized: &'a DeviceBuffer<f32>,
-    pub mean: &'a DeviceBuffer<f32>,
-    pub inv_std: &'a DeviceBuffer<f32>,
-    pub d_weight: &'out mut DeviceBuffer<f32>,
-    pub d_bias: &'out mut DeviceBuffer<f32>,
-    pub row_count: u32,
-    pub embedding_dim: u32,
-}
-
-pub struct LayerNormBackwardParamF32Args<'a, 'out> {
-    pub stream: &'a CudaStream,
-    pub residual: &'a DeviceBuffer<f32>,
-    pub d_normalized: &'a DeviceBuffer<f32>,
-    pub mean: &'a DeviceBuffer<f32>,
-    pub inv_std: &'a DeviceBuffer<f32>,
-    pub d_weight: &'out mut DeviceBuffer<f32>,
-    pub d_bias: &'out mut DeviceBuffer<f32>,
-    pub row_count: u32,
-    pub embedding_dim: u32,
-}
+pub use args::{
+    LayerNormBackwardInputArgs, LayerNormBackwardInputF32Args, LayerNormBackwardParamArgs,
+    LayerNormBackwardParamF32Args,
+};
 
 pub struct LayerNormBackwardModule {
     module: kernels::LoadedModule,
