@@ -16,6 +16,14 @@ pub(crate) mod fp32_pair;
 pub(crate) mod fp32_transpose;
 #[path = "ms_eden/input.rs"]
 mod input;
+#[path = "ms_eden/input/no_pad.rs"]
+mod input_no_pad;
+#[path = "ms_eden/input/padded.rs"]
+mod input_padded;
+#[path = "ms_eden/input/position.rs"]
+mod input_position;
+#[path = "ms_eden/input/values.rs"]
+mod input_values;
 #[path = "ms_eden/nvfp4_transpose.rs"]
 pub(crate) mod nvfp4_transpose;
 #[path = "ms_eden/pack.rs"]
