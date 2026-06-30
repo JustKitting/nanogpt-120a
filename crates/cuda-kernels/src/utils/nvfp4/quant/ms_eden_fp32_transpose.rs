@@ -10,7 +10,7 @@ impl Nvfp4QuantModule {
         args: MsEdenTransposeDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
-        self.ms_eden
+        self.ms_eden_fp32_transpose
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_kernel(
                 args.stream,
                 pack.config(),
@@ -37,7 +37,7 @@ impl Nvfp4QuantModule {
         let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
         if pack.is_exact() {
             return self
-                .ms_eden
+                .ms_eden_fp32_transpose
                 .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
                     args.stream,
                     pack.config(),
@@ -55,7 +55,7 @@ impl Nvfp4QuantModule {
                 );
         }
 
-        self.ms_eden
+        self.ms_eden_fp32_transpose
             .fp32_transpose_to_nvfp4_ms_eden_device_scale_no_chunk_amax_kernel(
                 args.stream,
                 pack.config(),
