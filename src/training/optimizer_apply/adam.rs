@@ -31,6 +31,83 @@ pub(super) fn next_latent_adam_learning_rate(step: u32) -> f32 {
     ADAM_LR * super::super::learning_rate::next_latent_adam_multiplier(step)
 }
 
+pub(super) struct AdamUpdate<'a, 'scratch> {
+    stream: &'a CudaStream,
+    optimizer: &'a OptimizerModule,
+    scratch: &'scratch mut OptimizerScratch,
+    step: u32,
+    average_coefficient: f32,
+    learning_rate: f32,
+}
+
+impl<'a, 'scratch> AdamUpdate<'a, 'scratch> {
+    pub(super) fn new(
+        stream: &'a CudaStream,
+        optimizer: &'a OptimizerModule,
+        scratch: &'scratch mut OptimizerScratch,
+        step: u32,
+        average_coefficient: f32,
+    ) -> Self {
+        Self::with_learning_rate(
+            stream,
+            optimizer,
+            scratch,
+            step,
+            average_coefficient,
+            adam_learning_rate(step),
+        )
+    }
+
+    pub(super) fn with_learning_rate(
+        stream: &'a CudaStream,
+        optimizer: &'a OptimizerModule,
+        scratch: &'scratch mut OptimizerScratch,
+        step: u32,
+        average_coefficient: f32,
+        learning_rate: f32,
+    ) -> Self {
+        Self {
+            stream,
+            optimizer,
+            scratch,
+            step,
+            average_coefficient,
+            learning_rate,
+        }
+    }
+
+    pub(super) fn update(
+        &mut self,
+        tensor: &mut UploadedNvfp4,
+        grad: &DeviceBuffer<f32>,
+        state: &mut AdamState,
+    ) -> Result<(), DriverError> {
+        self.optimizer.apply_adamw_update(AdamWUpdateArgs {
+            stream: self.stream,
+            bytes: &mut tensor.bytes,
+            scales: &mut tensor.scales,
+            global_scale: &mut tensor.global_scale,
+            z_master: &mut state.z_master,
+            x_master: &mut state.x_master,
+            grad,
+            first_moment: &mut state.first,
+            second_moment: &mut state.second,
+            amax: &mut self.scratch.amax,
+            chunk_amax: &mut self.scratch.chunk_amax,
+            len: tensor.len as u32,
+            learning_rate: self.learning_rate,
+            weight_decay: ADAM_WEIGHT_DECAY,
+            beta1: ADAM_BETA1,
+            beta2: ADAM_BETA2,
+            beta1_correction: 1.0 - ADAM_BETA1.powi(self.step as i32),
+            beta2_correction: 1.0 - ADAM_BETA2.powi(self.step as i32),
+            eps: ADAM_EPS,
+            average_coefficient: self.average_coefficient,
+        })?;
+        Ok(())
+    }
+}
+
 pub(crate) fn adam_debug_config(step: u32) -> AdamDebugConfig {
     AdamDebugConfig {
         learning_rate: adam_learning_rate(step),
@@ -41,64 +118,4 @@ pub(crate) fn adam_debug_config(step: u32) -> AdamDebugConfig {
         beta2_correction: 1.0 - ADAM_BETA2.powi(step as i32),
         eps: ADAM_EPS,
     }
-}
-
-pub(super) fn update_adam_tensor(
-    stream: &CudaStream,
-    optimizer: &OptimizerModule,
-    tensor: &mut UploadedNvfp4,
-    grad: &DeviceBuffer<f32>,
-    scratch: &mut OptimizerScratch,
-    state: &mut AdamState,
-    step: u32,
-    average_coefficient: f32,
-) -> Result<(), DriverError> {
-    update_adam_tensor_with_learning_rate(
-        stream,
-        optimizer,
-        tensor,
-        grad,
-        scratch,
-        state,
-        step,
-        average_coefficient,
-        adam_learning_rate(step),
-    )
-}
-
-pub(super) fn update_adam_tensor_with_learning_rate(
-    stream: &CudaStream,
-    optimizer: &OptimizerModule,
-    tensor: &mut UploadedNvfp4,
-    grad: &DeviceBuffer<f32>,
-    scratch: &mut OptimizerScratch,
-    state: &mut AdamState,
-    step: u32,
-    average_coefficient: f32,
-    learning_rate: f32,
-) -> Result<(), DriverError> {
-    optimizer.apply_adamw_update(AdamWUpdateArgs {
-        stream,
-        bytes: &mut tensor.bytes,
-        scales: &mut tensor.scales,
-        global_scale: &mut tensor.global_scale,
-        z_master: &mut state.z_master,
-        x_master: &mut state.x_master,
-        grad,
-        first_moment: &mut state.first,
-        second_moment: &mut state.second,
-        amax: &mut scratch.amax,
-        chunk_amax: &mut scratch.chunk_amax,
-        len: tensor.len as u32,
-        learning_rate,
-        weight_decay: ADAM_WEIGHT_DECAY,
-        beta1: ADAM_BETA1,
-        beta2: ADAM_BETA2,
-        beta1_correction: 1.0 - ADAM_BETA1.powi(step as i32),
-        beta2_correction: 1.0 - ADAM_BETA2.powi(step as i32),
-        eps: ADAM_EPS,
-        average_coefficient,
-    })?;
-
-    Ok(())
 }

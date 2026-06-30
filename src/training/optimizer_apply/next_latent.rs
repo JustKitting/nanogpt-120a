@@ -6,7 +6,7 @@ use crate::training::optimizer::OptimizerScratch;
 use crate::training::optimizer_state::NextLatState;
 use crate::upload::UploadedNextLat;
 
-use super::adam::{next_latent_adam_learning_rate, update_adam_tensor_with_learning_rate};
+use super::adam::{AdamUpdate, next_latent_adam_learning_rate};
 
 pub(super) struct NextLatUpdateArgs<'a> {
     pub stream: &'a CudaStream,
@@ -20,71 +20,49 @@ pub(super) struct NextLatUpdateArgs<'a> {
 }
 
 pub(super) fn update_next_latent(args: NextLatUpdateArgs<'_>) -> Result<(), DriverError> {
-    let step = args.step;
-    let average = args.average_coefficient;
+    let NextLatUpdateArgs {
+        stream,
+        optimizer,
+        weights,
+        grads,
+        scratch,
+        state,
+        step,
+        average_coefficient,
+    } = args;
     let learning_rate = next_latent_adam_learning_rate(step);
-    update_adam_tensor_with_learning_rate(
-        args.stream,
-        args.optimizer,
-        &mut args.weights.norm.weight,
-        &args.grads.d_norm_weight,
-        args.scratch,
-        &mut args.state.norm.weight,
+    let mut adam = AdamUpdate::with_learning_rate(
+        stream,
+        optimizer,
+        scratch,
         step,
-        average,
+        average_coefficient,
         learning_rate,
-    )?;
-    update_adam_tensor_with_learning_rate(
-        args.stream,
-        args.optimizer,
-        &mut args.weights.norm.bias,
-        &args.grads.d_norm_bias,
-        args.scratch,
-        &mut args.state.norm.bias,
-        step,
-        average,
-        learning_rate,
-    )?;
-    update_linear_biases(args, step, average, learning_rate)
-}
+    );
 
-fn update_linear_biases(
-    args: NextLatUpdateArgs<'_>,
-    step: u32,
-    average: f32,
-    learning_rate: f32,
-) -> Result<(), DriverError> {
-    update_adam_tensor_with_learning_rate(
-        args.stream,
-        args.optimizer,
-        &mut args.weights.input_projection.bias,
-        &args.grads.d_input_projection_bias,
-        args.scratch,
-        &mut args.state.input_projection.bias,
-        step,
-        average,
-        learning_rate,
+    adam.update(
+        &mut weights.norm.weight,
+        &grads.d_norm_weight,
+        &mut state.norm.weight,
     )?;
-    update_adam_tensor_with_learning_rate(
-        args.stream,
-        args.optimizer,
-        &mut args.weights.transition.bias,
-        &args.grads.d_transition_bias,
-        args.scratch,
-        &mut args.state.transition.bias,
-        step,
-        average,
-        learning_rate,
+    adam.update(
+        &mut weights.norm.bias,
+        &grads.d_norm_bias,
+        &mut state.norm.bias,
     )?;
-    update_adam_tensor_with_learning_rate(
-        args.stream,
-        args.optimizer,
-        &mut args.weights.output_projection.bias,
-        &args.grads.d_output_projection_bias,
-        args.scratch,
-        &mut args.state.output_projection.bias,
-        step,
-        average,
-        learning_rate,
+    adam.update(
+        &mut weights.input_projection.bias,
+        &grads.d_input_projection_bias,
+        &mut state.input_projection.bias,
+    )?;
+    adam.update(
+        &mut weights.transition.bias,
+        &grads.d_transition_bias,
+        &mut state.transition.bias,
+    )?;
+    adam.update(
+        &mut weights.output_projection.bias,
+        &grads.d_output_projection_bias,
+        &mut state.output_projection.bias,
     )
 }

@@ -7,7 +7,7 @@ use super::super::OptimizerTrace;
 use super::super::grad_block::BlockGradBuffers;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::BlockState;
-use super::adam::update_adam_tensor;
+use super::adam::AdamUpdate;
 use super::elapsed_ms;
 use std::time::Instant;
 
@@ -23,29 +23,20 @@ pub(super) fn update_mlp_biases(
     trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
     let optimizer = &runtime.optimizer;
+    let mut adam = AdamUpdate::new(stream, optimizer, scratch, step, average_coefficient);
     let start = Instant::now();
-    update_adam_tensor(
-        stream,
-        optimizer,
+    adam.update(
         &mut block.mlp_up.bias,
         &grad.d_mlp_c_fc_bias,
-        scratch,
         &mut state.mlp_up.bias,
-        step,
-        average_coefficient,
     )?;
     trace.adam_ms += elapsed_ms(start);
 
     let start = Instant::now();
-    update_adam_tensor(
-        stream,
-        optimizer,
+    adam.update(
         &mut block.mlp_down.bias,
         &grad.d_mlp_c_proj_bias,
-        scratch,
         &mut state.mlp_down.bias,
-        step,
-        average_coefficient,
     )?;
     trace.adam_ms += elapsed_ms(start);
     Ok(())

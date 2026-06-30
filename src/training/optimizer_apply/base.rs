@@ -8,7 +8,7 @@ use crate::training::optimizer::OptimizerScratch;
 use crate::training::optimizer_state::OptimizerStateBuffers;
 use crate::upload::UploadedModel;
 
-use super::adam::update_adam_tensor;
+use super::adam::AdamUpdate;
 use super::layer_norm::update_layer_norm;
 use super::next_latent::{NextLatUpdateArgs, update_next_latent};
 use super::utils::elapsed_ms;
@@ -33,15 +33,17 @@ pub(super) struct BaseAdamTrace {
 
 pub(super) fn update_base_adam(args: BaseAdamUpdateArgs<'_>) -> Result<BaseAdamTrace, DriverError> {
     let token_start = Instant::now();
-    update_adam_tensor(
+    AdamUpdate::new(
         args.stream,
         args.optimizer,
-        &mut args.uploaded.token_embedding,
-        &args.grads.d_lm_head_weight,
         args.scratch,
-        &mut args.state.token_embedding,
         args.step,
         args.average_coefficient,
+    )
+    .update(
+        &mut args.uploaded.token_embedding,
+        &args.grads.d_lm_head_weight,
+        &mut args.state.token_embedding,
     )?;
     let token_embedding_ms = elapsed_ms(token_start);
 
