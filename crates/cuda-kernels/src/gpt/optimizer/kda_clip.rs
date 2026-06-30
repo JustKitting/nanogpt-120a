@@ -8,7 +8,6 @@ use crate::warp_reduce::thread_lane_warp;
 
 use super::threads::{MATRIX_THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(super) mod module {
     use super::*;

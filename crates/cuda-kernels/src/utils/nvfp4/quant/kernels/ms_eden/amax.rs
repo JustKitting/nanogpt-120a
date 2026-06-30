@@ -12,7 +12,6 @@ use super::input::{
 };
 use crate::nvfp4_quant::kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK;
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(crate) mod module {
     use super::*;

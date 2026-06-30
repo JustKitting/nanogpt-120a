@@ -5,7 +5,6 @@ use crate::mma::{
     nvfp4_projection_cta_kernel_body_at_aligned_row_pair,
 };
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub mod module {
     use super::*;

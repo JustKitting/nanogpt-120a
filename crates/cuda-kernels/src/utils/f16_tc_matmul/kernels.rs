@@ -14,7 +14,6 @@ use super::pad::pad_rows_body;
 
 pub const F16_THREADS_PER_BLOCK: u32 = 256;
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(super) mod module {
     use super::*;

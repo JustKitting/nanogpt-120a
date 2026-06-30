@@ -11,7 +11,6 @@ const ROW_SIZE_F32: f32 = ROW_SIZE as f32;
 
 pub use module::{LoadedModule, from_module};
 
-#[allow(static_mut_refs)]
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 mod module {

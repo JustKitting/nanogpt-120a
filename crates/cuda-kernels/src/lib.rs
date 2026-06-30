@@ -1,3 +1,5 @@
+#![allow(static_mut_refs)]
+
 #[path = "utils/amax.rs"]
 pub(crate) mod amax;
 #[path = "utils/atomic.rs"]

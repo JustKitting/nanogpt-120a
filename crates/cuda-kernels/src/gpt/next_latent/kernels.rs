@@ -9,7 +9,6 @@ const THREADS_PER_BLOCK: u32 = 256;
 const WARP_SIZE: u32 = 32;
 const WARPS_PER_BLOCK: u32 = THREADS_PER_BLOCK / WARP_SIZE;
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub mod module {
     use super::*;

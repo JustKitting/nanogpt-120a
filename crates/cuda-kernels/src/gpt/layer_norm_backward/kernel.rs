@@ -11,7 +11,6 @@ pub const THREADS_PER_BLOCK: u32 = 256;
 const WARP_SIZE: u32 = 32;
 const WARPS_PER_BLOCK: u32 = THREADS_PER_BLOCK / WARP_SIZE;
 
-#[allow(static_mut_refs)]
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 pub(super) mod kernels {

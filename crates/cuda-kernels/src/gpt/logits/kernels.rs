@@ -4,7 +4,6 @@ use super::argmax::logits_argmax_body;
 use super::args::{ARGMAX_WARPS_PER_BLOCK, LogitsArgmaxParams, LogitsTopKParams, TOPK_CANDIDATES};
 use super::top_k::logits_top_k_body;
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub mod kernels {
     use super::*;

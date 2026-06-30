@@ -10,7 +10,6 @@ use crate::mma::{
 
 use super::{LINEAR_BIAS_THREADS_PER_BLOCK, bias};
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(super) mod module {
     use super::*;

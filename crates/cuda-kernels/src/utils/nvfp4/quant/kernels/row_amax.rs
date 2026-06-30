@@ -9,7 +9,6 @@ use super::super::config::WARPS_PER_BLOCK;
 
 pub(crate) const TENSOR_AMAX_VALUES_PER_BLOCK: u32 = 1024;
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(crate) mod module {
     use super::*;

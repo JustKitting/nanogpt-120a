@@ -11,7 +11,6 @@ use super::softmax::softmax_body;
 use crate::attention::CausalAttentionParams;
 use crate::kda_tc::{with_kda_tiles, with_tc_ab_tiles};
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(super) mod module {
     use super::*;

@@ -11,7 +11,6 @@ const NEG_INFINITY: f32 = -3.4028235e38_f32;
 
 pub use module::{LoadedModule, from_module};
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub mod module {
     use super::*;

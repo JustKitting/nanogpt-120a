@@ -4,7 +4,6 @@ use crate::mma::{
     Nvfp4ProjectionParams, nvfp4_projection_cta_kernel_body, with_projection_cta_tiles,
 };
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 mod module {
     use super::*;

@@ -6,7 +6,6 @@ use crate::mma::{
     nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
 };
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(super) mod module {
     use super::*;

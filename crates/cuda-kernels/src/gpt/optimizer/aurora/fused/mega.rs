@@ -10,7 +10,6 @@ use super::super::super::threads::WARPS_PER_BLOCK;
 
 mod slot;
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(crate) mod module {
     use super::*;

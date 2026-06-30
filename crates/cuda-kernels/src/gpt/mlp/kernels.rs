@@ -10,7 +10,6 @@ use crate::mma::{
 
 pub(super) const RELU2_THREADS_PER_BLOCK: u32 = 256;
 
-#[allow(static_mut_refs)]
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 mod module {

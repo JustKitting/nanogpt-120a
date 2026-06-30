@@ -15,7 +15,6 @@ const TENSOR_AMAX_VALUES_PER_BLOCK: u32 =
     crate::nvfp4_quant::kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK;
 const SCALE_OVERRIDE: f32 = 1.0;
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 pub(super) mod module {
     use super::*;

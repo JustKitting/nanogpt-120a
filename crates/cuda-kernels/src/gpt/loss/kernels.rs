@@ -7,7 +7,6 @@ use crate::warp_reduce::{thread_lane_warp, warp_max_f32, warp_sum_f32};
 
 pub use module::{LoadedModule, from_module};
 
-#[allow(static_mut_refs)]
 #[cuda_module]
 mod module {
     use super::*;
