@@ -89,22 +89,10 @@ fn features(candidate: &Candidate) -> [f64; FEATURE_COUNT] {
         log_range(candidate.lr_scale, candidate_space::LR_SCALE_RANGE),
         log_range(candidate.adam_lr_scale, candidate_space::LR_SCALE_RANGE),
         log_range(candidate.nextlat_lr_scale, candidate_space::LR_SCALE_RANGE),
-        log_range(candidate.warmup_steps as f64, (5.0, 100.0)),
-        range(
-            candidate.start_ratio,
-            candidate_space::START_RATIO_RANGE.0,
-            candidate_space::START_RATIO_RANGE.1,
-        ),
-        range(
-            candidate.amuse_beta1,
-            candidate_space::AMUSE_BETA1_RANGE.0,
-            candidate_space::AMUSE_BETA1_RANGE.1,
-        ),
-        range(
-            candidate.amuse_rho,
-            candidate_space::AMUSE_RHO_RANGE.0,
-            candidate_space::AMUSE_RHO_RANGE.1,
-        ),
+        range_usize(candidate.warmup_steps, candidate_space::WARMUP_STEPS_RANGE),
+        range_bounds(candidate.start_ratio, candidate_space::START_RATIO_RANGE),
+        range_bounds(candidate.amuse_beta1, candidate_space::AMUSE_BETA1_RANGE),
+        range_bounds(candidate.amuse_rho, candidate_space::AMUSE_RHO_RANGE),
     ]
 }
 
@@ -117,4 +105,12 @@ fn range(value: f64, min: f64, max: f64) -> f64 {
 
 fn log_range(value: f64, bounds: (f64, f64)) -> f64 {
     range(value.ln(), bounds.0.ln(), bounds.1.ln())
+}
+
+fn range_bounds(value: f64, bounds: (f64, f64)) -> f64 {
+    range(value, bounds.0, bounds.1)
+}
+
+fn range_usize(value: usize, bounds: (usize, usize)) -> f64 {
+    range(value as f64, bounds.0 as f64, bounds.1 as f64)
 }
