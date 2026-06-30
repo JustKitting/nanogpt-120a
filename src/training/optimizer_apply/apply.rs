@@ -10,7 +10,7 @@ use super::super::{OptimizerTrace, TokenBatch};
 use super::adam::adam_learning_rate;
 use super::aurora::update_aurora_groups;
 use super::base::{BaseAdamUpdateArgs, update_base_adam};
-use super::block::update_blocks;
+use super::block::{BlockUpdateArgs, update_blocks};
 use super::embedding::add_embedding_lookup_grad;
 use super::kda_clip::apply_kda_aurora_clip;
 use super::result::WeightUpdateResult;
@@ -21,21 +21,38 @@ use crate::training::runtime::Runtime;
 use crate::upload::UploadedModel;
 use cuda_core::CudaStream;
 
-pub fn apply_weight_updates(
-    stream: &CudaStream,
-    runtime: &Runtime,
-    batch: &TokenBatch,
-    uploaded: &mut UploadedModel,
-    grads: &mut BackwardBuffers,
-    next_latent_grads: &NextLatGradBuffers,
-    observed_loss: Option<f32>,
-    scratch: &mut OptimizerScratch,
-    state: &mut OptimizerStateBuffers,
-    aurora: &mut AuroraScratchBuffers,
-    aurora_tables: &AuroraPointerTables,
-    tape: &ForwardTapeBuffers,
-    grad_clip: &mut GradientClipBuffers,
-) -> AppResult<WeightUpdateResult> {
+pub struct WeightUpdateArgs<'a> {
+    pub stream: &'a CudaStream,
+    pub runtime: &'a Runtime,
+    pub batch: &'a TokenBatch,
+    pub uploaded: &'a mut UploadedModel,
+    pub grads: &'a mut BackwardBuffers,
+    pub next_latent_grads: &'a NextLatGradBuffers,
+    pub observed_loss: Option<f32>,
+    pub scratch: &'a mut OptimizerScratch,
+    pub state: &'a mut OptimizerStateBuffers,
+    pub aurora: &'a mut AuroraScratchBuffers,
+    pub aurora_tables: &'a AuroraPointerTables,
+    pub tape: &'a ForwardTapeBuffers,
+    pub grad_clip: &'a mut GradientClipBuffers,
+}
+
+pub fn apply_weight_updates(args: WeightUpdateArgs<'_>) -> AppResult<WeightUpdateResult> {
+    let WeightUpdateArgs {
+        stream,
+        runtime,
+        batch,
+        uploaded,
+        grads,
+        next_latent_grads,
+        observed_loss,
+        scratch,
+        state,
+        aurora,
+        aurora_tables,
+        tape,
+        grad_clip,
+    } = args;
     let optimizer = &runtime.optimizer;
     let mut trace = OptimizerTrace::default();
     let candidate_step = state.next_step();
@@ -93,17 +110,17 @@ pub fn apply_weight_updates(
     trace.final_norm_ms = base_trace.final_norm_ms;
     trace.adam_ms += base_trace.adam_ms;
 
-    update_blocks(
+    update_blocks(BlockUpdateArgs {
         stream,
-        runtime,
+        optimizer,
         uploaded,
         grads,
         scratch,
         state,
         step,
         average_coefficient,
-        &mut trace,
-    )?;
+        trace: &mut trace,
+    })?;
 
     update_aurora_groups(
         stream,

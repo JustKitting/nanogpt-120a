@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
+use rust_kernels_cuda::optimizer::OptimizerModule;
 
-use crate::training::runtime::Runtime;
 use crate::upload::{UploadedBlock, UploadedModel, UploadedNvfp4};
 
 use super::super::OptimizerTrace;
@@ -12,110 +12,79 @@ use super::adam::AdamUpdate;
 use super::layer_norm::update_layer_norm_timed;
 use super::timed_ms;
 
-pub(super) fn update_blocks(
-    stream: &CudaStream,
-    runtime: &Runtime,
-    uploaded: &mut UploadedModel,
-    grads: &BackwardBuffers,
-    scratch: &mut OptimizerScratch,
-    state: &mut OptimizerStateBuffers,
-    step: u32,
-    average_coefficient: f32,
-    trace: &mut OptimizerTrace,
-) -> Result<(), DriverError> {
-    trace.blocks_ms = timed_ms(|| {
-        for ((block, grad), state) in uploaded
+pub(super) struct BlockUpdateArgs<'a> {
+    pub stream: &'a CudaStream,
+    pub optimizer: &'a OptimizerModule,
+    pub uploaded: &'a mut UploadedModel,
+    pub grads: &'a BackwardBuffers,
+    pub scratch: &'a mut OptimizerScratch,
+    pub state: &'a mut OptimizerStateBuffers,
+    pub step: u32,
+    pub average_coefficient: f32,
+    pub trace: &'a mut OptimizerTrace,
+}
+
+pub(super) fn update_blocks(args: BlockUpdateArgs<'_>) -> Result<(), DriverError> {
+    let mut adam = AdamUpdate::new(
+        args.stream,
+        args.optimizer,
+        args.scratch,
+        args.step,
+        args.average_coefficient,
+    );
+    let blocks_ms = timed_ms(|| {
+        for ((block, grad), state) in args
+            .uploaded
             .blocks
             .iter_mut()
-            .zip(grads.blocks.iter())
-            .zip(state.blocks.iter_mut())
+            .zip(args.grads.blocks.iter())
+            .zip(args.state.blocks.iter_mut())
         {
-            update_block(
-                stream,
-                runtime,
-                block,
-                grad,
-                scratch,
-                state,
-                step,
-                average_coefficient,
-                trace,
-            )?;
+            update_block(&mut adam, block, grad, state, args.trace)?;
         }
         Ok(())
     })?;
+    args.trace.blocks_ms = blocks_ms;
     Ok(())
 }
 
 pub(super) fn update_block(
-    stream: &CudaStream,
-    runtime: &Runtime,
+    adam: &mut AdamUpdate<'_, '_>,
     block: &mut UploadedBlock,
     grad: &BlockGradBuffers,
-    scratch: &mut OptimizerScratch,
     state: &mut BlockState,
-    step: u32,
-    average_coefficient: f32,
     trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
-    let optimizer = &runtime.optimizer;
-    trace.adam_ms += update_layer_norm_timed(
-        stream,
-        optimizer,
-        &mut block.ln_1,
-        &grad.ln_1,
-        scratch,
-        &mut state.ln_1,
-        step,
-        average_coefficient,
+    trace.adam_ms += update_layer_norm_timed(adam, &mut block.ln_1, &grad.ln_1, &mut state.ln_1)?;
+    update_bias_timed(
+        adam,
+        trace,
+        &mut block.attn_qkv.bias,
+        &grad.d_attn_qkv_bias,
+        &mut state.attn_qkv.bias,
     )?;
-
-    {
-        let mut adam = AdamUpdate::new(stream, optimizer, scratch, step, average_coefficient);
-        update_bias_timed(
-            &mut adam,
-            trace,
-            &mut block.attn_qkv.bias,
-            &grad.d_attn_qkv_bias,
-            &mut state.attn_qkv.bias,
-        )?;
-        update_bias_timed(
-            &mut adam,
-            trace,
-            &mut block.attn_c_proj.bias,
-            &grad.d_attn_c_proj_bias,
-            &mut state.attn_c_proj.bias,
-        )?;
-    }
-
-    trace.adam_ms += update_layer_norm_timed(
-        stream,
-        optimizer,
-        &mut block.ln_2,
-        &grad.ln_2,
-        scratch,
-        &mut state.ln_2,
-        step,
-        average_coefficient,
+    update_bias_timed(
+        adam,
+        trace,
+        &mut block.attn_c_proj.bias,
+        &grad.d_attn_c_proj_bias,
+        &mut state.attn_c_proj.bias,
     )?;
-
-    {
-        let mut adam = AdamUpdate::new(stream, optimizer, scratch, step, average_coefficient);
-        update_bias_timed(
-            &mut adam,
-            trace,
-            &mut block.mlp_up.bias,
-            &grad.d_mlp_c_fc_bias,
-            &mut state.mlp_up.bias,
-        )?;
-        update_bias_timed(
-            &mut adam,
-            trace,
-            &mut block.mlp_down.bias,
-            &grad.d_mlp_c_proj_bias,
-            &mut state.mlp_down.bias,
-        )
-    }
+    trace.adam_ms += update_layer_norm_timed(adam, &mut block.ln_2, &grad.ln_2, &mut state.ln_2)?;
+    update_bias_timed(
+        adam,
+        trace,
+        &mut block.mlp_up.bias,
+        &grad.d_mlp_c_fc_bias,
+        &mut state.mlp_up.bias,
+    )?;
+    update_bias_timed(
+        adam,
+        trace,
+        &mut block.mlp_down.bias,
+        &grad.d_mlp_c_proj_bias,
+        &mut state.mlp_down.bias,
+    )
 }
 
 fn update_bias_timed(

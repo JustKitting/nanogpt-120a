@@ -4,6 +4,7 @@ mod loss;
 mod pass;
 mod weights;
 
+use super::optimizer_apply::{WeightUpdateArgs, apply_weight_updates};
 use super::{TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
 
@@ -32,21 +33,21 @@ impl Trainer {
 
         let optimizer_start = Instant::now();
         let stream = self.runtime.stream.as_ref();
-        let updates = super::optimizer_apply::apply_weight_updates(
+        let updates = apply_weight_updates(WeightUpdateArgs {
             stream,
-            &self.runtime,
+            runtime: &self.runtime,
             batch,
-            &mut self.uploaded,
-            &mut self.buffers.backward,
-            &self.buffers.next_latent_grads,
+            uploaded: &mut self.uploaded,
+            grads: &mut self.buffers.backward,
+            next_latent_grads: &self.buffers.next_latent_grads,
             observed_loss,
-            &mut self.buffers.optimizer,
-            &mut self.buffers.optimizer_state,
-            &mut self.buffers.aurora,
-            &self.buffers.aurora_tables,
-            &self.buffers.tape,
-            &mut self.buffers.grad_clip,
-        )?;
+            scratch: &mut self.buffers.optimizer,
+            state: &mut self.buffers.optimizer_state,
+            aurora: &mut self.buffers.aurora,
+            aurora_tables: &self.buffers.aurora_tables,
+            tape: &self.buffers.tape,
+            grad_clip: &mut self.buffers.grad_clip,
+        })?;
         stats.optimizer = updates.trace;
         stats.optimizer_ms = optimizer_start.elapsed().as_secs_f64() * 1000.0;
         stats.diagnostics = updates.diagnostics;

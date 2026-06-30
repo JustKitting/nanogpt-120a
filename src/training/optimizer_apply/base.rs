@@ -31,29 +31,27 @@ pub(super) struct BaseAdamTrace {
 }
 
 pub(super) fn update_base_adam(args: BaseAdamUpdateArgs<'_>) -> Result<BaseAdamTrace, DriverError> {
-    let token_embedding_ms = AdamUpdate::new(
-        args.stream,
-        args.optimizer,
-        args.scratch,
-        args.step,
-        args.average_coefficient,
-    )
-    .update_timed(
-        &mut args.uploaded.token_embedding,
-        &args.grads.d_lm_head_weight,
-        &mut args.state.token_embedding,
-    )?;
-
-    let final_norm_ms = update_layer_norm_timed(
-        args.stream,
-        args.optimizer,
-        &mut args.uploaded.ln_f,
-        &args.grads.final_norm,
-        args.scratch,
-        &mut args.state.ln_f,
-        args.step,
-        args.average_coefficient,
-    )?;
+    let (token_embedding_ms, final_norm_ms) = {
+        let mut adam = AdamUpdate::new(
+            args.stream,
+            args.optimizer,
+            args.scratch,
+            args.step,
+            args.average_coefficient,
+        );
+        let token_embedding_ms = adam.update_timed(
+            &mut args.uploaded.token_embedding,
+            &args.grads.d_lm_head_weight,
+            &mut args.state.token_embedding,
+        )?;
+        let final_norm_ms = update_layer_norm_timed(
+            &mut adam,
+            &mut args.uploaded.ln_f,
+            &args.grads.final_norm,
+            &mut args.state.ln_f,
+        )?;
+        (token_embedding_ms, final_norm_ms)
+    };
 
     let next_latent_ms = timed_ms(|| {
         update_next_latent(NextLatUpdateArgs {
