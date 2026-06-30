@@ -15,7 +15,7 @@ impl Nvfp4QuantModule {
         out_global_scale: &mut DeviceBuffer<f32>,
         chunk_count: u32,
     ) -> Result<(), DriverError> {
-        self.ms_eden
+        self.ms_eden_amax
             .quartet_backward_ms_eden_global_scale_from_chunks_kernel(
                 stream,
                 grid_config(1),
@@ -30,7 +30,7 @@ impl Nvfp4QuantModule {
         args: &mut RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'_, '_>,
     ) -> Result<(), DriverError> {
         let chunk_count = tensor_amax_chunk_count(args.source_rows * args.source_cols);
-        self.ms_eden.rowwise_nvfp4_chunk_amax_kernel(
+        self.ms_eden_amax.rowwise_nvfp4_chunk_amax_kernel(
             args.stream,
             grid_config(chunk_count),
             args.input.bytes,
@@ -55,7 +55,7 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         let element_count = args.source_rows * args.source_cols;
         let chunk_count = tensor_amax_chunk_count(element_count);
-        self.ms_eden.nvfp4_chunk_amax_kernel(
+        self.ms_eden_amax.nvfp4_chunk_amax_kernel(
             args.stream,
             grid_config(chunk_count),
             args.input.bytes,
