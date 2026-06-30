@@ -14,6 +14,7 @@ pub fn ptx_path() -> String {
         .into_owned()
 }
 
+#[allow(dead_code)]
 pub fn assert_nonzero_finite(values: &[f32]) {
     assert!(values.iter().all(|value| value.is_finite()));
     assert!(values.iter().any(|value| value.abs() > 0.0));

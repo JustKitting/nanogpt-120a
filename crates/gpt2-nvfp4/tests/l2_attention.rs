@@ -21,7 +21,7 @@ mod nvfp4_common;
 
 use common::{gpu_device_index, ptx_path};
 use f16_common::tc_f16;
-use nvfp4_common::set_e2m1_one;
+use nvfp4_common::repeating_identity_bytes;
 
 const E4M3_ONE: u8 = 0x38;
 const HEAD_DIM: usize = GPT2_N_EMBD / GPT2_N_HEAD;
@@ -172,19 +172,11 @@ fn residual_input() -> Vec<f32> {
 }
 
 fn qkv_identity_weight_bytes() -> Vec<u8> {
-    let mut bytes = vec![0_u8; QkvWeightShape::BYTE_LEN];
-    for col in 0..GPT2_QKV {
-        set_e2m1_one(&mut bytes, col * GPT2_N_EMBD + col % GPT2_N_EMBD);
-    }
-    bytes
+    repeating_identity_bytes(QkvWeightShape::BYTE_LEN, GPT2_QKV, GPT2_N_EMBD)
 }
 
 fn c_proj_identity_weight_bytes() -> Vec<u8> {
-    let mut bytes = vec![0_u8; ResidualWeightShape::BYTE_LEN];
-    for col in 0..GPT2_N_EMBD {
-        set_e2m1_one(&mut bytes, col * GPT2_N_EMBD + col);
-    }
-    bytes
+    repeating_identity_bytes(ResidualWeightShape::BYTE_LEN, GPT2_N_EMBD, GPT2_N_EMBD)
 }
 
 fn assert_qkv_nonzero(qkv: &[f32]) {

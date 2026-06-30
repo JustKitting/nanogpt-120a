@@ -3,7 +3,7 @@ use gpt2_nvfp4::{
     Nvfp4Shape,
 };
 
-use crate::nvfp4_common::set_e2m1_one;
+use crate::nvfp4_common::repeating_identity_bytes;
 
 pub fn normalized_input() -> Vec<f32> {
     let mut normalized = vec![0.0_f32; HiddenState::LEN];
@@ -27,17 +27,9 @@ pub fn residual_input() -> Vec<f32> {
 }
 
 pub fn mlp_up_repeat_weight_bytes() -> Vec<u8> {
-    let mut bytes = vec![0_u8; MlpUpWeightShape::BYTE_LEN];
-    for col in 0..GPT2_MLP {
-        set_e2m1_one(&mut bytes, col * GPT2_N_EMBD + col % GPT2_N_EMBD);
-    }
-    bytes
+    repeating_identity_bytes(MlpUpWeightShape::BYTE_LEN, GPT2_MLP, GPT2_N_EMBD)
 }
 
 pub fn mlp_down_identity_weight_bytes() -> Vec<u8> {
-    let mut bytes = vec![0_u8; MlpDownWeightShape::BYTE_LEN];
-    for col in 0..GPT2_N_EMBD {
-        set_e2m1_one(&mut bytes, col * GPT2_MLP + col);
-    }
-    bytes
+    repeating_identity_bytes(MlpDownWeightShape::BYTE_LEN, GPT2_N_EMBD, GPT2_MLP)
 }
