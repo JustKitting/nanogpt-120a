@@ -4,8 +4,8 @@ use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use super::args::BlockForwardArgs;
 use super::weights::Gpt2BlockWeights;
 use crate::types::{
-    AttentionForwardTape, AttentionWeights, HiddenStateDevice, LayerNormWeights,
-    MlpProjectionTensors, MlpScratch, MlpWeights,
+    AttentionForwardTape, AttentionWeights, HiddenStateDevice, LayerNormForwardArgs, LayerNormTape,
+    LayerNormWeights, MlpProjectionTensors, MlpScratch, MlpWeights,
 };
 
 impl Gpt2BlockWeights {
@@ -22,16 +22,8 @@ impl Gpt2BlockWeights {
 
         let ln_1 =
             LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_1, args.hidden);
-        let hidden = if let Some(tape) = tape.as_mut() {
-            let hidden = self
-                .ln_1
-                .forward_save_residual_f16(ln_1, &mut *tape.ln_1.residual)?;
-            tape.ln_1
-                .save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
-            hidden
-        } else {
-            self.ln_1.forward(ln_1)?
-        };
+        let hidden =
+            forward_layer_norm(&self.ln_1, ln_1, tape.as_mut().map(|tape| &mut tape.ln_1))?;
 
         let attention_tape = tape.as_mut().map(|tape| AttentionForwardTape {
             qkv_input_nvfp4: tape.qkv_input_nvfp4.reborrow(),
@@ -59,16 +51,8 @@ impl Gpt2BlockWeights {
         }
 
         let ln_2 = LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_2, hidden);
-        let hidden = if let Some(tape) = tape.as_mut() {
-            let hidden = self
-                .ln_2
-                .forward_save_residual_f16(ln_2, &mut *tape.ln_2.residual)?;
-            tape.ln_2
-                .save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
-            hidden
-        } else {
-            self.ln_2.forward(ln_2)?
-        };
+        let hidden =
+            forward_layer_norm(&self.ln_2, ln_2, tape.as_mut().map(|tape| &mut tape.ln_2))?;
 
         let mlp_tape = tape.as_mut().map(|tape| crate::types::MlpForwardTape {
             up_input_nvfp4: tape.mlp_up_input_nvfp4.reborrow(),
@@ -98,6 +82,20 @@ impl Gpt2BlockWeights {
             mlp_pre_activation,
             hidden,
         )
+    }
+}
+
+fn forward_layer_norm<'a>(
+    weights: &LayerNormWeights,
+    args: LayerNormForwardArgs<'a>,
+    tape: Option<&mut LayerNormTape<'_>>,
+) -> Result<HiddenStateDevice<'a>, DriverError> {
+    if let Some(tape) = tape {
+        let hidden = weights.forward_save_residual_f16(args, &mut *tape.residual)?;
+        tape.save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
+        Ok(hidden)
+    } else {
+        weights.forward(args)
     }
 }
 
