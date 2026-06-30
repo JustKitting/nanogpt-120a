@@ -25,19 +25,8 @@ pub(super) fn ms_eden_pack_chunk(
     scale_override: f32,
     scale_seed: u32,
 ) {
-    let lane = warp::lane_id();
-    let chunk_base = chunk * HADAMARD_DIM;
-    let element = chunk_base + lane;
-    let row = element / dst_row_len;
-    let row_offset = element - row * dst_row_len;
-
-    let value = hadamard_transform_lane(input, lane);
-
-    if row_offset == 0 {
-        unsafe {
-            *out_global_scales.get_unchecked_mut(row as usize) = global_scale;
-        }
-    }
+    let (value, lane) =
+        pack_chunk_value(input, out_global_scales, chunk, dst_row_len, global_scale);
 
     let chunk_amax = warp_max_f32(abs_f32(value));
     if lane == 0 {
@@ -70,19 +59,7 @@ pub(super) fn ms_eden_pack_chunk_no_chunk_amax(
     scale_override: f32,
     scale_seed: u32,
 ) {
-    let lane = warp::lane_id();
-    let chunk_base = chunk * HADAMARD_DIM;
-    let element = chunk_base + lane;
-    let row = element / dst_row_len;
-    let row_offset = element - row * dst_row_len;
-
-    let value = hadamard_transform_lane(input, lane);
-
-    if row_offset == 0 {
-        unsafe {
-            *out_global_scales.get_unchecked_mut(row as usize) = global_scale;
-        }
-    }
+    let (value, _) = pack_chunk_value(input, out_global_scales, chunk, dst_row_len, global_scale);
 
     ms_eden_pack_payload(
         value,
@@ -93,6 +70,28 @@ pub(super) fn ms_eden_pack_chunk_no_chunk_amax(
         scale_override,
         scale_seed,
     );
+}
+
+#[inline(always)]
+fn pack_chunk_value(
+    input: f32,
+    out_global_scales: &mut DisjointSlice<'_, f32>,
+    chunk: u32,
+    dst_row_len: u32,
+    global_scale: f32,
+) -> (f32, u32) {
+    let lane = warp::lane_id();
+    let element = chunk * HADAMARD_DIM + lane;
+    let row = element / dst_row_len;
+    let value = hadamard_transform_lane(input, lane);
+
+    if element == row * dst_row_len {
+        unsafe {
+            *out_global_scales.get_unchecked_mut(row as usize) = global_scale;
+        }
+    }
+
+    (value, lane)
 }
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
