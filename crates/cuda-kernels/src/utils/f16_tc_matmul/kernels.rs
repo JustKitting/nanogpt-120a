@@ -20,7 +20,7 @@ pub(super) mod module {
     use super::*;
 
     macro_rules! call_with_tiles {
-        ($body:ident, [$($pre:expr),*], [$($post:expr),*]) => {{
+        ($body:ident; $($pre:expr),* ; $($post:expr),* $(,)?) => {{
             static mut A_TILE: SharedArray<u16, CTA_A_ELEMS> = SharedArray::UNINIT;
             static mut B_TILE: SharedArray<u16, CTA_B_ELEMS> = SharedArray::UNINIT;
             $body($($pre,)* unsafe { &mut A_TILE }, unsafe { &mut B_TILE }, $($post),*);
@@ -53,7 +53,7 @@ pub(super) mod module {
         n: u32,
         k: u32,
     ) {
-        call_with_tiles!(cta_matmul_body, [a, b_t, out], [batch_count, m, n, k]);
+        call_with_tiles!(cta_matmul_body; a, b_t, out; batch_count, m, n, k);
     }
 
     #[kernel]
@@ -66,7 +66,7 @@ pub(super) mod module {
         n: u32,
         k: u32,
     ) {
-        call_with_tiles!(cta_matmul_f32_body, [a, b_t, out], [batch_count, m, n, k]);
+        call_with_tiles!(cta_matmul_f32_body; a, b_t, out; batch_count, m, n, k);
     }
 
     #[kernel]
@@ -79,11 +79,7 @@ pub(super) mod module {
         n: u32,
         k: u32,
     ) {
-        call_with_tiles!(
-            cta_matmul_f32_rhs_body,
-            [a, rhs, out],
-            [batch_count, m, n, k]
-        );
+        call_with_tiles!(cta_matmul_f32_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
     #[kernel]
@@ -96,11 +92,7 @@ pub(super) mod module {
         n: u32,
         k: u32,
     ) {
-        call_with_tiles!(
-            cta_matmul_f32_half_rhs_body,
-            [a, rhs, out],
-            [batch_count, m, n, k]
-        );
+        call_with_tiles!(cta_matmul_f32_half_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
     #[kernel]
@@ -113,11 +105,7 @@ pub(super) mod module {
         n: u32,
         k: u32,
     ) {
-        call_with_tiles!(
-            cta_matmul_f32_a_transposed_rhs_body,
-            [a, rhs, out],
-            [batch_count, m, n, k]
-        );
+        call_with_tiles!(cta_matmul_f32_a_transposed_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
     #[kernel]
@@ -130,11 +118,7 @@ pub(super) mod module {
         n: u32,
         k: u32,
     ) {
-        call_with_tiles!(
-            cta_matmul_f32_a_transposed_half_rhs_body,
-            [a, rhs, out],
-            [batch_count, m, n, k]
-        );
+        call_with_tiles!(cta_matmul_f32_a_transposed_half_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
     #[kernel]
@@ -150,11 +134,7 @@ pub(super) mod module {
         base_scale: f32,
         matmul_scale: f32,
     ) {
-        call_with_tiles!(
-            cta_matmul_add_f32_body,
-            [a, b_t, base, out],
-            [batch_count, m, n, k, base_scale, matmul_scale]
-        );
+        call_with_tiles!(cta_matmul_add_f32_body; a, b_t, base, out; batch_count, m, n, k, base_scale, matmul_scale);
     }
 
     #[kernel]
@@ -170,11 +150,7 @@ pub(super) mod module {
         base_scale: f32,
         matmul_scale: f32,
     ) {
-        call_with_tiles!(
-            cta_matmul_add_f32_rhs_transposed_base_body,
-            [a, rhs, base, out],
-            [batch_count, m, n, k, base_scale, matmul_scale]
-        );
+        call_with_tiles!(cta_matmul_add_f32_rhs_transposed_base_body; a, rhs, base, out; batch_count, m, n, k, base_scale, matmul_scale);
     }
 }
 
