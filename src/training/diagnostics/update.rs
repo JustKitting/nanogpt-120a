@@ -1,5 +1,6 @@
 mod collect;
 mod finish;
+mod record;
 mod snapshot;
 mod stats;
 
