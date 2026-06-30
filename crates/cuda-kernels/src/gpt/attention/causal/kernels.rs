@@ -19,6 +19,32 @@ pub mod module {
     static mut REDUCE: SharedArray<f32, { CAUSAL_MAX_WARPS_PER_BLOCK as usize }> =
         SharedArray::UNINIT;
 
+    macro_rules! score_reduce {
+        ($query:expr, $thread_index:expr, $init:expr, $warp_reduce:ident, |$local:ident, $key:ident| $value:expr) => {{
+            let lane = warp::lane_id();
+            let warp_in_block = $thread_index / 32;
+            let block_threads = thread::blockDim_x();
+            let mut $local = $init;
+            let mut $key = $thread_index;
+
+            while $key <= $query {
+                unsafe {
+                    $local = $value;
+                }
+                $key += block_threads;
+            }
+            block_reduce_f32!(
+                REDUCE,
+                block_threads / 32,
+                $local,
+                lane,
+                warp_in_block,
+                $warp_reduce,
+                $init
+            )
+        }};
+    }
+
     #[kernel]
     pub fn causal_attention_kernel(
         qkv: &[f32],
@@ -124,52 +150,19 @@ pub mod module {
 
     #[inline(always)]
     fn score_max(query: u32, thread_index: u32) -> f32 {
-        let lane = warp::lane_id();
-        let warp_in_block = thread_index / 32;
-        let block_threads = thread::blockDim_x();
-        let mut local_max = NEG_INFINITY;
-        let mut key = thread_index;
-
-        while key <= query {
-            unsafe {
-                local_max = max_f32(local_max, SCORES[key as usize]);
-            }
-            key += block_threads;
-        }
-        block_reduce_f32!(
-            REDUCE,
-            block_threads / 32,
-            local_max,
-            lane,
-            warp_in_block,
+        score_reduce!(
+            query,
+            thread_index,
+            NEG_INFINITY,
             warp_max_f32,
-            NEG_INFINITY
+            |local, key| max_f32(local, SCORES[key as usize])
         )
     }
 
     #[inline(always)]
     fn score_denom(query: u32, thread_index: u32, score_max: f32) -> f32 {
-        let lane = warp::lane_id();
-        let warp_in_block = thread_index / 32;
-        let block_threads = thread::blockDim_x();
-        let mut local_sum = 0.0;
-        let mut key = thread_index;
-
-        while key <= query {
-            unsafe {
-                local_sum += exp_f32(SCORES[key as usize] - score_max);
-            }
-            key += block_threads;
-        }
-        block_reduce_f32!(
-            REDUCE,
-            block_threads / 32,
-            local_sum,
-            lane,
-            warp_in_block,
-            warp_sum_f32,
-            0.0
-        )
+        score_reduce!(query, thread_index, 0.0, warp_sum_f32, |local, key| local
+            + exp_f32(SCORES[key as usize] - score_max))
     }
 
     #[inline(always)]
