@@ -1,16 +1,10 @@
 use std::collections::VecDeque;
 
-use super::env::{env_bool, env_f32, env_usize};
+mod config;
+#[cfg(test)]
+mod tests;
 
-const ENABLED_ENV: &str = "TRAIN_SKIP_UNSTABLE_UPDATES";
-const ROLLING_INTERVAL_ENV: &str = "TRAIN_SKIP_ROLLING_INTERVAL";
-const SIGMA_FACTOR_ENV: &str = "TRAIN_SKIP_SIGMA_FACTOR";
-const USE_LOSS_ENV: &str = "TRAIN_SKIP_USE_LOSS";
-const USE_GRAD_NORM_ENV: &str = "TRAIN_SKIP_USE_GRAD_NORM";
-
-const DEFAULT_ENABLED: bool = true;
-const DEFAULT_ROLLING_INTERVAL: usize = 128;
-const DEFAULT_SIGMA_FACTOR: f32 = 6.0;
+use config::UpdateSkipConfig;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct UpdateSkipDecision {
@@ -24,15 +18,6 @@ pub(super) struct UpdateSkipState {
     config: UpdateSkipConfig,
     losses: VecDeque<f32>,
     grad_norms: VecDeque<f32>,
-}
-
-#[derive(Clone, Copy)]
-struct UpdateSkipConfig {
-    enabled: bool,
-    rolling_interval: usize,
-    sigma_factor: f32,
-    use_loss: bool,
-    use_grad_norm: bool,
 }
 
 impl UpdateSkipState {
@@ -103,82 +88,9 @@ impl UpdateSkipState {
     }
 }
 
-impl UpdateSkipConfig {
-    fn from_env() -> Self {
-        Self {
-            enabled: env_bool(ENABLED_ENV).unwrap_or(DEFAULT_ENABLED),
-            rolling_interval: env_usize(ROLLING_INTERVAL_ENV)
-                .unwrap_or(DEFAULT_ROLLING_INTERVAL)
-                .max(2),
-            sigma_factor: env_f32(SIGMA_FACTOR_ENV)
-                .filter(|value| value.is_finite())
-                .unwrap_or(DEFAULT_SIGMA_FACTOR)
-                .max(0.0),
-            use_loss: env_bool(USE_LOSS_ENV).unwrap_or(true),
-            use_grad_norm: env_bool(USE_GRAD_NORM_ENV).unwrap_or(true),
-        }
-    }
-}
-
 fn push_history(history: &mut VecDeque<f32>, value: f32, max_len: usize) {
     history.push_back(value);
     while history.len() > max_len {
         history.pop_front();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn state() -> UpdateSkipState {
-        UpdateSkipState {
-            config: UpdateSkipConfig {
-                enabled: true,
-                rolling_interval: 4,
-                sigma_factor: 2.0,
-                use_loss: true,
-                use_grad_norm: true,
-            },
-            losses: VecDeque::new(),
-            grad_norms: VecDeque::new(),
-        }
-    }
-
-    #[test]
-    fn waits_for_minimum_history() {
-        let mut state = state();
-        assert!(!state.observe(Some(1.0), 1.0).skipped);
-        assert!(!state.observe(Some(100.0), 100.0).skipped);
-    }
-
-    #[test]
-    fn skips_loss_outlier_after_history() {
-        let mut state = state();
-        assert!(!state.observe(Some(1.0), 1.0).skipped);
-        assert!(!state.observe(Some(1.1), 1.0).skipped);
-        let decision = state.observe(Some(10.0), 1.0);
-        assert!(decision.skipped);
-        assert!(decision.loss_spike);
-        assert!(!decision.grad_norm_spike);
-    }
-
-    #[test]
-    fn skips_grad_norm_outlier_after_history() {
-        let mut state = state();
-        assert!(!state.observe(None, 1.0).skipped);
-        assert!(!state.observe(None, 1.1).skipped);
-        let decision = state.observe(None, 10.0);
-        assert!(decision.skipped);
-        assert!(!decision.loss_spike);
-        assert!(decision.grad_norm_spike);
-    }
-
-    #[test]
-    fn skips_non_finite_without_history() {
-        let mut state = state();
-        let decision = state.observe(Some(f32::NAN), 1.0);
-        assert!(decision.skipped);
-        assert!(decision.non_finite);
     }
 }
