@@ -10,33 +10,9 @@ use super::output::CudaValidOutput;
 use crate::training::launch::CudaLearningComponents;
 use crate::training::metric_accumulator::MetricAccumulator;
 
-#[derive(Clone, Copy)]
-struct ValidMetricSpec {
-    name: &'static str,
-    unit: Option<&'static str>,
-    higher_is_better: bool,
-    field: ValidMetricField,
-}
+mod fields;
 
-metric_fields! {
-    ValidMetricField, VALID_METRIC_FIELDS, ValidMetricSpec {
-        Loss => ("Validation loss", None, false),
-        EvalElapsed => ("Eval elapsed", Some("s"), false),
-        WindowCount => ("Val windows", None, true),
-        CompletedSteps => ("Completed steps", None, true),
-    }
-}
-
-impl ValidMetricField {
-    fn value(self, item: &CudaValidOutput) -> f64 {
-        match self {
-            Self::Loss => item.val_loss as f64,
-            Self::EvalElapsed => item.eval_elapsed_s,
-            Self::WindowCount => item.window_count as f64,
-            Self::CompletedSteps => item.completed_steps as f64,
-        }
-    }
-}
+use fields::{ValidMetricSpec, valid_metric_specs};
 
 #[derive(Clone)]
 struct CudaValidMetric {
@@ -57,20 +33,19 @@ impl Metric for CudaValidMetric {
     type Input = CudaValidOutput;
 
     fn name(&self) -> MetricName {
-        Arc::new(self.spec.name.to_string())
+        Arc::new(self.spec.name().to_string())
     }
 
     fn attributes(&self) -> MetricAttributes {
         NumericAttributes {
-            unit: self.spec.unit.map(str::to_string),
-            higher_is_better: self.spec.higher_is_better,
+            unit: self.spec.unit().map(str::to_string),
+            higher_is_better: self.spec.higher_is_better(),
         }
         .into()
     }
 
     fn update(&mut self, item: &Self::Input, _metadata: &MetricMetadata) -> SerializedEntry {
-        self.state
-            .update(self.spec.field.value(item), self.spec.unit)
+        self.state.update(self.spec.value(item), self.spec.unit())
     }
 
     fn clear(&mut self) {
@@ -91,8 +66,8 @@ impl Numeric for CudaValidMetric {
 pub(super) fn register_valid_metrics(
     mut training: SupervisedTraining<CudaLearningComponents>,
 ) -> SupervisedTraining<CudaLearningComponents> {
-    for field in VALID_METRIC_FIELDS {
-        training = training.metric_valid_numeric(CudaValidMetric::new(field.spec()));
+    for spec in valid_metric_specs() {
+        training = training.metric_valid_numeric(CudaValidMetric::new(spec));
     }
     training
 }
