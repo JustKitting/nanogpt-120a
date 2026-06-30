@@ -6,3 +6,19 @@ pub fn set_e2m1_one(bytes: &mut [u8], element: usize) {
         *byte = (*byte & 0x0f) | 0x20;
     }
 }
+
+pub fn first_col_one_bytes(rows: usize, cols: usize) -> Vec<u8> {
+    let mut bytes = vec![0_u8; rows * cols / 2];
+    for row in 0..rows {
+        set_e2m1_one(&mut bytes, row * cols);
+    }
+    bytes
+}
+
+pub fn first_row_one_bytes(rows: usize, cols: usize) -> Vec<u8> {
+    let mut bytes = vec![0_u8; rows * cols / 2];
+    for col in 0..cols {
+        set_e2m1_one(&mut bytes, col);
+    }
+    bytes
+}

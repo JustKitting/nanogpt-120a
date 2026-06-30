@@ -16,6 +16,24 @@ struct CorrectionGram {
     refresh: bool,
 }
 
+impl CorrectionGram {
+    fn refreshed(values: Vec<f32>) -> Self {
+        Self {
+            values,
+            stale_reject_candidate: false,
+            refresh: true,
+        }
+    }
+
+    fn approximate(values: Vec<f32>) -> Self {
+        Self {
+            values,
+            stale_reject_candidate: false,
+            refresh: false,
+        }
+    }
+}
+
 impl<'a> Nvfp4Polar<'a> {
     pub fn iterations(
         &self,
@@ -123,38 +141,22 @@ impl<'a> Nvfp4Polar<'a> {
         let rejects_stale_steps = mode.rejects_stale_steps();
         let gram = match mode {
             GramCorrectionMode::HighPrecision | GramCorrectionMode::HighPrecisionSafety { .. } => {
-                CorrectionGram {
-                    values: self.high_precision_gram(source, rows, cols, stats)?,
-                    stale_reject_candidate: false,
-                    refresh: true,
-                }
+                CorrectionGram::refreshed(self.high_precision_gram(source, rows, cols, stats)?)
             }
             GramCorrectionMode::Nvfp4GramOnly
             | GramCorrectionMode::Nvfp4GramOnlySafety { .. }
             | GramCorrectionMode::Nvfp4GramOnlySchedule { .. }
-            | GramCorrectionMode::Nvfp4GramOnlyLateSafety { .. } => CorrectionGram {
-                values: self.nvfp4_gram(source, rows, cols, iter, stats)?,
-                stale_reject_candidate: false,
-                refresh: false,
-            },
-            GramCorrectionMode::Nvfp4GramAverage { samples } => CorrectionGram {
-                values: self.averaged_nvfp4_gram(source, rows, cols, iter, samples, stats)?,
-                stale_reject_candidate: false,
-                refresh: false,
-            },
+            | GramCorrectionMode::Nvfp4GramOnlyLateSafety { .. } => {
+                CorrectionGram::approximate(self.nvfp4_gram(source, rows, cols, iter, stats)?)
+            }
+            GramCorrectionMode::Nvfp4GramAverage { samples } => CorrectionGram::approximate(
+                self.averaged_nvfp4_gram(source, rows, cols, iter, samples, stats)?,
+            ),
             GramCorrectionMode::ExactPrefixThenNvfp4 { exact_steps } => {
                 if iter < exact_steps {
-                    CorrectionGram {
-                        values: self.high_precision_gram(source, rows, cols, stats)?,
-                        stale_reject_candidate: false,
-                        refresh: true,
-                    }
+                    CorrectionGram::refreshed(self.high_precision_gram(source, rows, cols, stats)?)
                 } else {
-                    CorrectionGram {
-                        values: self.nvfp4_gram(source, rows, cols, iter, stats)?,
-                        stale_reject_candidate: false,
-                        refresh: false,
-                    }
+                    CorrectionGram::approximate(self.nvfp4_gram(source, rows, cols, iter, stats)?)
                 }
             }
             GramCorrectionMode::ExactPrefixThenNvfp4Average {
@@ -162,18 +164,11 @@ impl<'a> Nvfp4Polar<'a> {
                 samples,
             } => {
                 if iter < exact_steps {
-                    CorrectionGram {
-                        values: self.high_precision_gram(source, rows, cols, stats)?,
-                        stale_reject_candidate: false,
-                        refresh: true,
-                    }
+                    CorrectionGram::refreshed(self.high_precision_gram(source, rows, cols, stats)?)
                 } else {
-                    CorrectionGram {
-                        values: self
-                            .averaged_nvfp4_gram(source, rows, cols, iter, samples, stats)?,
-                        stale_reject_candidate: false,
-                        refresh: false,
-                    }
+                    CorrectionGram::approximate(
+                        self.averaged_nvfp4_gram(source, rows, cols, iter, samples, stats)?,
+                    )
                 }
             }
             GramCorrectionMode::Stale { period }
@@ -218,11 +213,7 @@ impl<'a> Nvfp4Polar<'a> {
                 ..
             } => {
                 if iter < exact_steps {
-                    CorrectionGram {
-                        values: self.high_precision_gram(source, rows, cols, stats)?,
-                        stale_reject_candidate: false,
-                        refresh: true,
-                    }
+                    CorrectionGram::refreshed(self.high_precision_gram(source, rows, cols, stats)?)
                 } else {
                     self.stale_correction_gram(
                         request,
