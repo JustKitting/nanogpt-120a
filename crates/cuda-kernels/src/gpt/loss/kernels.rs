@@ -3,6 +3,7 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp}
 use super::{
     CROSS_ENTROPY_THREADS_PER_BLOCK, CROSS_ENTROPY_WARPS_PER_BLOCK, CrossEntropyParams, WARP_SIZE,
 };
+use crate::block_reduce::block_reduce_f32;
 use crate::float_ptx::{abs_f32, exp_f32, ln_f32, max_f32, safe_positive_denom};
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
@@ -38,66 +39,30 @@ mod module {
                 local_max = max_f32(local_max, logits[row_base + col as usize]);
                 col += CROSS_ENTROPY_THREADS_PER_BLOCK;
             }
-
-            let warp_max = warp_max_f32(local_max);
-            if lane == 0 {
-                unsafe {
-                    REDUCE[warp_in_block as usize] = warp_max;
-                }
-            }
-
-            thread::sync_threads();
-
-            if warp_in_block == 0 {
-                let partial = if lane < CROSS_ENTROPY_WARPS_PER_BLOCK {
-                    unsafe { REDUCE[lane as usize] }
-                } else {
-                    f32::NEG_INFINITY
-                };
-                let block_max = warp_max_f32(partial);
-                if lane == 0 {
-                    unsafe {
-                        REDUCE[0] = block_max;
-                    }
-                }
-            }
-
-            thread::sync_threads();
-
-            let row_max = unsafe { REDUCE[0] };
+            let row_max = block_reduce_f32!(
+                REDUCE,
+                CROSS_ENTROPY_WARPS_PER_BLOCK,
+                local_max,
+                lane,
+                warp_in_block,
+                warp_max_f32,
+                f32::NEG_INFINITY
+            );
             let mut local_sum = 0.0_f32;
             col = thread;
             while col < params.vocab_size {
                 local_sum += exp_f32(logits[row_base + col as usize] - row_max);
                 col += CROSS_ENTROPY_THREADS_PER_BLOCK;
             }
-
-            let warp_sum = warp_sum_f32(local_sum);
-            if lane == 0 {
-                unsafe {
-                    REDUCE[warp_in_block as usize] = warp_sum;
-                }
-            }
-
-            thread::sync_threads();
-
-            if warp_in_block == 0 {
-                let partial = if lane < CROSS_ENTROPY_WARPS_PER_BLOCK {
-                    unsafe { REDUCE[lane as usize] }
-                } else {
-                    0.0
-                };
-                let block_sum = warp_sum_f32(partial);
-                if lane == 0 {
-                    unsafe {
-                        REDUCE[0] = block_sum;
-                    }
-                }
-            }
-
-            thread::sync_threads();
-
-            let denom = safe_positive_denom(unsafe { REDUCE[0] });
+            let denom = safe_positive_denom(block_reduce_f32!(
+                REDUCE,
+                CROSS_ENTROPY_WARPS_PER_BLOCK,
+                local_sum,
+                lane,
+                warp_in_block,
+                warp_sum_f32,
+                0.0
+            ));
             let target = targets[row as usize];
             if thread == 0 {
                 let target_logit = logits[row_base + target as usize];
@@ -121,26 +86,18 @@ mod module {
                 col += CROSS_ENTROPY_THREADS_PER_BLOCK;
             }
 
-            let warp_dlogits_amax = warp_max_f32(local_dlogits_amax);
-            if lane == 0 {
+            let row_dlogits_amax = block_reduce_f32!(
+                REDUCE,
+                CROSS_ENTROPY_WARPS_PER_BLOCK,
+                local_dlogits_amax,
+                lane,
+                warp_in_block,
+                warp_max_f32,
+                0.0
+            );
+            if thread == 0 {
                 unsafe {
-                    REDUCE[warp_in_block as usize] = warp_dlogits_amax;
-                }
-            }
-
-            thread::sync_threads();
-
-            if warp_in_block == 0 {
-                let partial = if lane < CROSS_ENTROPY_WARPS_PER_BLOCK {
-                    unsafe { REDUCE[lane as usize] }
-                } else {
-                    0.0
-                };
-                let row_dlogits_amax = warp_max_f32(partial);
-                if lane == 0 {
-                    unsafe {
-                        *dlogits_row_amax.get_unchecked_mut(row as usize) = row_dlogits_amax;
-                    }
+                    *dlogits_row_amax.get_unchecked_mut(row as usize) = row_dlogits_amax;
                 }
             }
         }
