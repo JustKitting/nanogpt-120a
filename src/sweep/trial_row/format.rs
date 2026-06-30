@@ -10,10 +10,7 @@ pub(super) fn format_trial(trial: &Trial) -> String {
     format!(
         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}",
         trial.status,
-        trial
-            .val_loss
-            .map(fmt::f64_6)
-            .unwrap_or_else(|| "NaN".to_string()),
+        fmt::optional_f64_6_or_nan(trial.val_loss),
         fmt::optional_usize(trial.completed_steps),
         c.batch_size,
         c.n_layer,

@@ -64,10 +64,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "sweep_trial_end index={index} status={} val_loss={} completed_steps={} log_path={}",
             trial.status,
-            trial
-                .val_loss
-                .map(fmt::f64_6)
-                .unwrap_or_else(|| "NaN".to_string()),
+            fmt::optional_f64_6_or_nan(trial.val_loss),
             fmt::optional_usize(trial.completed_steps),
             trial.log_path.display()
         );
@@ -84,8 +81,8 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
                     .and_then(|trial| trial.screen_val_loss);
             }
             println!(
-                "sweep_baseline_promoted val_loss={:.6} key={} path={}",
-                baseline.val_loss().unwrap_or(f64::NAN),
+                "sweep_baseline_promoted val_loss={} key={} path={}",
+                fmt::optional_f64_6_or_nan(baseline.val_loss()),
                 baseline
                     .candidate()
                     .map(|candidate| candidate.key())
