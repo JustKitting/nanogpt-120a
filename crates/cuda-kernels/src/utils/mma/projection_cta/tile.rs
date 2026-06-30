@@ -108,7 +108,7 @@ pub fn projection_cta_row_pair_tile_count(token_count: u32, output_dim: u32) -> 
 }
 
 pub fn projection_cta_shape_aligned(token_count: u32, input_dim: u32, output_dim: u32) -> bool {
-    token_count % NVFP4_PROJECTION_CTA_M == 0
-        && input_dim % NVFP4_PROJECTION_CTA_K == 0
-        && output_dim % NVFP4_PROJECTION_CTA_N == 0
+    token_count.is_multiple_of(NVFP4_PROJECTION_CTA_M)
+        && input_dim.is_multiple_of(NVFP4_PROJECTION_CTA_K)
+        && output_dim.is_multiple_of(NVFP4_PROJECTION_CTA_N)
 }

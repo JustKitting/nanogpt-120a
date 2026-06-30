@@ -40,13 +40,12 @@ pub(crate) fn softplus(x: f32) -> f32 {
 }
 
 #[inline(always)]
+#[expect(clippy::manual_clamp, reason = "cuda-oxide does not lower f32::clamp")]
 pub(crate) fn kda_decay_exp(x: f32) -> f32 {
-    let x = if x < -KDA_DECAY_EXP_LIMIT {
-        -KDA_DECAY_EXP_LIMIT
-    } else if x > KDA_DECAY_EXP_LIMIT {
-        KDA_DECAY_EXP_LIMIT
-    } else {
-        x
+    let x = match x {
+        x if x < -KDA_DECAY_EXP_LIMIT => -KDA_DECAY_EXP_LIMIT,
+        x if x > KDA_DECAY_EXP_LIMIT => KDA_DECAY_EXP_LIMIT,
+        x => x,
     };
     exp_f32(x)
 }

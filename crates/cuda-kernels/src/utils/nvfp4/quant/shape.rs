@@ -29,7 +29,7 @@ impl MsEdenPackGrid {
     }
 
     pub fn is_exact(self) -> bool {
-        self.chunk_count % WARPS_PER_BLOCK == 0
+        self.chunk_count.is_multiple_of(WARPS_PER_BLOCK)
     }
 }
 
@@ -48,12 +48,12 @@ impl Fp32PairNoPad {
     ) -> Option<Self> {
         (src_row_len == dst_row_len
             && row_count == transpose_dst_row_len
-            && dst_row_len % MS_EDEN_CHUNK_LEN == 0
-            && transpose_dst_row_len % MS_EDEN_CHUNK_LEN == 0)
-            .then_some(Self {
-                chunks_per_row: dst_row_len / MS_EDEN_CHUNK_LEN,
-                transpose_chunks_per_row: transpose_dst_row_len / MS_EDEN_CHUNK_LEN,
-            })
+            && dst_row_len.is_multiple_of(MS_EDEN_CHUNK_LEN)
+            && transpose_dst_row_len.is_multiple_of(MS_EDEN_CHUNK_LEN))
+        .then_some(Self {
+            chunks_per_row: dst_row_len / MS_EDEN_CHUNK_LEN,
+            transpose_chunks_per_row: transpose_dst_row_len / MS_EDEN_CHUNK_LEN,
+        })
     }
 
     pub fn pow2(self) -> Option<Fp32PairNoPadPow2> {
@@ -79,7 +79,7 @@ pub(super) struct RowwiseTransposeNoPad {
 
 impl RowwiseTransposeNoPad {
     pub fn new(source_rows: u32, source_cols: u32, dst_row_len: u32) -> Option<Self> {
-        if source_rows != dst_row_len || dst_row_len % MS_EDEN_CHUNK_LEN != 0 {
+        if source_rows != dst_row_len || !dst_row_len.is_multiple_of(MS_EDEN_CHUNK_LEN) {
             return None;
         }
 
@@ -106,7 +106,7 @@ pub(super) fn four_six_grid_config(group_count: u32) -> LaunchConfig {
 }
 
 pub(super) fn four_six_rowwise_pow2(row_len: u32, group_count: u32) -> bool {
-    row_len.is_power_of_two() && group_count % GROUPS_PER_BLOCK == 0
+    row_len.is_power_of_two() && group_count.is_multiple_of(GROUPS_PER_BLOCK)
 }
 
 pub(super) fn tensor_amax_chunk_count(element_count: u32) -> u32 {
