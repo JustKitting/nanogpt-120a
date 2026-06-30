@@ -1,5 +1,6 @@
-use super::super::super::diagnostics::{TensorUpdateDiagnostics, TrainingDiagnostics};
 use super::super::super::launch::CudaTrainOutput;
+
+mod value;
 
 #[derive(Clone, Copy)]
 pub(super) struct DebugMetricSpec {
@@ -63,7 +64,7 @@ impl DebugMetricSpec {
     }
 
     pub(super) fn value(self, item: &CudaTrainOutput) -> f64 {
-        self.field.value(item)
+        value::debug_metric_value(self.field, item)
     }
 }
 
@@ -72,112 +73,4 @@ pub(super) fn debug_metric_specs() -> impl Iterator<Item = DebugMetricSpec> {
         .iter()
         .copied()
         .map(DebugMetricField::spec)
-}
-
-impl DebugMetricField {
-    fn value(self, item: &CudaTrainOutput) -> f64 {
-        let Some(trace) = item.stats.diagnostics.as_ref() else {
-            return f64::NAN;
-        };
-
-        match self {
-            Self::UpdateCount => trace.update_count as f64,
-            Self::PositiveUpdateDot => trace.positive_update_dot_count as f64,
-            Self::ZeroGradChanged => trace.zero_grad_changed_count as f64,
-            Self::MaxUpdateToWeightRms => trace.max_update_to_weight_rms as f64,
-            Self::DlogitsRms => trace.dlogits_rms as f64,
-            Self::DlogitsMax => trace.dlogits_max as f64,
-            Self::DLmHeadRms => trace.d_lm_head_rms as f64,
-            Self::DLmHeadMax => trace.d_lm_head_max as f64,
-            Self::DEmbeddingRms => trace.d_embedding_rms as f64,
-            Self::DEmbeddingMax => trace.d_embedding_max as f64,
-            Self::TokenEmbeddingGlobalBefore => trace.token_embedding_global_before as f64,
-            Self::TokenEmbeddingGlobalAfter => trace.token_embedding_global_after as f64,
-            Self::TokenEmbeddingChangedBytes => trace.token_embedding_changed_bytes as f64,
-            Self::TensorCount => trace.updates.len() as f64,
-            Self::TensorLenTotal => tensor_sum(trace, |update| update.len as f64),
-            Self::TensorGradRmsMax => tensor_max(trace, |update| update.grad_rms as f64),
-            Self::TensorGradMaxMax => tensor_max(trace, |update| update.grad_max as f64),
-            Self::TensorGradNonzeroTotal => tensor_sum(trace, |update| update.grad_nonzero as f64),
-            Self::TensorGradFiniteAll => tensor_all(trace, |update| update.grad_finite),
-            Self::TensorWeightRmsBeforeMax => {
-                tensor_max(trace, |update| update.weight_rms_before as f64)
-            }
-            Self::TensorWeightRmsAfterMax => {
-                tensor_max(trace, |update| update.weight_rms_after as f64)
-            }
-            Self::TensorDeltaRmsMax => tensor_max(trace, |update| update.delta_rms as f64),
-            Self::TensorDeltaMaxMax => tensor_max(trace, |update| update.delta_max as f64),
-            Self::TensorUpdateToWeightRmsMax => {
-                tensor_max(trace, |update| update.update_to_weight_rms as f64)
-            }
-            Self::TensorDeltaGradDotMaxAbs => {
-                tensor_max_abs(trace, |update| update.delta_grad_dot as f64)
-            }
-            Self::TensorDeltaGradCosMaxAbs => {
-                tensor_max_abs(trace, |update| update.delta_grad_cos as f64)
-            }
-            Self::TensorPredictedDeltaRmsMax => {
-                tensor_max(trace, |update| update.predicted_delta_rms as f64)
-            }
-            Self::TensorPredictedDeltaGradDotMaxAbs => {
-                tensor_max_abs(trace, |update| update.predicted_delta_grad_dot as f64)
-            }
-            Self::TensorPredictedDeltaGradCosMaxAbs => {
-                tensor_max_abs(trace, |update| update.predicted_delta_grad_cos as f64)
-            }
-            Self::TensorQuantErrorRmsMax => {
-                tensor_max(trace, |update| update.quant_error_rms as f64)
-            }
-            Self::TensorQuantErrorToPredictedDeltaRmsMax => tensor_max(trace, |update| {
-                update.quant_error_to_predicted_delta_rms as f64
-            }),
-            Self::TensorChangedBytesTotal => {
-                tensor_sum(trace, |update| update.changed_bytes as f64)
-            }
-            Self::TensorChangedScalesTotal => {
-                tensor_sum(trace, |update| update.changed_scales as f64)
-            }
-            Self::TensorGlobalBeforeMaxAbs => {
-                tensor_max_abs(trace, |update| update.global_before as f64)
-            }
-            Self::TensorGlobalAfterMaxAbs => {
-                tensor_max_abs(trace, |update| update.global_after as f64)
-            }
-        }
-    }
-}
-
-fn tensor_sum(trace: &TrainingDiagnostics, value: impl Fn(&TensorUpdateDiagnostics) -> f64) -> f64 {
-    trace.updates.iter().map(value).sum()
-}
-
-fn tensor_max(trace: &TrainingDiagnostics, value: impl Fn(&TensorUpdateDiagnostics) -> f64) -> f64 {
-    max_or_nan(trace.updates.iter().map(value))
-}
-
-fn tensor_max_abs(
-    trace: &TrainingDiagnostics,
-    value: impl Fn(&TensorUpdateDiagnostics) -> f64,
-) -> f64 {
-    max_or_nan(trace.updates.iter().map(|update| value(update).abs()))
-}
-
-fn tensor_all(
-    trace: &TrainingDiagnostics,
-    predicate: impl Fn(&TensorUpdateDiagnostics) -> bool,
-) -> f64 {
-    if trace.updates.is_empty() {
-        f64::NAN
-    } else if trace.updates.iter().all(predicate) {
-        1.0
-    } else {
-        0.0
-    }
-}
-
-fn max_or_nan(values: impl Iterator<Item = f64>) -> f64 {
-    values
-        .reduce(|current, value| current.max(value))
-        .unwrap_or(f64::NAN)
 }
