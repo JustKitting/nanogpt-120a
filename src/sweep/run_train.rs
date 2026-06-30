@@ -78,33 +78,18 @@ fn run_candidate_stage(
     trial_index: usize,
     stage: Stage,
 ) -> std::io::Result<RunResult> {
+    let record = |event: &str, result: &RunResult| {
+        status::record(sweep_dir, trial_dir, trial_index, candidate, event, result)
+    };
+    let record_stage = |suffix: &str, result: &RunResult| {
+        record(&format!("{}_{suffix}", stage.event_prefix()), result)
+    };
     let mut log = File::create(trial_dir.join(stage.log_name()))?;
-    let mut command = Command::new("./target/release/rust-kernels");
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
-    command.env("TRAIN_DATASET", &config.dataset);
-    command.env(
-        "TRAIN_MAX_SECONDS",
-        format!("{:.3}", stage.max_seconds(config)),
-    );
-    command.env("TRAIN_LOG_INTERVAL", config.log_interval.to_string());
-    if let Some(device) = &config.cuda_device {
-        command.env("CUDA_DEVICE_INDEX", device);
-    }
-    for (name, value) in candidate.run_env() {
-        command.env(name, value);
-    }
-
+    let mut command = training_command(candidate, config, stage);
     let mut child = command.spawn()?;
     let stdout = child.stdout.take().expect("stdout must be piped");
     let mut result = RunResult::default();
-    status::record(
-        sweep_dir,
-        trial_dir,
-        trial_index,
-        candidate,
-        &format!("{}_started", stage.event_prefix()),
-        &result,
-    )?;
+    record_stage("started", &result)?;
     for line in BufReader::new(stdout).lines() {
         let line = line?;
         let previous_steps = result.completed_steps;
@@ -116,26 +101,12 @@ fn run_candidate_stage(
             || result.val_loss != previous_val_loss
             || result.saw_nan
         {
-            status::record(
-                sweep_dir,
-                trial_dir,
-                trial_index,
-                candidate,
-                &format!("{}_progress", stage.event_prefix()),
-                &result,
-            )?;
+            record_stage("progress", &result)?;
         }
         if result.saw_nan {
             writeln!(log, "sweep_early_stop=nan_detected")?;
             println!("sweep_early_stop=nan_detected");
-            status::record(
-                sweep_dir,
-                trial_dir,
-                trial_index,
-                candidate,
-                "nan_detected",
-                &result,
-            )?;
+            record("nan_detected", &result)?;
             let _ = child.kill();
             break;
         }
@@ -146,13 +117,26 @@ fn run_candidate_stage(
         }
     }
     child.wait()?;
-    status::record(
-        sweep_dir,
-        trial_dir,
-        trial_index,
-        candidate,
-        &format!("{}_exited", stage.event_prefix()),
-        &result,
-    )?;
+    record_stage("exited", &result)?;
     Ok(result)
+}
+
+fn training_command(candidate: &Candidate, config: &SweepConfig, stage: Stage) -> Command {
+    let mut command = Command::new("./target/release/rust-kernels");
+    command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env("TRAIN_DATASET", &config.dataset)
+        .env(
+            "TRAIN_MAX_SECONDS",
+            format!("{:.3}", stage.max_seconds(config)),
+        )
+        .env("TRAIN_LOG_INTERVAL", config.log_interval.to_string());
+    if let Some(device) = &config.cuda_device {
+        command.env("CUDA_DEVICE_INDEX", device);
+    }
+    for (name, value) in candidate.run_env() {
+        command.env(name, value);
+    }
+    command
 }
