@@ -2,9 +2,9 @@ use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
 use crate::mma::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
-    NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_M,
-    NVFP4_PROJECTION_CTA_N, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
+    NVFP4_PROJECTION_CTA_B_SCALES, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
     nvfp4_projection_cta_kernel_body, nvfp4_projection_cta_kernel_body_at_aligned_row_pair,
+    projection_cta_shape_aligned,
 };
 
 #[allow(static_mut_refs)]
@@ -40,14 +40,8 @@ pub mod module {
             ..params
         };
 
-        if projection_cta_aligned(params) {
-            let tile_col = thread::blockIdx_x();
-            let tile_row_pair = thread::blockIdx_y();
-            let thread_id = thread::threadIdx_x();
-            let tile0 =
-                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2, thread_id);
-            let tile1 =
-                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id);
+        if projection_cta_shape_aligned(params.token_count, params.input_dim, params.output_dim) {
+            let (tile0, tile1) = Nvfp4ProjectionCtaTile::row_pair(thread::threadIdx_x());
             nvfp4_projection_cta_kernel_body_at_aligned_row_pair(
                 input_bytes,
                 input_scales,
@@ -84,12 +78,5 @@ pub mod module {
                 unsafe { &mut B_SCALES },
             );
         }
-    }
-
-    #[inline(always)]
-    fn projection_cta_aligned(params: Nvfp4ProjectionParams) -> bool {
-        params.token_count % NVFP4_PROJECTION_CTA_M == 0
-            && params.input_dim % NVFP4_PROJECTION_CTA_K == 0
-            && params.output_dim % NVFP4_PROJECTION_CTA_N == 0
     }
 }

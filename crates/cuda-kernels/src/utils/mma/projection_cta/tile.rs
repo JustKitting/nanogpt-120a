@@ -43,6 +43,29 @@ impl Nvfp4ProjectionCtaTile {
         }
     }
 
+    pub fn row_pair(thread_id: u32) -> (Self, Self) {
+        let tile_col = thread::blockIdx_x();
+        let tile_row_pair = thread::blockIdx_y();
+        (
+            Self::from_grid_tile(tile_col, tile_row_pair * 2, thread_id),
+            Self::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id),
+        )
+    }
+
+    pub fn packed_row_pair(
+        tile_index: u32,
+        grid_col_mask: u32,
+        grid_col_shift: u32,
+        thread_id: u32,
+    ) -> (Self, Self) {
+        let tile_col = tile_index & grid_col_mask;
+        let tile_row_pair = tile_index >> grid_col_shift;
+        (
+            Self::from_grid_tile(tile_col, tile_row_pair * 2, thread_id),
+            Self::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id),
+        )
+    }
+
     #[inline(always)]
     pub fn mma_row_base(self) -> u32 {
         self.row_base + self.warp_m * 16
@@ -70,4 +93,10 @@ pub fn projection_cta_row_pair_grid_dim(token_count: u32, output_dim: u32) -> (u
 pub fn projection_cta_row_pair_tile_count(token_count: u32, output_dim: u32) -> u32 {
     let grid = projection_cta_row_pair_grid_dim(token_count, output_dim);
     grid.0 * grid.1
+}
+
+pub fn projection_cta_shape_aligned(token_count: u32, input_dim: u32, output_dim: u32) -> bool {
+    token_count % NVFP4_PROJECTION_CTA_M == 0
+        && input_dim % NVFP4_PROJECTION_CTA_K == 0
+        && output_dim % NVFP4_PROJECTION_CTA_N == 0
 }

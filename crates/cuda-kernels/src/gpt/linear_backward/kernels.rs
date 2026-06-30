@@ -106,12 +106,12 @@ pub(super) mod module {
         let thread_id = thread::threadIdx_x();
 
         if tile_index < dinput_tile_count {
-            let tile_col = tile_index & dinput_grid_col_mask;
-            let tile_row_pair = tile_index >> dinput_grid_col_shift;
-            let tile0 =
-                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2, thread_id);
-            let tile1 =
-                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id);
+            let (tile0, tile1) = Nvfp4ProjectionCtaTile::packed_row_pair(
+                tile_index,
+                dinput_grid_col_mask,
+                dinput_grid_col_shift,
+                thread_id,
+            );
 
             dinput_params.weight_global_scale = dinput_weight_global_scale[0];
             nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
@@ -133,12 +133,12 @@ pub(super) mod module {
             );
         } else {
             let dweight_tile_index = tile_index - dinput_tile_count;
-            let tile_col = dweight_tile_index & dweight_grid_col_mask;
-            let tile_row_pair = dweight_tile_index >> dweight_grid_col_shift;
-            let tile0 =
-                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2, thread_id);
-            let tile1 =
-                Nvfp4ProjectionCtaTile::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id);
+            let (tile0, tile1) = Nvfp4ProjectionCtaTile::packed_row_pair(
+                dweight_tile_index,
+                dweight_grid_col_mask,
+                dweight_grid_col_shift,
+                thread_id,
+            );
 
             dweight_params.weight_global_scale = dweight_weight_global_scale[0];
             nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(

@@ -6,7 +6,7 @@ use super::args::{MlpDownResidualArgs, MlpUpRelu2Args, Relu2BackwardArgs, Relu2B
 use super::kernels;
 use crate::mma::{
     NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams,
-    projection_cta_grid_dim, projection_cta_row_pair_grid_dim,
+    projection_cta_grid_dim, projection_cta_row_pair_grid_dim, projection_cta_shape_aligned,
 };
 
 pub struct MlpModule {
@@ -93,7 +93,7 @@ impl MlpModule {
 
 fn aligned_config(token_count: u32, input_dim: u32, output_dim: u32) -> LaunchConfig {
     LaunchConfig {
-        grid_dim: if projection_cta_aligned(token_count, input_dim, output_dim) {
+        grid_dim: if projection_cta_shape_aligned(token_count, input_dim, output_dim) {
             projection_cta_row_pair_grid_dim(token_count, output_dim)
         } else {
             projection_cta_grid_dim(token_count, output_dim)
@@ -101,14 +101,6 @@ fn aligned_config(token_count: u32, input_dim: u32, output_dim: u32) -> LaunchCo
         block_dim: (NVFP4_PROJECTION_CTA_THREADS, 1, 1),
         shared_mem_bytes: 0,
     }
-}
-
-fn projection_cta_aligned(token_count: u32, input_dim: u32, output_dim: u32) -> bool {
-    use crate::mma::{NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_M, NVFP4_PROJECTION_CTA_N};
-
-    token_count % NVFP4_PROJECTION_CTA_M == 0
-        && input_dim % NVFP4_PROJECTION_CTA_K == 0
-        && output_dim % NVFP4_PROJECTION_CTA_N == 0
 }
 
 fn up_params(args: &MlpUpRelu2Args<'_, '_>) -> Nvfp4ProjectionParams {

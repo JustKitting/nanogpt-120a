@@ -3,10 +3,9 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
 use crate::mma::{
-    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_M,
-    NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_THREADS, NVFP4_PROJECTION_THREADS_PER_BLOCK,
-    Nvfp4ProjectionParams, projection_cta_grid_dim, projection_cta_row_pair_tile_count,
-    projection_grid_dim,
+    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS,
+    NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams, projection_cta_grid_dim,
+    projection_cta_row_pair_tile_count, projection_cta_shape_aligned, projection_grid_dim,
 };
 use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 
@@ -129,8 +128,8 @@ impl LinearBackwardModule {
     ) -> Result<(), DriverError> {
         let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
-        if !projection_cta_aligned(args.token_count, args.input_dim, dinput_k)
-            || !projection_cta_aligned(args.output_dim, args.input_dim, dweight_k)
+        if !projection_cta_shape_aligned(args.token_count, dinput_k, args.input_dim)
+            || !projection_cta_shape_aligned(args.output_dim, dweight_k, args.input_dim)
         {
             return self.backward_device_scale(args);
         }
@@ -188,10 +187,4 @@ impl LinearBackwardModule {
                 },
             )
     }
-}
-
-fn projection_cta_aligned(rows: u32, cols: u32, k: u32) -> bool {
-    rows % NVFP4_PROJECTION_CTA_M == 0
-        && cols % NVFP4_PROJECTION_CTA_N == 0
-        && k % NVFP4_PROJECTION_CTA_K == 0
 }
