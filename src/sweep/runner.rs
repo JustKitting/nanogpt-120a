@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use super::{
-    analysis, baseline::Baseline, chain, config::SweepConfig, history::History, optimizer,
+    analysis, baseline::Baseline, chain, config::SweepConfig, fmt, history::History, optimizer,
     proposal_log,
 };
 use crate::time_utils;
@@ -66,12 +66,9 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
             trial.status,
             trial
                 .val_loss
-                .map(|value| format!("{value:.6}"))
+                .map(fmt::f64_6)
                 .unwrap_or_else(|| "NaN".to_string()),
-            trial
-                .completed_steps
-                .map(|value| value.to_string())
-                .unwrap_or_default(),
+            fmt::optional_usize(trial.completed_steps),
             trial.log_path.display()
         );
         history.append_unique(trial.clone())?;

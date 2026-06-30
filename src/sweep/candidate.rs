@@ -1,4 +1,4 @@
-use super::{candidate_space, rng::SweepRng};
+use super::{candidate_space, fmt, rng::SweepRng};
 
 pub const MIN_N_LAYER: usize = 4;
 pub(super) use candidate_space::valid_aurora_phases;
@@ -89,16 +89,13 @@ impl Candidate {
 
     pub fn run_env(&self) -> Vec<(&'static str, String)> {
         vec![
-            ("TRAIN_LR_SCALE", format!("{:.6}", self.lr_scale)),
-            ("TRAIN_ADAM_LR_SCALE", format!("{:.6}", self.adam_lr_scale)),
-            (
-                "TRAIN_NEXTLAT_LR_SCALE",
-                format!("{:.6}", self.nextlat_lr_scale),
-            ),
+            ("TRAIN_LR_SCALE", fmt::f64_6(self.lr_scale)),
+            ("TRAIN_ADAM_LR_SCALE", fmt::f64_6(self.adam_lr_scale)),
+            ("TRAIN_NEXTLAT_LR_SCALE", fmt::f64_6(self.nextlat_lr_scale)),
             ("TRAIN_LR_WARMUP_STEPS", self.warmup_steps.to_string()),
-            ("TRAIN_LR_START_RATIO", format!("{:.6}", self.start_ratio)),
-            ("TRAIN_AMUSE_BETA1", format!("{:.6}", self.amuse_beta1)),
-            ("TRAIN_AMUSE_RHO", format!("{:.6}", self.amuse_rho)),
+            ("TRAIN_LR_START_RATIO", fmt::f64_6(self.start_ratio)),
+            ("TRAIN_AMUSE_BETA1", fmt::f64_6(self.amuse_beta1)),
+            ("TRAIN_AMUSE_RHO", fmt::f64_6(self.amuse_rho)),
         ]
     }
 }
