@@ -1,12 +1,13 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
 use crate::amax::{amax4_f32, max4_f32};
+use crate::block_reduce::block_max_leader_f32;
 use crate::float_ptx::abs_f32;
 use crate::nvfp4_quant::kernels::convert::{
     candidate_error, cvt_rn_satfinite_e2m1x2_f32, local_scale_bits, nonzero_global_scale,
     nvfp4_inv_scale, scale_value,
 };
-use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32, warp_max_f32};
+use crate::warp_reduce::{half_warp_max_f32, half_warp_sum_f32};
 
 use super::threads::WARPS_PER_BLOCK;
 
@@ -60,25 +61,11 @@ pub(super) mod module {
             )
         };
 
-        let warp_amax = warp_max_f32(local_amax);
-        if lane == 0 {
+        if let Some(block_amax) =
+            unsafe { block_max_leader_f32(&mut TENSOR_AMAX, local_amax, lane, warp_in_block) }
+        {
             unsafe {
-                TENSOR_AMAX[warp_in_block as usize] = warp_amax;
-            }
-        }
-        thread::sync_threads();
-
-        if warp_in_block == 0 {
-            let partial = if lane < WARPS_PER_BLOCK {
-                unsafe { TENSOR_AMAX[lane as usize] }
-            } else {
-                0.0
-            };
-            let block_amax = warp_max_f32(partial);
-            if lane == 0 {
-                unsafe {
-                    *out.get_unchecked_mut(chunk as usize) = block_amax;
-                }
+                *out.get_unchecked_mut(chunk as usize) = block_amax;
             }
         }
     }

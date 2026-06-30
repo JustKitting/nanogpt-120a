@@ -1,9 +1,9 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread, warp};
 
+use crate::block_reduce::block_max_shared_f32;
 use crate::f16_tc_matmul::convert::cvt_f32_f16;
 use crate::float_ptx::{fma_f32, sqrt_f32};
 use crate::kda_common::{KDA_DENOM_EPS, silu};
-use crate::warp_reduce::warp_max_f32;
 
 use super::threads::{MATRIX_THREADS_PER_BLOCK, WARPS_PER_BLOCK};
 
@@ -33,7 +33,7 @@ pub(super) mod module {
             return;
         }
 
-        static mut REDUCE: SharedArray<f32, { WARPS_PER_BLOCK as usize * 2 }> = SharedArray::UNINIT;
+        static mut REDUCE: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
         let tid = thread::threadIdx_x();
         let lane = warp::lane_id();
         let warp_id = tid / 32;
@@ -53,14 +53,8 @@ pub(super) mod module {
             row += MATRIX_THREADS_PER_BLOCK;
         }
 
-        let q_max = block_max(q_max, lane, warp_id, unsafe { &mut REDUCE }, 0);
-        let k_max = block_max(
-            k_max,
-            lane,
-            warp_id,
-            unsafe { &mut REDUCE },
-            WARPS_PER_BLOCK,
-        );
+        let q_max = unsafe { block_max_shared_f32(&mut REDUCE, q_max, lane, warp_id) };
+        let k_max = unsafe { block_max_shared_f32(&mut REDUCE, k_max, lane, warp_id) };
         let score = q_max * k_max / sqrt_f32(head_dim as f32);
         let factor = clip_factor(score, tau);
         if tid == 0 {
@@ -124,32 +118,6 @@ fn qk_norms(qkv: &[u16], row: u32, head: u32, params: ClipParams, silu_qk: u32) 
 
 fn qkv_index(row: u32, head: u32, dim: u32, section_offset: u32, params: ClipParams) -> usize {
     (row * params.qkv_dim + section_offset + head * params.head_dim + dim) as usize
-}
-
-fn block_max(
-    local: f32,
-    lane: u32,
-    warp_id: u32,
-    reduce: &mut SharedArray<f32, { WARPS_PER_BLOCK as usize * 2 }>,
-    offset: u32,
-) -> f32 {
-    let warp_value = warp_max_f32(local);
-    if lane == 0 {
-        reduce[(offset + warp_id) as usize] = warp_value;
-    }
-    thread::sync_threads();
-
-    let partial = if warp_id == 0 && lane < WARPS_PER_BLOCK {
-        reduce[(offset + lane) as usize]
-    } else {
-        0.0
-    };
-    let block_value = warp_max_f32(partial);
-    if warp_id == 0 && lane == 0 {
-        reduce[offset as usize] = block_value;
-    }
-    thread::sync_threads();
-    reduce[offset as usize]
 }
 
 fn clip_factor(score: f32, tau: f32) -> f32 {
