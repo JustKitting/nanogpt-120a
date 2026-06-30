@@ -1,13 +1,11 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
+use cuda_device::{DisjointSlice, cuda_module, kernel, thread};
 
 use crate::f16_tc_matmul::convert::cvt_f32_f16;
 use crate::float_ptx::max_f32;
 use crate::mma::{
-    NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
-    NVFP4_PROJECTION_CTA_B_SCALES, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
-    nvfp4_projection_cta_kernel_body, nvfp4_projection_cta_kernel_body_at_aligned_row_pair,
-    nvfp4_projection_cta_relu2_kernel_body,
-    nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair, projection_cta_shape_aligned,
+    Nvfp4ProjectionParams, dispatch_projection_cta_tiles, nvfp4_projection_cta_kernel_body,
+    nvfp4_projection_cta_kernel_body_at_aligned_row_pair, nvfp4_projection_cta_relu2_kernel_body,
+    nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair,
 };
 
 pub(super) const RELU2_THREADS_PER_BLOCK: u32 = 256;
@@ -38,51 +36,20 @@ mod module {
             ..params
         };
 
-        static mut A_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
-        static mut A1_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
-        static mut B_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS> = SharedArray::UNINIT;
-        static mut A_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
-        static mut A1_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
-        static mut B_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES> = SharedArray::UNINIT;
-
-        if projection_cta_shape_aligned(params.token_count, params.input_dim, params.output_dim) {
-            let (tile0, tile1) = Nvfp4ProjectionCtaTile::row_pair(thread::threadIdx_x());
-            nvfp4_projection_cta_kernel_body_at_aligned_row_pair(
-                input_bytes,
-                input_scales,
-                input_global_scales,
-                weight_bytes,
-                weight_scales,
-                bias_bytes,
-                bias_scales,
-                &mut out,
-                params,
-                unsafe { &mut A_PACKS },
-                unsafe { &mut A1_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut A1_SCALES },
-                unsafe { &mut B_SCALES },
-                tile0,
-                tile1,
-            );
-        } else {
-            nvfp4_projection_cta_kernel_body(
-                input_bytes,
-                input_scales,
-                input_global_scales,
-                weight_bytes,
-                weight_scales,
-                bias_bytes,
-                bias_scales,
-                &mut out,
-                params,
-                unsafe { &mut A_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut B_SCALES },
-            );
-        }
+        dispatch_projection_cta_tiles!(
+            params,
+            nvfp4_projection_cta_kernel_body_at_aligned_row_pair,
+            nvfp4_projection_cta_kernel_body;
+            input_bytes,
+            input_scales,
+            input_global_scales,
+            weight_bytes,
+            weight_scales,
+            bias_bytes,
+            bias_scales,
+            &mut out,
+            params,
+        );
     }
 
     #[kernel]
@@ -107,53 +74,21 @@ mod module {
             ..params
         };
 
-        static mut A_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
-        static mut A1_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
-        static mut B_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS> = SharedArray::UNINIT;
-        static mut A_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
-        static mut A1_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
-        static mut B_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES> = SharedArray::UNINIT;
-
-        if projection_cta_shape_aligned(params.token_count, params.input_dim, params.output_dim) {
-            let (tile0, tile1) = Nvfp4ProjectionCtaTile::row_pair(thread::threadIdx_x());
-            nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair(
-                input_bytes,
-                input_scales,
-                input_global_scales,
-                weight_bytes,
-                weight_scales,
-                bias_bytes,
-                bias_scales,
-                &mut pre_activation,
-                &mut out,
-                params,
-                unsafe { &mut A_PACKS },
-                unsafe { &mut A1_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut A1_SCALES },
-                unsafe { &mut B_SCALES },
-                tile0,
-                tile1,
-            );
-        } else {
-            nvfp4_projection_cta_relu2_kernel_body(
-                input_bytes,
-                input_scales,
-                input_global_scales,
-                weight_bytes,
-                weight_scales,
-                bias_bytes,
-                bias_scales,
-                &mut pre_activation,
-                &mut out,
-                params,
-                unsafe { &mut A_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut B_SCALES },
-            );
-        }
+        dispatch_projection_cta_tiles!(
+            params,
+            nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair,
+            nvfp4_projection_cta_relu2_kernel_body;
+            input_bytes,
+            input_scales,
+            input_global_scales,
+            weight_bytes,
+            weight_scales,
+            bias_bytes,
+            bias_scales,
+            &mut pre_activation,
+            &mut out,
+            params,
+        );
     }
 
     #[kernel]

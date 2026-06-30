@@ -35,4 +35,5 @@ pub use projection_cta::{
     projection_cta_row_pair_grid_dim, projection_cta_row_pair_tile_count,
     projection_cta_shape_aligned,
 };
+pub(crate) use projection_cta::{dispatch_projection_cta_tiles, with_projection_cta_tiles};
 pub use tensors::{Nvfp4DeviceScaleMmaWeightTensor, Nvfp4FourSixMmaWeightTensor};

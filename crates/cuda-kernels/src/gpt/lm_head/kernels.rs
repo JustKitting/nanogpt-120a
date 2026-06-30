@@ -1,11 +1,9 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
+use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::LmHeadParams;
 use crate::mma::{
-    NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
-    NVFP4_PROJECTION_CTA_B_SCALES, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
-    nvfp4_projection_cta_nobias_kernel_body,
-    nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair, projection_cta_shape_aligned,
+    Nvfp4ProjectionParams, dispatch_projection_cta_tiles, nvfp4_projection_cta_nobias_kernel_body,
+    nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
 };
 
 #[allow(static_mut_refs)]
@@ -24,13 +22,6 @@ pub(super) mod module {
         mut logits: DisjointSlice<f32>,
         params: LmHeadParams,
     ) {
-        static mut A_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
-        static mut A1_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
-        static mut B_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS> = SharedArray::UNINIT;
-        static mut A_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
-        static mut A1_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
-        static mut B_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES> = SharedArray::UNINIT;
-
         let projection = Nvfp4ProjectionParams {
             token_count: params.token_count,
             input_dim: params.input_dim,
@@ -41,41 +32,18 @@ pub(super) mod module {
             activation: 0,
         };
 
-        if projection_cta_shape_aligned(params.token_count, params.input_dim, params.vocab_size) {
-            let (tile0, tile1) = Nvfp4ProjectionCtaTile::row_pair(thread::threadIdx_x());
-
-            nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
-                input_bytes,
-                input_scales,
-                input_global_scales,
-                weight_bytes,
-                weight_scales,
-                &mut logits,
-                projection,
-                unsafe { &mut A_PACKS },
-                unsafe { &mut A1_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut A1_SCALES },
-                unsafe { &mut B_SCALES },
-                tile0,
-                tile1,
-            );
-        } else {
-            nvfp4_projection_cta_nobias_kernel_body(
-                input_bytes,
-                input_scales,
-                input_global_scales,
-                weight_bytes,
-                weight_scales,
-                &mut logits,
-                projection,
-                unsafe { &mut A_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut B_SCALES },
-            );
-        }
+        dispatch_projection_cta_tiles!(
+            projection,
+            nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
+            nvfp4_projection_cta_nobias_kernel_body;
+            input_bytes,
+            input_scales,
+            input_global_scales,
+            weight_bytes,
+            weight_scales,
+            &mut logits,
+            projection,
+        );
     }
 }
 

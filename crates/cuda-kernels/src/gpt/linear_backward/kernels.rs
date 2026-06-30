@@ -5,7 +5,7 @@ use crate::mma::{
     NVFP4_PROJECTION_CTA_B_SCALES, Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams,
     nvfp4_projection_cta_nobias_kernel_body,
     nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
-    nvfp4_projection_nobias_kernel_body,
+    nvfp4_projection_nobias_kernel_body, with_projection_cta_tiles,
 };
 
 use super::{LINEAR_BIAS_THREADS_PER_BLOCK, bias};
@@ -49,13 +49,9 @@ pub(super) mod module {
         mut out: DisjointSlice<f32>,
         mut params: Nvfp4ProjectionParams,
     ) {
-        static mut A_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS> = SharedArray::UNINIT;
-        static mut B_PACKS: SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS> = SharedArray::UNINIT;
-        static mut A_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES> = SharedArray::UNINIT;
-        static mut B_SCALES: SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES> = SharedArray::UNINIT;
-
         params.weight_global_scale = weight_global_scale[0];
-        nvfp4_projection_cta_nobias_kernel_body(
+        with_projection_cta_tiles!(
+            nvfp4_projection_cta_nobias_kernel_body;
             input_bytes,
             input_scales,
             input_global_scales,
@@ -63,10 +59,6 @@ pub(super) mod module {
             weight_scales,
             &mut out,
             params,
-            unsafe { &mut A_PACKS },
-            unsafe { &mut B_PACKS },
-            unsafe { &mut A_SCALES },
-            unsafe { &mut B_SCALES },
         );
     }
 
