@@ -6,20 +6,19 @@ use burn::train::{
     ValidLoader,
 };
 
-use super::config::{
-    generate_prompt, generate_tokens, load_model_path, sampling_config, should_eval_step,
-    should_log_step,
-};
+use super::config::{load_model_path, should_eval_step, should_log_step};
 use super::metrics::CudaTrainOutput;
-use super::output::{RunOutput, ensure_parent, save_model_path, write_generated_text};
+use super::output::RunOutput;
 use super::{CudaLearningComponents, TrainConfig};
 use crate::AppResult;
 use crate::training::{Trainer, debug_metrics};
 
+mod artifacts;
 mod budget;
 mod progress;
 mod validation;
 
+use artifacts::finish_training_artifacts;
 use budget::WallClockBudget;
 use progress::{TRAIN_EPOCH, epoch_progress};
 use validation::{process_validation, validation_input};
@@ -154,21 +153,11 @@ impl CudaTrainingStrategy {
             final_eval.val_loss, train_elapsed_s, final_eval.eval_elapsed_s,
         );
 
-        if let Some(path) = save_model_path(&self.run_output) {
-            ensure_parent(&path)?;
-            trainer.save_model(&path)?;
-            println!("saved_model={}", path.display());
-        }
-
-        if let Some(prompt) = generate_prompt(&self.dataset, train_elapsed_s) {
-            let text = trainer.generate_sampled(&prompt, generate_tokens(), sampling_config())?;
-            let generated_path = write_generated_text(&self.run_output, &text)?;
-            println!("generated_text={}", generated_path.display());
-            println!("generated_text_begin");
-            println!("{text}");
-            println!("generated_text_end");
-        }
-
-        Ok(())
+        finish_training_artifacts(
+            &mut trainer,
+            &self.dataset,
+            train_elapsed_s,
+            &self.run_output,
+        )
     }
 }
