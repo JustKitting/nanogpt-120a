@@ -11,7 +11,8 @@ use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
 
 use super::{
     LINEAR_BIAS_THREADS_PER_BLOCK, LinearBackwardDeviceScaleArgs, LinearBackwardInputTranspose,
-    LinearBackwardModule, LinearBackwardMsEdenArgs, LinearBackwardWeightTranspose, bias,
+    LinearBackwardModule, LinearBackwardMsEdenArgs, LinearBackwardWeightTranspose,
+    MsEdenOperandScratch, bias,
 };
 
 impl LinearBackwardModule {
@@ -33,7 +34,7 @@ impl LinearBackwardModule {
             )?;
         }
 
-        let scratch = args.scratch;
+        let mut scratch = args.scratch;
         let output_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let token_k = nvfp4_tc_matmul_padded_k(args.token_count);
 
@@ -68,11 +69,7 @@ impl LinearBackwardModule {
                     QuantizeOperandArgs {
                         stream: args.stream,
                         x: weight_t,
-                        scratch: &mut *scratch.weight_t_h.bytes,
-                        scales: &mut *scratch.weight_t_h.scales,
-                        global_scales: &mut *scratch.weight_t_h.global_scales,
-                        chunk_amax: &mut *scratch.weight_t_h.chunk_amax,
-                        global_scale: &mut *scratch.weight_t_h.global_scale,
+                        operand: &mut scratch.weight_t_h,
                         row_count: args.input_dim,
                         src_row_len: args.output_dim,
                         dst_row_len: output_k,
@@ -109,11 +106,7 @@ impl LinearBackwardModule {
                     QuantizeOperandArgs {
                         stream: args.stream,
                         x: input_t,
-                        scratch: &mut *scratch.input_t_h.bytes,
-                        scales: &mut *scratch.input_t_h.scales,
-                        global_scales: &mut *scratch.input_t_h.global_scales,
-                        chunk_amax: &mut *scratch.input_t_h.chunk_amax,
-                        global_scale: &mut *scratch.input_t_h.global_scale,
+                        operand: &mut scratch.input_t_h,
                         row_count: args.input_dim,
                         src_row_len: args.token_count,
                         dst_row_len: token_k,
@@ -159,14 +152,10 @@ impl LinearBackwardModule {
     }
 }
 
-struct QuantizeOperandArgs<'a, 'out> {
+struct QuantizeOperandArgs<'a, 'operand, 'scratch> {
     stream: &'a CudaStream,
     x: &'a DeviceBuffer<f32>,
-    scratch: &'out mut DeviceBuffer<u8>,
-    scales: &'out mut DeviceBuffer<u8>,
-    global_scales: &'out mut DeviceBuffer<f32>,
-    chunk_amax: &'out mut DeviceBuffer<f32>,
-    global_scale: &'out mut DeviceBuffer<f32>,
+    operand: &'operand mut MsEdenOperandScratch<'scratch>,
     row_count: u32,
     src_row_len: u32,
     dst_row_len: u32,
@@ -177,13 +166,14 @@ struct QuantizeOperandArgs<'a, 'out> {
 
 fn quantize_operand(
     module: &Nvfp4QuantModule,
-    args: QuantizeOperandArgs<'_, '_>,
+    args: QuantizeOperandArgs<'_, '_, '_>,
 ) -> Result<(), DriverError> {
+    let operand = args.operand;
     if let Some(chunk_count) = args.precomputed_chunk_count {
         module.quartet_backward_ms_eden_global_scale_from_chunks(
             args.stream,
-            &*args.chunk_amax,
-            &mut *args.global_scale,
+            &*operand.chunk_amax,
+            &mut *operand.global_scale,
             chunk_count,
         )?;
 
@@ -191,11 +181,11 @@ fn quantize_operand(
             MsEdenDeviceScaleQuantArgs {
                 stream: args.stream,
                 x: args.x,
-                out_fp4: args.scratch,
-                out_scales: args.scales,
-                out_global_scales: args.global_scales,
-                out_chunk_amax: args.chunk_amax,
-                global_scale: &*args.global_scale,
+                out_fp4: operand.bytes,
+                out_scales: operand.scales,
+                out_global_scales: operand.global_scales,
+                out_chunk_amax: operand.chunk_amax,
+                global_scale: &*operand.global_scale,
                 row_count: args.row_count,
                 src_row_len: args.src_row_len,
                 dst_row_len: args.dst_row_len,
@@ -210,11 +200,11 @@ fn quantize_operand(
         QuartetBackwardMsEdenDeviceScaleQuantArgs {
             stream: args.stream,
             x: args.x,
-            out_fp4: args.scratch,
-            out_scales: args.scales,
-            out_global_scales: args.global_scales,
-            out_chunk_amax: args.chunk_amax,
-            out_global_scale: args.global_scale,
+            out_fp4: operand.bytes,
+            out_scales: operand.scales,
+            out_global_scales: operand.global_scales,
+            out_chunk_amax: operand.chunk_amax,
+            out_global_scale: operand.global_scale,
             row_count: args.row_count,
             src_row_len: args.src_row_len,
             dst_row_len: args.dst_row_len,
