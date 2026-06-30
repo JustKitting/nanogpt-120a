@@ -19,15 +19,15 @@ pub(super) fn default_renderer(interrupter: Interrupter) -> Box<dyn MetricsRende
 
     if wants_tui && std::io::stdout().is_terminal() {
         let renderer = TuiMetricsRendererWrapper::new(interrupter, None);
-        if persistent {
+        return if persistent {
             Box::new(renderer.persistent())
         } else {
             Box::new(renderer)
-        }
-    } else if matches!(mode.as_str(), "tui" | "tui-persistent" | "persistent") {
-        eprintln!("train_renderer_fallback=cli reason=stdout_not_tty requested={mode}");
-        Box::new(CliMetricsRenderer::new())
-    } else {
-        Box::new(CliMetricsRenderer::new())
+        };
     }
+
+    if matches!(mode.as_str(), "tui" | "tui-persistent" | "persistent") {
+        eprintln!("train_renderer_fallback=cli reason=stdout_not_tty requested={mode}");
+    }
+    Box::new(CliMetricsRenderer::new())
 }
