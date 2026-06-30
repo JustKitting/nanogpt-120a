@@ -135,19 +135,22 @@ fn fmt_prediction(value: Option<Prediction>) -> String {
 }
 
 fn value(prediction: Option<Prediction>) -> String {
-    prediction
-        .map(|prediction| format!("{:.8}", prediction.value))
-        .unwrap_or_default()
+    prediction_field(prediction, |prediction| prediction.value)
 }
 
 fn standard_score(prediction: Option<Prediction>) -> String {
-    prediction
-        .map(|prediction| format!("{:.8}", prediction.standard_score))
-        .unwrap_or_default()
+    prediction_field(prediction, |prediction| prediction.standard_score)
 }
 
 fn uncertainty(prediction: Option<Prediction>) -> String {
+    prediction_field(prediction, |prediction| prediction.uncertainty)
+}
+
+fn prediction_field(
+    prediction: Option<Prediction>,
+    value: impl FnOnce(Prediction) -> f64,
+) -> String {
     prediction
-        .map(|prediction| format!("{:.8}", prediction.uncertainty))
+        .map(|prediction| format!("{:.8}", value(prediction)))
         .unwrap_or_default()
 }

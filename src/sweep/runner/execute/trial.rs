@@ -22,59 +22,21 @@ pub(in crate::sweep::runner) fn run_trial(
     fs::create_dir_all(trial_dir)?;
     history::write_candidate(&trial_dir.join("candidate.env"), &candidate)?;
     let mut run_result = RunResult::default();
-    status::record(
-        sweep_dir,
-        trial_dir,
-        index,
-        &candidate,
-        "trial_started",
-        &run_result,
-    )?;
+    let record = |event: &str, result: &RunResult| {
+        status::record(sweep_dir, trial_dir, index, &candidate, event, result)
+    };
+    record("trial_started", &run_result)?;
     if config.dry_run {
-        status::record(
-            sweep_dir,
-            trial_dir,
-            index,
-            &candidate,
-            "dry_run",
-            &run_result,
-        )?;
-        return Ok(trial(
-            candidate, "dry_run", None, None, None, None, None, None, None, trial_dir,
-        ));
+        record("dry_run", &run_result)?;
+        return Ok(empty_trial(candidate, "dry_run", trial_dir));
     }
 
-    status::record(
-        sweep_dir,
-        trial_dir,
-        index,
-        &candidate,
-        "build_started",
-        &run_result,
-    )?;
+    record("build_started", &run_result)?;
     let build_status =
         run_build::build_candidate(&candidate, config, &trial_dir.join("build.log"))?;
     if !build_status.success() {
-        status::record(
-            sweep_dir,
-            trial_dir,
-            index,
-            &candidate,
-            "failed_build",
-            &run_result,
-        )?;
-        return Ok(trial(
-            candidate,
-            "failed_build",
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            trial_dir,
-        ));
+        record("failed_build", &run_result)?;
+        return Ok(empty_trial(candidate, "failed_build", trial_dir));
     }
 
     let screen_result =
@@ -82,11 +44,7 @@ pub(in crate::sweep::runner) fn run_trial(
     let screen_decision = screen_gate::decide(&screen_result, screen_baseline, screen_score);
     screen_gate::write(&trial_dir.join("screen_decision.env"), &screen_decision)?;
     if !screen_decision.pass {
-        status::record(
-            sweep_dir,
-            trial_dir,
-            index,
-            &candidate,
+        record(
             &format!("rejected_screen_{}", screen_decision.reason),
             &screen_result,
         )?;
@@ -104,14 +62,7 @@ pub(in crate::sweep::runner) fn run_trial(
             "screen.log",
         ));
     }
-    status::record(
-        sweep_dir,
-        trial_dir,
-        index,
-        &candidate,
-        "screen_passed",
-        &screen_result,
-    )?;
+    record("screen_passed", &screen_result)?;
 
     run_result = run_train::run_candidate(&candidate, config, sweep_dir, trial_dir, index)?;
     let status_name = match (run_result.val_loss, run_result.saw_nan) {
@@ -120,14 +71,7 @@ pub(in crate::sweep::runner) fn run_trial(
         (None, true) => "nan",
         (None, false) => "failed_run",
     };
-    status::record(
-        sweep_dir,
-        trial_dir,
-        index,
-        &candidate,
-        status_name,
-        &run_result,
-    )?;
+    record(status_name, &run_result)?;
     Ok(trial(
         candidate,
         status_name,
@@ -140,4 +84,10 @@ pub(in crate::sweep::runner) fn run_trial(
         Some(screen_decision.reason),
         trial_dir,
     ))
+}
+
+fn empty_trial(candidate: Candidate, status: &'static str, trial_dir: &Path) -> Trial {
+    trial(
+        candidate, status, None, None, None, None, None, None, None, trial_dir,
+    )
 }
