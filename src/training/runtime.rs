@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
 use cuda_core::{CudaContext, CudaStream};
-use gpt2_nvfp4::{
-    AttentionBackwardModules, BlockAttentionBackwardModules, BlockMlpBackwardModules,
-    FinalHeadBackwardModules, Gpt2BackwardModules, MlpBackwardModules,
-};
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::embedding::EmbeddingModule;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
@@ -23,6 +19,8 @@ use rust_kernels_cuda::residual::ResidualBackwardModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
 use crate::AppResult;
+
+mod backward;
 
 pub struct Runtime {
     pub stream: Arc<CudaStream>,
@@ -68,44 +66,6 @@ impl Runtime {
             residual: ResidualBackwardModule::from_module(ptx.clone())?,
             optimizer: OptimizerModule::from_module(ptx)?,
         })
-    }
-
-    pub fn backward_modules(&self) -> Gpt2BackwardModules<'_> {
-        let linear = AttentionBackwardModules {
-            transpose: &self.transpose,
-            decode: &self.decode,
-            linear: &self.linear,
-            quant: &self.quant,
-        };
-        Gpt2BackwardModules {
-            residual: &self.residual,
-            final_head: FinalHeadBackwardModules {
-                loss: &self.loss,
-                transpose: &self.transpose,
-                decode: &self.decode,
-                linear: &self.linear,
-                quant: &self.quant,
-            },
-            final_norm: &self.layer_norm_backward,
-            attention: BlockAttentionBackwardModules {
-                residual: &self.residual,
-                layer_norm: &self.layer_norm_backward,
-                attention: &self.attention,
-                f16_tc: &self.f16_tc_matmul,
-                linear,
-            },
-            mlp: BlockMlpBackwardModules {
-                residual: &self.residual,
-                layer_norm: &self.layer_norm_backward,
-                mlp: MlpBackwardModules {
-                    transpose: &self.transpose,
-                    decode: &self.decode,
-                    linear: &self.linear,
-                    quant: &self.quant,
-                    mlp: &self.mlp,
-                },
-            },
-        }
     }
 }
 
