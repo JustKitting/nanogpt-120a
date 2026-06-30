@@ -2,7 +2,6 @@ use burn::train::SupervisedTraining;
 
 use super::CudaLearningComponents;
 
-mod accumulator;
 mod output;
 mod train;
 mod valid;

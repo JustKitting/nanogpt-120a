@@ -8,6 +8,7 @@ use burn::train::metric::{
 
 use super::super::diagnostics::{TensorUpdateDiagnostics, TrainingDiagnostics};
 use super::super::launch::{CudaLearningComponents, CudaTrainOutput};
+use crate::training::metric_accumulator::MetricAccumulator;
 
 #[derive(Clone, Copy)]
 struct DebugMetricSpec {
@@ -134,14 +135,14 @@ impl DebugMetricField {
 #[derive(Clone)]
 struct CudaDebugMetric {
     spec: DebugMetricSpec,
-    state: DebugMetricAccumulator,
+    state: MetricAccumulator,
 }
 
 impl CudaDebugMetric {
     fn new(spec: DebugMetricSpec) -> Self {
         Self {
             spec,
-            state: DebugMetricAccumulator::default(),
+            state: MetricAccumulator::default(),
         }
     }
 }
@@ -178,46 +179,6 @@ impl Numeric for CudaDebugMetric {
 
     fn running_value(&self) -> NumericEntry {
         self.state.running_value()
-    }
-}
-
-#[derive(Clone, Default)]
-struct DebugMetricAccumulator {
-    current: f64,
-    sum: f64,
-    count: usize,
-}
-
-impl DebugMetricAccumulator {
-    fn update(&mut self, value: f64, unit: Option<&str>) -> SerializedEntry {
-        self.current = value;
-        if value.is_finite() {
-            self.sum += value;
-            self.count += 1;
-        }
-        SerializedEntry {
-            formatted: format_metric_value(value, unit),
-            serialized: value.to_string(),
-        }
-    }
-
-    fn clear(&mut self) {
-        *self = Self::default();
-    }
-
-    fn value(&self) -> NumericEntry {
-        NumericEntry::Value(self.current)
-    }
-
-    fn running_value(&self) -> NumericEntry {
-        if self.count == 0 {
-            NumericEntry::Value(f64::NAN)
-        } else {
-            NumericEntry::Aggregated {
-                aggregated_value: self.sum / self.count as f64,
-                count: self.count,
-            }
-        }
     }
 }
 
@@ -262,11 +223,4 @@ fn max_or_nan(values: impl Iterator<Item = f64>) -> f64 {
     values
         .reduce(|current, value| current.max(value))
         .unwrap_or(f64::NAN)
-}
-
-fn format_metric_value(value: f64, unit: Option<&str>) -> String {
-    match unit {
-        Some(unit) => format!("{value:.6} {unit}"),
-        None => format!("{value:.6}"),
-    }
 }

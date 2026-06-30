@@ -79,6 +79,7 @@ mod grads;
 mod launch;
 mod learning_rate;
 mod linear_scratch;
+mod metric_accumulator;
 mod next_latent;
 mod operand_scratch;
 mod optimizer;

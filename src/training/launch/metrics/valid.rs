@@ -6,9 +6,9 @@ use burn::train::metric::{
     SerializedEntry,
 };
 
-use super::accumulator::MetricAccumulator;
 use super::output::CudaValidOutput;
 use crate::training::launch::CudaLearningComponents;
+use crate::training::metric_accumulator::MetricAccumulator;
 
 #[derive(Clone, Copy)]
 struct ValidMetricSpec {
