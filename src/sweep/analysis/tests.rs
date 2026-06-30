@@ -1,7 +1,9 @@
+use super::super::history::Trial;
 use super::super::test_fixtures::{
     basic_candidate as candidate, quality_config, success_trial as trial, trial_with_losses,
     trial_with_status,
 };
+use super::SweepAnalysis;
 
 #[test]
 fn scoring_uses_pairwise_interaction_signal() {
@@ -32,12 +34,7 @@ fn scoring_uses_pairwise_interaction_signal() {
 #[test]
 fn scoring_reports_expected_improvement_against_best_observed_quality() {
     let config = config();
-    let trials = [
-        trial(candidate(4, 4), 9.0),
-        trial(candidate(4, 8), 5.0),
-        trial(candidate(16, 4), 5.0),
-        trial(candidate(16, 8), 1.0),
-    ];
+    let trials = quality_trials();
     let analysis = super::analyze(&trials, &config);
     let best_like = super::score_candidate(&analysis, &config, &candidate(16, 8));
     let bad_like = super::score_candidate(&analysis, &config, &candidate(4, 4));
@@ -61,18 +58,8 @@ fn scoring_prefers_screen_quality_over_sparse_full_quality_for_proposals() {
     let low_batch = super::score_candidate(&analysis, &config, &candidate(4, 4));
     let high_batch = super::score_candidate(&analysis, &config, &candidate(32, 4));
 
-    assert!(
-        analysis
-            .models
-            .iter()
-            .any(|model| model.name == "screen_quality")
-    );
-    assert!(
-        analysis
-            .models
-            .iter()
-            .any(|model| model.name == "full_quality")
-    );
+    assert!(has_model(&analysis, "screen_quality"));
+    assert!(has_model(&analysis, "full_quality"));
     assert!(
         low_batch.predicted_quality.unwrap().standard_score
             > high_batch.predicted_quality.unwrap().standard_score
@@ -82,12 +69,7 @@ fn scoring_prefers_screen_quality_over_sparse_full_quality_for_proposals() {
 #[test]
 fn factor_beliefs_aggregate_direction_and_confidence() {
     let config = config();
-    let trials = [
-        trial(candidate(4, 4), 9.0),
-        trial(candidate(4, 8), 5.0),
-        trial(candidate(16, 4), 5.0),
-        trial(candidate(16, 8), 1.0),
-    ];
+    let trials = quality_trials();
     let analysis = super::analyze(&trials, &config);
     let beliefs = super::factor_beliefs(&analysis, &config);
     let batch = beliefs
@@ -134,14 +116,22 @@ fn scoring_uses_stability_prior_when_stability_model_is_constant_failure() {
     let analysis = super::analyze(&trials, &config);
     let score = super::score_candidate(&analysis, &config, &candidate(8, 4));
 
-    assert!(
-        analysis
-            .models
-            .iter()
-            .all(|model| model.name != "stability")
-    );
+    assert!(!has_model(&analysis, "stability"));
     assert!(score.survival_prior < 0.5);
     assert!(score.expected_quality < -3.0);
+}
+
+fn quality_trials() -> [Trial; 4] {
+    [
+        trial(candidate(4, 4), 9.0),
+        trial(candidate(4, 8), 5.0),
+        trial(candidate(16, 4), 5.0),
+        trial(candidate(16, 8), 1.0),
+    ]
+}
+
+fn has_model(analysis: &SweepAnalysis, name: &str) -> bool {
+    analysis.models.iter().any(|model| model.name == name)
 }
 
 fn config() -> super::super::config::SweepConfig {
