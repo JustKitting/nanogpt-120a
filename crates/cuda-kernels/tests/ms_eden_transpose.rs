@@ -2,8 +2,7 @@ use std::error::Error;
 
 use cuda_core::{CudaContext, DeviceBuffer};
 use rust_kernels_cuda::nvfp4::{
-    Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4DeviceTensor,
-    Nvfp4RowwiseDecodeTransposeArgs, Nvfp4RowwiseDeviceTensor,
+    Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4RowwiseDecodeTransposeArgs,
 };
 use rust_kernels_cuda::nvfp4_quant::{
     MsEdenDeviceScaleQuantArgs, MsEdenTransposeDeviceScaleQuantArgs, Nvfp4QuantArgs,
@@ -11,18 +10,13 @@ use rust_kernels_cuda::nvfp4_quant::{
     QuartetBackwardMsEdenDeviceScaleQuantArgs, RowAmaxArgs,
     RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
 };
-use rust_kernels_cuda::nvfp4_tc_matmul::{
-    nvfp4_tc_matmul_bytes, nvfp4_tc_matmul_chunks, nvfp4_tc_matmul_padded_k, nvfp4_tc_matmul_scales,
-};
 use rust_kernels_cuda::transpose::{TransposeF32Args, TransposeModule};
 
 mod common;
+#[path = "ms_eden_transpose/support.rs"]
+mod support;
 
-const ROWS: usize = 33;
-const COLS: usize = 16;
-const SIGN_SEED: u32 = 0x1c69_b3f5;
-const SCALE_SEED: u32 = 0x4a7c_15d3;
-const SCALE_OVERRIDE: f32 = 0.25;
+use support::*;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -80,22 +74,7 @@ fn fp32_transpose_ms_eden_matches_materialized_transpose() -> Result<(), Box<dyn
         scale_seed: SCALE_SEED,
     })?;
 
-    assert_eq!(
-        direct.bytes.to_host_vec(&stream)?,
-        materialized.bytes.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.scales.to_host_vec(&stream)?,
-        materialized.scales.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.global_scales.to_host_vec(&stream)?,
-        materialized.global_scales.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.chunk_amax.to_host_vec(&stream)?,
-        materialized.chunk_amax.to_host_vec(&stream)?
-    );
+    direct.assert_ms_eden_eq(&stream, &materialized)?;
     Ok(())
 }
 
@@ -175,26 +154,7 @@ fn rowwise_nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), B
         },
     )?;
 
-    assert_eq!(
-        direct.bytes.to_host_vec(&stream)?,
-        materialized.bytes.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.scales.to_host_vec(&stream)?,
-        materialized.scales.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.global_scales.to_host_vec(&stream)?,
-        materialized.global_scales.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.chunk_amax.to_host_vec(&stream)?,
-        materialized.chunk_amax.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.global_scale.to_host_vec(&stream)?,
-        materialized.global_scale.to_host_vec(&stream)?
-    );
+    direct.assert_quartet_eq(&stream, &materialized)?;
     Ok(())
 }
 
@@ -220,24 +180,10 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
         .collect::<Vec<_>>();
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let mut row_amax = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_ROWS)?;
-    let mut source_bytes = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 2)?;
-    let mut source_scales = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 16)?;
-    let mut source_global_scales = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_ROWS)?;
+    let mut source = RowwiseSourceScratch::new_for_shape(&stream, LOCAL_ROWS, LOCAL_COLS)?;
     let mut x_t_dev = DeviceBuffer::<f32>::zeroed(&stream, x.len())?;
-
-    let out_bytes = LOCAL_ROWS * LOCAL_COLS / 2;
-    let out_scales = LOCAL_ROWS * LOCAL_COLS / 16;
-    let out_chunks = LOCAL_ROWS * LOCAL_COLS / 32;
-    let mut materialized_bytes = DeviceBuffer::<u8>::zeroed(&stream, out_bytes)?;
-    let mut materialized_scales = DeviceBuffer::<u8>::zeroed(&stream, out_scales)?;
-    let mut materialized_global_scales = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_COLS)?;
-    let mut materialized_chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, out_chunks)?;
-    let mut materialized_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
-    let mut direct_bytes = DeviceBuffer::<u8>::zeroed(&stream, out_bytes)?;
-    let mut direct_scales = DeviceBuffer::<u8>::zeroed(&stream, out_scales)?;
-    let mut direct_global_scales = DeviceBuffer::<f32>::zeroed(&stream, LOCAL_COLS)?;
-    let mut direct_chunk_amax = DeviceBuffer::<f32>::zeroed(&stream, out_chunks)?;
-    let mut direct_global_scale = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
+    let mut materialized = QuantScratch::new_exact(&stream, LOCAL_COLS, LOCAL_ROWS)?;
+    let mut direct = QuantScratch::new_exact(&stream, LOCAL_COLS, LOCAL_ROWS)?;
 
     quant.row_amax_f32(RowAmaxArgs {
         stream: &stream,
@@ -250,18 +196,14 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
         stream: &stream,
         x: &x_dev,
         amax: &row_amax,
-        out_fp4: &mut source_bytes,
-        out_scales: &mut source_scales,
-        out_global_scale: &mut source_global_scales,
+        out_fp4: &mut source.bytes,
+        out_scales: &mut source.scales,
+        out_global_scale: &mut source.global_scales,
         group_count: (LOCAL_ROWS * LOCAL_COLS / 16) as u32,
         row_len: LOCAL_COLS as u32,
     })?;
 
-    let source_tensor = Nvfp4RowwiseDeviceTensor {
-        bytes: &source_bytes,
-        scales: &source_scales,
-        global_scales: &source_global_scales,
-    };
+    let source_tensor = source.tensor();
     decode.decode_rowwise_transpose_f32(Nvfp4RowwiseDecodeTransposeArgs {
         stream: &stream,
         input: source_tensor,
@@ -273,11 +215,11 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
         QuartetBackwardMsEdenDeviceScaleQuantArgs {
             stream: &stream,
             x: &x_t_dev,
-            out_fp4: &mut materialized_bytes,
-            out_scales: &mut materialized_scales,
-            out_global_scales: &mut materialized_global_scales,
-            out_chunk_amax: &mut materialized_chunk_amax,
-            out_global_scale: &mut materialized_global_scale,
+            out_fp4: &mut materialized.bytes,
+            out_scales: &mut materialized.scales,
+            out_global_scales: &mut materialized.global_scales,
+            out_chunk_amax: &mut materialized.chunk_amax,
+            out_global_scale: &mut materialized.global_scale,
             row_count: LOCAL_COLS as u32,
             src_row_len: LOCAL_ROWS as u32,
             dst_row_len: LOCAL_ROWS as u32,
@@ -289,11 +231,11 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
         RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs {
             stream: &stream,
             input: source_tensor,
-            out_fp4: &mut direct_bytes,
-            out_scales: &mut direct_scales,
-            out_global_scales: &mut direct_global_scales,
-            out_chunk_amax: &mut direct_chunk_amax,
-            out_global_scale: &mut direct_global_scale,
+            out_fp4: &mut direct.bytes,
+            out_scales: &mut direct.scales,
+            out_global_scales: &mut direct.global_scales,
+            out_chunk_amax: &mut direct.chunk_amax,
+            out_global_scale: &mut direct.global_scale,
             source_rows: LOCAL_ROWS as u32,
             source_cols: LOCAL_COLS as u32,
             dst_row_len: LOCAL_ROWS as u32,
@@ -302,22 +244,7 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
         },
     )?;
 
-    assert_eq!(
-        direct_bytes.to_host_vec(&stream)?,
-        materialized_bytes.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct_scales.to_host_vec(&stream)?,
-        materialized_scales.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct_global_scales.to_host_vec(&stream)?,
-        materialized_global_scales.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct_global_scale.to_host_vec(&stream)?,
-        materialized_global_scale.to_host_vec(&stream)?
-    );
+    direct.assert_no_chunk_quartet_eq(&stream, &materialized)?;
     Ok(())
 }
 
@@ -389,114 +316,6 @@ fn nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), Box<dyn E
         },
     )?;
 
-    assert_eq!(
-        direct.bytes.to_host_vec(&stream)?,
-        materialized.bytes.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.scales.to_host_vec(&stream)?,
-        materialized.scales.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.global_scales.to_host_vec(&stream)?,
-        materialized.global_scales.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.chunk_amax.to_host_vec(&stream)?,
-        materialized.chunk_amax.to_host_vec(&stream)?
-    );
-    assert_eq!(
-        direct.global_scale.to_host_vec(&stream)?,
-        materialized.global_scale.to_host_vec(&stream)?
-    );
+    direct.assert_quartet_eq(&stream, &materialized)?;
     Ok(())
-}
-
-struct QuantScratch {
-    bytes: DeviceBuffer<u8>,
-    scales: DeviceBuffer<u8>,
-    global_scales: DeviceBuffer<f32>,
-    chunk_amax: DeviceBuffer<f32>,
-    global_scale: DeviceBuffer<f32>,
-}
-
-impl QuantScratch {
-    fn new(stream: &cuda_core::CudaStream) -> Result<Self, cuda_core::DriverError> {
-        Ok(Self {
-            bytes: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_bytes(COLS as u32, ROWS as u32))?,
-            scales: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_scales(COLS as u32, ROWS as u32))?,
-            global_scales: DeviceBuffer::zeroed(stream, COLS)?,
-            chunk_amax: DeviceBuffer::zeroed(
-                stream,
-                nvfp4_tc_matmul_chunks(COLS as u32, ROWS as u32),
-            )?,
-            global_scale: DeviceBuffer::zeroed(stream, 1)?,
-        })
-    }
-}
-
-struct SourceScratch {
-    bytes: DeviceBuffer<u8>,
-    scales: DeviceBuffer<u8>,
-    global_scale: DeviceBuffer<f32>,
-}
-
-impl SourceScratch {
-    fn new(stream: &cuda_core::CudaStream) -> Result<Self, cuda_core::DriverError> {
-        Ok(Self {
-            bytes: DeviceBuffer::zeroed(stream, ROWS * COLS / 2)?,
-            scales: DeviceBuffer::zeroed(stream, ROWS * COLS / 16)?,
-            global_scale: DeviceBuffer::zeroed(stream, 1)?,
-        })
-    }
-
-    fn tensor(&self) -> Nvfp4DeviceTensor<'_> {
-        Nvfp4DeviceTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scale: &self.global_scale,
-        }
-    }
-}
-
-struct RowwiseSourceScratch {
-    bytes: DeviceBuffer<u8>,
-    scales: DeviceBuffer<u8>,
-    global_scales: DeviceBuffer<f32>,
-}
-
-impl RowwiseSourceScratch {
-    fn new(stream: &cuda_core::CudaStream) -> Result<Self, cuda_core::DriverError> {
-        Ok(Self {
-            bytes: DeviceBuffer::zeroed(stream, ROWS * COLS / 2)?,
-            scales: DeviceBuffer::zeroed(stream, ROWS * COLS / 16)?,
-            global_scales: DeviceBuffer::zeroed(stream, ROWS)?,
-        })
-    }
-
-    fn tensor(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        Nvfp4RowwiseDeviceTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scales: &self.global_scales,
-        }
-    }
-}
-
-fn padded_rows() -> usize {
-    nvfp4_tc_matmul_padded_k(ROWS as u32) as usize
-}
-
-fn input_matrix() -> Vec<f32> {
-    (0..ROWS * COLS)
-        .map(|index| {
-            let row = index / COLS;
-            let col = index % COLS;
-            (row as f32 - 9.0) * 0.03125 + (col as f32 - 4.0) * 0.0078125
-        })
-        .collect()
-}
-
-fn cpu_amax(x: &[f32]) -> f32 {
-    x.iter().fold(0.0, |max, value| max.max(value.abs()))
 }
