@@ -13,6 +13,12 @@ pub(super) struct SourceBudget {
     pub(super) random: usize,
 }
 
+impl SourceBudget {
+    pub(super) fn total(self) -> usize {
+        self.guided + self.local + self.factorial + self.variance + self.coverage + self.random
+    }
+}
+
 pub(super) fn source_budget(
     target: usize,
     analysis: &SweepAnalysis,

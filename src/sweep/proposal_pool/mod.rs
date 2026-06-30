@@ -34,15 +34,7 @@ pub fn sample(
     let mut used = seen.clone();
     let direction = direction::from_analysis(analysis, config);
     let budget = source_budget(target, analysis, config);
-    debug_assert_eq!(
-        budget.guided
-            + budget.local
-            + budget.factorial
-            + budget.variance
-            + budget.coverage
-            + budget.random,
-        target
-    );
+    debug_assert_eq!(budget.total(), target);
     fill::push_guided(&mut pool, &mut used, rng, &direction, budget.guided);
     fill::push_local(&mut pool, &mut used, rng, center, budget.local);
     fill::push_factorial(

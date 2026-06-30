@@ -88,15 +88,7 @@ fn source_budget_keeps_guided_off_without_response_model() {
     assert!(budget.variance > 0);
     assert!(budget.coverage > 0);
     assert!(budget.random > 0);
-    assert_eq!(
-        budget.guided
-            + budget.local
-            + budget.factorial
-            + budget.variance
-            + budget.coverage
-            + budget.random,
-        40
-    );
+    assert_eq!(budget.total(), 40);
 }
 
 #[test]
