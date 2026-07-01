@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use cuda_core::{CudaContext, CudaModule, CudaStream, DriverError};
-use gpt2_nvfp4::{AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN};
+use gpt2_nvfp4::{AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS};
 
 pub type CudaTestContext = (Arc<CudaContext>, Arc<CudaStream>, Arc<CudaModule>);
 
@@ -29,6 +29,11 @@ pub fn assert_nonzero_finite(values: &[f32]) {
 #[allow(dead_code)]
 pub fn float_bits(values: &[f32]) -> Vec<u32> {
     values.iter().map(|value| value.to_bits()).collect()
+}
+
+#[allow(dead_code)]
+pub fn row_ones() -> Vec<f32> {
+    vec![1.0; GPT2_TOKEN_ROWS]
 }
 
 #[allow(dead_code)]

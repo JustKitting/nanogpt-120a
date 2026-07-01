@@ -35,7 +35,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> TestResult {
 
     let qkv_input_bytes = DeviceBuffer::from_host(&stream, &data::qkv_input_bytes())?;
     let qkv_input_scales = DeviceBuffer::from_host(&stream, &data::hidden_scales())?;
-    let qkv_input_globals = DeviceBuffer::from_host(&stream, &data::row_global_scales())?;
+    let qkv_input_globals = DeviceBuffer::from_host(&stream, &common::row_ones())?;
     let d_qkv = DeviceBuffer::from_host(&stream, &data::d_qkv_values())?;
     let dummy_f32 = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
     let dummy_u16 = DeviceBuffer::<u16>::zeroed(&stream, 1)?;
