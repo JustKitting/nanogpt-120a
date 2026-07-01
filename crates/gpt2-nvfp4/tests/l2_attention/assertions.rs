@@ -1,3 +1,5 @@
+use std::fmt;
+
 use gpt2_nvfp4::{HiddenState, GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV};
 
 use crate::common::f16::tc_f16;
@@ -35,13 +37,7 @@ pub fn assert_attention_matches(qkv: &[f32], out: &[f32]) {
                 }
 
                 let col = head * HEAD_DIM + dim;
-                let actual = out[row * GPT2_N_EMBD + col];
-                let error = (actual - expected).abs();
-                let tolerance = expected.abs().max(1.0) * ATTENTION_TOLERANCE;
-                assert!(
-                    error <= tolerance,
-                    "row={row} head={head} dim={dim} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
-                );
+                assert_scaled_close(format_args!("row={row} head={head} dim={dim}"), out[row * GPT2_N_EMBD + col], expected, ATTENTION_TOLERANCE);
             }
         }
     }
@@ -72,12 +68,7 @@ pub fn assert_output_amax(out: &[f32], output_amax: &[f32]) {
             .iter()
             .map(|value| value.abs())
             .fold(0.0_f32, f32::max);
-        let error = (actual - expected).abs();
-        let tolerance = expected.abs().max(1.0) * 1.0e-7;
-        assert!(
-            error <= tolerance,
-            "row={row} actual_amax={actual:.8e} expected_amax={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
-        );
+        assert_scaled_close(format_args!("row={row}"), actual, expected, 1.0e-7);
     }
 }
 
@@ -88,12 +79,15 @@ pub fn assert_c_proj_residual_add(
 ) {
     for index in 0..HiddenState::LEN {
         let expected = residual_before[index] + attention_out[index];
-        let actual = residual_after[index];
-        let error = (actual - expected).abs();
-        let tolerance = expected.abs().max(1.0) * RESIDUAL_TOLERANCE;
-        assert!(
-            error <= tolerance,
-            "index={index} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
-        );
+        assert_scaled_close(format_args!("index={index}"), residual_after[index], expected, RESIDUAL_TOLERANCE);
     }
+}
+
+fn assert_scaled_close(context: fmt::Arguments<'_>, actual: f32, expected: f32, relative_tolerance: f32) {
+    let error = (actual - expected).abs();
+    let tolerance = expected.abs().max(1.0) * relative_tolerance;
+    assert!(
+        error <= tolerance,
+        "{context} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
+    );
 }
