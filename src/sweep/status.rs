@@ -16,22 +16,9 @@ pub fn record(
     event: &str,
     result: &RunResult,
 ) -> io::Result<()> {
-    write_status(
-        &sweep_dir.join("status.env"),
-        trial_dir,
-        trial_index,
-        candidate,
-        event,
-        result,
-    )?;
-    write_status(
-        &trial_dir.join("status.env"),
-        trial_dir,
-        trial_index,
-        candidate,
-        event,
-        result,
-    )?;
+    for path in [sweep_dir.join("status.env"), trial_dir.join("status.env")] {
+        write_status(&path, trial_dir, trial_index, candidate, event, result)?;
+    }
     append_event(sweep_dir, trial_dir, trial_index, candidate, event, result)
 }
 
