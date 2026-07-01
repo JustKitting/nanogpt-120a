@@ -14,6 +14,32 @@ pub struct MlpModule {
     module: kernels::LoadedModule,
 }
 
+macro_rules! projection_launcher {
+    ($method:ident, $args:ty, $kernel:ident, $residual_add:expr, outputs($($out:ident),+)) => {
+        pub fn $method(&self, args: $args) -> Result<(), DriverError> {
+            self.module.$kernel(
+                args.stream,
+                projection_config(args.token_count, args.input_dim, args.output_dim),
+                args.input.bytes, args.input.scales, args.input.global_scales,
+                args.weight.bytes, args.weight.scales, args.bias.bytes, args.bias.scales,
+                args.weight.global_scale, args.bias.global_scale, $(args.$out,)*
+                projection_params(args.token_count, args.input_dim, args.output_dim, $residual_add),
+            )
+        }
+    };
+}
+
+macro_rules! relu2_backward_launcher {
+    ($method:ident, $args:ty, $kernel:ident) => {
+        pub fn $method(&self, args: $args) -> Result<(), DriverError> {
+            self.module.$kernel(
+                args.stream, linear_config(args.len, kernels::RELU2_THREADS_PER_BLOCK),
+                args.pre_activation, args.d_out, args.d_pre_activation, args.len,
+            )
+        }
+    };
+}
+
 impl MlpModule {
     pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
         Ok(Self {
@@ -21,67 +47,10 @@ impl MlpModule {
         })
     }
 
-    pub fn up_relu2(&self, args: MlpUpRelu2Args<'_, '_>) -> Result<(), DriverError> {
-        self.module.mlp_projection_relu2_kernel(
-            args.stream,
-            projection_config(args.token_count, args.input_dim, args.output_dim),
-            args.input.bytes,
-            args.input.scales,
-            args.input.global_scales,
-            args.weight.bytes,
-            args.weight.scales,
-            args.bias.bytes,
-            args.bias.scales,
-            args.weight.global_scale,
-            args.bias.global_scale,
-            args.pre_activation,
-            args.out,
-            projection_params(args.token_count, args.input_dim, args.output_dim, 0),
-        )
-    }
-
-    pub fn down_residual(&self, args: MlpDownResidualArgs<'_, '_>) -> Result<(), DriverError> {
-        self.module.mlp_projection_kernel(
-            args.stream,
-            projection_config(args.token_count, args.input_dim, args.output_dim),
-            args.input.bytes,
-            args.input.scales,
-            args.input.global_scales,
-            args.weight.bytes,
-            args.weight.scales,
-            args.bias.bytes,
-            args.bias.scales,
-            args.weight.global_scale,
-            args.bias.global_scale,
-            args.residual,
-            projection_params(args.token_count, args.input_dim, args.output_dim, 1),
-        )
-    }
-
-    pub fn relu2_backward(&self, args: Relu2BackwardArgs<'_, '_>) -> Result<(), DriverError> {
-        self.module.relu2_backward_kernel(
-            args.stream,
-            linear_config(args.len, kernels::RELU2_THREADS_PER_BLOCK),
-            args.pre_activation,
-            args.d_out,
-            args.d_pre_activation,
-            args.len,
-        )
-    }
-
-    pub fn relu2_backward_f16(
-        &self,
-        args: Relu2BackwardF16Args<'_, '_>,
-    ) -> Result<(), DriverError> {
-        self.module.relu2_backward_f16_kernel(
-            args.stream,
-            linear_config(args.len, kernels::RELU2_THREADS_PER_BLOCK),
-            args.pre_activation,
-            args.d_out,
-            args.d_pre_activation,
-            args.len,
-        )
-    }
+    projection_launcher!(up_relu2, MlpUpRelu2Args<'_, '_>, mlp_projection_relu2_kernel, 0, outputs(pre_activation, out));
+    projection_launcher!(down_residual, MlpDownResidualArgs<'_, '_>, mlp_projection_kernel, 1, outputs(residual));
+    relu2_backward_launcher!(relu2_backward, Relu2BackwardArgs<'_, '_>, relu2_backward_kernel);
+    relu2_backward_launcher!(relu2_backward_f16, Relu2BackwardF16Args<'_, '_>, relu2_backward_f16_kernel);
 }
 
 fn projection_config(token_count: u32, input_dim: u32, output_dim: u32) -> cuda_core::LaunchConfig {
