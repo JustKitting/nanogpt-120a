@@ -15,11 +15,10 @@ pub(super) fn read_u16_tokens(path: &Path) -> AppResult<Vec<u16>> {
 }
 
 pub(super) fn write_u16_tokens(path: &Path, tokens: &[u16]) -> AppResult<()> {
-    let mut bytes = Vec::with_capacity(tokens.len() * 2);
-    for &token in tokens {
-        bytes.extend_from_slice(&token.to_ne_bytes());
-    }
-
+    let bytes = tokens
+        .iter()
+        .flat_map(|&token| token.to_ne_bytes())
+        .collect::<Vec<_>>();
     fs::write(path, bytes).map_err(|err| {
         io::Error::new(
             err.kind(),
