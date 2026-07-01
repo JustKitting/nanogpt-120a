@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use burn::data::dataloader::Progress;
 use burn::train::{
     Learner, SupervisedLearningStrategy, SupervisedTrainingEventProcessor, TrainLoader,
     TrainingComponents, TrainingModel, ValidLoader,
@@ -10,9 +11,14 @@ use super::{CudaLearningComponents, TrainConfig};
 
 mod artifacts;
 mod budget;
-mod progress;
 mod run;
 mod validation;
+
+const TRAIN_EPOCH: usize = 1;
+
+fn epoch_progress() -> Progress {
+    Progress::new(TRAIN_EPOCH, TRAIN_EPOCH)
+}
 
 pub(super) struct CudaTrainingStrategy {
     dataset: String,

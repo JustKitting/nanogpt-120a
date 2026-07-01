@@ -8,9 +8,9 @@ use burn::train::{
 
 use super::super::super::Trainer;
 use super::super::{
-    CudaLearningComponents, data_loader::CudaValidationInput, metrics::CudaValidOutput,
+    data_loader::CudaValidationInput, metrics::CudaValidOutput, CudaLearningComponents,
 };
-use super::progress::epoch_progress;
+use super::epoch_progress;
 use crate::AppResult;
 
 pub(super) fn process_validation(

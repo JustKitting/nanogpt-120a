@@ -6,19 +6,19 @@ use burn::train::{
 };
 
 use super::{
-    CudaTrainingStrategy,
     artifacts::finish_training_artifacts,
     budget::WallClockBudget,
-    progress::{TRAIN_EPOCH, epoch_progress},
+    epoch_progress,
     validation::{process_validation, validation_input},
+    CudaTrainingStrategy, TRAIN_EPOCH,
 };
-use crate::AppResult;
 use crate::training::launch::{
-    CudaLearningComponents,
     config::{load_model_path, should_eval_step, should_log_step},
     metrics::CudaTrainOutput,
+    CudaLearningComponents,
 };
-use crate::training::{Trainer, debug_metrics};
+use crate::training::{debug_metrics, Trainer};
+use crate::AppResult;
 
 impl CudaTrainingStrategy {
     pub(super) fn run_training(
