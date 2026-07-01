@@ -1,3 +1,5 @@
+#![allow(unused_unsafe)]
+
 macro_rules! block_reduce_f32 {
     ($storage:ident, $warps:expr, $local:expr, $lane:expr, $warp:expr, $op:path, $identity:expr) => {{
         let warp_total = $op($local);
@@ -47,7 +49,6 @@ use cuda_device::SharedArray;
 
 use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
-#[allow(unused_unsafe)]
 #[inline(always)]
 pub(crate) fn block_sum_shared_f32<const WARPS: usize>(
     storage: &mut SharedArray<f32, WARPS>,
@@ -58,7 +59,6 @@ pub(crate) fn block_sum_shared_f32<const WARPS: usize>(
     block_sum_shared_f32_for_warps(storage, WARPS as u32, local, lane, warp)
 }
 
-#[allow(unused_unsafe)]
 #[inline(always)]
 pub(crate) fn block_sum_shared_f32_for_warps<const WARPS: usize>(
     storage: &mut SharedArray<f32, WARPS>,
@@ -70,7 +70,6 @@ pub(crate) fn block_sum_shared_f32_for_warps<const WARPS: usize>(
     block_reduce_f32!(storage, active_warps, local, lane, warp, warp_sum_f32, 0.0)
 }
 
-#[allow(unused_unsafe)]
 #[inline(always)]
 pub(crate) fn block_max_shared_f32<const WARPS: usize>(
     storage: &mut SharedArray<f32, WARPS>,
@@ -81,7 +80,6 @@ pub(crate) fn block_max_shared_f32<const WARPS: usize>(
     block_max_shared_f32_for_warps(storage, WARPS as u32, local, lane, warp, 0.0)
 }
 
-#[allow(unused_unsafe)]
 #[inline(always)]
 pub(crate) fn block_max_shared_f32_for_warps<const WARPS: usize>(
     storage: &mut SharedArray<f32, WARPS>,
@@ -102,7 +100,6 @@ pub(crate) fn block_max_shared_f32_for_warps<const WARPS: usize>(
     )
 }
 
-#[allow(unused_unsafe)]
 #[inline(always)]
 pub(crate) fn block_max_leader_f32<const WARPS: usize>(
     storage: &mut SharedArray<f32, WARPS>,

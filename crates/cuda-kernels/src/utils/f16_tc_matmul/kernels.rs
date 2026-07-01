@@ -14,6 +14,7 @@ use super::pad::pad_rows_body;
 
 pub const F16_THREADS_PER_BLOCK: u32 = 256;
 
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 pub(super) mod module {
     use super::*;
@@ -84,7 +85,6 @@ pub(super) mod module {
         call_with_tiles!(cta_matmul_f32_a_transposed_half_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn f16_cta_tc_matmul_add_f32_kernel(
         a: &[f32], b_t: &[f32], base: &[f32], out: DisjointSlice<f32>,
@@ -93,7 +93,6 @@ pub(super) mod module {
         call_with_tiles!(cta_matmul_add_f32_body; a, b_t, base, out; batch_count, m, n, k, base_scale, matmul_scale);
     }
 
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn f16_cta_tc_matmul_add_f32_rhs_transposed_base_kernel(
         a: &[f32], rhs: &[f32], base: &[f32], out: DisjointSlice<f32>,

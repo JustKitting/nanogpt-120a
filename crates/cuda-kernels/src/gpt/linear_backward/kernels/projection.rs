@@ -9,11 +9,11 @@ use crate::mma::{
     Nvfp4ProjectionParams,
 };
 
+#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[cuda_module]
 pub(super) mod module {
     use super::*;
 
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn linear_backward_projection_device_scale_kernel(
         input_bytes: &[u8], input_scales: &[u8], input_global_scales: &[f32],
@@ -33,7 +33,6 @@ pub(super) mod module {
         );
     }
 
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn linear_backward_projection_cta_device_scale_kernel(
         input_bytes: &[u8], input_scales: &[u8], input_global_scales: &[f32],
@@ -54,7 +53,6 @@ pub(super) mod module {
         );
     }
 
-    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn linear_backward_projection_pair_cta_device_scale_kernel(
         dinput_input_bytes: &[u8], dinput_input_scales: &[u8], dinput_input_global_scales: &[f32],
