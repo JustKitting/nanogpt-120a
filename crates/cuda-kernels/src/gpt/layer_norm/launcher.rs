@@ -60,16 +60,8 @@ impl LayerNormModule {
     pub fn layer_norm_warp_f32(&self, args: LayerNormArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.layer_norm_warp_f32_kernel(
             args.stream,
-            launch_config(
-                (args.row_count.div_ceil(WARPS_PER_BLOCK), 1, 1),
-                THREADS_PER_BLOCK,
-            ),
-            args.x,
-            args.gamma,
-            args.beta,
-            args.out,
-            args.row_count,
-            args.epsilon,
+            launch_config((args.row_count.div_ceil(WARPS_PER_BLOCK), 1, 1), THREADS_PER_BLOCK),
+            args.x, args.gamma, args.beta, args.out, args.row_count, args.epsilon,
         )
     }
 
@@ -77,20 +69,9 @@ impl LayerNormModule {
         self.module.gpt_layer_norm_kernel(
             args.stream,
             grid_x_config(args.row_count, GPT_LAYER_NORM_THREADS_PER_BLOCK),
-            args.residual,
-            args.weight.bytes,
-            args.weight.scales,
-            args.bias.bytes,
-            args.bias.scales,
-            args.weight.global_scale,
-            args.bias.global_scale,
-            args.normalized,
-            args.normalized_amax,
-            args.mean,
-            args.inv_std,
-            args.row_count,
-            args.embedding_dim,
-            args.epsilon,
+            args.residual, args.weight.bytes, args.weight.scales, args.bias.bytes, args.bias.scales,
+            args.weight.global_scale, args.bias.global_scale, args.normalized, args.normalized_amax,
+            args.mean, args.inv_std, args.row_count, args.embedding_dim, args.epsilon,
         )
     }
 
@@ -101,20 +82,9 @@ impl LayerNormModule {
         self.module.gpt_layer_norm_save_residual_f16_kernel(
             args.stream,
             grid_x_config(args.row_count, GPT_LAYER_NORM_THREADS_PER_BLOCK),
-            args.residual,
-            args.weight.bytes,
-            args.weight.scales,
-            args.bias.bytes,
-            args.bias.scales,
-            args.weight.global_scale,
-            args.bias.global_scale,
-            args.normalized,
-            args.normalized_amax,
-            args.mean,
-            args.inv_std,
-            args.residual_f16,
-            args.row_count,
-            args.embedding_dim,
+            args.residual, args.weight.bytes, args.weight.scales, args.bias.bytes, args.bias.scales,
+            args.weight.global_scale, args.bias.global_scale, args.normalized, args.normalized_amax,
+            args.mean, args.inv_std, args.residual_f16, args.row_count, args.embedding_dim,
             args.epsilon,
         )
     }
