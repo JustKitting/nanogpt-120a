@@ -13,20 +13,10 @@ macro_rules! maybe_store_residual_f16 {
 
 macro_rules! gpt_layer_norm_body {
     (
-        $residual:ident,
-        $weight_bytes:ident,
-        $weight_scales:ident,
-        $bias_bytes:ident,
-        $bias_scales:ident,
-        $weight_global_scale:ident,
-        $bias_global_scale:ident,
-        $normalized:ident,
-        $normalized_amax:ident,
-        $mean_out:ident,
-        $inv_std_out:ident,
-        $row_count:ident,
-        $embedding_dim:ident,
-        $epsilon:ident,
+        $residual:ident $weight_bytes:ident $weight_scales:ident $bias_bytes:ident $bias_scales:ident;
+        $weight_global_scale:ident $bias_global_scale:ident;
+        $normalized:ident $normalized_amax:ident $mean_out:ident $inv_std_out:ident;
+        $row_count:ident $embedding_dim:ident $epsilon:ident;
         $residual_f16:ident
     ) => {{
         use cuda_device::{SharedArray, thread};

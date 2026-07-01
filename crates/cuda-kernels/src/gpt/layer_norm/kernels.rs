@@ -63,20 +63,10 @@ mod module {
         epsilon: f32,
     ) {
         gpt_layer_norm_body!(
-            residual,
-            weight_bytes,
-            weight_scales,
-            bias_bytes,
-            bias_scales,
-            weight_global_scale,
-            bias_global_scale,
-            normalized,
-            normalized_amax,
-            mean_out,
-            inv_std_out,
-            row_count,
-            embedding_dim,
-            epsilon,
+            residual weight_bytes weight_scales bias_bytes bias_scales;
+            weight_global_scale bias_global_scale;
+            normalized normalized_amax mean_out inv_std_out;
+            row_count embedding_dim epsilon;
             none
         );
     }
@@ -100,20 +90,10 @@ mod module {
         epsilon: f32,
     ) {
         gpt_layer_norm_body!(
-            residual,
-            weight_bytes,
-            weight_scales,
-            bias_bytes,
-            bias_scales,
-            weight_global_scale,
-            bias_global_scale,
-            normalized,
-            normalized_amax,
-            mean_out,
-            inv_std_out,
-            row_count,
-            embedding_dim,
-            epsilon,
+            residual weight_bytes weight_scales bias_bytes bias_scales;
+            weight_global_scale bias_global_scale;
+            normalized normalized_amax mean_out inv_std_out;
+            row_count embedding_dim epsilon;
             residual_f16
         );
     }
