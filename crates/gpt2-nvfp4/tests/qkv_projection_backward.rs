@@ -32,7 +32,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
     let qkv_input_scales = DeviceBuffer::from_host(&stream, &data::hidden_scales())?;
     let qkv_input_globals = DeviceBuffer::from_host(&stream, &data::row_global_scales())?;
     let qkv_weight_bytes = DeviceBuffer::from_host(&stream, &data::qkv_weight_bytes())?;
-    let qkv_weight_scales = DeviceBuffer::from_host(&stream, &data::qkv_weight_scales())?;
+    let qkv_weight_scales = DeviceBuffer::from_host(&stream, &data::one_scales())?;
     let zero_bytes = DeviceBuffer::from_host(&stream, &data::zero_bytes())?;
     let one_scales = DeviceBuffer::from_host(&stream, &data::one_scales())?;
     let d_qkv = DeviceBuffer::from_host(&stream, &data::d_qkv_values())?;

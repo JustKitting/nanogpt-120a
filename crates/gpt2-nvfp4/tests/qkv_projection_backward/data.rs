@@ -57,10 +57,6 @@ pub fn qkv_weight_bytes() -> Vec<u8> {
     vec![E2M1_MIN_PAIR; QkvWeightShape::BYTE_LEN]
 }
 
-pub fn qkv_weight_scales() -> Vec<u8> {
-    vec![E4M3_ONE; QkvWeightShape::SCALE_LEN]
-}
-
 pub fn zero_bytes() -> Vec<u8> {
     vec![0; QkvWeightShape::BYTE_LEN]
 }

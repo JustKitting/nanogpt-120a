@@ -15,7 +15,7 @@ mod common;
 #[path = "attention_core_backward/data.rs"]
 mod data;
 
-use common::cuda_test_context;
+use common::{assert_nonzero_finite, cuda_test_context};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -81,8 +81,7 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
 
     let wrapper = wrapper_d_qkv.to_host_vec(&stream)?;
     let direct = direct_d_qkv.to_host_vec(&stream)?;
-    assert!(wrapper.iter().all(|value| value.is_finite()));
-    assert!(wrapper.iter().any(|value| value.abs() > 0.0));
+    assert_nonzero_finite(&wrapper);
     assert_eq!(
         wrapper
             .iter()

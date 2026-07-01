@@ -14,8 +14,8 @@ mod kernels;
 mod ms_eden;
 pub use args::{
     LinearBackwardArgs, LinearBackwardDeviceScaleArgs, LinearBackwardInputTranspose,
-    LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratch, LinearBackwardWeightTranspose,
-    MsEdenOperandScratch, MsEdenOperandScratchBuffer,
+    LinearBackwardMsEdenArgs, LinearBackwardMsEdenScratch, LinearBackwardMsEdenScratchBuffers,
+    LinearBackwardWeightTranspose, MsEdenOperandScratch, MsEdenOperandScratchBuffer,
 };
 pub use bias::LINEAR_BIAS_THREADS_PER_BLOCK;
 
