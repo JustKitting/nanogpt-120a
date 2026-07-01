@@ -33,11 +33,7 @@ const fn align_up(value: usize, alignment: usize) -> usize {
 }
 
 const fn align_kda_qkv(value: usize) -> usize {
-    let mut aligned = align_up(value, 32);
-    while !align_up(aligned, 64).is_multiple_of(128) {
-        aligned += 32;
-    }
-    aligned
+    align_up(value, 128)
 }
 
 pub const fn uses_full_attention(block_index: usize) -> bool {

@@ -34,6 +34,51 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-07-01
 commit: accepted local jj commit after full gate
+experiment: Align KDA QKV padded width to the 128-row TMA tile.
+status: accepted_900s
+change:
+  Simplified align_kda_qkv to round the active KDA QKV width directly up to
+  128. For the d=2048, h=32 shape this changes the KDA QKV padded width from
+  8288 to 8320, so the KDA QKV dweight branch is TMA-aligned and can use the
+  accepted linear backward TMA path instead of falling back to
+  linear_backward_projection_device_scale_kernel. The active KDA Q/K/V/G/beta
+  offsets and math are unchanged; this only changes the unused padded tail.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260701_231603Z_synth_1s
+    val_loss=10.386334, train_elapsed_s=1.676, completed_steps=2.
+  30s candidate screen:
+    target/runs/20260701_231614Z_synth_30s
+    val_loss=6.680145, train_elapsed_s=30.245, completed_steps=36.
+  900s gate:
+    target/runs/20260701_231714Z_synth_900s
+    val_loss=3.861339, train_elapsed_s=900.780, completed_steps=1044.
+measured_effect:
+  Against the accepted linear-backward TMA 30s baseline:
+    target/runs/20260701_225445Z_synth_30s
+    val_loss: 6.799187 -> 6.680145
+    completed_steps: 32 -> 36
+  Against the accepted linear-backward TMA 900s baseline:
+    target/runs/20260701_225551Z_synth_900s
+    val_loss: 3.942715 -> 3.861339
+    completed_steps: 919 -> 1044
+  Logged 900s timing:
+    Loss_host_wait avg: 542.973ms -> 414.576ms
+    Backward_enqueue avg: 241.698ms -> 253.790ms
+    Optimizer avg: 185.121ms -> 184.816ms
+  The extra padded QKV columns remove the unaligned KDA QKV dweight fallback
+  from the hot path and improve the fixed-wall objective.
+decision:
+  Accept as the new active kernel/runtime baseline. Keep the code and update
+  notes/sweep_baseline.env to this run.
+```
+
+```text
+date: 2026-07-01
+commit: accepted local jj commit after full gate
 experiment: Route aligned MS-EDEN linear backward projections through NVFP4 TMA GEMM.
 status: accepted_900s
 change:
