@@ -17,10 +17,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn gather_qkv_forward_kernel(
-        qkv: &[f32],
-        q: DisjointSlice<f32>,
-        k: DisjointSlice<f32>,
-        v: DisjointSlice<f32>,
+        qkv: &[f32], q: DisjointSlice<f32>, k: DisjointSlice<f32>, v: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         gather_qkv_body(qkv, q, k, v, params);
@@ -28,12 +25,8 @@ pub(super) mod module {
 
     #[kernel]
     pub fn prepare_kda_forward_kernel(
-        qkv: &[f32],
-        q: DisjointSlice<f32>,
-        k: DisjointSlice<f32>,
-        v: DisjointSlice<f32>,
-        g: DisjointSlice<f32>,
-        beta: DisjointSlice<f32>,
+        qkv: &[f32], q: DisjointSlice<f32>, k: DisjointSlice<f32>, v: DisjointSlice<f32>,
+        g: DisjointSlice<f32>, beta: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         prepare_kda_body(qkv, q, k, v, g, beta, params);
@@ -51,10 +44,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn make_kda_qg_kneg_kernel(
-        q: DisjointSlice<f32>,
-        k: &[f32],
-        g: &[f32],
-        kneg: DisjointSlice<f32>,
+        q: DisjointSlice<f32>, k: &[f32], g: &[f32], kneg: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         make_qg_kneg_body(q, k, g, kneg, params);
@@ -62,10 +52,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn make_kda_kg_kpos_vbeta_kernel(
-        k: DisjointSlice<f32>,
-        v: DisjointSlice<f32>,
-        g: &[f32],
-        beta: &[f32],
+        k: DisjointSlice<f32>, v: DisjointSlice<f32>, g: &[f32], beta: &[f32],
         kpos_beta: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
@@ -74,19 +61,14 @@ pub(super) mod module {
 
     #[kernel]
     pub fn store_kda_chunk_g_last_kernel(
-        g: &[f32],
-        chunk_g_last: DisjointSlice<f32>,
-        params: CausalAttentionParams,
+        g: &[f32], chunk_g_last: DisjointSlice<f32>, params: CausalAttentionParams,
     ) {
         store_chunk_g_last_body(g, chunk_g_last, params);
     }
 
     #[kernel]
     pub fn make_kda_kneg_from_kg_kernel(
-        k: &[f32],
-        chunk_g_last: &[f32],
-        kneg: DisjointSlice<f32>,
-        params: CausalAttentionParams,
+        k: &[f32], chunk_g_last: &[f32], kneg: DisjointSlice<f32>, params: CausalAttentionParams,
     ) {
         make_kneg_from_kg_body(k, chunk_g_last, kneg, params);
     }
@@ -108,11 +90,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunk_kda_state_save_kernel(
-        kg: &[f32],
-        v_new: DisjointSlice<f32>,
-        w: &[f32],
-        u: &[f32],
-        chunk_g_last: &[f32],
+        kg: &[f32], v_new: DisjointSlice<f32>, w: &[f32], u: &[f32], chunk_g_last: &[f32],
         chunk_states: DisjointSlice<u16>,
         params: CausalAttentionParams,
     ) {
@@ -121,11 +99,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunk_kda_output_from_state_kernel(
-        qg: &[f32],
-        v_new: &[f32],
-        aqk: &[f32],
-        out: DisjointSlice<f32>,
-        chunk_states: &[u16],
+        qg: &[f32], v_new: &[f32], aqk: &[f32], out: DisjointSlice<f32>, chunk_states: &[u16],
         params: CausalAttentionParams,
     ) {
         with_tc_ab_tiles!(chunk_kda_output_from_state_body; qg, v_new, aqk, out, chunk_states, params);
@@ -133,9 +107,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn attention_softmax_forward_kernel(
-        scores: &[f32],
-        probs: DisjointSlice<f32>,
-        log_sum_exp: DisjointSlice<f32>,
+        scores: &[f32], probs: DisjointSlice<f32>, log_sum_exp: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         static mut REDUCE: SharedArray<f32, 8> = SharedArray::UNINIT;
@@ -144,18 +116,14 @@ pub(super) mod module {
 
     #[kernel]
     pub fn scatter_attention_forward_kernel(
-        compact: &[f32],
-        out: DisjointSlice<f32>,
-        params: CausalAttentionParams,
+        compact: &[f32], out: DisjointSlice<f32>, params: CausalAttentionParams,
     ) {
         scatter_output_body(compact, out, params);
     }
 
     #[kernel]
     pub fn scatter_attention_forward_save_f16_kernel(
-        compact: &[f32],
-        out: DisjointSlice<f32>,
-        attention_out_f16: DisjointSlice<u16>,
+        compact: &[f32], out: DisjointSlice<f32>, attention_out_f16: DisjointSlice<u16>,
         params: CausalAttentionParams,
     ) {
         scatter_output_save_f16_body(compact, out, attention_out_f16, params);
