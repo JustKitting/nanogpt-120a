@@ -8,7 +8,7 @@ mod common;
 #[path = "layer_norm/reference.rs"]
 mod reference;
 
-use common::max_abs_error;
+use common::assert_slice_close;
 use common::nvfp4::{one_pair_bytes, one_scales};
 use reference::{
     assert_row_amax, reference_layer_norm, reference_layer_norm_rows, sample_row_0, sample_row_1,
@@ -45,9 +45,7 @@ fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
 
     let out = out_dev.to_host_vec(&stream)?;
     let expected = reference_layer_norm(&x, &gamma, &beta, row_count, epsilon);
-    let max_abs_error = max_abs_error(&out, &expected);
-
-    assert!(max_abs_error <= 1.0e-9, "max_abs_error={max_abs_error:.8e}");
+    assert_slice_close(&out, &expected, 1.0e-9);
     Ok(())
 }
 
@@ -97,9 +95,7 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let out = out_dev.to_host_vec(&stream)?;
     let amax = amax_dev.to_host_vec(&stream)?;
     let expected = reference_layer_norm_rows(&x, row_count, GPT_EMBEDDING_DIM, epsilon);
-    let max_abs_error = max_abs_error(&out, &expected);
-
-    assert!(max_abs_error <= 1.0e-7, "max_abs_error={max_abs_error:.8e}");
+    assert_slice_close(&out, &expected, 1.0e-7);
     assert_row_amax(&out, &amax, row_count, GPT_EMBEDDING_DIM);
     Ok(())
 }
