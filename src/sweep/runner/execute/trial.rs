@@ -7,7 +7,7 @@ use crate::sweep::{
     config::SweepConfig,
     history::{self, Trial},
     parse::RunResult,
-    run_build, run_train, screen_gate, status,
+    run_build, run_train, screen_gate, status, SweepResult,
 };
 
 pub(in crate::sweep::runner) fn run_trial(
@@ -18,7 +18,7 @@ pub(in crate::sweep::runner) fn run_trial(
     config: &SweepConfig,
     screen_baseline: Option<f64>,
     screen_score: Option<&analysis::CandidateScore>,
-) -> Result<Trial, Box<dyn std::error::Error>> {
+) -> SweepResult<Trial> {
     fs::create_dir_all(trial_dir)?;
     history::write_candidate(&trial_dir.join("candidate.env"), &candidate)?;
     let mut run_result = RunResult::default();

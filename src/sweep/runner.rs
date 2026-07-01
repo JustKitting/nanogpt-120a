@@ -2,6 +2,7 @@ use std::{fs, path::{Path, PathBuf}};
 
 use super::{
     analysis, baseline::Baseline, chain, config::SweepConfig, fmt, history::{History, Trial}, optimizer, proposal_log,
+    SweepResult,
 };
 use crate::time_utils;
 
@@ -11,7 +12,7 @@ mod trial_record;
 use execute::{run_trial, screen_baseline};
 use trial_record::{current_baseline_trial, promoted_screen_loss};
 
-pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(config: SweepConfig) -> SweepResult {
     let sweep_dir = config.sweep_dir.clone().unwrap_or_else(default_sweep_dir);
     fs::create_dir_all(&sweep_dir)?;
     let mut history = History::load(sweep_dir.join("trials.tsv"))?;
@@ -89,7 +90,7 @@ pub fn run(config: SweepConfig) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn analyze_and_write(sweep_dir: &Path, shared_history: &History, history: &History, baseline: &Baseline, baseline_screen_trial: Option<&Trial>, config: &SweepConfig) -> Result<(analysis::SweepAnalysis, Vec<Trial>), Box<dyn std::error::Error>> {
+fn analyze_and_write(sweep_dir: &Path, shared_history: &History, history: &History, baseline: &Baseline, baseline_screen_trial: Option<&Trial>, config: &SweepConfig) -> SweepResult<(analysis::SweepAnalysis, Vec<Trial>)> {
     let baseline_trial = current_baseline_trial(baseline_screen_trial, baseline.measured_trial());
     let all_trials = chain::all_trials_with_baseline(
         baseline_trial.as_ref(),

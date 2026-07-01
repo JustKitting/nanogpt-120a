@@ -26,7 +26,8 @@ mod tests;
 
 use clap::Parser;
 
-pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+pub(crate) type SweepResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+pub fn run() -> SweepResult {
     let config = config::SweepConfig::parse();
     runner::run(config)
 }

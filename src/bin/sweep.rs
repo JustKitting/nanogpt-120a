@@ -7,6 +7,6 @@ mod sweep;
 #[path = "../time_utils.rs"]
 mod time_utils;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> sweep::SweepResult {
     sweep::run()
 }
