@@ -61,13 +61,7 @@ impl CudaTrainingStrategy {
                 process_validation(&mut trainer, processor, &validation, step, completed_steps)?;
             }
 
-            let stopped_by_burn = interrupter.should_stop();
-            if stopped_by_burn || wall_clock.expired() {
-                let reason = if stopped_by_burn {
-                    "burn_interrupter"
-                } else {
-                    "wall_clock"
-                };
+            if let Some(reason) = stop_reason(interrupter, &wall_clock) {
                 println!(
                     "stopped_by_{reason}=true elapsed_s={:.3} completed_steps={completed_steps}",
                     wall_clock.elapsed_seconds(),
@@ -98,4 +92,8 @@ impl CudaTrainingStrategy {
             &self.run_output,
         )
     }
+}
+
+fn stop_reason(interrupter: &Interrupter, wall_clock: &WallClockBudget) -> Option<&'static str> {
+    if interrupter.should_stop() { Some("burn_interrupter") } else if wall_clock.expired() { Some("wall_clock") } else { None }
 }
