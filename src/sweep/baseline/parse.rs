@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crate::sweep::candidate::Candidate;
+use crate::sweep::env_file::{parsed, value};
 
 use super::record::Record;
 
@@ -29,16 +30,5 @@ pub(super) fn record(text: &str) -> Option<Record> {
             amuse_beta1: parsed(text, "TRAIN_AMUSE_BETA1")?,
             amuse_rho: parsed(text, "TRAIN_AMUSE_RHO")?,
         },
-    })
-}
-
-fn parsed<T: std::str::FromStr>(text: &str, name: &str) -> Option<T> {
-    value(text, name)?.parse().ok()
-}
-
-fn value<'a>(text: &'a str, name: &str) -> Option<&'a str> {
-    text.lines().find_map(|line| {
-        let (key, value) = line.split_once('=')?;
-        (key.trim() == name).then_some(value.trim())
     })
 }

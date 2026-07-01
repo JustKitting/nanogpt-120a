@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::sweep::candidate::Candidate;
+use crate::sweep::env_file::parsed;
 use crate::sweep::history::Trial;
 use crate::sweep::parse::RunResult;
 
@@ -59,12 +60,5 @@ pub(super) fn trial_with_log(
 
 pub(super) fn promoted_screen_loss(trial: &Trial) -> Option<f64> {
     let text = fs::read_to_string(trial.log_path.with_file_name("screen_decision.env")).ok()?;
-    value(&text, "SCREEN_LOSS")?.parse().ok()
-}
-
-fn value<'a>(text: &'a str, key: &str) -> Option<&'a str> {
-    text.lines().find_map(|line| {
-        let (name, value) = line.split_once('=')?;
-        (name == key).then_some(value)
-    })
+    parsed(&text, "SCREEN_LOSS")
 }
