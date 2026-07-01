@@ -1,7 +1,7 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::super::kda::{
-    ChunkStateMatmulMode, chunk_intra_kda_backward_body, chunk_intra_kda_dm_body,
+    ChunkStateMatmulMode, KdaDmInputs, chunk_intra_kda_backward_body, chunk_intra_kda_dm_body,
     chunk_kda_dkg_from_vnew_dh_body, chunk_state_matmul_body, chunkwise_kda_backward_body,
 };
 use crate::attention::CausalAttentionParams;
@@ -86,7 +86,7 @@ pub(super) mod module {
         d_m: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        with_tc_ab_tiles!(chunk_intra_kda_dm_body; kg, vbeta, g, beta, d_u, d_w, d_m, params);
+        with_tc_ab_tiles!(chunk_intra_kda_dm_body; KdaDmInputs { kg, vbeta, g, beta, d_u, d_w }, d_m, params);
     }
 
     #[kernel]
