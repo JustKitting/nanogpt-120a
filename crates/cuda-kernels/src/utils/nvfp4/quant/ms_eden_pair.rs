@@ -30,16 +30,12 @@ impl Nvfp4QuantModule {
         )?;
 
         let row_pack = MsEdenPackGrid::for_elements(args.row_count * args.dst_row_len);
-        let transpose_pack =
-            MsEdenPackGrid::for_elements(args.src_row_len * args.transpose_dst_row_len);
+        let transpose_pack = MsEdenPackGrid::for_elements(args.src_row_len * args.transpose_dst_row_len);
         if row_pack.is_exact() && transpose_pack.is_exact() {
             let grid = grid_config(row_pack.grid_dim + transpose_pack.grid_dim);
-            if let Some(no_pad) = Fp32PairNoPad::new(
-                args.row_count,
-                args.src_row_len,
-                args.dst_row_len,
-                args.transpose_dst_row_len,
-            ) {
+            if let Some(no_pad) =
+                Fp32PairNoPad::new(args.row_count, args.src_row_len, args.dst_row_len, args.transpose_dst_row_len)
+            {
                 if let Some(pow2) = no_pad.pow2() {
                     return self
                         .ms_eden_fp32_pair

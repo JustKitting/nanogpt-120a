@@ -42,9 +42,7 @@ impl Nvfp4QuantModule {
         self.derive_rowwise_nvfp4_transpose_global_scale(&mut args)?;
         let pack = MsEdenPackGrid::for_elements(args.source_cols * args.dst_row_len);
         if pack.is_exact() {
-            if let Some(no_pad) =
-                RowwiseTransposeNoPad::new(args.source_rows, args.source_cols, args.dst_row_len)
-            {
+            if let Some(no_pad) = RowwiseTransposeNoPad::new(args.source_rows, args.source_cols, args.dst_row_len) {
                 if let Some(source_cols_shift) = no_pad.source_cols_shift() {
                     return self
                         .ms_eden_rowwise_transpose
