@@ -1,6 +1,9 @@
 use crate::polar_coefficients::coefficients;
 
-pub use crate::polar_reference::{cosine, max_abs_error, relative_l2};
+pub use crate::polar_reference::{
+    cosine, max_abs_error, normalized_polar_source as normalized_source,
+    polar_iterations_f16 as polar_iterations_f16_leaf, relative_l2,
+};
 
 pub fn error_metrics(actual: &[f32], expected: &[f32]) -> (f32, f32, f32) {
     (
@@ -22,22 +25,6 @@ pub fn gradient(rows: usize, cols: usize) -> Vec<f32> {
     (0..rows * cols)
         .map(|i| ((i % 41) as f32 - 20.0) * 0.0007 + ((i / cols) as f32) * 0.00003)
         .collect()
-}
-
-pub fn normalized_source(source: &[f32], rows: usize, cols: usize) -> Vec<f32> {
-    crate::polar_reference::normalized_polar_source(source, rows, cols)
-}
-
-pub fn polar_iterations_f16_leaf(
-    mut source: Vec<f32>,
-    rows: usize,
-    cols: usize,
-    iterations: usize,
-) -> Vec<f32> {
-    for iter in 0..iterations {
-        source = polar_step_f16_leaf(&source, rows, cols, iter);
-    }
-    source
 }
 
 pub fn gram_form_polar_iterations_f16_leaf(
