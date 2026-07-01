@@ -5,11 +5,12 @@ use crate::training::grads::BackwardBuffers;
 use crate::training::next_latent::NextLatGradBuffers;
 use crate::training::optimizer::OptimizerScratch;
 use crate::training::optimizer_state::OptimizerStateBuffers;
+use crate::training::OptimizerTrace;
 use crate::upload::UploadedModel;
 
 use super::adam::AdamUpdate;
 use super::layer_norm::update_layer_norm_timed;
-use super::next_latent::{NextLatUpdateArgs, update_next_latent};
+use super::next_latent::{update_next_latent, NextLatUpdateArgs};
 use super::timed_ms;
 
 pub(super) struct BaseAdamUpdateArgs<'a> {
@@ -22,15 +23,10 @@ pub(super) struct BaseAdamUpdateArgs<'a> {
     pub state: &'a mut OptimizerStateBuffers,
     pub step: u32,
     pub average_coefficient: f32,
+    pub trace: &'a mut OptimizerTrace,
 }
 
-pub(super) struct BaseAdamTrace {
-    pub token_embedding_ms: f64,
-    pub final_norm_ms: f64,
-    pub adam_ms: f64,
-}
-
-pub(super) fn update_base_adam(args: BaseAdamUpdateArgs<'_>) -> Result<BaseAdamTrace, DriverError> {
+pub(super) fn update_base_adam(args: BaseAdamUpdateArgs<'_>) -> Result<(), DriverError> {
     let (token_embedding_ms, final_norm_ms) = {
         let mut adam = AdamUpdate::new(
             args.stream,
@@ -66,9 +62,8 @@ pub(super) fn update_base_adam(args: BaseAdamUpdateArgs<'_>) -> Result<BaseAdamT
         })
     })?;
 
-    Ok(BaseAdamTrace {
-        token_embedding_ms,
-        final_norm_ms,
-        adam_ms: token_embedding_ms + final_norm_ms + next_latent_ms,
-    })
+    args.trace.token_embedding_ms = token_embedding_ms;
+    args.trace.final_norm_ms = final_norm_ms;
+    args.trace.adam_ms += token_embedding_ms + final_norm_ms + next_latent_ms;
+    Ok(())
 }

@@ -81,7 +81,7 @@ pub fn apply_weight_updates(args: WeightUpdateArgs<'_>) -> AppResult<WeightUpdat
         .then(|| PendingTrainingDiagnostics::collect(stream, uploaded, grads, state, step, average_coefficient))
         .transpose()?;
 
-    let base_trace = update_base_adam(BaseAdamUpdateArgs {
+    update_base_adam(BaseAdamUpdateArgs {
         stream,
         optimizer,
         uploaded,
@@ -91,10 +91,8 @@ pub fn apply_weight_updates(args: WeightUpdateArgs<'_>) -> AppResult<WeightUpdat
         state,
         step,
         average_coefficient,
+        trace: &mut trace,
     })?;
-    trace.token_embedding_ms = base_trace.token_embedding_ms;
-    trace.final_norm_ms = base_trace.final_norm_ms;
-    trace.adam_ms += base_trace.adam_ms;
 
     update_blocks(BlockUpdateArgs {
         stream,
