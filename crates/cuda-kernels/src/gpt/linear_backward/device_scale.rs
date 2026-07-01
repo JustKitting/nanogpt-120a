@@ -10,6 +10,19 @@ use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 
 use super::{LinearBackwardDeviceScaleArgs, LinearBackwardModule};
 
+macro_rules! device_scale_projection {
+    ($this:expr, $args:ident, $input:ident, $weight:ident, $out:ident, rows: $rows:expr, k: $k:expr) => {
+        $this.module.projection.linear_backward_projection_device_scale_kernel(
+            $args.stream,
+            launch_config(projection_grid_dim($rows, $args.input_dim), NVFP4_PROJECTION_THREADS_PER_BLOCK),
+            $args.$input.bytes, $args.$input.scales, $args.$input.global_scales,
+            $args.$weight.bytes, $args.$weight.scales, $args.$weight.global_scale,
+            $args.$out,
+            linear_backward_projection_params($rows, $k, $args.input_dim),
+        )
+    };
+}
+
 impl LinearBackwardModule {
     pub fn backward_device_scale(
         &self,
@@ -18,37 +31,8 @@ impl LinearBackwardModule {
         let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
 
-        self.module.projection.linear_backward_projection_device_scale_kernel(
-            args.stream,
-            launch_config(
-                projection_grid_dim(args.token_count, args.input_dim),
-                NVFP4_PROJECTION_THREADS_PER_BLOCK,
-            ),
-            args.e_h.bytes,
-            args.e_h.scales,
-            args.e_h.global_scales,
-            args.weight_t_h.bytes,
-            args.weight_t_h.scales,
-            args.weight_t_h.global_scale,
-            args.dinput,
-            linear_backward_projection_params(args.token_count, dinput_k, args.input_dim),
-        )?;
-
-        self.module.projection.linear_backward_projection_device_scale_kernel(
-            args.stream,
-            launch_config(
-                projection_grid_dim(args.output_dim, args.input_dim),
-                NVFP4_PROJECTION_THREADS_PER_BLOCK,
-            ),
-            args.e_t_h.bytes,
-            args.e_t_h.scales,
-            args.e_t_h.global_scales,
-            args.input_t_h.bytes,
-            args.input_t_h.scales,
-            args.input_t_h.global_scale,
-            args.dweight,
-            linear_backward_projection_params(args.output_dim, dweight_k, args.input_dim),
-        )
+        device_scale_projection!(self, args, e_h, weight_t_h, dinput, rows: args.token_count, k: dinput_k)?;
+        device_scale_projection!(self, args, e_t_h, input_t_h, dweight, rows: args.output_dim, k: dweight_k)
     }
 
     pub fn backward_device_scale_cta(
