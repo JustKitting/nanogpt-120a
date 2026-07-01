@@ -37,32 +37,20 @@ pub fn backward(
 
 fn scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
     (0..=query)
-        .map(|key| {
-            let mut dot = 0.0;
-            for dim in 0..HEAD_DIM {
-                dot +=
-                    qkv_value(qkv, query, head, dim, 0) * qkv_value(qkv, key, head, dim, EMBEDDING);
-            }
-            dot
-        })
+        .map(|key| head_sum(|dim| qkv_value(qkv, query, head, dim, 0) * qkv_value(qkv, key, head, dim, EMBEDDING)))
         .collect()
 }
 
 fn softmax_d(out: &[f32], d_out: &[f32], query: usize, head: usize) -> f32 {
-    let mut value = 0.0;
-    for dim in 0..HEAD_DIM {
-        value += out[hidden_index(query, head, dim)] * d_out[hidden_index(query, head, dim)];
-    }
-    value
+    head_sum(|dim| out[hidden_index(query, head, dim)] * d_out[hidden_index(query, head, dim)])
 }
 
 fn d_out_dot_v(qkv: &[f32], d_out: &[f32], query: usize, key: usize, head: usize) -> f32 {
-    let mut value = 0.0;
-    for dim in 0..HEAD_DIM {
-        value +=
-            d_out[hidden_index(query, head, dim)] * qkv[qkv_index(key, head, dim, 2 * EMBEDDING)];
-    }
-    value
+    head_sum(|dim| d_out[hidden_index(query, head, dim)] * qkv[qkv_index(key, head, dim, 2 * EMBEDDING)])
+}
+
+fn head_sum(value: impl Fn(usize) -> f32) -> f32 {
+    (0..HEAD_DIM).map(value).sum()
 }
 
 fn apply_rope_backward(grad: &mut [f32], dq_rot: &[f32], dk_rot: &[f32]) {
@@ -70,18 +58,10 @@ fn apply_rope_backward(grad: &mut [f32], dq_rot: &[f32], dk_rot: &[f32]) {
         for head in 0..HEADS {
             for dim in 0..HEAD_DIM {
                 let h = hidden_index(token, head, dim);
-                grad[qkv_index(token, head, dim, 0)] = rope_raw_grad(
-                    token,
-                    dim,
-                    dq_rot[h],
-                    dq_rot[hidden_index(token, head, dim ^ 1)],
-                );
-                grad[qkv_index(token, head, dim, EMBEDDING)] = rope_raw_grad(
-                    token,
-                    dim,
-                    dk_rot[h],
-                    dk_rot[hidden_index(token, head, dim ^ 1)],
-                );
+                let pair = hidden_index(token, head, dim ^ 1);
+                for (offset, rot) in [(0, dq_rot), (EMBEDDING, dk_rot)] {
+                    grad[qkv_index(token, head, dim, offset)] = rope_raw_grad(token, dim, rot[h], rot[pair]);
+                }
             }
         }
     }
