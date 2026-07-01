@@ -37,8 +37,7 @@ fn fp32_to_nvfp4_four_six_writes_quantized_outputs() -> Result<(), Box<dyn Error
     let scales = scales_dev.to_host_vec(&stream)?;
     let global_scale = global_scale_dev.to_host_vec(&stream)?;
 
-    assert!(fp4.iter().any(|byte| *byte != 0));
-    assert!(scales.iter().any(|byte| *byte != 0));
+    common::assert_nvfp4_buffers_nonzero(&fp4, &scales);
     assert!((global_scale[0] - 8.0 / (256.0 * 6.0)).abs() <= 1.0e-8);
     Ok(())
 }
@@ -79,8 +78,7 @@ fn fp32_to_nvfp4_ms_eden_writes_rotated_quantized_outputs() -> Result<(), Box<dy
     let global_scales = global_scales_dev.to_host_vec(&stream)?;
     let chunk_amax = chunk_amax_dev.to_host_vec(&stream)?;
 
-    assert!(fp4.iter().any(|byte| *byte != 0));
-    assert!(scales.iter().any(|byte| *byte != 0));
+    common::assert_nvfp4_buffers_nonzero(&fp4, &scales);
     assert!(
         global_scales
             .iter()

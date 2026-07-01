@@ -81,8 +81,7 @@ pub fn assert_quantized_slot_matches(
     let bytes = slots.bytes.remove(0).to_host_vec(stream)?;
     let scales = slots.scales.remove(0).to_host_vec(stream)?;
     let global_scale = slots.global_scales.remove(0).to_host_vec(stream)?;
-    assert!(bytes.iter().any(|byte| *byte != 0));
-    assert!(scales.iter().any(|scale| *scale != 0));
+    crate::common::assert_nvfp4_buffers_nonzero(&bytes, &scales);
     assert!((global_scale[0] - expected.abs() / (256.0 * 6.0)).abs() <= 1.0e-8);
     Ok(())
 }
