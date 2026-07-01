@@ -15,16 +15,7 @@ pub(super) fn forward<'a, 'scratch>(
     let dims = AttentionDims::new(args.use_full_attention);
     let hidden = args.hidden;
 
-    input_nvfp4.quantize_precomputed_amax(
-        args.quant_module,
-        hidden.stream,
-        &*hidden.normalized,
-        &*hidden.normalized_amax,
-        hidden.row_count,
-        dims.embedding_dim,
-    )?;
-
-    let input = input_nvfp4.device();
+    let input = input_nvfp4.quantize_hidden_precomputed(args.quant_module, &hidden, dims.embedding_dim)?;
     if let Some(tape) = tape.as_mut() {
         tape.save_qkv_input(hidden.stream, input)?;
     }

@@ -12,16 +12,7 @@ pub(super) fn forward<'a, 'scratch>(
     let mut tape = args.tape;
     let hidden = args.hidden;
 
-    input_nvfp4.quantize_precomputed_amax(
-        args.quant_module,
-        hidden.stream,
-        &*hidden.normalized,
-        &*hidden.normalized_amax,
-        hidden.row_count,
-        crate::GPT2_EMBEDDING_DIM,
-    )?;
-
-    let input = input_nvfp4.device();
+    let input = input_nvfp4.quantize_hidden_precomputed(args.quant_module, &hidden, crate::GPT2_EMBEDDING_DIM)?;
     if let Some(tape) = tape.as_mut() {
         tape.save_up_input(hidden.stream, input)?;
     }

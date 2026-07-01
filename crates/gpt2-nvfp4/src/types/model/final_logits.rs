@@ -31,16 +31,7 @@ pub(super) fn finish_forward<'a>(
         .ln_f_weights
         .forward_with_tape(ln_f, tape.as_mut().map(|tape| &mut tape.final_norm))?;
 
-    hidden_nvfp4.quantize_precomputed_amax(
-        args.quant_module,
-        hidden.stream,
-        &*hidden.normalized,
-        &*hidden.normalized_amax,
-        hidden.row_count,
-        crate::GPT2_EMBEDDING_DIM,
-    )?;
-
-    let input = hidden_nvfp4.device();
+    let input = hidden_nvfp4.quantize_hidden_precomputed(args.quant_module, &hidden, crate::GPT2_EMBEDDING_DIM)?;
     if let Some(tape) = tape.as_mut() {
         tape.lm_head_input_nvfp4.save(hidden.stream, input)?;
     }
