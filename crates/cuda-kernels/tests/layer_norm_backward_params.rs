@@ -18,8 +18,8 @@ const COLS: usize = 32;
 #[test]
 fn layer_norm_backward_params_match_reference() -> Result<(), Box<dyn Error>> {
     let epsilon = 1.0e-5f32;
-    let x = sample_residual();
-    let dy = sample_grad();
+    let x = sample_rows(ROWS, COLS, 19, 9.0, 0.125, 0.25);
+    let dy = sample_rows(ROWS, COLS, 13, 6.0, 0.03125, 0.0);
     let (mean, inv_std) = reference_row_stats(&x, ROWS, COLS, epsilon);
 
     let (_, stream, module) = common::cuda_test_module(LayerNormBackwardModule::from_module)?;
@@ -49,14 +49,6 @@ fn layer_norm_backward_params_match_reference() -> Result<(), Box<dyn Error>> {
     common::assert_slice_close(&d_weight, &expected_weight, 1.0e-7);
     common::assert_slice_close(&d_bias, &expected_bias, 1.0e-7);
     Ok(())
-}
-
-fn sample_residual() -> Vec<f32> {
-    sample_rows(ROWS, COLS, 19, 9.0, 0.125, 0.25)
-}
-
-fn sample_grad() -> Vec<f32> {
-    sample_rows(ROWS, COLS, 13, 6.0, 0.03125, 0.0)
 }
 
 fn reference_param_grads(

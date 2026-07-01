@@ -21,8 +21,8 @@ const COLS: usize = 32;
 #[test]
 fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let epsilon = 1.0e-5f32;
-    let x = sample_residual();
-    let d_normalized = sample_grad();
+    let x = sample_rows(ROWS, COLS, 17, 8.0, 0.125, 0.25);
+    let d_normalized = sample_rows(ROWS, COLS, 11, 5.0, 0.03125, 0.0);
     let (mean, inv_std) = reference_row_stats(&x, ROWS, COLS, epsilon);
 
     let (_, stream, module) = common::cuda_test_module(LayerNormBackwardModule::from_module)?;
@@ -57,14 +57,6 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let error = max_abs_error(&dx, &expected);
     assert!(error <= 1.0e-8, "max_abs_error={error:.8e}");
     Ok(())
-}
-
-fn sample_residual() -> Vec<f32> {
-    sample_rows(ROWS, COLS, 17, 8.0, 0.125, 0.25)
-}
-
-fn sample_grad() -> Vec<f32> {
-    sample_rows(ROWS, COLS, 11, 5.0, 0.03125, 0.0)
 }
 
 fn reference_backward_input(x: &[f32], grad: &[f32], mean: &[f32], inv_std: &[f32]) -> Vec<f32> {
