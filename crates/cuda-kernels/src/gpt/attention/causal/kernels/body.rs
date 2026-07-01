@@ -1,7 +1,7 @@
 use cuda_device::{DisjointSlice, SharedArray, thread};
 
 use crate::attention::CausalAttentionParams;
-use crate::attention::layout::batched_qkv_index;
+use crate::attention::layout::qkv_value;
 use crate::block_reduce::block_sum_shared_f32_for_warps;
 use crate::float_ptx::{exp_f32, fma_f32, ln_f32, safe_positive_denom};
 use crate::warp_reduce::thread_lane_warp;
@@ -107,17 +107,4 @@ pub(super) fn causal_attention_body<const WARPS: usize>(
             *out.get_unchecked_mut(out_index) = value;
         }
     }
-}
-
-#[inline(always)]
-fn qkv_value(
-    qkv: &[f32],
-    batch: u32,
-    token: u32,
-    head: u32,
-    dim: u32,
-    section_offset: u32,
-    params: &CausalAttentionParams,
-) -> f32 {
-    qkv[batched_qkv_index(batch, token, head, dim, section_offset, params)]
 }

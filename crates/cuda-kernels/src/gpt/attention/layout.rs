@@ -80,6 +80,19 @@ pub(crate) fn batched_qkv_index(
 }
 
 #[inline(always)]
+pub(crate) fn qkv_value<T: Copy>(
+    qkv: &[T],
+    batch: u32,
+    token: u32,
+    head: u32,
+    dim: u32,
+    section_offset: u32,
+    params: &CausalAttentionParams,
+) -> T {
+    qkv[batched_qkv_index(batch, token, head, dim, section_offset, params)]
+}
+
+#[inline(always)]
 pub(crate) fn rope_qkv_index(
     batch: u32,
     token: u32,

@@ -1,7 +1,7 @@
 use cuda_device::{DisjointSlice, thread};
 
 use crate::attention::CausalAttentionParams;
-use crate::attention::layout::{batched_qkv_index, compact_linear_parts, hidden_index, row_index};
+use crate::attention::layout::{compact_linear_parts, hidden_index, qkv_value, row_index};
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 
 pub(super) const TC_BACKWARD_THREADS_PER_BLOCK: u32 = 256;
@@ -49,17 +49,4 @@ pub(super) fn gather_body(
         *d_out.get_unchecked_mut(index as usize) =
             cvt_rn_f16_f32(d_out_src[hidden_index(batch, token, head, dim, &params)]);
     }
-}
-
-#[inline(always)]
-fn qkv_value(
-    qkv: &[u16],
-    batch: u32,
-    token: u32,
-    head: u32,
-    dim: u32,
-    section_offset: u32,
-    params: &CausalAttentionParams,
-) -> u16 {
-    qkv[batched_qkv_index(batch, token, head, dim, section_offset, params)]
 }
