@@ -7,9 +7,12 @@ use rust_kernels_cuda::layer_norm_backward::{
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 mod common;
+#[path = "layer_norm/stats.rs"]
+mod stats;
 
 use common::max_abs_error;
 use common::nvfp4::{one_pair_bytes, one_scales};
+use stats::reference_row_stats;
 
 const ROWS: usize = 2;
 const COLS: usize = 32;
@@ -20,7 +23,7 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let epsilon = 1.0e-5f32;
     let x = sample_residual();
     let d_normalized = sample_grad();
-    let (mean, inv_std) = reference_stats(&x, epsilon);
+    let (mean, inv_std) = reference_row_stats(&x, ROWS, COLS, epsilon);
 
     let (_, stream, ptx) = common::cuda_test_context()?;
     let module = LayerNormBackwardModule::from_module(ptx)?;
@@ -67,22 +70,6 @@ fn sample_grad() -> Vec<f32> {
     (0..ROWS * COLS)
         .map(|i| (i as f32 % 11.0 - 5.0) * 0.03125)
         .collect()
-}
-
-fn reference_stats(x: &[f32], epsilon: f32) -> (Vec<f32>, Vec<f32>) {
-    let mut mean = vec![0.0f32; ROWS];
-    let mut inv_std = vec![0.0f32; ROWS];
-    for row in 0..ROWS {
-        let base = row * COLS;
-        mean[row] = x[base..base + COLS].iter().sum::<f32>() / COLS as f32;
-        let centered = x[base..base + COLS]
-            .iter()
-            .map(|value| value - mean[row])
-            .collect::<Vec<_>>();
-        let variance = centered.iter().map(|value| value * value).sum::<f32>() / COLS as f32;
-        inv_std[row] = 1.0 / (variance + epsilon).sqrt();
-    }
-    (mean, inv_std)
 }
 
 fn reference_backward_input(x: &[f32], grad: &[f32], mean: &[f32], inv_std: &[f32]) -> Vec<f32> {

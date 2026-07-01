@@ -6,6 +6,10 @@ use rust_kernels_cuda::layer_norm_backward::{
 };
 
 mod common;
+#[path = "layer_norm/stats.rs"]
+mod stats;
+
+use stats::reference_row_stats;
 
 const ROWS: usize = 3;
 const COLS: usize = 32;
@@ -16,7 +20,7 @@ fn layer_norm_backward_params_match_reference() -> Result<(), Box<dyn Error>> {
     let epsilon = 1.0e-5f32;
     let x = sample_residual();
     let dy = sample_grad();
-    let (mean, inv_std) = reference_stats(&x, epsilon);
+    let (mean, inv_std) = reference_row_stats(&x, ROWS, COLS, epsilon);
 
     let (_, stream, ptx) = common::cuda_test_context()?;
     let module = LayerNormBackwardModule::from_module(ptx)?;
@@ -58,25 +62,6 @@ fn sample_grad() -> Vec<f32> {
     (0..ROWS * COLS)
         .map(|i| (i as f32 % 13.0 - 6.0) * 0.03125)
         .collect()
-}
-
-fn reference_stats(x: &[f32], epsilon: f32) -> (Vec<f32>, Vec<f32>) {
-    let mut mean = vec![0.0f32; ROWS];
-    let mut inv_std = vec![0.0f32; ROWS];
-    for row in 0..ROWS {
-        let base = row * COLS;
-        mean[row] = x[base..base + COLS].iter().sum::<f32>() / COLS as f32;
-        let variance = x[base..base + COLS]
-            .iter()
-            .map(|value| {
-                let centered = value - mean[row];
-                centered * centered
-            })
-            .sum::<f32>()
-            / COLS as f32;
-        inv_std[row] = 1.0 / (variance + epsilon).sqrt();
-    }
-    (mean, inv_std)
 }
 
 fn reference_param_grads(
