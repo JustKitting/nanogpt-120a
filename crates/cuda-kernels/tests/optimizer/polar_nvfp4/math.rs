@@ -2,7 +2,7 @@ use crate::polar_coefficients::coefficients;
 
 pub use crate::polar_reference::{
     cosine, max_abs_error, normalized_polar_source as normalized_source,
-    polar_iterations_f16 as polar_iterations_f16_leaf, relative_l2,
+    polar_iterations_f16 as polar_iterations_f16_leaf, polar_next as combine_next, relative_l2,
 };
 
 pub fn error_metrics(actual: &[f32], expected: &[f32]) -> (f32, f32, f32) {
@@ -64,10 +64,6 @@ pub fn gram_form_polar_step_f16_leaf(
         q[row * rows + row] += a;
     }
     matmul_f16_leaf(&q, &transpose(source, rows, cols), rows, cols, rows)
-}
-
-pub fn combine_next(x: &[f32], ax: &[f32], aax: &[f32], iter: usize) -> Vec<f32> {
-    crate::polar_reference::polar_next(x, ax, aax, iter)
 }
 
 pub fn transpose(x: &[f32], rows: usize, cols: usize) -> Vec<f32> {
