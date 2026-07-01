@@ -43,10 +43,7 @@ fn causal_attention_batch_isolation() -> Result<(), Box<dyn Error>> {
 
     let sample0_out_len = TOKEN_COUNT * EMBEDDING_DIM;
     let sample0_log_sum_exp_len = HEAD_COUNT * TOKEN_COUNT;
-    assert_eq!(
-        bits(&first.out[..sample0_out_len]),
-        bits(&second.out[..sample0_out_len])
-    );
+    assert_eq!(bits(&first.out[..sample0_out_len]), bits(&second.out[..sample0_out_len]));
     assert_eq!(
         bits(&first.log_sum_exp[..sample0_log_sum_exp_len]),
         bits(&second.log_sum_exp[..sample0_log_sum_exp_len])
