@@ -3,11 +3,11 @@ use cuda_core::DriverError;
 use super::types::BlockAttentionBackwardArgs;
 use crate::backward::residual::residual_grad_add;
 use crate::backward::{
-    AttentionCProjBackwardArgs, AttentionCoreBackwardArgs, AttentionQkvBackwardArgs,
-    Gpt2LayerNormBackwardArgs, attention_c_proj_backward, causal_attention_backward,
-    layer_norm_backward, qkv_projection_backward,
+    attention_c_proj_backward, causal_attention_backward, layer_norm_backward,
+    qkv_projection_backward, AttentionCProjBackwardArgs, AttentionCoreBackwardArgs,
+    AttentionQkvBackwardArgs, Gpt2LayerNormBackwardArgs,
 };
-use crate::types::{BlockBackwardGrads, LayerNormGrads};
+use crate::types::BlockBackwardGrads;
 
 pub fn attention_side_backward(
     args: BlockAttentionBackwardArgs<'_, '_, '_>,
@@ -25,7 +25,7 @@ pub fn attention_side_backward(
     } = args;
     let BlockBackwardGrads {
         d_residual_in,
-        ln_1: ln_1_grads,
+        ln_1: mut ln_1_grads,
         d_qkv,
         d_attention_out,
         d_residual_after_attention,
@@ -35,13 +35,6 @@ pub fn attention_side_backward(
         d_attn_c_proj_bias,
         ..
     } = grads;
-    let LayerNormGrads {
-        d_residual: d_ln_1_residual,
-        d_normalized: d_ln_1_normalized,
-        d_weight: d_ln_1_weight,
-        d_bias: d_ln_1_bias,
-    } = ln_1_grads;
-
     attention_c_proj_backward(AttentionCProjBackwardArgs {
         stream,
         modules: modules.linear,
@@ -71,7 +64,7 @@ pub fn attention_side_backward(
         saved,
         projections,
         d_qkv: &*d_qkv,
-        d_ln_1_normalized,
+        d_ln_1_normalized: &mut *ln_1_grads.d_normalized,
         d_attn_qkv_weight,
         d_attn_qkv_bias,
         scratch: scratch.qkv,
@@ -82,19 +75,14 @@ pub fn attention_side_backward(
         module: modules.layer_norm,
         weights: ln_1,
         saved: saved.ln_1,
-        grads: LayerNormGrads {
-            d_residual: d_ln_1_residual,
-            d_normalized: d_ln_1_normalized,
-            d_weight: d_ln_1_weight,
-            d_bias: d_ln_1_bias,
-        },
+        grads: ln_1_grads.reborrow(),
     })?;
 
     residual_grad_add(
         modules.residual,
         stream,
         &*d_residual_after_attention,
-        &*d_ln_1_residual,
+        &*ln_1_grads.d_residual,
         d_residual_in,
         saved.row_count,
     )

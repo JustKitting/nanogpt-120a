@@ -2,13 +2,13 @@ use cuda_core::{CudaStream, DriverError};
 use rust_kernels_cuda::layer_norm_backward::LayerNormBackwardModule;
 use rust_kernels_cuda::residual::ResidualBackwardModule;
 
-use super::layer_norm::{Gpt2LayerNormBackwardArgs, layer_norm_backward};
+use super::layer_norm::{layer_norm_backward, Gpt2LayerNormBackwardArgs};
 use super::mlp::{
-    MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds,
-    backward as mlp_backward,
+    backward as mlp_backward, MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules,
+    MlpBackwardScratch, MlpBackwardSeeds,
 };
 use super::residual::residual_grad_add;
-use crate::types::{BlockBackwardGrads, BlockForwardSaved, LayerNormGrads};
+use crate::types::{BlockBackwardGrads, BlockForwardSaved};
 use crate::{LayerNormTensors, MlpProjectionTensors};
 
 #[derive(Clone, Copy)]
@@ -42,7 +42,7 @@ pub fn mlp_side_backward(args: BlockMlpBackwardArgs<'_, '_, '_>) -> Result<(), D
     } = args;
     let BlockBackwardGrads {
         d_residual_after_attention,
-        ln_2: ln_2_grads,
+        ln_2: mut ln_2_grads,
         d_mlp_up,
         d_mlp_relu2,
         d_mlp_c_fc_weight,
@@ -52,13 +52,6 @@ pub fn mlp_side_backward(args: BlockMlpBackwardArgs<'_, '_, '_>) -> Result<(), D
         d_residual_out,
         ..
     } = grads;
-    let LayerNormGrads {
-        d_residual: d_ln_2_residual,
-        d_normalized: d_ln_2_normalized,
-        d_weight: d_ln_2_weight,
-        d_bias: d_ln_2_bias,
-    } = ln_2_grads;
-
     mlp_backward(MlpBackwardArgs {
         stream,
         modules: modules.mlp,
@@ -68,7 +61,7 @@ pub fn mlp_side_backward(args: BlockMlpBackwardArgs<'_, '_, '_>) -> Result<(), D
         grads: MlpBackwardGrads {
             d_mlp_relu2,
             d_mlp_up,
-            d_ln_2_normalized: &mut *d_ln_2_normalized,
+            d_ln_2_normalized: &mut *ln_2_grads.d_normalized,
             d_c_proj_weight: d_mlp_c_proj_weight,
             d_c_proj_bias: d_mlp_c_proj_bias,
             d_c_fc_weight: d_mlp_c_fc_weight,
@@ -83,19 +76,14 @@ pub fn mlp_side_backward(args: BlockMlpBackwardArgs<'_, '_, '_>) -> Result<(), D
         module: modules.layer_norm,
         weights: ln_2,
         saved: saved.ln_2,
-        grads: LayerNormGrads {
-            d_residual: d_ln_2_residual,
-            d_normalized: d_ln_2_normalized,
-            d_weight: d_ln_2_weight,
-            d_bias: d_ln_2_bias,
-        },
+        grads: ln_2_grads.reborrow(),
     })?;
 
     residual_grad_add(
         modules.residual,
         stream,
         &*d_residual_out,
-        &*d_ln_2_residual,
+        &*ln_2_grads.d_residual,
         d_residual_after_attention,
         saved.row_count,
     )

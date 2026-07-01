@@ -82,4 +82,16 @@ impl<'a> LayerNormGrads<'a> {
             d_bias: &mut *self.d_bias,
         }
     }
+
+    pub fn reborrow_with_residual<'b>(
+        &'b mut self,
+        d_residual: &'b mut DeviceBuffer<f32>,
+    ) -> LayerNormGrads<'b> {
+        LayerNormGrads {
+            d_residual,
+            d_normalized: &mut *self.d_normalized,
+            d_weight: &mut *self.d_weight,
+            d_bias: &mut *self.d_bias,
+        }
+    }
 }
