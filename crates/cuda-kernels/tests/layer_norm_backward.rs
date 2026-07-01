@@ -12,7 +12,7 @@ mod stats;
 
 use common::max_abs_error;
 use common::nvfp4::{one_pair_bytes, one_scales};
-use stats::reference_row_stats;
+use stats::{reference_row_stats, sample_rows};
 
 const ROWS: usize = 2;
 const COLS: usize = 32;
@@ -61,15 +61,11 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
 }
 
 fn sample_residual() -> Vec<f32> {
-    (0..ROWS * COLS)
-        .map(|i| (i as f32 % 17.0 - 8.0) * 0.125 + (i / COLS) as f32 * 0.25)
-        .collect()
+    sample_rows(ROWS, COLS, 17, 8.0, 0.125, 0.25)
 }
 
 fn sample_grad() -> Vec<f32> {
-    (0..ROWS * COLS)
-        .map(|i| (i as f32 % 11.0 - 5.0) * 0.03125)
-        .collect()
+    sample_rows(ROWS, COLS, 11, 5.0, 0.03125, 0.0)
 }
 
 fn reference_backward_input(x: &[f32], grad: &[f32], mean: &[f32], inv_std: &[f32]) -> Vec<f32> {

@@ -9,7 +9,7 @@ mod common;
 #[path = "layer_norm/stats.rs"]
 mod stats;
 
-use stats::reference_row_stats;
+use stats::{reference_row_stats, sample_rows};
 
 const ROWS: usize = 3;
 const COLS: usize = 32;
@@ -53,15 +53,11 @@ fn layer_norm_backward_params_match_reference() -> Result<(), Box<dyn Error>> {
 }
 
 fn sample_residual() -> Vec<f32> {
-    (0..ROWS * COLS)
-        .map(|i| (i as f32 % 19.0 - 9.0) * 0.125 + (i / COLS) as f32 * 0.25)
-        .collect()
+    sample_rows(ROWS, COLS, 19, 9.0, 0.125, 0.25)
 }
 
 fn sample_grad() -> Vec<f32> {
-    (0..ROWS * COLS)
-        .map(|i| (i as f32 % 13.0 - 6.0) * 0.03125)
-        .collect()
+    sample_rows(ROWS, COLS, 13, 6.0, 0.03125, 0.0)
 }
 
 fn reference_param_grads(
