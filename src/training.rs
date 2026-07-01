@@ -17,7 +17,6 @@ mod grad_clip;
 mod grads;
 mod launch;
 mod learning_rate;
-mod linear_scratch;
 mod metric_accumulator;
 mod next_latent;
 mod numeric_metric;

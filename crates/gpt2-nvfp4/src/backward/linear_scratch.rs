@@ -1,8 +1,11 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{AttentionCProjScratch, FinalHeadBackwardScratch, GPT2_TOKEN_ROWS};
 use rust_kernels_cuda::linear_backward::{
     LinearBackwardMsEdenScratch, LinearBackwardMsEdenScratchBuffers,
 };
+
+use super::attention::{AttentionCProjScratch, AttentionQkvScratch};
+use super::final_head::FinalHeadBackwardScratch;
+use crate::GPT2_TOKEN_ROWS;
 
 pub struct LinearScratch {
     pub error_t: DeviceBuffer<f32>,
@@ -31,6 +34,10 @@ impl LinearScratch {
     }
 
     pub fn attention(&mut self) -> AttentionCProjScratch<'_> {
+        self.c_proj()
+    }
+
+    pub fn c_proj(&mut self) -> AttentionCProjScratch<'_> {
         let (error_t, weight_t, input_t, linear) = self.parts();
         AttentionCProjScratch {
             error_t,
@@ -38,6 +45,10 @@ impl LinearScratch {
             input_t,
             linear,
         }
+    }
+
+    pub fn qkv(&mut self) -> AttentionQkvScratch<'_> {
+        self.c_proj()
     }
 
     pub fn final_head(&mut self) -> FinalHeadBackwardScratch<'_> {

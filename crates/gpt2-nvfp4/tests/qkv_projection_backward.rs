@@ -1,8 +1,8 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
     qkv_projection_backward, AttentionBackwardModules, AttentionProjectionTensors,
-    AttentionQkvBackwardArgs, HiddenState, HiddenVectorShape, QkvVectorShape, QkvWeightShape,
-    ResidualWeightShape, GPT2_N_EMBD, GPT2_QKV,
+    AttentionQkvBackwardArgs, HiddenState, HiddenVectorShape, LinearScratch, QkvVectorShape,
+    QkvWeightShape, ResidualWeightShape, GPT2_N_EMBD, GPT2_QKV,
 };
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
 use rust_kernels_cuda::nvfp4::{Nvfp4DecodeModule, Nvfp4RowwiseDeviceTensor};
@@ -13,7 +13,6 @@ mod common;
 #[path = "qkv_projection_backward/data.rs"]
 mod data;
 
-use common::linear_backward_scratch::LinearBackwardScratchBuffers;
 use common::saved_block::{saved_block, SavedBlockParts};
 use common::upload::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
 use common::{assert_nonzero_finite, cuda_test_context, row_ones};
@@ -58,7 +57,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> TestResult {
         c_proj_weight: c_proj_weight.mma(),
         c_proj_bias: c_proj_bias.device(),
     };
-    let mut scratch = LinearBackwardScratchBuffers::new(&stream, GPT2_N_EMBD, GPT2_QKV)?;
+    let mut scratch = LinearScratch::new(&stream, GPT2_N_EMBD, GPT2_QKV)?;
     let mut d_ln_1_normalized = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut d_attn_qkv_weight = DeviceBuffer::<f32>::zeroed(&stream, GPT2_N_EMBD * GPT2_QKV)?;
     let mut d_attn_qkv_bias = DeviceBuffer::<f32>::zeroed(&stream, GPT2_QKV)?;

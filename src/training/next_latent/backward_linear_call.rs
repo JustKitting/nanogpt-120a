@@ -6,8 +6,8 @@ use rust_kernels_cuda::linear_backward::{
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
-use crate::training::linear_scratch::LinearScratch;
 use crate::upload::UploadedLinear;
+use gpt2_nvfp4::LinearScratch;
 
 pub(super) struct LinearCall<'a, 'scratch, 'out> {
     pub linear: &'a LinearBackwardModule,
