@@ -21,6 +21,16 @@ pub struct PooledCandidate {
     pub source: &'static str,
 }
 
+fn unique_random(seen: &mut HashSet<String>, rng: &mut SweepRng) -> Option<Candidate> {
+    for _ in 0..4096 {
+        let candidate = Candidate::random(rng);
+        if seen.insert(candidate.key()) {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
 pub fn sample(
     seen: &HashSet<String>,
     rng: &mut SweepRng,

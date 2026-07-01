@@ -58,7 +58,7 @@ fn push_random(
     analysis: &SweepAnalysis,
 ) {
     while ranked.len() < count {
-        let candidate = unique_random(seen, rng);
+        let candidate = super::unique_random(seen, rng).unwrap_or_else(|| Candidate::random(rng));
         ranked.push(scored(candidate, config, analysis));
     }
 }
@@ -70,14 +70,4 @@ fn scored(
 ) -> (Candidate, f64) {
     let score = analysis::score_candidate(analysis, config, &candidate);
     (candidate, score.uncertainty)
-}
-
-fn unique_random(seen: &mut HashSet<String>, rng: &mut SweepRng) -> Candidate {
-    for _ in 0..4096 {
-        let candidate = Candidate::random(rng);
-        if seen.insert(candidate.key()) {
-            return candidate;
-        }
-    }
-    Candidate::random(rng)
 }

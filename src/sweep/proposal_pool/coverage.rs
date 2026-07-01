@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::super::features::{FEATURE_COUNT, unit_features};
+use super::super::features::{unit_features, FEATURE_COUNT};
 use super::super::{candidate::Candidate, config::SweepConfig, rng::SweepRng};
 
 #[cfg(test)]
@@ -37,7 +37,7 @@ fn best_candidate(
     let mut best = None;
     let mut best_score = f64::NEG_INFINITY;
     for _ in 0..search {
-        let candidate = unique_random(seen, rng)?;
+        let candidate = super::unique_random(seen, rng)?;
         let score = coverage_score(&candidate, anchors);
         if score > best_score {
             best_score = score;
@@ -45,16 +45,6 @@ fn best_candidate(
         }
     }
     best
-}
-
-fn unique_random(seen: &mut HashSet<String>, rng: &mut SweepRng) -> Option<Candidate> {
-    for _ in 0..4096 {
-        let candidate = Candidate::random(rng);
-        if seen.insert(candidate.key()) {
-            return Some(candidate);
-        }
-    }
-    None
 }
 
 fn coverage_score(candidate: &Candidate, anchors: &[[f64; FEATURE_COUNT]]) -> f64 {
