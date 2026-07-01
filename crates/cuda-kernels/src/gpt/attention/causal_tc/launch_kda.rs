@@ -41,24 +41,9 @@ impl AttentionModule {
         let batch_cfg = grid_x_config(dims.batch_head, threads);
         let chunk_cfg = kda_launch::chunk_dim_config(dims.batch_head, dims.chunks, threads);
         let matrix_cfg = grid_x_config(dims.chunk_batch, threads);
-        macro_rules! kda_linear {
-            ($kernel:ident, $n:expr; $($arg:expr),* $(,)?) => {
-                kda.$kernel(stream, linear($n), $($arg,)* params)?;
-            };
-        }
-        macro_rules! kda_chunk {
-            ($kernel:ident; $($arg:expr),* $(,)?) => {
-                kda.$kernel(stream, chunk_cfg, $($arg,)* params)?;
-            };
-        }
-        macro_rules! kda_batch {
-            ($kernel:ident; $($arg:expr),* $(,)?) => {
-                kda.$kernel(stream, batch_cfg, $($arg,)* params)?;
-            };
-        }
-        macro_rules! kda_matrix {
-            ($kernel:ident; $($arg:expr),* $(,)?) => {
-                kda.$kernel(stream, matrix_cfg, $($arg,)* params)?;
+        macro_rules! kda_kernel {
+            ($kernel:ident($config:expr; $($arg:expr),* $(,)?)) => {
+                kda.$kernel(stream, $config, $($arg,)* params)?;
             };
         }
         macro_rules! mm_in_scratch {
@@ -81,24 +66,24 @@ impl AttentionModule {
             })?;
         }
 
-        kda_linear!(prepare_kda_forward_kernel, dims.batch_head * args.seq_len * 32; args.qkv, &mut *scratch.q, &mut *scratch.k, &mut *scratch.v, &mut *scratch.scores, &mut *args.log_sum_exp);
-        kda_chunk!(chunk_cumsum_kda_g_kernel; &mut *scratch.scores);
-        kda_linear!(make_kda_qg_kneg_kernel, dims.compact_elems; &mut *scratch.q, &*scratch.k, &*scratch.scores, &mut *scratch.compact_out);
-        kda_linear!(make_kda_kg_kpos_vbeta_kernel, dims.compact_elems; &mut *scratch.k, &mut *scratch.v, &*scratch.scores, &*args.log_sum_exp, &mut *scratch.probs);
-        kda_linear!(store_kda_chunk_g_last_kernel, dims.batch_head * dims.chunks * args.head_dim; &*scratch.scores, &mut *args.log_sum_exp);
+        kda_kernel!(prepare_kda_forward_kernel(linear(dims.batch_head * args.seq_len * 32); args.qkv, &mut *scratch.q, &mut *scratch.k, &mut *scratch.v, &mut *scratch.scores, &mut *args.log_sum_exp));
+        kda_kernel!(chunk_cumsum_kda_g_kernel(chunk_cfg; &mut *scratch.scores));
+        kda_kernel!(make_kda_qg_kneg_kernel(linear(dims.compact_elems); &mut *scratch.q, &*scratch.k, &*scratch.scores, &mut *scratch.compact_out));
+        kda_kernel!(make_kda_kg_kpos_vbeta_kernel(linear(dims.compact_elems); &mut *scratch.k, &mut *scratch.v, &*scratch.scores, &*args.log_sum_exp, &mut *scratch.probs));
+        kda_kernel!(store_kda_chunk_g_last_kernel(linear(dims.batch_head * dims.chunks * args.head_dim); &*scratch.scores, &mut *args.log_sum_exp));
         mm_in_scratch!(probs, compact_out, scores, dims.cch());
-        kda_matrix!(mask_kda_akk_kernel; &mut *scratch.scores);
-        kda_matrix!(solve_kda_akk_inv_kernel; &mut *scratch.scores);
+        kda_kernel!(mask_kda_akk_kernel(matrix_cfg; &mut *scratch.scores));
+        kda_kernel!(solve_kda_akk_inv_kernel(matrix_cfg; &mut *scratch.scores));
         mm_rhs_scratch!(scores, probs, compact_out, dims.chc());
         mm_rhs_scratch!(scores, v, probs, dims.chc());
-        kda_linear!(make_kda_kneg_from_kg_kernel, dims.compact_elems; &*scratch.k, &*args.log_sum_exp, &mut *scratch.v);
+        kda_kernel!(make_kda_kneg_from_kg_kernel(linear(dims.compact_elems); &*scratch.k, &*args.log_sum_exp, &mut *scratch.v));
         mm_in_scratch!(q, v, scores, dims.cch());
-        kda_linear!(mask_kda_aqk_kernel, dims.chunk_matrix_elems; &mut *scratch.scores);
+        kda_kernel!(mask_kda_aqk_kernel(linear(dims.chunk_matrix_elems); &mut *scratch.scores));
 
         macro_rules! kda_output {
             ($chunk_states:expr) => {{
-                kda_batch!(chunk_kda_state_save_kernel; &*scratch.k, &mut *scratch.v, &*scratch.compact_out, &*scratch.probs, &*args.log_sum_exp, &mut *$chunk_states);
-                kda_chunk!(chunk_kda_output_from_state_kernel; &*scratch.q, &*scratch.v, &*scratch.scores, args.out, &*$chunk_states);
+                kda_kernel!(chunk_kda_state_save_kernel(batch_cfg; &*scratch.k, &mut *scratch.v, &*scratch.compact_out, &*scratch.probs, &*args.log_sum_exp, &mut *$chunk_states));
+                kda_kernel!(chunk_kda_output_from_state_kernel(chunk_cfg; &*scratch.q, &*scratch.v, &*scratch.scores, args.out, &*$chunk_states));
             }};
         }
         if let Some(chunk_states) = args.attention_out_f16 {
