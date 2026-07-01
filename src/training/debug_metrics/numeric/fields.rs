@@ -3,7 +3,8 @@ use super::super::super::launch::CudaTrainOutput;
 mod value;
 
 metric_fields! {
-    DebugMetricField, DEBUG_METRIC_FIELDS, debug_metric_specs, DebugMetricSpec, "Diagnostic " {
+    DebugMetricField, DEBUG_METRIC_FIELDS, debug_metric_specs, DebugMetricSpec,
+    CudaTrainOutput, value::debug_metric_value, "Diagnostic " {
         UpdateCount => ("update count", None, true),
         PositiveUpdateDot => ("positive update dot", None, true),
         ZeroGradChanged => ("zero grad changed", None, false),
@@ -41,5 +42,3 @@ metric_fields! {
         TensorGlobalAfterMaxAbs => ("tensor global after max abs", None, false),
     }
 }
-
-impl_numeric_metric_spec!(DebugMetricSpec, CudaTrainOutput, value::debug_metric_value);

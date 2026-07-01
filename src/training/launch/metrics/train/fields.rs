@@ -1,7 +1,8 @@
 use super::super::output::CudaTrainOutput;
 
 metric_fields! {
-    TrainMetricField, TRAIN_METRIC_FIELDS, train_metric_specs, TrainMetricSpec, "" {
+    TrainMetricField, TRAIN_METRIC_FIELDS, train_metric_specs, TrainMetricSpec,
+    CudaTrainOutput, TrainMetricField::value, "" {
         Loss => ("Loss", None, false),
         ForwardMs => ("Forward", Some("ms"), false),
         BackwardEnqueueMs => ("Backward enqueue", Some("ms"), false),
@@ -30,8 +31,6 @@ metric_fields! {
         SeqLen => ("Seq len", None, true),
     }
 }
-
-impl_numeric_metric_spec!(TrainMetricSpec, CudaTrainOutput, TrainMetricField::value);
 
 impl TrainMetricField {
     fn value(self, item: &CudaTrainOutput) -> f64 {

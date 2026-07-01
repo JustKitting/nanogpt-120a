@@ -1,15 +1,14 @@
 use super::super::output::CudaValidOutput;
 
 metric_fields! {
-    ValidMetricField, VALID_METRIC_FIELDS, valid_metric_specs, ValidMetricSpec, "" {
+    ValidMetricField, VALID_METRIC_FIELDS, valid_metric_specs, ValidMetricSpec,
+    CudaValidOutput, ValidMetricField::value, "" {
         Loss => ("Validation loss", None, false),
         EvalElapsed => ("Eval elapsed", Some("s"), false),
         WindowCount => ("Val windows", None, true),
         CompletedSteps => ("Completed steps", None, true),
     }
 }
-
-impl_numeric_metric_spec!(ValidMetricSpec, CudaValidOutput, ValidMetricField::value);
 
 impl ValidMetricField {
     fn value(self, item: &CudaValidOutput) -> f64 {

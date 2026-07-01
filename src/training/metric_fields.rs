@@ -4,6 +4,8 @@ macro_rules! metric_fields {
         $field_const:ident,
         $specs_fn:ident,
         $spec_ty:ident,
+        $input_ty:ty,
+        $value:expr,
         $prefix:literal
         {
             $($variant:ident => ($name:literal, $unit:expr, $higher_is_better:expr),)+
@@ -44,11 +46,7 @@ macro_rules! metric_fields {
         pub(super) fn $specs_fn() -> impl Iterator<Item = $spec_ty> {
             $field_const.iter().copied().map($field_ty::spec)
         }
-    };
-}
 
-macro_rules! impl_numeric_metric_spec {
-    ($spec_ty:ty, $input_ty:ty, $value:expr $(,)?) => {
         impl $crate::training::numeric_metric::NumericMetricSpec for $spec_ty {
             type Input = $input_ty;
 
