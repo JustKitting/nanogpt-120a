@@ -1,51 +1,9 @@
 use std::error::Error;
 
 use super::{CorrectionStats, GramCorrectionMode, Nvfp4Polar};
+use correction::GramRequest;
 
 mod correction;
-
-#[derive(Clone, Copy)]
-struct GramRequest<'s> {
-    source: &'s [f32],
-    rows: usize,
-    cols: usize,
-    iter: usize,
-}
-
-impl<'s> GramRequest<'s> {
-    fn new(source: &'s [f32], rows: usize, cols: usize, iter: usize) -> Self {
-        Self {
-            source,
-            rows,
-            cols,
-            iter,
-        }
-    }
-}
-
-struct CorrectionGram {
-    values: Vec<f32>,
-    stale_reject_candidate: bool,
-    refresh: bool,
-}
-
-impl CorrectionGram {
-    fn new(values: Vec<f32>, stale_reject_candidate: bool, refresh: bool) -> Self {
-        Self {
-            values,
-            stale_reject_candidate,
-            refresh,
-        }
-    }
-
-    fn refreshed(values: Vec<f32>) -> Self {
-        Self::new(values, false, true)
-    }
-
-    fn approximate(values: Vec<f32>) -> Self {
-        Self::new(values, false, false)
-    }
-}
 
 fn row_orthogonality_residual(x: &[f32], rows: usize, cols: usize) -> f32 {
     let mut sum = 0.0_f32;

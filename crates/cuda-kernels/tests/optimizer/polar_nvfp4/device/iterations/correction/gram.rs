@@ -2,7 +2,7 @@ use std::error::Error;
 
 use super::super::super::super::math::relative_l2;
 use super::super::super::{CorrectionStats, Nvfp4Polar};
-use super::super::{CorrectionGram, GramRequest};
+use super::{CorrectionGram, GramRequest};
 
 impl<'a> Nvfp4Polar<'a> {
     pub(super) fn stale_correction_gram(
@@ -37,11 +37,11 @@ impl<'a> Nvfp4Polar<'a> {
                 .collect()
         };
 
-        Ok(CorrectionGram::new(
+        Ok(CorrectionGram {
             values,
-            rejects_stale_steps && !refresh,
+            stale_reject_candidate: rejects_stale_steps && !refresh,
             refresh,
-        ))
+        })
     }
 
     pub(super) fn high_precision_gram(

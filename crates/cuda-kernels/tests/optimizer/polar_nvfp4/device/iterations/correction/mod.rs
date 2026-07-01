@@ -1,9 +1,11 @@
 use std::error::Error;
 
 use super::super::{CorrectionStats, GramCorrectionMode, Nvfp4Polar};
-use super::{CorrectionGram, GramRequest};
 
 mod gram;
+mod types;
+
+pub(super) use types::{CorrectionGram, GramRequest};
 
 impl<'a> Nvfp4Polar<'a> {
     pub(super) fn correction_gram(

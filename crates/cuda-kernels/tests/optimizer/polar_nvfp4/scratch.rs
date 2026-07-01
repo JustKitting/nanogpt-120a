@@ -32,16 +32,16 @@ impl Scratch {
         b_global_scale: f32,
     ) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
-            a_padded: DeviceBuffer::zeroed(stream, elements(m, k))?,
-            b_t_padded: DeviceBuffer::zeroed(stream, elements(n, k))?,
-            a_bytes: DeviceBuffer::zeroed(stream, bytes(m, k))?,
-            a_scales: DeviceBuffer::zeroed(stream, scales(m, k))?,
+            a_padded: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_elements(m as u32, k as u32))?,
+            b_t_padded: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_elements(n as u32, k as u32))?,
+            a_bytes: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_bytes(m as u32, k as u32))?,
+            a_scales: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_scales(m as u32, k as u32))?,
             a_globals: DeviceBuffer::zeroed(stream, m)?,
-            a_amax: DeviceBuffer::zeroed(stream, chunks(m, k))?,
-            b_bytes: DeviceBuffer::zeroed(stream, bytes(n, k))?,
-            b_scales: DeviceBuffer::zeroed(stream, scales(n, k))?,
+            a_amax: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_chunks(m as u32, k as u32))?,
+            b_bytes: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_bytes(n as u32, k as u32))?,
+            b_scales: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_scales(n as u32, k as u32))?,
             b_globals: DeviceBuffer::zeroed(stream, n)?,
-            b_amax: DeviceBuffer::zeroed(stream, chunks(n, k))?,
+            b_amax: DeviceBuffer::zeroed(stream, nvfp4_tc_matmul_chunks(n as u32, k as u32))?,
             a_global_scale,
             b_global_scale,
         })
@@ -88,20 +88,4 @@ fn operand<'a>(
         chunk_amax: amax,
         global_scale,
     }
-}
-
-fn elements(rows: usize, k: usize) -> usize {
-    nvfp4_tc_matmul_elements(rows as u32, k as u32)
-}
-
-fn bytes(rows: usize, k: usize) -> usize {
-    nvfp4_tc_matmul_bytes(rows as u32, k as u32)
-}
-
-fn scales(rows: usize, k: usize) -> usize {
-    nvfp4_tc_matmul_scales(rows as u32, k as u32)
-}
-
-fn chunks(rows: usize, k: usize) -> usize {
-    nvfp4_tc_matmul_chunks(rows as u32, k as u32)
 }
