@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 use rust_kernels_cuda::mlp::Relu2BackwardF16Args;
 
 use super::args::{MlpBackwardArgs, MlpBackwardGrads, MlpBackwardScratch};
-use super::pass::{LinearPass, run_linear_pass};
+use crate::backward::linear::{RowwiseLinearBackwardPass, run_rowwise_linear_backward};
 use crate::{GPT2_MLP, GPT2_N_EMBD};
 
 pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
@@ -31,14 +31,15 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         d_c_fc_bias,
     } = grads;
 
-    run_linear_pass(
-        &modules,
+    run_rowwise_linear_backward(
+        modules.linear,
+        modules.quant,
         stream,
-        LinearPass {
+        RowwiseLinearBackwardPass {
             e: d_residual_out,
             saved_input: saved.mlp_down_input_nvfp4,
             weight: projections.down.weight,
-            linear_scratch: down_linear,
+            scratch: down_linear,
             dinput: d_mlp_relu2,
             dweight: d_c_proj_weight,
             dbias: d_c_proj_bias,
@@ -58,14 +59,15 @@ pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
         len: saved.row_count * GPT2_MLP as u32,
     })?;
 
-    run_linear_pass(
-        &modules,
+    run_rowwise_linear_backward(
+        modules.linear,
+        modules.quant,
         stream,
-        LinearPass {
+        RowwiseLinearBackwardPass {
             e: d_mlp_up,
             saved_input: saved.mlp_up_input_nvfp4,
             weight: projections.up.weight,
-            linear_scratch: up_linear,
+            scratch: up_linear,
             dinput: d_ln_2_normalized,
             dweight: d_c_fc_weight,
             dbias: d_c_fc_bias,

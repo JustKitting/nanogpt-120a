@@ -1,5 +1,4 @@
 mod args;
-mod pass;
 mod run;
 
 pub use args::{

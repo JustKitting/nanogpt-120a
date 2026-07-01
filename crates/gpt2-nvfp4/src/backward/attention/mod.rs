@@ -1,5 +1,4 @@
 mod causal;
-mod linear;
 mod output_projection;
 mod qkv_projection;
 mod types;

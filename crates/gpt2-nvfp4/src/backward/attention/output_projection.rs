@@ -1,7 +1,7 @@
 use cuda_core::DriverError;
 
-use super::linear::{AttentionLinearPass, run_attention_linear_pass};
 use super::types::AttentionCProjBackwardArgs;
+use crate::backward::linear::{RowwiseLinearBackwardPass, run_rowwise_linear_backward};
 use crate::GPT2_N_EMBD;
 
 pub fn c_proj_backward(args: AttentionCProjBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
@@ -18,13 +18,14 @@ pub fn c_proj_backward(args: AttentionCProjBackwardArgs<'_, '_, '_>) -> Result<(
         seeds,
     } = args;
 
-    run_attention_linear_pass(
-        &modules,
+    run_rowwise_linear_backward(
+        modules.linear,
+        modules.quant,
         stream,
-        AttentionLinearPass {
+        RowwiseLinearBackwardPass {
             saved_input: saved.c_proj_input_nvfp4,
             weight: projections.c_proj_weight,
-            scratch,
+            scratch: scratch.linear,
             dinput: d_attention_out,
             dweight: d_attn_c_proj_weight,
             dbias: d_attn_c_proj_bias,

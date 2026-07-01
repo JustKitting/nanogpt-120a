@@ -1,7 +1,7 @@
 use cuda_core::DriverError;
 
-use super::linear::{AttentionLinearPass, run_attention_linear_pass};
 use super::types::AttentionQkvBackwardArgs;
+use crate::backward::linear::{RowwiseLinearBackwardPass, run_rowwise_linear_backward};
 use crate::{GPT2_FULL_ATTENTION_QKV, GPT2_N_EMBD, GPT2_QKV};
 
 pub fn qkv_projection_backward(
@@ -26,14 +26,15 @@ pub fn qkv_projection_backward(
         GPT2_QKV
     } as u32;
 
-    run_attention_linear_pass(
-        &modules,
+    run_rowwise_linear_backward(
+        modules.linear,
+        modules.quant,
         stream,
-        AttentionLinearPass {
+        RowwiseLinearBackwardPass {
             e: d_qkv,
             saved_input: saved.qkv_input_nvfp4,
             weight: projections.qkv_weight,
-            scratch,
+            scratch: scratch.linear,
             dinput: d_ln_1_normalized,
             dweight: d_attn_qkv_weight,
             dbias: d_attn_qkv_bias,
