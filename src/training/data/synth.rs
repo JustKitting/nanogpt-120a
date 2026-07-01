@@ -49,22 +49,13 @@ pub(super) fn ensure_shards() -> AppResult<()> {
 fn shards_for_split(split: &str) -> AppResult<Vec<PathBuf>> {
     let dir = synth_shard_dir();
     let prefix = format!("{SHARD_FILE_PREFIX}_{split}_");
-    let mut shards = Vec::new();
-
     if !dir.exists() {
         return Err(format!("{} does not exist after SYNTH prep", dir.display()).into());
     }
 
-    for entry in fs::read_dir(&dir)? {
-        let path = entry?.path();
-        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        if file_name.starts_with(&prefix) && file_name.ends_with(".bin") {
-            shards.push(path);
-        }
-    }
-
+    let mut shards = matching_entries(&dir, |file_name| {
+        file_name.starts_with(&prefix) && file_name.ends_with(".bin")
+    })?;
     shards.sort();
     Ok(shards)
 }
@@ -88,17 +79,24 @@ fn clear_shards() -> AppResult<()> {
         return Ok(());
     }
 
-    for entry in fs::read_dir(&dir)? {
-        let path = entry?.path();
-        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        if (file_name.starts_with(SHARD_FILE_PREFIX) && file_name.ends_with(".bin"))
+    for path in matching_entries(&dir, |file_name| {
+        (file_name.starts_with(SHARD_FILE_PREFIX) && file_name.ends_with(".bin"))
             || file_name == SYNTH_EOS_MARKER
-        {
-            fs::remove_file(path)?;
-        }
+    })? {
+        fs::remove_file(path)?;
     }
 
     Ok(())
+}
+
+fn matching_entries(dir: &Path, keep: impl Fn(&str) -> bool) -> AppResult<Vec<PathBuf>> {
+    let mut paths = fs::read_dir(dir)?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<Vec<_>, _>>()?;
+    paths.retain(|path| {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(&keep)
+    });
+    Ok(paths)
 }
