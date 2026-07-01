@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::super::super::{analysis::CandidateScore, optimizer::Proposal};
+use super::score_columns;
 
 #[derive(Clone, Debug)]
 struct SourceSummary<'a> {
@@ -34,17 +35,12 @@ pub(in crate::sweep::proposal_log) fn sources_tsv(proposal: &Proposal) -> String
     );
     for (source, summary) in summaries {
         text.push_str(&format!(
-            "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\n",
+            "{}\t{}\t{}\t{}\t{}\n",
             source,
             summary.count,
             summary.selected,
             summary.best_rank,
-            summary.best.score,
-            summary.best.expected_quality,
-            summary.best.survival_prior,
-            summary.best.probability_improvement,
-            summary.best.expected_improvement,
-            summary.best.uncertainty
+            score_columns(summary.best),
         ));
     }
     text
