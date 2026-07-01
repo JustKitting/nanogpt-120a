@@ -4,7 +4,7 @@ use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulF32Args;
 use rust_kernels_cuda::nvfp4_tc_matmul::Nvfp4TcMatmulArgs;
 
-use super::super::scratch::{Scratch, global_scale};
+use super::super::scratch::{global_scale, Scratch};
 use super::Nvfp4Polar;
 
 impl<'a> Nvfp4Polar<'a> {
@@ -21,7 +21,8 @@ impl<'a> Nvfp4Polar<'a> {
         let a_dev = DeviceBuffer::from_host(self.stream, a)?;
         let b_t_dev = DeviceBuffer::from_host(self.stream, b_t)?;
         let mut out = DeviceBuffer::<f32>::zeroed(self.stream, m * n)?;
-        let mut scratch = Scratch::new(self.stream, m, n, k, global_scale(a), global_scale(b_t))?;
+        let mut scratch =
+            Scratch::new(self.stream, (m, n, k), (global_scale(a), global_scale(b_t)))?;
 
         self.matmul.matmul_ms_eden(Nvfp4TcMatmulArgs {
             stream: self.stream,

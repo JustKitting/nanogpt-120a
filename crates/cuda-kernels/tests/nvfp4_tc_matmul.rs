@@ -12,7 +12,7 @@ mod decode;
 mod scratch;
 
 use decode::decoded_dot;
-use scratch::{K, M, N, ScratchBuffers};
+use scratch::{ScratchBuffers, K, M, N};
 
 const TOLERANCE: f32 = 1.0e-5;
 
@@ -27,7 +27,7 @@ fn fp32_ms_eden_tc_matmul_matches_decoded_operands() -> Result<(), Box<dyn Error
     let a_dev = DeviceBuffer::from_host(&stream, &vec![1.0_f32; M * K])?;
     let b_t_dev = DeviceBuffer::from_host(&stream, &vec![0.5_f32; N * K])?;
     let mut out = DeviceBuffer::<f32>::zeroed(&stream, M * N)?;
-    let mut scratch = ScratchBuffers::new(&stream)?;
+    let mut scratch = ScratchBuffers::new(&stream, (M, N, K), (1.0, 1.0))?;
 
     module.matmul_ms_eden(Nvfp4TcMatmulArgs {
         stream: &stream,

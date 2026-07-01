@@ -4,6 +4,7 @@ use cuda_core::{CudaContext, CudaModule, CudaStream, DriverError};
 
 pub mod f16_tc;
 pub mod nvfp4;
+pub mod nvfp4_tc;
 
 pub type CudaTestContext = (Arc<CudaContext>, Arc<CudaStream>, Arc<CudaModule>);
 
