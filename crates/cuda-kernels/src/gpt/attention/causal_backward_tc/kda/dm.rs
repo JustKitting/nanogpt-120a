@@ -4,7 +4,7 @@ use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 use crate::f16_tc_matmul::cta_tile::{CTA_B_ELEMS, CTA_K, CTA_THREADS};
 use crate::kda_common::{beta_compact_index, compact_index, kda_decay_exp};
-use crate::kda_tc::{CompactTileCtx, CtaATile, CtaBTile, KdaChunkTileCtx, stage_compact_a as stage_dm_compact_a, stage_compact_token_dim_b_t as stage_dm_compact_b_t, store_chunk_matrix_quads, tc_stage_loop};
+use crate::kda_tc::{CompactTileCtx, CtaBTile, CtaTiles, KdaChunkTileCtx, stage_compact_a as stage_dm_compact_a, stage_compact_token_dim_b_t as stage_dm_compact_b_t, store_chunk_matrix_quads, tc_stage_loop};
 
 #[derive(Clone, Copy)]
 pub(crate) struct KdaDmInputs<'a> { pub(crate) kg: &'a [f32], pub(crate) vbeta: &'a [f32], pub(crate) g: &'a [f32], pub(crate) beta: &'a [f32], pub(crate) d_u: &'a [f32], pub(crate) d_w: &'a [f32] }
@@ -13,12 +13,12 @@ pub(crate) fn chunk_intra_kda_dm_body(
     inputs: KdaDmInputs<'_>,
     mut d_m: DisjointSlice<f32>,
     params: CausalAttentionParams,
-    a_tile: &mut CtaATile,
-    b_tile: &mut CtaBTile,
+    tiles: CtaTiles<'_>,
 ) {
     let Some(ctx) = KdaChunkTileCtx::from_block(&params) else {
         return;
     };
+    let (a_tile, b_tile) = tiles;
     let compact_ctx = ctx.compact;
     let mut acc = [[0.0_f32; 4]; 4];
 

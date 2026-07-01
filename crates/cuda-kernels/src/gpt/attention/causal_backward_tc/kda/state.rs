@@ -2,7 +2,7 @@ use cuda_device::{DisjointSlice, thread};
 
 use crate::attention::CausalAttentionParams;
 use crate::kda_tc::{
-    CompactStore::SetScaled, CtaATile, CtaBTile, KdaChunkTileCtx, StateTileLayout, StateTileSource,
+    CompactStore::SetScaled, CtaTiles, KdaChunkTileCtx, StateTileLayout, StateTileSource,
     stage_compact_a as stage_dm_compact_a, stage_state_b_t, store_compact_quads, store_vnew_quads,
     tc_stage_loop,
 };
@@ -12,12 +12,12 @@ pub(crate) fn chunk_kda_dkg_from_vnew_dh_body(
     d_h_states: &[f32],
     mut d_kg: DisjointSlice<f32>,
     params: CausalAttentionParams,
-    a_tile: &mut CtaATile,
-    b_tile: &mut CtaBTile,
+    tiles: CtaTiles<'_>,
 ) {
     let Some(ctx) = KdaChunkTileCtx::from_block(&params) else {
         return;
     };
+    let (a_tile, b_tile) = tiles;
     let compact_ctx = ctx.compact;
 
     let mut acc = [[0.0_f32; 4]; 4];
@@ -37,20 +37,19 @@ pub(crate) enum ChunkStateMatmulMode {
     Dqg,
 }
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(crate) fn chunk_state_matmul_body(
     a_src: &[f32],
     vnew_base: &[f32],
     state_u16: &[u16],
     mut out: DisjointSlice<f32>,
     params: CausalAttentionParams,
-    a_tile: &mut CtaATile,
-    b_tile: &mut CtaBTile,
+    tiles: CtaTiles<'_>,
     mode: ChunkStateMatmulMode,
 ) {
     let Some(ctx) = KdaChunkTileCtx::from_block(&params) else {
         return;
     };
+    let (a_tile, b_tile) = tiles;
     let compact_ctx = ctx.compact;
 
     let mut acc = [[0.0_f32; 4]; 4];

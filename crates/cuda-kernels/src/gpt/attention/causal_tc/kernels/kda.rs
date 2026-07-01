@@ -1,7 +1,8 @@
 use cuda_device::{cuda_module, kernel, DisjointSlice};
 
 use super::super::kda::{
-    chunk_cumsum_g_body, chunk_kda_output_from_state_body, chunk_kda_state_save_body,
+    KdaStateSaveInputs, chunk_cumsum_g_body, chunk_kda_output_from_state_body,
+    chunk_kda_state_save_body,
     make_kg_kpos_vbeta_body, make_kneg_from_kg_body, make_qg_kneg_body, mask_akk_body,
     mask_aqk_body, prepare_kda_body, solve_akk_inv_body, store_chunk_g_last_body, zero_f32_body,
 };
@@ -102,7 +103,7 @@ pub(super) mod module {
         chunk_states: DisjointSlice<u16>,
         params: CausalAttentionParams,
     ) {
-        with_kda_tiles!(state chunk_kda_state_save_body; kg, v_new, w, u, chunk_g_last, chunk_states, params);
+        with_kda_tiles!(state chunk_kda_state_save_body; KdaStateSaveInputs { kg, w, u, chunk_g_last }, v_new, chunk_states, params);
     }
 
     #[kernel]

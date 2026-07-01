@@ -7,4 +7,4 @@ pub(super) use super::kda_elementwise::{
     zero_f32_body,
 };
 pub(super) use output::chunk_kda_output_from_state_body;
-pub(super) use state::chunk_kda_state_save_body;
+pub(super) use state::{KdaStateSaveInputs, chunk_kda_state_save_body};

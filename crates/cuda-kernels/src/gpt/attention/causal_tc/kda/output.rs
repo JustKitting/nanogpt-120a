@@ -4,7 +4,7 @@ use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_K, CTA_THREADS};
 use crate::kda_common::chunk_matrix_index;
-use crate::kda_tc::{CtaATile, CtaBTile, KdaChunkTileCtx, MatrixTileCtx, StateTileLayout, StateTileSource, stage_compact_a, stage_compact_b_t as stage_vnew_b_t_slice, stage_state_b_t, store_hidden_output_quads, tc_stage_loop};
+use crate::kda_tc::{CtaATile, CtaTiles, KdaChunkTileCtx, MatrixTileCtx, StateTileLayout, StateTileSource, stage_compact_a, stage_compact_b_t as stage_vnew_b_t_slice, stage_state_b_t, store_hidden_output_quads, tc_stage_loop};
 
 pub(in super::super) fn chunk_kda_output_from_state_body(
     q: &[f32],
@@ -13,12 +13,12 @@ pub(in super::super) fn chunk_kda_output_from_state_body(
     mut out: DisjointSlice<f32>,
     chunk_states: &[u16],
     params: CausalAttentionParams,
-    a_tile: &mut CtaATile,
-    b_tile: &mut CtaBTile,
+    tiles: CtaTiles<'_>,
 ) {
     let Some(ctx) = KdaChunkTileCtx::from_block(&params) else {
         return;
     };
+    let (a_tile, b_tile) = tiles;
     let compact_ctx = ctx.compact;
 
     let mut acc = [[0.0_f32; 4]; 4];
@@ -36,12 +36,7 @@ pub(in super::super) fn chunk_kda_output_from_state_body(
     store_hidden_output_quads(acc, &mut out, compact_ctx);
 }
 
-fn stage_chunk_matrix_a(
-    src: &[f32],
-    a_tile: &mut CtaATile,
-    ctx: MatrixTileCtx<'_>,
-    k_base: u32,
-) {
+fn stage_chunk_matrix_a(src: &[f32], a_tile: &mut CtaATile, ctx: MatrixTileCtx<'_>, k_base: u32) {
     let mut offset = thread::threadIdx_x();
     while offset < CTA_A_ELEMS as u32 {
         let row = offset / CTA_K;
