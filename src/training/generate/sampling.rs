@@ -9,10 +9,7 @@ pub(super) fn sample_top_k(
 ) -> u32 {
     let temperature = positive_finite_or(temperature, 1.0);
     let top_p = positive_finite_or(top_p, 1.0).clamp(0.0, 1.0);
-    let max_logit = logits
-        .iter()
-        .copied()
-        .fold(f32::NEG_INFINITY, |max, value| max.max(value));
+    let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let mut weights = Vec::with_capacity(logits.len());
     let mut total = 0.0_f64;
 
