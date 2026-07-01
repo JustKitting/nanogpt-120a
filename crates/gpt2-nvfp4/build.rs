@@ -1,5 +1,10 @@
 use std::{env, fs, path::PathBuf};
 
+#[path = "../build_support.rs"]
+mod build_support;
+
+use build_support::{Baseline, emit_rerun_metadata, env_usize};
+
 fn main() {
     let baseline = Baseline::load();
     let seq_len = env_usize("GPT2_SEQ_LEN")
@@ -28,19 +33,13 @@ fn main() {
         "GPT2_N_EMBD must be divisible by GPT2_N_HEAD"
     );
 
-    for name in [
+    emit_rerun_metadata(&[
         "GPT2_SEQ_LEN",
         "GPT2_BATCH_SIZE",
         "GPT2_N_LAYER",
         "GPT2_N_HEAD",
         "GPT2_N_EMBD",
-    ] {
-        println!("cargo:rerun-if-env-changed={name}");
-    }
-    println!(
-        "cargo:rerun-if-changed={}",
-        baseline_path().to_string_lossy()
-    );
+    ]);
 
     let out = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR must be set"));
     fs::write(
@@ -54,36 +53,4 @@ fn main() {
         ),
     )
     .expect("failed to write generated GPT-2 shape");
-}
-
-fn env_usize(name: &str) -> Option<usize> {
-    env::var(name).ok().and_then(|value| value.parse().ok())
-}
-
-struct Baseline {
-    text: String,
-}
-
-impl Baseline {
-    fn load() -> Self {
-        Self {
-            text: fs::read_to_string(baseline_path()).unwrap_or_default(),
-        }
-    }
-
-    fn usize(&self, name: &str) -> Option<usize> {
-        self.value(name).and_then(|value| value.parse().ok())
-    }
-
-    fn value(&self, name: &str) -> Option<&str> {
-        self.text.lines().find_map(|line| {
-            let (key, value) = line.split_once('=')?;
-            (key.trim() == name).then_some(value.trim())
-        })
-    }
-}
-
-fn baseline_path() -> PathBuf {
-    PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set"))
-        .join("../../notes/sweep_baseline.env")
 }
