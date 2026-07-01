@@ -1,6 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use super::args::{F16TcMatmulScratch, f16_tc_matmul_padded_k};
+use super::cta_tile::CtaMatmulDims;
 use super::kernels::LoadedModule;
 use super::launch_ops::{convert, pad_rows};
 
@@ -10,29 +11,26 @@ pub(super) fn prepare_halves<'scratch>(
     a: &DeviceBuffer<f32>,
     b_t: &DeviceBuffer<f32>,
     scratch: F16TcMatmulScratch<'scratch>,
-    batch_count: u32,
-    m: u32,
-    n: u32,
-    k: u32,
+    dims: CtaMatmulDims,
 ) -> Result<(F16TcMatmulScratch<'scratch>, u32), DriverError> {
-    let padded_k = f16_tc_matmul_padded_k(k);
-    let a_rows = batch_count * m;
-    let b_rows = batch_count * n;
-    assert!(a.len() >= a_rows as usize * k as usize);
-    assert!(b_t.len() >= b_rows as usize * k as usize);
+    let padded_k = f16_tc_matmul_padded_k(dims.k);
+    let a_rows = dims.batch_count * dims.m;
+    let b_rows = dims.batch_count * dims.n;
+    assert!(a.len() >= a_rows as usize * dims.k as usize);
+    assert!(b_t.len() >= b_rows as usize * dims.k as usize);
     assert!(scratch.a_halves.len() >= a_rows as usize * padded_k as usize);
     assert!(scratch.b_t_halves.len() >= b_rows as usize * padded_k as usize);
 
-    if padded_k == k {
-        convert(module, stream, a, scratch.a_halves, a_rows * k)?;
-        convert(module, stream, b_t, scratch.b_t_halves, b_rows * k)?;
-        return Ok((scratch, k));
+    if padded_k == dims.k {
+        convert(module, stream, a, scratch.a_halves, a_rows * dims.k)?;
+        convert(module, stream, b_t, scratch.b_t_halves, b_rows * dims.k)?;
+        return Ok((scratch, dims.k));
     }
 
     assert!(scratch.a_padded.len() >= a_rows as usize * padded_k as usize);
     assert!(scratch.b_t_padded.len() >= b_rows as usize * padded_k as usize);
-    pad_rows(module, stream, a, scratch.a_padded, a_rows, k, padded_k)?;
-    pad_rows(module, stream, b_t, scratch.b_t_padded, b_rows, k, padded_k)?;
+    pad_rows(module, stream, a, scratch.a_padded, a_rows, dims.k, padded_k)?;
+    pad_rows(module, stream, b_t, scratch.b_t_padded, b_rows, dims.k, padded_k)?;
     convert(
         module,
         stream,

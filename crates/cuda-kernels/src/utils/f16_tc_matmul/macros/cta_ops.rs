@@ -55,14 +55,15 @@ macro_rules! cta_store_add4 {
         $(
             $store_add(
                 $acc,
-                tile,
-                tile.warp_n0 + $offset,
-                $base,
                 $out,
-                $dims.m,
-                $dims.n,
-                $base_scale,
-                $matmul_scale,
+                $crate::f16_tc_matmul::cta_store_add::StoreAddArgs::new(
+                    tile,
+                    tile.warp_n0 + $offset,
+                    $base,
+                    $dims,
+                    $base_scale,
+                    $matmul_scale,
+                ),
             );
         )+
     }};

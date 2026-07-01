@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cuda_core::{CudaModule, DriverError, LaunchConfig};
 
 use super::args::{F16ConvertArgs, F16TcMatmulArgs, F16TcMatmulHalfArgs};
-use super::cta_tile::{CTA_M, CTA_N, CTA_THREADS};
+use super::cta_tile::{CTA_M, CTA_N, CTA_THREADS, CtaMatmulDims};
 use super::kernels;
 use super::launch_ops::convert;
 use super::prepare::prepare_halves;
@@ -31,6 +31,7 @@ impl F16TcMatmulModule {
     }
 
     pub fn batched_matmul(&self, args: F16TcMatmulArgs<'_, '_, '_>) -> Result<(), DriverError> {
+        let dims = CtaMatmulDims::new(args.batch_count, args.m, args.n, args.k);
         assert!(args.out.len() >= elements(args.batch_count, args.m, args.n));
 
         let (scratch, k) = prepare_halves(
@@ -39,10 +40,7 @@ impl F16TcMatmulModule {
             args.a,
             args.b_t,
             args.scratch,
-            args.batch_count,
-            args.m,
-            args.n,
-            args.k,
+            dims,
         )?;
 
         self.module.f16_cta_tc_matmul_kernel(
