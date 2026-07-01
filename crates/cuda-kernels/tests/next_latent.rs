@@ -23,7 +23,7 @@ fn nextlat_concat_and_shifted_smooth_l1_match_reference() -> Result<(), Box<dyn 
     let next_token_embeddings = reference::values(0.25);
     let current_states = reference::values(-0.5);
     let predicted = reference::values(0.125);
-    let mut losses = vec![1.0_f32; ROW_COUNT];
+    let losses = vec![1.0_f32; ROW_COUNT];
 
     let next_token_dev = DeviceBuffer::from_host(&stream, &next_token_embeddings)?;
     let current_dev = DeviceBuffer::from_host(&stream, &current_states)?;
@@ -52,14 +52,11 @@ fn nextlat_concat_and_shifted_smooth_l1_match_reference() -> Result<(), Box<dyn 
         lambda: LAMBDA,
     })?;
 
-    let concat = concat_dev.to_host_vec(&stream)?;
-    losses = losses_dev.to_host_vec(&stream)?;
-    let d_pred = d_pred_dev.to_host_vec(&stream)?;
     let expected_concat = reference::concat(&next_token_embeddings, &current_states);
     let (expected_losses, expected_grad) = reference::smooth_l1(&predicted, &current_states);
 
-    common::assert_slice_close(&concat, &expected_concat, TOLERANCE);
-    common::assert_slice_close(&losses, &expected_losses, TOLERANCE);
-    common::assert_slice_close(&d_pred, &expected_grad, TOLERANCE);
+    common::assert_slice_close(&concat_dev.to_host_vec(&stream)?, &expected_concat, TOLERANCE);
+    common::assert_slice_close(&losses_dev.to_host_vec(&stream)?, &expected_losses, TOLERANCE);
+    common::assert_slice_close(&d_pred_dev.to_host_vec(&stream)?, &expected_grad, TOLERANCE);
     Ok(())
 }

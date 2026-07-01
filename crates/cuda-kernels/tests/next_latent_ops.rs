@@ -62,14 +62,11 @@ fn nextlat_projection_gelu_and_residual_match_reference() -> Result<(), Box<dyn 
         len: (TOKEN_COUNT * OUTPUT_DIM) as u32,
     })?;
 
-    let projection = projection.to_host_vec(&stream)?;
-    let gelu = gelu.to_host_vec(&stream)?;
-    let out = out.to_host_vec(&stream)?;
     let expected_gelu = reference_gelu(1.0);
 
-    common::assert_all_close(&projection, 1.0, TOLERANCE);
-    common::assert_all_close(&gelu, expected_gelu, TOLERANCE);
-    common::assert_all_close(&out, expected_gelu + 0.25, TOLERANCE);
+    common::assert_all_close(&projection.to_host_vec(&stream)?, 1.0, TOLERANCE);
+    common::assert_all_close(&gelu.to_host_vec(&stream)?, expected_gelu, TOLERANCE);
+    common::assert_all_close(&out.to_host_vec(&stream)?, expected_gelu + 0.25, TOLERANCE);
     Ok(())
 }
 
