@@ -16,6 +16,8 @@ pub(super) fn current_baseline_trial(
     screen_trial.cloned().or(measured_trial)
 }
 
+pub(super) fn screen_loss(trial: Option<&Trial>) -> Option<f64> { trial.and_then(|trial| trial.screen_val_loss) }
+
 pub(super) fn trial(
     candidate: Candidate,
     status: &str,

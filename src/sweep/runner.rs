@@ -10,7 +10,7 @@ mod execute;
 mod trial_record;
 
 use execute::{run_trial, screen_baseline};
-use trial_record::{current_baseline_trial, promoted_screen_loss};
+use trial_record::{current_baseline_trial, promoted_screen_loss, screen_loss};
 
 pub fn run(config: SweepConfig) -> SweepResult {
     let sweep_dir = config.sweep_dir.clone().unwrap_or_else(default_sweep_dir);
@@ -20,9 +20,7 @@ pub fn run(config: SweepConfig) -> SweepResult {
     chain::sync_shared_history(&mut shared_history, &history.trials, config.dry_run)?;
     let mut baseline = Baseline::load(config.baseline.clone())?;
     let mut baseline_screen_trial = screen_baseline(&baseline, &config, &sweep_dir)?;
-    let mut baseline_screen_loss = baseline_screen_trial
-        .as_ref()
-        .and_then(|trial| trial.screen_val_loss);
+    let mut baseline_screen_loss = screen_loss(baseline_screen_trial.as_ref());
     let mut rng = chain::sweep_rng(config.seed, history.trials.len());
 
     for index in history.trials.len()..config.trials {
@@ -68,9 +66,7 @@ pub fn run(config: SweepConfig) -> SweepResult {
                 baseline_screen_trial = Some(trial.clone());
             } else {
                 baseline_screen_trial = screen_baseline(&baseline, &config, &sweep_dir)?;
-                baseline_screen_loss = baseline_screen_trial
-                    .as_ref()
-                    .and_then(|trial| trial.screen_val_loss);
+                baseline_screen_loss = screen_loss(baseline_screen_trial.as_ref());
             }
             println!(
                 "sweep_baseline_promoted val_loss={} key={} path={}",
