@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use gpt2_nvfp4::{
     HiddenStateDevice, MlpForwardArgs, MlpProjectionTensors, MlpScratch, MlpWeights,
     GPT2_CONTEXT_LEN,
@@ -11,9 +9,10 @@ use crate::assertions::{assert_down_projection_residual_add, assert_relu2_sample
 use crate::buffers::ScratchBuffers;
 use crate::common::cuda_test_context;
 use crate::data::{normalized_input, residual_input};
+use crate::upload_common::TestResult;
 use crate::weights::WeightBuffers;
 
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run() -> TestResult {
     let (_, stream, module) = cuda_test_context()?;
     let mlp_module = MlpModule::from_module(module.clone())?;
     let quant_module = Nvfp4QuantModule::from_module(module)?;
