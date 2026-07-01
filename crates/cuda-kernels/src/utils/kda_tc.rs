@@ -80,7 +80,7 @@ pub(crate) use {with_kda_tiles, with_tc_ab_tiles};
 mod context;
 #[path = "kda_tc/stage.rs"]
 mod stage;
-#[path = "kda_tc/store.rs"]
+#[path = "kda_tc/store/mod.rs"]
 mod store;
 
 pub(crate) use {context::*, stage::*, store::*};
