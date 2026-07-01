@@ -26,5 +26,14 @@ fn records_sweep_owned_trial_status_and_events() {
     assert!(root_status.contains("VAL_LOSS=4.200000"));
     assert!(trial_status.contains("COMPLETED_STEPS=128"));
     assert!(events.contains("success\t0\tb8_l2_d1024_h16_p2_c80_lr1.0140"));
+    assert_eq!(status_timestamp(&root_status), event_timestamp(&events));
     let _ = std::fs::remove_dir_all(sweep_dir);
+}
+
+fn status_timestamp(text: &str) -> &str {
+    text.lines().find_map(|line| line.strip_prefix("UPDATED_AT_UTC=")).unwrap()
+}
+
+fn event_timestamp(text: &str) -> &str {
+    text.lines().nth(1).unwrap().split('\t').next().unwrap()
 }
