@@ -15,16 +15,11 @@ use crate::kda_tc::{
 };
 
 pub(in super::super) fn chunk_kda_state_save_body(
-    kg: &[f32],
-    mut v_new: DisjointSlice<f32>,
-    w: &[f32],
-    u: &[f32],
-    chunk_g_last: &[f32],
+    kg: &[f32], mut v_new: DisjointSlice<f32>, w: &[f32], u: &[f32], chunk_g_last: &[f32],
     mut chunk_states: DisjointSlice<u16>,
     params: CausalAttentionParams,
     state: &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>, b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
 ) {
     let bh = thread::blockIdx_x();
     let tid = thread::threadIdx_x();
@@ -74,12 +69,9 @@ pub(in super::super) fn chunk_kda_state_save_body(
 }
 
 fn compute_ws_to_vnew(
-    w: &[f32],
-    u: &[f32],
-    v_new: &mut DisjointSlice<f32>,
+    w: &[f32], u: &[f32], v_new: &mut DisjointSlice<f32>,
     state: &SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>, b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
     ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
@@ -92,11 +84,9 @@ fn compute_ws_to_vnew(
 }
 
 fn compute_kg_vnew_add_state(
-    k: &[f32],
-    v_new: &mut DisjointSlice<f32>,
+    k: &[f32], v_new: &mut DisjointSlice<f32>,
     state: &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>, b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
     ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
@@ -111,9 +101,7 @@ fn compute_kg_vnew_add_state(
 fn decay_state(
     state: &mut SharedArray<f32, KDA_STATE_ELEMS>,
     chunk_g_last: &[f32],
-    bh: u32,
-    chunk: u32,
-    tid: u32,
+    bh: u32, chunk: u32, tid: u32,
     ctx: CompactTileCtx<'_>,
 ) {
     let state_elems = state_elems(ctx.params);
@@ -129,8 +117,7 @@ fn decay_state(
 fn stage_kg_t_a(
     src: &[f32],
     a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    ctx: CompactTileCtx<'_>,
-    k_base: u32,
+    ctx: CompactTileCtx<'_>, k_base: u32,
 ) {
     let mut offset = thread::threadIdx_x();
     while offset < CTA_A_ELEMS as u32 {

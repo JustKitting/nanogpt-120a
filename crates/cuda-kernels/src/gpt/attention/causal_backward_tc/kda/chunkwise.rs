@@ -14,21 +14,13 @@ use crate::kda_tc::{
 };
 
 pub(crate) fn chunkwise_kda_backward_body(
-    qg: &[f32],
-    kg: &[f32],
-    mut u_to_du: DisjointSlice<f32>,
-    mut w_to_dw: DisjointSlice<f32>,
-    _aqk: &[f32],
-    g: &[f32],
-    chunk_states: &[u16],
-    d_out: &[f32],
+    qg: &[f32], kg: &[f32], mut u_to_du: DisjointSlice<f32>, mut w_to_dw: DisjointSlice<f32>,
+    _aqk: &[f32], g: &[f32], chunk_states: &[u16], d_out: &[f32],
     mut d_h_states: DisjointSlice<f32>,
     _d_aqk: DisjointSlice<f32>,
     params: CausalAttentionParams,
-    state: &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    d_h_next: &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    d_h: &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+    state: &mut SharedArray<f32, KDA_STATE_ELEMS>, d_h_next: &mut SharedArray<f32, KDA_STATE_ELEMS>,
+    d_h: &mut SharedArray<f32, KDA_STATE_ELEMS>, a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
     b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
 ) {
     let bh = thread::blockIdx_x();
@@ -97,11 +89,9 @@ pub(crate) fn chunkwise_kda_backward_body(
 }
 
 fn add_kg_dh_to_du_tc(
-    kg: &[f32],
-    d_u: &mut DisjointSlice<f32>,
+    kg: &[f32], d_u: &mut DisjointSlice<f32>,
     d_h_next: &SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>, b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
     ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
@@ -117,14 +107,8 @@ fn add_kg_dh_to_du_tc(
 fn compute_prev_dh_tc(
     inputs: (&[f32], &[f32], &[f32]),
     grads: (&mut DisjointSlice<f32>, &mut DisjointSlice<f32>),
-    states: (
-        &SharedArray<f32, KDA_STATE_ELEMS>,
-        &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    ),
-    tiles: (
-        &mut SharedArray<u16, CTA_A_ELEMS>,
-        &mut SharedArray<u16, CTA_B_ELEMS>,
-    ),
+    states: (&SharedArray<f32, KDA_STATE_ELEMS>, &mut SharedArray<f32, KDA_STATE_ELEMS>),
+    tiles: (&mut SharedArray<u16, CTA_A_ELEMS>, &mut SharedArray<u16, CTA_B_ELEMS>),
     compact_ctx: CompactTileCtx<'_>,
 ) {
     let (qg, g, d_out) = inputs;

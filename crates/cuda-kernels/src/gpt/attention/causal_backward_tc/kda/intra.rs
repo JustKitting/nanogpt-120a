@@ -7,20 +7,12 @@ use crate::kda_common::{beta_compact_index, compact_index, kda_decay_exp, safe_d
 use crate::kda_tc::KdaChunkTileCtx;
 
 pub(crate) fn chunk_intra_kda_backward_body(
-    qg: &[f32],
-    kg: &[f32],
-    vbeta: &[f32],
-    g: &[f32],
-    beta: &[f32],
+    qg: &[f32], kg: &[f32], vbeta: &[f32], g: &[f32], beta: &[f32],
     mut d_qg_to_dv: DisjointSlice<f32>,
     d_kg: &[f32],
     mut d_k_a_to_dg: DisjointSlice<f32>,
-    d_kpos_m: &[f32],
-    d_vbeta_m: &[f32],
-    d_kneg_from_b: &[f32],
-    d_kpos_from_b_t: &[f32],
-    mut d_q: DisjointSlice<f32>,
-    mut d_k: DisjointSlice<f32>,
+    d_kpos_m: &[f32], d_vbeta_m: &[f32], d_kneg_from_b: &[f32], d_kpos_from_b_t: &[f32],
+    mut d_q: DisjointSlice<f32>, mut d_k: DisjointSlice<f32>,
     mut d_beta: DisjointSlice<f32>,
     params: CausalAttentionParams,
 ) {
