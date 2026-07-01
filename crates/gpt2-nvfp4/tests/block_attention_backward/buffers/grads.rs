@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    BlockBackwardGrads, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, HiddenState, LayerNormGrads,
-    MlpActivation, QkvActivation,
+    BlockBackwardGrads, HiddenState, LayerNormGrads, MlpActivation, QkvActivation, GPT2_MLP,
+    GPT2_N_EMBD, GPT2_QKV,
 };
 
 use crate::data;
@@ -29,23 +29,23 @@ pub struct GradBuffers {
 impl GradBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            d_residual_in: zero_f32(stream, HiddenState::LEN)?,
-            d_qkv: zero_f32(stream, QkvActivation::LEN)?,
-            d_attention_out: zero_f32(stream, HiddenState::LEN)?,
-            d_attn_qkv_weight: zero_f32(stream, GPT2_N_EMBD * GPT2_QKV)?,
-            d_attn_qkv_bias: zero_f32(stream, GPT2_QKV)?,
-            d_attn_c_proj_weight: zero_f32(stream, GPT2_N_EMBD * GPT2_N_EMBD)?,
-            d_attn_c_proj_bias: zero_f32(stream, GPT2_N_EMBD)?,
+            d_residual_in: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
+            d_qkv: DeviceBuffer::zeroed(stream, QkvActivation::LEN)?,
+            d_attention_out: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
+            d_attn_qkv_weight: DeviceBuffer::zeroed(stream, GPT2_N_EMBD * GPT2_QKV)?,
+            d_attn_qkv_bias: DeviceBuffer::zeroed(stream, GPT2_QKV)?,
+            d_attn_c_proj_weight: DeviceBuffer::zeroed(stream, GPT2_N_EMBD * GPT2_N_EMBD)?,
+            d_attn_c_proj_bias: DeviceBuffer::zeroed(stream, GPT2_N_EMBD)?,
             d_residual_after_attention: DeviceBuffer::from_host(stream, &data::hidden_values())?,
             ln1: LayerNormGradBuffers::new(stream)?,
             ln2: LayerNormGradBuffers::new(stream)?,
-            d_mlp_up: zero_f32(stream, MlpActivation::LEN)?,
-            d_mlp_relu2: zero_f32(stream, MlpActivation::LEN)?,
-            d_mlp_c_fc_weight: zero_f32(stream, GPT2_N_EMBD * GPT2_MLP)?,
-            d_mlp_c_fc_bias: zero_f32(stream, GPT2_MLP)?,
-            d_mlp_c_proj_weight: zero_f32(stream, GPT2_MLP * GPT2_N_EMBD)?,
-            d_mlp_c_proj_bias: zero_f32(stream, GPT2_N_EMBD)?,
-            d_residual_out: zero_f32(stream, HiddenState::LEN)?,
+            d_mlp_up: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
+            d_mlp_relu2: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
+            d_mlp_c_fc_weight: DeviceBuffer::zeroed(stream, GPT2_N_EMBD * GPT2_MLP)?,
+            d_mlp_c_fc_bias: DeviceBuffer::zeroed(stream, GPT2_MLP)?,
+            d_mlp_c_proj_weight: DeviceBuffer::zeroed(stream, GPT2_MLP * GPT2_N_EMBD)?,
+            d_mlp_c_proj_bias: DeviceBuffer::zeroed(stream, GPT2_N_EMBD)?,
+            d_residual_out: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
         })
     }
 
@@ -82,10 +82,10 @@ struct LayerNormGradBuffers {
 impl LayerNormGradBuffers {
     fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            d_residual: zero_f32(stream, HiddenState::LEN)?,
-            d_normalized: zero_f32(stream, HiddenState::LEN)?,
-            d_weight: zero_f32(stream, GPT2_N_EMBD)?,
-            d_bias: zero_f32(stream, GPT2_N_EMBD)?,
+            d_residual: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
+            d_normalized: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
+            d_weight: DeviceBuffer::zeroed(stream, GPT2_N_EMBD)?,
+            d_bias: DeviceBuffer::zeroed(stream, GPT2_N_EMBD)?,
         })
     }
 
@@ -97,8 +97,4 @@ impl LayerNormGradBuffers {
             d_bias: &mut self.d_bias,
         }
     }
-}
-
-fn zero_f32(stream: &CudaStream, len: usize) -> Result<DeviceBuffer<f32>, DriverError> {
-    DeviceBuffer::zeroed(stream, len)
 }
