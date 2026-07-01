@@ -7,9 +7,7 @@ use super::common::{aligned_pair, row_col};
 
 #[inline(always)]
 pub fn store_accumulator(
-    acc: [f32; 4],
-    input_global_scales: &[f32],
-    out: &mut DisjointSlice<'_, f32>,
+    acc: [f32; 4], input_global_scales: &[f32], out: &mut DisjointSlice<'_, f32>,
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
@@ -18,9 +16,7 @@ pub fn store_accumulator(
 
 #[inline(always)]
 pub fn store_accumulator_aligned(
-    acc: [f32; 4],
-    input_global_scales: &[f32],
-    out: &mut DisjointSlice<'_, f32>,
+    acc: [f32; 4], input_global_scales: &[f32], out: &mut DisjointSlice<'_, f32>,
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
@@ -38,10 +34,7 @@ pub fn store_accumulator_aligned(
 
 #[inline(always)]
 fn store_one(
-    acc: f32,
-    index: u32,
-    input_global_scales: &[f32],
-    out: &mut DisjointSlice<'_, f32>,
+    acc: f32, index: u32, input_global_scales: &[f32], out: &mut DisjointSlice<'_, f32>,
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {

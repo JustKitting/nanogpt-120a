@@ -14,39 +14,21 @@ struct AffineStoreArgs<'a> {
 
 #[inline(always)]
 pub fn store_affine_accumulator(
-    acc: [f32; 4],
-    input_global_scales: &[f32],
-    bias_bytes: &[u8],
-    bias_scales: &[u8],
-    out: &mut DisjointSlice<'_, f32>,
-    tile: Nvfp4ProjectionCtaTile,
+    acc: [f32; 4], input_global_scales: &[f32], bias_bytes: &[u8], bias_scales: &[u8],
+    out: &mut DisjointSlice<'_, f32>, tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
-    let args = AffineStoreArgs {
-        input_global_scales,
-        bias_bytes,
-        bias_scales,
-        params,
-    };
+    let args = AffineStoreArgs { input_global_scales, bias_bytes, bias_scales, params };
     store_acc4!(store_one, acc, out, tile, &args);
 }
 
 #[inline(always)]
 pub fn store_affine_accumulator_aligned(
-    acc: [f32; 4],
-    input_global_scales: &[f32],
-    bias_bytes: &[u8],
-    bias_scales: &[u8],
-    out: &mut DisjointSlice<'_, f32>,
-    tile: Nvfp4ProjectionCtaTile,
+    acc: [f32; 4], input_global_scales: &[f32], bias_bytes: &[u8], bias_scales: &[u8],
+    out: &mut DisjointSlice<'_, f32>, tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
-    let args = AffineStoreArgs {
-        input_global_scales,
-        bias_bytes,
-        bias_scales,
-        params,
-    };
+    let args = AffineStoreArgs { input_global_scales, bias_bytes, bias_scales, params };
     let (row0, row1, col0, scale0, scale1) = aligned_pair(tile, input_global_scales, params);
     store_pair_aligned(acc[0], acc[1], row0, col0, scale0, out, &args);
     store_pair_aligned(acc[2], acc[3], row1, col0, scale1, out, &args);
@@ -54,23 +36,12 @@ pub fn store_affine_accumulator_aligned(
 
 #[inline(always)]
 fn store_one(
-    acc: f32,
-    index: u32,
-    out: &mut DisjointSlice<'_, f32>,
-    tile: Nvfp4ProjectionCtaTile,
+    acc: f32, index: u32, out: &mut DisjointSlice<'_, f32>, tile: Nvfp4ProjectionCtaTile,
     args: &AffineStoreArgs<'_>,
 ) {
     let (row, col) = row_col(tile, index);
     if row < args.params.token_count && col < args.params.output_dim {
-        let value = affine_value(
-            acc,
-            row,
-            col,
-            args.input_global_scales,
-            args.bias_bytes,
-            args.bias_scales,
-            args.params,
-        );
+        let value = affine_value(acc, row, col, args.input_global_scales, args.bias_bytes, args.bias_scales, args.params);
         let offset = row as usize * args.params.output_dim as usize + col as usize;
         unsafe {
             *out.get_unchecked_mut(offset) = if args.params.residual_add == 0 {
@@ -84,21 +55,12 @@ fn store_one(
 
 #[inline(always)]
 fn store_pair_aligned(
-    acc0: f32,
-    acc1: f32,
-    row: u32,
-    col0: u32,
-    scale: f32,
+    acc0: f32, acc1: f32, row: u32, col0: u32, scale: f32,
     out: &mut DisjointSlice<'_, f32>,
     args: &AffineStoreArgs<'_>,
 ) {
-    let (value0, value1) = affine_pair_scaled(
-        (acc0, acc1),
-        scale,
-        col0,
-        (args.bias_bytes, args.bias_scales),
-        args.params,
-    );
+    let (value0, value1) =
+        affine_pair_scaled((acc0, acc1), scale, col0, (args.bias_bytes, args.bias_scales), args.params);
     let offset = row as usize * args.params.output_dim as usize + col0 as usize;
     unsafe {
         if args.params.residual_add == 0 {
