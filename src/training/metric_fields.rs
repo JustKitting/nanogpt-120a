@@ -2,6 +2,7 @@ macro_rules! metric_fields {
     (
         $field_ty:ident,
         $field_const:ident,
+        $specs_fn:ident,
         $spec_ty:ident,
         $prefix:literal
         {
@@ -38,6 +39,10 @@ macro_rules! metric_fields {
                     )+
                 }
             }
+        }
+
+        pub(super) fn $specs_fn() -> impl Iterator<Item = $spec_ty> {
+            $field_const.iter().copied().map($field_ty::spec)
         }
     };
 }

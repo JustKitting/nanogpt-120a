@@ -3,7 +3,7 @@ use super::super::super::launch::CudaTrainOutput;
 mod value;
 
 metric_fields! {
-    DebugMetricField, DEBUG_METRIC_FIELDS, DebugMetricSpec, "Diagnostic " {
+    DebugMetricField, DEBUG_METRIC_FIELDS, debug_metric_specs, DebugMetricSpec, "Diagnostic " {
         UpdateCount => ("update count", None, true),
         PositiveUpdateDot => ("positive update dot", None, true),
         ZeroGradChanged => ("zero grad changed", None, false),
@@ -43,10 +43,3 @@ metric_fields! {
 }
 
 impl_numeric_metric_spec!(DebugMetricSpec, CudaTrainOutput, value::debug_metric_value);
-
-pub(super) fn debug_metric_specs() -> impl Iterator<Item = DebugMetricSpec> {
-    DEBUG_METRIC_FIELDS
-        .iter()
-        .copied()
-        .map(DebugMetricField::spec)
-}

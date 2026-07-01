@@ -1,7 +1,7 @@
 use super::super::output::CudaTrainOutput;
 
 metric_fields! {
-    TrainMetricField, TRAIN_METRIC_FIELDS, TrainMetricSpec, "" {
+    TrainMetricField, TRAIN_METRIC_FIELDS, train_metric_specs, TrainMetricSpec, "" {
         Loss => ("Loss", None, false),
         ForwardMs => ("Forward", Some("ms"), false),
         BackwardEnqueueMs => ("Backward enqueue", Some("ms"), false),
@@ -32,13 +32,6 @@ metric_fields! {
 }
 
 impl_numeric_metric_spec!(TrainMetricSpec, CudaTrainOutput, TrainMetricField::value);
-
-pub(super) fn train_metric_specs() -> impl Iterator<Item = TrainMetricSpec> {
-    TRAIN_METRIC_FIELDS
-        .iter()
-        .copied()
-        .map(TrainMetricField::spec)
-}
 
 impl TrainMetricField {
     fn value(self, item: &CudaTrainOutput) -> f64 {

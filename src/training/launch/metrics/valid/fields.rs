@@ -1,7 +1,7 @@
 use super::super::output::CudaValidOutput;
 
 metric_fields! {
-    ValidMetricField, VALID_METRIC_FIELDS, ValidMetricSpec, "" {
+    ValidMetricField, VALID_METRIC_FIELDS, valid_metric_specs, ValidMetricSpec, "" {
         Loss => ("Validation loss", None, false),
         EvalElapsed => ("Eval elapsed", Some("s"), false),
         WindowCount => ("Val windows", None, true),
@@ -10,13 +10,6 @@ metric_fields! {
 }
 
 impl_numeric_metric_spec!(ValidMetricSpec, CudaValidOutput, ValidMetricField::value);
-
-pub(super) fn valid_metric_specs() -> impl Iterator<Item = ValidMetricSpec> {
-    VALID_METRIC_FIELDS
-        .iter()
-        .copied()
-        .map(ValidMetricField::spec)
-}
 
 impl ValidMetricField {
     fn value(self, item: &CudaValidOutput) -> f64 {
