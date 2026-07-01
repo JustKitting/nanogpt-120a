@@ -54,7 +54,7 @@ impl Gpt2Config {
         GPT2_SEQ_LEN
     }
 
-    pub const fn head_dim(self) -> usize {
+    pub const fn head_dim() -> usize {
         GPT2_N_EMBD / GPT2_N_HEAD
     }
 

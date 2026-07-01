@@ -45,7 +45,7 @@ pub(super) fn apply_kda_aurora_clip(
                 input_dim: GPT2_N_EMBD as u32,
                 embedding_dim: GPT2_N_EMBD as u32,
                 head_count: GPT2_N_HEAD as u32,
-                head_dim: (GPT2_N_EMBD / GPT2_N_HEAD) as u32,
+                head_dim: Gpt2Config::head_dim() as u32,
                 tau: KDA_QK_CLIP_TAU,
                 silu_qk: (!full_attention) as u32,
             })?;

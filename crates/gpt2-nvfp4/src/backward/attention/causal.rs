@@ -24,7 +24,7 @@ pub fn causal_attention_backward(
         embedding_dim: GPT2_N_EMBD as u32,
         qkv_dim,
         head_count: GPT2_N_HEAD as u32,
-        head_dim: (GPT2_N_EMBD / GPT2_N_HEAD) as u32,
+        head_dim: Gpt2Config::head_dim() as u32,
     };
     if args.use_full_attention {
         args.module.causal_attention_backward_tc(tc_args)

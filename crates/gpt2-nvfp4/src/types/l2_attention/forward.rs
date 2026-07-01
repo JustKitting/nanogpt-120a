@@ -50,7 +50,7 @@ pub(super) fn forward<'a, 'scratch>(
             embedding_dim: crate::GPT2_N_EMBD as u32,
             qkv_dim,
             head_count: crate::GPT2_N_HEAD as u32,
-            head_dim: (crate::GPT2_N_EMBD / crate::GPT2_N_HEAD) as u32,
+            head_dim: crate::Gpt2Config::head_dim() as u32,
         })?;
     }
 
@@ -75,7 +75,7 @@ pub(super) fn forward<'a, 'scratch>(
         embedding_dim: crate::GPT2_N_EMBD as u32,
         qkv_dim,
         head_count: crate::GPT2_N_HEAD as u32,
-        head_dim: (crate::GPT2_N_EMBD / crate::GPT2_N_HEAD) as u32,
+        head_dim: crate::Gpt2Config::head_dim() as u32,
     };
     if args.use_full_attention {
         args.module.causal_attention_tc(attention_args)?;
