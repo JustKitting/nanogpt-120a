@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use super::{CorrectionStats, GramCorrectionMode, Nvfp4Polar, row_orthogonality_residual};
+use super::{CorrectionStats, GramCorrectionMode, Nvfp4Polar};
 
 mod correction;
 
@@ -34,6 +34,22 @@ impl CorrectionGram {
     fn approximate(values: Vec<f32>) -> Self {
         Self::new(values, false, false)
     }
+}
+
+fn row_orthogonality_residual(x: &[f32], rows: usize, cols: usize) -> f32 {
+    let mut sum = 0.0_f32;
+    for row in 0..rows {
+        for col in 0..rows {
+            let mut dot = 0.0_f32;
+            for k in 0..cols {
+                dot += x[row * cols + k] * x[col * cols + k];
+            }
+            let expected = if row == col { 1.0 } else { 0.0 };
+            let diff = dot - expected;
+            sum = diff.mul_add(diff, sum);
+        }
+    }
+    sum.sqrt()
 }
 
 impl<'a> Nvfp4Polar<'a> {
