@@ -76,14 +76,10 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
     let mut fixture = AdamFixture::new(&stream)?;
 
     fixture.apply(&stream, &module, 1.0)?;
-    let z_master = fixture.z_master.to_host_vec(&stream)?;
-    let x_master = fixture.x_master.to_host_vec(&stream)?;
-    let first = fixture.first.to_host_vec(&stream)?;
-    let second = fixture.second.to_host_vec(&stream)?;
-    assert_all_close(&z_master, 0.725, 1.0e-6);
-    assert_all_close(&x_master, 0.725, 1.0e-6);
-    assert_all_close(&first, 0.05, 1.0e-6);
-    assert_all_close(&second, 0.0125, 1.0e-6);
+    assert_all_close(&fixture.z_master.to_host_vec(&stream)?, 0.725, 1.0e-6);
+    assert_all_close(&fixture.x_master.to_host_vec(&stream)?, 0.725, 1.0e-6);
+    assert_all_close(&fixture.first.to_host_vec(&stream)?, 0.05, 1.0e-6);
+    assert_all_close(&fixture.second.to_host_vec(&stream)?, 0.0125, 1.0e-6);
     Ok(())
 }
 
@@ -94,9 +90,7 @@ fn nvfp4_adamw_update_applies_schedule_free_average() -> Result<(), Box<dyn Erro
     let mut fixture = AdamFixture::new(&stream)?;
 
     fixture.apply(&stream, &module, 0.25)?;
-    let z_master = fixture.z_master.to_host_vec(&stream)?;
-    let x_master = fixture.x_master.to_host_vec(&stream)?;
-    assert_all_close(&z_master, 0.725, 1.0e-6);
-    assert_all_close(&x_master, 0.93125, 1.0e-6);
+    assert_all_close(&fixture.z_master.to_host_vec(&stream)?, 0.725, 1.0e-6);
+    assert_all_close(&fixture.x_master.to_host_vec(&stream)?, 0.93125, 1.0e-6);
     Ok(())
 }
