@@ -2,10 +2,10 @@ use cuda_core::DriverError;
 
 use super::args::Gpt2ForwardArgs;
 use super::weights::Gpt2Weights;
-use crate::Gpt2Rng;
 use crate::types::{HiddenStateDevice, TokenEmbeddingArgs};
+use crate::Gpt2Rng;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Gpt2 {
     weights: Option<Gpt2Weights>,
 }
@@ -48,11 +48,5 @@ impl Gpt2 {
         self.weights()
             .expect("Gpt2::init must be called before forward")
             .forward(args)
-    }
-}
-
-impl Default for Gpt2 {
-    fn default() -> Self {
-        Self::new()
     }
 }
