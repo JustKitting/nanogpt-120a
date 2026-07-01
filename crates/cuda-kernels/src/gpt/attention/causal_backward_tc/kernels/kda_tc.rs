@@ -1,9 +1,9 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::super::kda::{
-    ChunkStateMatmulMode, KdaDmInputs, KdaIntraGrads, KdaIntraInputs,
-    chunk_intra_kda_backward_body, chunk_intra_kda_dm_body, chunk_kda_dkg_from_vnew_dh_body,
-    chunk_state_matmul_body, chunkwise_kda_backward_body,
+    ChunkStateMatmulMode, KdaChunkwiseGrads, KdaChunkwiseInputs, KdaDmInputs, KdaIntraGrads,
+    KdaIntraInputs, chunk_intra_kda_backward_body, chunk_intra_kda_dm_body,
+    chunk_kda_dkg_from_vnew_dh_body, chunk_state_matmul_body, chunkwise_kda_backward_body,
 };
 use crate::attention::CausalAttentionParams;
 use crate::kda_tc::{with_kda_tiles, with_tc_ab_tiles};
@@ -59,15 +59,17 @@ pub(super) mod module {
         kg: &[f32],
         u_to_du: DisjointSlice<f32>,
         w_to_dw: DisjointSlice<f32>,
-        aqk: &[f32],
+        _aqk: &[f32],
         g: &[f32],
         chunk_states: &[u16],
         d_out: &[f32],
         d_h_states: DisjointSlice<f32>,
-        d_aqk: DisjointSlice<f32>,
+        _d_aqk: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        with_kda_tiles!(backward chunkwise_kda_backward_body; qg, kg, u_to_du, w_to_dw, aqk, g, chunk_states, d_out, d_h_states, d_aqk, params);
+        let inputs = KdaChunkwiseInputs { qg, kg, g, chunk_states, d_out };
+        let grads = KdaChunkwiseGrads { u_to_du, w_to_dw, d_h_states };
+        with_kda_tiles!(backward chunkwise_kda_backward_body; inputs, grads, params);
     }
 
     #[kernel]

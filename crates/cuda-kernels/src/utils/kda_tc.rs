@@ -69,7 +69,7 @@ macro_rules! with_kda_tiles {
         static mut D_H: $crate::kda_tc::KdaStateTile = cuda_device::SharedArray::UNINIT;
         static mut A_TILE: $crate::kda_tc::CtaATile = cuda_device::SharedArray::UNINIT;
         static mut B_TILE: $crate::kda_tc::CtaBTile = cuda_device::SharedArray::UNINIT;
-        $body($($arg,)* unsafe { &mut STATE }, unsafe { &mut D_H_NEXT }, unsafe { &mut D_H }, unsafe { &mut A_TILE }, unsafe { &mut B_TILE });
+        $body($($arg,)* (unsafe { &mut STATE }, unsafe { &mut D_H_NEXT }, unsafe { &mut D_H }), (unsafe { &mut A_TILE }, unsafe { &mut B_TILE }));
     }};
 }
 
