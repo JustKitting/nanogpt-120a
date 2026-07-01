@@ -12,6 +12,17 @@ struct GramRequest<'s> {
     iter: usize,
 }
 
+impl<'s> GramRequest<'s> {
+    fn new(source: &'s [f32], rows: usize, cols: usize, iter: usize) -> Self {
+        Self {
+            source,
+            rows,
+            cols,
+            iter,
+        }
+    }
+}
+
 struct CorrectionGram {
     values: Vec<f32>,
     stale_reject_candidate: bool,
@@ -74,19 +85,11 @@ impl<'a> Nvfp4Polar<'a> {
         iterations: usize,
         mode: GramCorrectionMode,
     ) -> Result<(Vec<f32>, CorrectionStats), Box<dyn Error>> {
-        let mut stats = CorrectionStats {
-            last_relative_defect: f32::INFINITY,
-            ..CorrectionStats::default()
-        };
+        let mut stats = CorrectionStats::pending();
         let mut stale_defect = vec![0.0_f32; rows * rows];
 
         for iter in 0..iterations {
-            let request = GramRequest {
-                source: &source,
-                rows,
-                cols,
-                iter,
-            };
+            let request = GramRequest::new(&source, rows, cols, iter);
             let gram = self.correction_gram(request, mode, &mut stale_defect, &mut stats)?;
             source = self.step_from_gram(&source, &gram.values, rows, cols, iter)?;
         }
@@ -102,21 +105,13 @@ impl<'a> Nvfp4Polar<'a> {
         iterations: usize,
         mode: GramCorrectionMode,
     ) -> Result<(Vec<f32>, CorrectionStats), Box<dyn Error>> {
-        let mut stats = CorrectionStats {
-            last_relative_defect: f32::INFINITY,
-            ..CorrectionStats::default()
-        };
+        let mut stats = CorrectionStats::pending();
         let mut stale_defect = vec![0.0_f32; rows * rows];
         let mut residual = row_orthogonality_residual(&source, rows, cols);
 
         for iter in 0..iterations {
             let coefficient_safety = mode.coefficient_safety(iter);
-            let request = GramRequest {
-                source: &source,
-                rows,
-                cols,
-                iter,
-            };
+            let request = GramRequest::new(&source, rows, cols, iter);
             let gram = self.correction_gram(request, mode, &mut stale_defect, &mut stats)?;
 
             let candidate = self.gram_form_step_from_gram(

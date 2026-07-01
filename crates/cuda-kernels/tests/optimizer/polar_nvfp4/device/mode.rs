@@ -88,13 +88,7 @@ impl GramCorrectionMode {
                 start_iter,
                 coefficient_safety,
                 ..
-            } => {
-                if iter >= start_iter {
-                    coefficient_safety
-                } else {
-                    1.0
-                }
-            }
+            } if iter >= start_iter => coefficient_safety,
             GramCorrectionMode::Nvfp4GramOnlySchedule { coefficient_safety }
             | GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
                 coefficient_safety, ..
@@ -123,4 +117,13 @@ pub struct CorrectionStats {
     pub max_relative_defect: f32,
     pub last_relative_defect: f32,
     pub rejected_stale_steps: usize,
+}
+
+impl CorrectionStats {
+    pub(super) fn pending() -> Self {
+        Self {
+            last_relative_defect: f32::INFINITY,
+            ..Self::default()
+        }
+    }
 }
