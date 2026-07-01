@@ -1,10 +1,10 @@
-use std::collections::VecDeque;
-
 mod config;
+mod rolling;
 #[cfg(test)]
 mod tests;
 
 use config::UpdateSkipConfig;
+use rolling::RollingHistory;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct UpdateSkipDecision {
@@ -16,16 +16,20 @@ pub(super) struct UpdateSkipDecision {
 
 pub(super) struct UpdateSkipState {
     config: UpdateSkipConfig,
-    losses: VecDeque<f32>,
-    grad_norms: VecDeque<f32>,
+    losses: RollingHistory,
+    grad_norms: RollingHistory,
 }
 
 impl UpdateSkipState {
     pub(super) fn new() -> Self {
+        Self::from_config(UpdateSkipConfig::from_env())
+    }
+
+    fn from_config(config: UpdateSkipConfig) -> Self {
         Self {
-            config: UpdateSkipConfig::from_env(),
-            losses: VecDeque::new(),
-            grad_norms: VecDeque::new(),
+            losses: RollingHistory::new(config.rolling_interval),
+            grad_norms: RollingHistory::new(config.rolling_interval),
+            config,
         }
     }
 
@@ -38,20 +42,19 @@ impl UpdateSkipState {
         let loss_non_finite = loss.is_some() && finite_loss.is_none();
         let grad_non_finite = !grad_norm.is_finite();
         let loss_spike = self.config.use_loss
-            && finite_loss.is_some_and(|value| self.is_spike(value, &self.losses));
+            && finite_loss
+                .is_some_and(|value| self.losses.is_spike(value, self.config.sigma_factor));
         let grad_norm_spike = self.config.use_grad_norm
             && grad_norm.is_finite()
-            && self.is_spike(grad_norm, &self.grad_norms);
+            && self
+                .grad_norms
+                .is_spike(grad_norm, self.config.sigma_factor);
 
         if let Some(loss) = finite_loss {
-            push_history(&mut self.losses, loss, self.config.rolling_interval);
+            self.losses.push(loss);
         }
         if grad_norm.is_finite() {
-            push_history(
-                &mut self.grad_norms,
-                grad_norm,
-                self.config.rolling_interval,
-            );
+            self.grad_norms.push(grad_norm);
         }
 
         let non_finite = loss_non_finite || grad_non_finite;
@@ -61,35 +64,5 @@ impl UpdateSkipState {
             grad_norm_spike,
             non_finite,
         }
-    }
-
-    fn is_spike(&self, value: f32, history: &VecDeque<f32>) -> bool {
-        if history.len() < self.min_history() {
-            return false;
-        }
-
-        let len = history.len() as f32;
-        let mean = history.iter().sum::<f32>() / len;
-        let variance = history
-            .iter()
-            .map(|sample| {
-                let diff = *sample - mean;
-                diff * diff
-            })
-            .sum::<f32>()
-            / len;
-        let threshold = mean + self.config.sigma_factor * variance.sqrt();
-        value > threshold
-    }
-
-    fn min_history(&self) -> usize {
-        (self.config.rolling_interval / 2).max(2)
-    }
-}
-
-fn push_history(history: &mut VecDeque<f32>, value: f32, max_len: usize) {
-    history.push_back(value);
-    while history.len() > max_len {
-        history.pop_front();
     }
 }

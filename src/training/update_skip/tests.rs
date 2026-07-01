@@ -1,13 +1,7 @@
-use std::collections::VecDeque;
-
 use super::{UpdateSkipConfig, UpdateSkipState};
 
 fn state() -> UpdateSkipState {
-    UpdateSkipState {
-        config: UpdateSkipConfig::for_test(),
-        losses: VecDeque::new(),
-        grad_norms: VecDeque::new(),
-    }
+    UpdateSkipState::from_config(UpdateSkipConfig::for_test())
 }
 
 #[test]
