@@ -47,8 +47,8 @@ pub(super) fn ranked_tsv(proposal: &Proposal) -> String {
 }
 
 fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, selected: bool) {
-    let quality = scored.score.predicted_quality;
-    let stability = scored.score.predicted_stability;
+    let [quality_value, quality_z, quality_uncertainty] = prediction_columns(scored.score.predicted_quality);
+    let [stability_value, stability_z, stability_uncertainty] = prediction_columns(scored.score.predicted_stability);
     text.push_str(&format!(
         "{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{}\t{}\n",
         rank,
@@ -62,12 +62,12 @@ fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, sel
         scored.score.expected_improvement,
         scored.score.uncertainty,
         scored.score.exploration,
-        value(quality),
-        standard_score(quality),
-        uncertainty(quality),
-        value(stability),
-        standard_score(stability),
-        uncertainty(stability)
+        quality_value,
+        quality_z,
+        quality_uncertainty,
+        stability_value,
+        stability_z,
+        stability_uncertainty
     ));
 }
 
@@ -82,23 +82,12 @@ fn fmt_prediction(value: Option<Prediction>) -> String {
         .unwrap_or_else(|| "n/a".to_string())
 }
 
-fn value(prediction: Option<Prediction>) -> String {
-    prediction_field(prediction, |prediction| prediction.value)
-}
-
-fn standard_score(prediction: Option<Prediction>) -> String {
-    prediction_field(prediction, |prediction| prediction.standard_score)
-}
-
-fn uncertainty(prediction: Option<Prediction>) -> String {
-    prediction_field(prediction, |prediction| prediction.uncertainty)
-}
-
-fn prediction_field(
-    prediction: Option<Prediction>,
-    value: impl FnOnce(Prediction) -> f64,
-) -> String {
+fn prediction_columns(prediction: Option<Prediction>) -> [String; 3] {
     prediction
-        .map(|prediction| format!("{:.8}", value(prediction)))
+        .map(|prediction| [
+            format!("{:.8}", prediction.value),
+            format!("{:.8}", prediction.standard_score),
+            format!("{:.8}", prediction.uncertainty),
+        ])
         .unwrap_or_default()
 }
