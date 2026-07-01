@@ -1,4 +1,4 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel};
 
 use crate::amax::{amax4_f32, max4_f32};
 use crate::block_reduce::block_max_store_f32;
@@ -7,12 +7,12 @@ use crate::nvfp4_quant::kernels::convert::cvt_rn_satfinite_e2m1x2_f32;
 use crate::nvfp4_quant::kernels::four_six::helpers::{
     GROUP_SIZE, four_six_block_group, four_six_global_scale, four_six_group_scale, four_six_lane,
 };
-use crate::warp_reduce::thread_lane_warp;
 
 use super::threads::WARPS_PER_BLOCK;
 
-const TENSOR_AMAX_VALUES_PER_BLOCK: u32 =
-    crate::nvfp4_quant::kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK;
+use crate::nvfp4_quant::kernels::row_amax::{
+    TENSOR_AMAX_VALUES_PER_BLOCK, tensor_amax_chunk_indices,
+};
 const SCALE_OVERRIDE: f32 = 1.0;
 
 #[cuda_module]
@@ -30,14 +30,7 @@ pub(super) mod module {
         static mut TENSOR_AMAX: SharedArray<f32, { WARPS_PER_BLOCK as usize }> =
             SharedArray::UNINIT;
 
-        let chunk = thread::blockIdx_x();
-        let (tid, lane, warp_in_block) = thread_lane_warp();
-        let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
-        let stride = thread::blockDim_x();
-        let i0 = base + tid;
-        let i1 = i0 + stride;
-        let i2 = i1 + stride;
-        let i3 = i2 + stride;
+        let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
         let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= len {
             amax4_f32(

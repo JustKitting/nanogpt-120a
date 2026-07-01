@@ -9,6 +9,19 @@ use super::super::config::WARPS_PER_BLOCK;
 
 pub(crate) const TENSOR_AMAX_VALUES_PER_BLOCK: u32 = 1024;
 
+#[inline(always)]
+pub(crate) fn tensor_amax_chunk_indices() -> (u32, u32, u32, u32, u32, u32, u32, u32) {
+    let chunk = thread::blockIdx_x();
+    let (thread, lane, warp_in_block) = thread_lane_warp();
+    let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
+    let stride = thread::blockDim_x();
+    let i0 = base + thread;
+    let i1 = i0 + stride;
+    let i2 = i1 + stride;
+    let i3 = i2 + stride;
+    (chunk, lane, warp_in_block, base, i0, i1, i2, i3)
+}
+
 #[cuda_module]
 pub(crate) mod module {
     use super::*;
@@ -46,15 +59,7 @@ pub(crate) mod module {
         mut out: DisjointSlice<f32>,
         element_count: u32,
     ) {
-        let chunk = thread::blockIdx_x();
-        let (thread, lane, warp_in_block) = thread_lane_warp();
-        let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
-
-        let stride = thread::blockDim_x();
-        let i0 = base + thread;
-        let i1 = i0 + stride;
-        let i2 = i1 + stride;
-        let i3 = i2 + stride;
+        let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
         let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
             amax4_f32(
