@@ -9,11 +9,10 @@ use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 mod common;
 
 use common::max_abs_error;
+use common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE};
 
 const ROWS: usize = 2;
 const COLS: usize = 32;
-const E2M1_ONE_PAIR: u8 = 0x22;
-const E4M3_ONE: u8 = 0x38;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]

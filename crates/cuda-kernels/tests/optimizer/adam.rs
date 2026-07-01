@@ -4,10 +4,9 @@ use cuda_core::{CudaStream, DeviceBuffer};
 use rust_kernels_cuda::optimizer::{AdamWUpdateArgs, OptimizerModule};
 
 use crate::common;
+use crate::common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE};
 
 const LEN: usize = 32;
-const E2M1_ONE_PAIR: u8 = 0x22;
-const E4M3_ONE: u8 = 0x38;
 
 struct AdamFixture {
     bytes: DeviceBuffer<u8>,

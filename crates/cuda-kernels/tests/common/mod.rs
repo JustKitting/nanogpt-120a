@@ -2,6 +2,8 @@ use std::{path::PathBuf, sync::Arc};
 
 use cuda_core::{CudaContext, CudaModule, CudaStream, DriverError};
 
+pub mod nvfp4;
+
 pub type CudaTestContext = (Arc<CudaContext>, Arc<CudaStream>, Arc<CudaModule>);
 
 pub fn gpu_device_index() -> usize {

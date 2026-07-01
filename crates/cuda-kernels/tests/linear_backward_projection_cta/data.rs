@@ -1,6 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
-const E4M3_ONE: u8 = 0x38;
+use crate::common::nvfp4::E4M3_ONE;
+
 const TOLERANCE: f32 = 1.0e-7;
 
 pub fn upload_bytes(

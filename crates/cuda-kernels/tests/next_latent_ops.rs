@@ -9,12 +9,12 @@ use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 
 mod common;
 
+use common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE};
+
 const TOKEN_COUNT: usize = 32;
 const INPUT_DIM: usize = 128;
 const OUTPUT_DIM: usize = 64;
 const TOLERANCE: f32 = 1.0e-6;
-const E2M1_ONE_PAIR: u8 = 0x22;
-const E4M3_ONE: u8 = 0x38;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]

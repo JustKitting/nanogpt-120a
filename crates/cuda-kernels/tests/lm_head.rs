@@ -6,15 +6,12 @@ use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 mod common;
-#[path = "common/nvfp4.rs"]
-mod nvfp4_common;
 
-use nvfp4_common::set_e2m1_one;
+use common::nvfp4::{E4M3_ONE, set_e2m1_one};
 
 const TOKEN_COUNT: usize = 2;
 const INPUT_DIM: usize = 64;
 const VOCAB_SIZE: usize = 16;
-const E4M3_ONE: u8 = 0x38;
 const TOLERANCE: f32 = 1.0e-7;
 
 #[ignore = "requires generated sm_120a PTX"]

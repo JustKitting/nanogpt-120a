@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+pub const E2M1_ONE_PAIR: u8 = 0x22;
+pub const E4M3_ONE: u8 = 0x38;
+
 pub fn set_e2m1_one(bytes: &mut [u8], element: usize) {
     let byte = &mut bytes[element / 2];
     if element & 1 == 0 {

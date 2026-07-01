@@ -12,16 +12,12 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 
 mod common;
-#[path = "common/nvfp4.rs"]
-mod nvfp4_common;
 
-use nvfp4_common::{first_col_one_bytes, first_row_one_bytes};
+use common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE, first_col_one_bytes, first_row_one_bytes};
 
 const TOKEN_COUNT: usize = 64;
 const INPUT_DIM: usize = 64;
 const OUTPUT_DIM: usize = 64;
-const E2M1_ONE_PAIR: u8 = 0x22;
-const E4M3_ONE: u8 = 0x38;
 const TOLERANCE: f32 = 1.0e-7;
 
 struct LinearBackwardMsEdenScratchBuffers {
