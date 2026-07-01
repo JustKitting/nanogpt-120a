@@ -8,7 +8,7 @@ use rust_kernels_cuda::nvfp4_tc_matmul::{Nvfp4TcMatmulArgs, Nvfp4TcMatmulModule}
 use super::math::{combine_next, relative_l2, transpose};
 use super::scratch::{Scratch, global_scale};
 
-#[path = "device/iterations.rs"]
+#[path = "device/iterations/mod.rs"]
 mod iterations;
 #[path = "device/mode.rs"]
 mod mode;
