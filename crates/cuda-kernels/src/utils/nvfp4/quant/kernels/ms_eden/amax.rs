@@ -21,6 +21,16 @@ pub(crate) mod module {
     static mut AMAX_REDUCE: SharedArray<f32, { AMAX_WARPS_PER_BLOCK as usize }> =
         SharedArray::UNINIT;
 
+    macro_rules! chunk_amax4 {
+        ($base:expr, $count:expr, [$i0:expr, $i1:expr, $i2:expr, $i3:expr], $value:ident($($value_arg:expr),+), $checked:ident($($checked_arg:expr),+)) => {{
+            if $base + TENSOR_AMAX_VALUES_PER_BLOCK <= $count {
+                amax4_f32($value($($value_arg),+, $i0), $value($($value_arg),+, $i1), $value($($value_arg),+, $i2), $value($($value_arg),+, $i3))
+            } else {
+                max4_f32($checked($($checked_arg),+, $i0, $count), $checked($($checked_arg),+, $i1, $count), $checked($($checked_arg),+, $i2, $count), $checked($($checked_arg),+, $i3, $count))
+            }
+        }};
+    }
+
     #[kernel]
     pub fn rowwise_nvfp4_chunk_amax_kernel(
         bytes: &[u8],
@@ -33,17 +43,11 @@ pub(crate) mod module {
         let element_count = rows * cols;
         let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
-        let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
-            amax4_f32(
-                rowwise_value_at(bytes, scales, global_scales, cols, i0), rowwise_value_at(bytes, scales, global_scales, cols, i1),
-                rowwise_value_at(bytes, scales, global_scales, cols, i2), rowwise_value_at(bytes, scales, global_scales, cols, i3),
-            )
-        } else {
-            max4_f32(
-                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i0, element_count), checked_rowwise_abs_value(bytes, scales, global_scales, cols, i1, element_count),
-                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i2, element_count), checked_rowwise_abs_value(bytes, scales, global_scales, cols, i3, element_count),
-            )
-        };
+        let local_amax = chunk_amax4!(
+            base, element_count, [i0, i1, i2, i3],
+            rowwise_value_at(bytes, scales, global_scales, cols),
+            checked_rowwise_abs_value(bytes, scales, global_scales, cols)
+        );
 
         block_max_store_f32!(AMAX_REDUCE, out[chunk], local_amax, lane, warp_in_block);
     }
@@ -58,17 +62,11 @@ pub(crate) mod module {
     ) {
         let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
-        let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
-            amax4_f32(
-                nvfp4_value_at(bytes, scales, global_scale, i0), nvfp4_value_at(bytes, scales, global_scale, i1),
-                nvfp4_value_at(bytes, scales, global_scale, i2), nvfp4_value_at(bytes, scales, global_scale, i3),
-            )
-        } else {
-            max4_f32(
-                checked_nvfp4_abs_value(bytes, scales, global_scale, i0, element_count), checked_nvfp4_abs_value(bytes, scales, global_scale, i1, element_count),
-                checked_nvfp4_abs_value(bytes, scales, global_scale, i2, element_count), checked_nvfp4_abs_value(bytes, scales, global_scale, i3, element_count),
-            )
-        };
+        let local_amax = chunk_amax4!(
+            base, element_count, [i0, i1, i2, i3],
+            nvfp4_value_at(bytes, scales, global_scale),
+            checked_nvfp4_abs_value(bytes, scales, global_scale)
+        );
 
         block_max_store_f32!(AMAX_REDUCE, out[chunk], local_amax, lane, warp_in_block);
     }
