@@ -72,16 +72,11 @@ impl CudaTrainingStrategy {
                 process_validation(&mut trainer, processor, &validation, step, completed_steps)?;
             }
 
-            if interrupter.should_stop() {
+            let stopped_by_burn = interrupter.should_stop();
+            if stopped_by_burn || wall_clock.expired() {
+                let reason = if stopped_by_burn { "burn_interrupter" } else { "wall_clock" };
                 println!(
-                    "stopped_by_burn_interrupter=true elapsed_s={:.3} completed_steps={completed_steps}",
-                    wall_clock.elapsed_seconds(),
-                );
-                break;
-            }
-            if wall_clock.expired() {
-                println!(
-                    "stopped_by_wall_clock=true elapsed_s={:.3} completed_steps={completed_steps}",
+                    "stopped_by_{reason}=true elapsed_s={:.3} completed_steps={completed_steps}",
                     wall_clock.elapsed_seconds(),
                 );
                 break;
