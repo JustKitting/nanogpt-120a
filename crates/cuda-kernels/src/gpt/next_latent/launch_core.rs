@@ -13,13 +13,7 @@ impl NextLatModule {
             args.next_token_embeddings,
             args.current_states,
             args.out,
-            NextLatShape {
-                row_count: args.row_count,
-                embedding_dim: args.embedding_dim,
-                seq_len: 0,
-                batch_size: 0,
-                lambda: 0.0,
-            },
+            NextLatShape::rows(args.row_count, args.embedding_dim),
         )
     }
 
@@ -34,13 +28,7 @@ impl NextLatModule {
             args.d_predicted,
             args.d_next_token_embeddings,
             args.d_current_states,
-            NextLatShape {
-                row_count: args.row_count,
-                embedding_dim: args.embedding_dim,
-                seq_len: 0,
-                batch_size: 0,
-                lambda: 0.0,
-            },
+            NextLatShape::rows(args.row_count, args.embedding_dim),
         )
     }
 
@@ -55,13 +43,7 @@ impl NextLatModule {
             args.target_states,
             args.losses,
             args.d_predicted_next_states,
-            NextLatShape {
-                row_count: args.batch_size * args.seq_len,
-                embedding_dim: args.embedding_dim,
-                seq_len: args.seq_len,
-                batch_size: args.batch_size,
-                lambda: args.lambda,
-            },
+            NextLatShape::smooth_l1(args.batch_size, args.seq_len, args.embedding_dim, args.lambda),
         )
     }
 }

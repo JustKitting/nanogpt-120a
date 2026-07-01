@@ -15,6 +15,16 @@ pub struct NextLatShape {
 
 unsafe impl DeviceCopy for NextLatShape {}
 
+impl NextLatShape {
+    pub fn rows(row_count: u32, embedding_dim: u32) -> Self {
+        Self { row_count, embedding_dim, seq_len: 0, batch_size: 0, lambda: 0.0 }
+    }
+
+    pub fn smooth_l1(batch_size: u32, seq_len: u32, embedding_dim: u32, lambda: f32) -> Self {
+        Self { row_count: batch_size * seq_len, embedding_dim, seq_len, batch_size, lambda }
+    }
+}
+
 pub struct NextLatConcatArgs<'a, 'out> {
     pub stream: &'a CudaStream,
     pub next_token_embeddings: &'a DeviceBuffer<f32>,
