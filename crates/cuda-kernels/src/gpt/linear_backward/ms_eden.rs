@@ -4,17 +4,11 @@ mod quantize;
 use cuda_core::DriverError;
 
 use crate::launch::grid_x_config;
-use crate::nvfp4_quant::{
-    MsEdenPairDeviceScaleQuantArgs, Nvfp4TransposeMsEdenDeviceScaleQuantArgs,
-    RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
-};
-use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
-use crate::quartet::QUARTET_MS_EDEN_SCALE_OVERRIDE;
 
-use self::quantize::{QuantizeOperandArgs, quantize_operand};
+use self::quantize::QuantizeContext;
 use super::{
-    LINEAR_BIAS_THREADS_PER_BLOCK, LinearBackwardDeviceScaleArgs, LinearBackwardInputTranspose,
-    LinearBackwardModule, LinearBackwardMsEdenArgs, LinearBackwardWeightTranspose, bias,
+    LINEAR_BIAS_THREADS_PER_BLOCK, LinearBackwardDeviceScaleArgs, LinearBackwardModule,
+    LinearBackwardMsEdenArgs, bias,
 };
 
 impl LinearBackwardModule {
@@ -22,6 +16,8 @@ impl LinearBackwardModule {
         &self,
         args: LinearBackwardMsEdenArgs<'_, '_, '_>,
     ) -> Result<(), DriverError> {
+        let quantize = QuantizeContext::for_args(&args);
+
         if let Some(dbias) = args.dbias {
             self.module.linear_bias_grad_kernel(
                 args.stream,
@@ -37,107 +33,9 @@ impl LinearBackwardModule {
         }
 
         let mut scratch = args.scratch;
-        let output_k = nvfp4_tc_matmul_padded_k(args.output_dim);
-        let token_k = nvfp4_tc_matmul_padded_k(args.token_count);
-
-        args.quant_module
-            .fp32_pair_to_nvfp4_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
-                MsEdenPairDeviceScaleQuantArgs {
-                    stream: args.stream,
-                    x: args.e,
-                    out_fp4: &mut *scratch.e_h.bytes,
-                    out_scales: &mut *scratch.e_h.scales,
-                    out_global_scales: &mut *scratch.e_h.global_scales,
-                    transpose_out_fp4: &mut *scratch.e_t_h.bytes,
-                    transpose_out_scales: &mut *scratch.e_t_h.scales,
-                    transpose_out_global_scales: &mut *scratch.e_t_h.global_scales,
-                    out_chunk_amax: &mut *scratch.e_h.chunk_amax,
-                    out_global_scale: &mut *scratch.e_h.global_scale,
-                    row_count: args.token_count,
-                    src_row_len: args.output_dim,
-                    dst_row_len: output_k,
-                    transpose_dst_row_len: token_k,
-                    scale_override: QUARTET_MS_EDEN_SCALE_OVERRIDE,
-                    sign_seed: args.sign_seed,
-                    scale_seed: args.scale_seed,
-                    transpose_scale_seed: args.scale_seed ^ 0x85eb_ca6b,
-                    precomputed_chunk_count: args.precomputed_e_amax_chunks,
-                },
-            )?;
-        match args.weight_t {
-            LinearBackwardWeightTranspose::Fp32(weight_t) => {
-                quantize_operand(
-                    args.quant_module,
-                    QuantizeOperandArgs {
-                        stream: args.stream,
-                        x: weight_t,
-                        operand: &mut scratch.weight_t_h,
-                        row_count: args.input_dim,
-                        src_row_len: args.output_dim,
-                        dst_row_len: output_k,
-                        sign_seed: args.sign_seed,
-                        scale_seed: args.scale_seed ^ 0x9e37_79b9,
-                        precomputed_chunk_count: None,
-                    },
-                )?;
-            }
-            LinearBackwardWeightTranspose::Nvfp4(weight) => {
-                args.quant_module
-                    .nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
-                        Nvfp4TransposeMsEdenDeviceScaleQuantArgs {
-                            stream: args.stream,
-                            input: weight,
-                            out_fp4: &mut *scratch.weight_t_h.bytes,
-                            out_scales: &mut *scratch.weight_t_h.scales,
-                            out_global_scales: &mut *scratch.weight_t_h.global_scales,
-                            out_chunk_amax: &mut *scratch.weight_t_h.chunk_amax,
-                            out_global_scale: &mut *scratch.weight_t_h.global_scale,
-                            source_rows: args.output_dim,
-                            source_cols: args.input_dim,
-                            dst_row_len: output_k,
-                            sign_seed: args.sign_seed,
-                            scale_seed: args.scale_seed ^ 0x9e37_79b9,
-                        },
-                    )?;
-            }
-        }
-        match args.input_t {
-            LinearBackwardInputTranspose::Fp32(input_t) => {
-                quantize_operand(
-                    args.quant_module,
-                    QuantizeOperandArgs {
-                        stream: args.stream,
-                        x: input_t,
-                        operand: &mut scratch.input_t_h,
-                        row_count: args.input_dim,
-                        src_row_len: args.token_count,
-                        dst_row_len: token_k,
-                        sign_seed: args.sign_seed,
-                        scale_seed: args.scale_seed ^ 0xc2b2_ae35,
-                        precomputed_chunk_count: None,
-                    },
-                )?;
-            }
-            LinearBackwardInputTranspose::RowwiseNvfp4(input_t) => {
-                args.quant_module
-                    .rowwise_nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
-                        RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs {
-                            stream: args.stream,
-                            input: input_t,
-                            out_fp4: &mut *scratch.input_t_h.bytes,
-                            out_scales: &mut *scratch.input_t_h.scales,
-                            out_global_scales: &mut *scratch.input_t_h.global_scales,
-                            out_chunk_amax: &mut *scratch.input_t_h.chunk_amax,
-                            out_global_scale: &mut *scratch.input_t_h.global_scale,
-                            source_rows: args.token_count,
-                            source_cols: args.input_dim,
-                            dst_row_len: token_k,
-                            sign_seed: args.sign_seed,
-                            scale_seed: args.scale_seed ^ 0xc2b2_ae35,
-                        },
-                    )?;
-            }
-        }
+        quantize.error_pair(args.e, &mut scratch, args.precomputed_e_amax_chunks)?;
+        quantize.weight_transpose(args.weight_t, &mut scratch.weight_t_h)?;
+        quantize.input_transpose(args.input_t, &mut scratch.input_t_h)?;
 
         self.backward_device_scale_cta(LinearBackwardDeviceScaleArgs {
             stream: args.stream,
