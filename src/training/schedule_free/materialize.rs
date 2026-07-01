@@ -17,12 +17,8 @@ pub(in crate::training) fn materialize_training_weights(
     scratch: &mut OptimizerScratch,
     state: &OptimizerStateBuffers,
 ) -> Result<(), DriverError> {
-    let mut materializer = Materializer::new(
-        stream,
-        &runtime.optimizer,
-        scratch,
-        schedule_free_beta(state.next_step()),
-    );
+    let beta = schedule_free_beta(state.next_step());
+    let mut materializer = Materializer::new(stream, &runtime.optimizer, scratch, beta);
 
     materializer.adam(&mut uploaded.token_embedding, &state.token_embedding)?;
     materialize_layer_norm(&mut materializer, &mut uploaded.ln_f, &state.ln_f)?;
@@ -45,17 +41,9 @@ fn materialize_next_latent(
     state: &NextLatState,
 ) -> Result<(), DriverError> {
     materialize_layer_norm(materializer, &mut next_latent.norm, &state.norm)?;
-    materialize_linear(
-        materializer,
-        &mut next_latent.input_projection,
-        &state.input_projection,
-    )?;
+    materialize_linear(materializer, &mut next_latent.input_projection, &state.input_projection)?;
     materialize_linear(materializer, &mut next_latent.transition, &state.transition)?;
-    materialize_linear(
-        materializer,
-        &mut next_latent.output_projection,
-        &state.output_projection,
-    )
+    materialize_linear(materializer, &mut next_latent.output_projection, &state.output_projection)
 }
 
 fn materialize_block(

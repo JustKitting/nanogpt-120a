@@ -22,12 +22,7 @@ pub(super) fn parameter_gradient_views<'a>(
     next_latent: &'a NextLatGradBuffers,
 ) -> Vec<HostGradView<'a>> {
     let mut rows = Vec::new();
-    push_view(
-        &mut rows,
-        "lm_head.weight",
-        &grads.d_lm_head_weight,
-        GPT2_VOCAB_SIZE * GPT2_N_EMBD,
-    );
+    push_view(&mut rows, "lm_head.weight", &grads.d_lm_head_weight, GPT2_VOCAB_SIZE * GPT2_N_EMBD);
     push_layer_norm_views(&mut rows, "final_norm", &grads.final_norm);
 
     for (block_index, block) in grads.blocks.iter().enumerate() {
