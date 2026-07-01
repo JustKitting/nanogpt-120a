@@ -17,12 +17,9 @@ pub(super) mod module {
 
     #[kernel]
     pub fn grad_clip_sumsq_chunks_kernel(
-        ptrs: &[u64],
-        lens: &[u32],
-        chunk_offsets: &[u32],
+        ptrs: &[u64], lens: &[u32], chunk_offsets: &[u32],
         mut chunk_sums: DisjointSlice<f32>,
-        slot_count: u32,
-        chunk_count: u32,
+        slot_count: u32, chunk_count: u32,
     ) {
         let chunk = thread::blockIdx_x();
         if chunk >= chunk_count {
@@ -56,11 +53,8 @@ pub(super) mod module {
 
     #[kernel]
     pub fn grad_clip_scale_kernel(
-        chunk_sums: &[f32],
-        mut scale: DisjointSlice<f32>,
-        mut norm_out: DisjointSlice<f32>,
-        chunk_count: u32,
-        max_norm: f32,
+        chunk_sums: &[f32], mut scale: DisjointSlice<f32>, mut norm_out: DisjointSlice<f32>,
+        chunk_count: u32, max_norm: f32,
     ) {
         let (thread, lane, warp) = thread_lane_warp();
         static mut WARP_SUMS: SharedArray<f32, WARP_SUM_SLOTS> = SharedArray::UNINIT;
@@ -87,12 +81,8 @@ pub(super) mod module {
 
     #[kernel]
     pub fn grad_clip_apply_kernel(
-        ptrs: &[u64],
-        lens: &[u32],
-        chunk_offsets: &[u32],
-        scale: &[f32],
-        slot_count: u32,
-        chunk_count: u32,
+        ptrs: &[u64], lens: &[u32], chunk_offsets: &[u32], scale: &[f32],
+        slot_count: u32, chunk_count: u32,
     ) {
         let chunk = thread::blockIdx_x();
         if chunk >= chunk_count {
