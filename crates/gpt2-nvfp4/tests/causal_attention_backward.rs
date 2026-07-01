@@ -18,7 +18,7 @@ mod data;
 #[path = "common/saved_block.rs"]
 mod saved_block;
 
-use common::{assert_nonzero_finite, cuda_test_context};
+use common::{assert_nonzero_finite, attention_log_sum_exp_values, cuda_test_context};
 use saved_block::{SavedBlockParts, saved_block};
 
 #[ignore = "requires generated sm_120a PTX"]
@@ -31,7 +31,7 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
     let qkv = DeviceBuffer::from_host(&stream, &vec![0x3c00_u16; QkvActivation::LEN])?;
     let attention_out = DeviceBuffer::from_host(&stream, &vec![0x2e66_u16; HiddenState::LEN])?;
     let d_out = DeviceBuffer::from_host(&stream, &data::d_out_values())?;
-    let log_sum_exp = DeviceBuffer::from_host(&stream, &data::log_sum_exp_values())?;
+    let log_sum_exp = DeviceBuffer::from_host(&stream, &attention_log_sum_exp_values())?;
     let dummy = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
     let dummy_u16 = DeviceBuffer::<u16>::zeroed(&stream, 1)?;
     let dummy_bytes = DeviceBuffer::<u8>::zeroed(&stream, 1)?;

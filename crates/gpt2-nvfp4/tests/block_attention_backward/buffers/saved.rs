@@ -25,7 +25,7 @@ impl SavedBuffers {
             hidden_globals: DeviceBuffer::from_host(stream, &data::row_global_scales())?,
             hidden_f16: DeviceBuffer::from_host(stream, &vec![0x2e66_u16; HiddenState::LEN])?,
             qkv: DeviceBuffer::from_host(stream, &vec![0x3c00_u16; QkvActivation::LEN])?,
-            log_sum_exp: DeviceBuffer::from_host(stream, &data::attention_log_sum_exp_values())?,
+            log_sum_exp: DeviceBuffer::from_host(stream, &crate::common::attention_log_sum_exp_values())?,
             mean: DeviceBuffer::zeroed(stream, GPT2_TOKEN_ROWS)?,
             inv_std: DeviceBuffer::from_host(stream, &data::inv_std_values())?,
         })

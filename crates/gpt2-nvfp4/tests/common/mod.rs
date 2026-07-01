@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use cuda_core::{CudaContext, CudaModule, CudaStream, DriverError};
+use gpt2_nvfp4::{AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN};
 
 pub type CudaTestContext = (Arc<CudaContext>, Arc<CudaStream>, Arc<CudaModule>);
 
@@ -23,4 +24,18 @@ pub fn cuda_test_context() -> Result<CudaTestContext, DriverError> {
 pub fn assert_nonzero_finite(values: &[f32]) {
     assert!(values.iter().all(|value| value.is_finite()));
     assert!(values.iter().any(|value| value.abs() > 0.0));
+}
+
+#[allow(dead_code)]
+pub fn attention_log_sum_exp_values() -> Vec<f32> {
+    let mut log_sum_exp = vec![0.0_f32; AttentionLogSumExp::LEN];
+    for batch in 0..GPT2_BATCH_SIZE {
+        for head in 0..GPT2_N_HEAD {
+            for token in 0..GPT2_SEQ_LEN {
+                let index = (batch * GPT2_N_HEAD + head) * GPT2_SEQ_LEN + token;
+                log_sum_exp[index] = ((token + 1) as f32).ln();
+            }
+        }
+    }
+    log_sum_exp
 }
