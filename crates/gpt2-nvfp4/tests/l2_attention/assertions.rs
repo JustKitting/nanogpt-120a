@@ -1,4 +1,4 @@
-use gpt2_nvfp4::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, HiddenState};
+use gpt2_nvfp4::{HiddenState, GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV};
 
 use super::f16_common::tc_f16;
 
@@ -7,17 +7,8 @@ const ATTENTION_TOLERANCE: f32 = 1.0e-6;
 const RESIDUAL_TOLERANCE: f32 = 1.0e-7;
 
 pub fn assert_qkv_nonzero(qkv: &[f32]) {
-    let q_nonzero = qkv
-        .iter()
-        .take(GPT2_N_EMBD)
-        .any(|value| value.abs() > 1.0e-7);
-    let k_nonzero = qkv[GPT2_N_EMBD..2 * GPT2_N_EMBD]
-        .iter()
-        .any(|value| value.abs() > 1.0e-7);
-    let v_nonzero = qkv[2 * GPT2_N_EMBD..GPT2_QKV]
-        .iter()
-        .any(|value| value.abs() > 1.0e-7);
-    assert!(q_nonzero && k_nonzero && v_nonzero);
+    let nonzero = |start| qkv[start..start + GPT2_N_EMBD].iter().any(|value| value.abs() > 1.0e-7);
+    assert!(nonzero(0) && nonzero(GPT2_N_EMBD) && nonzero(2 * GPT2_N_EMBD));
 }
 
 pub fn assert_attention_log_sum_exp(log_sum_exp: &[f32]) {
