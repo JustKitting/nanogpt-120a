@@ -1,12 +1,11 @@
 use cuda_device::{DisjointSlice, thread};
 
 use crate::attention::CausalAttentionParams;
-use crate::float_ptx::{fma_f32, sqrt_f32};
+use crate::float_ptx::fma_f32;
 use crate::kda_common::{
-    KDA_DENOM_EPS, batch_head, beta_compact_index, beta_index, compact_index, g_offset, qkv_index,
+    batch_head, beta_compact_index, beta_index, compact_index, g_offset, kda_warp_norm, qkv_index,
     safe_denom, sigmoid, silu, softplus, v_offset,
 };
-use crate::warp_reduce::warp_sum_f32;
 
 use super::context::{KdaQkAct, KdaQkvRead, KdaWarpCtx, kda_warp_ctx, read_qk_act};
 
@@ -25,8 +24,8 @@ impl PrepareNormAcc {
 
     #[inline(always)]
     fn inv(self, scale: f32) -> (f32, f32) {
-        let q_norm = sqrt_f32(warp_sum_f32(self.q_sum) + KDA_DENOM_EPS);
-        let k_norm = sqrt_f32(warp_sum_f32(self.k_sum) + KDA_DENOM_EPS);
+        let q_norm = kda_warp_norm(self.q_sum);
+        let k_norm = kda_warp_norm(self.k_sum);
         (scale / safe_denom(q_norm), 1.0 / safe_denom(k_norm))
     }
 }

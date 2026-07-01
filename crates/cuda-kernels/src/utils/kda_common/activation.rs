@@ -1,5 +1,6 @@
 use crate::attention::CausalAttentionParams;
-use crate::float_ptx::{exp_f32, ln_f32};
+use crate::float_ptx::{exp_f32, ln_f32, sqrt_f32};
+use crate::warp_reduce::warp_sum_f32;
 
 use super::shape::KDA_DENOM_EPS;
 
@@ -28,6 +29,11 @@ pub(crate) fn safe_denom(x: f32) -> f32 {
     } else {
         x - KDA_DENOM_EPS
     }
+}
+
+#[inline(always)]
+pub(crate) fn kda_warp_norm(sum: f32) -> f32 {
+    sqrt_f32(warp_sum_f32(sum) + KDA_DENOM_EPS)
 }
 
 #[inline(always)]

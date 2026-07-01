@@ -3,9 +3,9 @@ use cuda_device::DisjointSlice;
 use super::super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_f32_f16;
-use crate::float_ptx::{fma_f32, sqrt_f32};
+use crate::float_ptx::fma_f32;
 use crate::kda_common::{
-    KDA_DENOM_EPS, beta_compact_index, beta_index, compact_index, g_offset, k_offset, q_offset,
+    beta_compact_index, beta_index, compact_index, g_offset, k_offset, kda_warp_norm, q_offset,
     qkv_index, safe_denom, sigmoid, silu_grad, v_offset,
 };
 use crate::kda_elementwise::{KdaQkAct, KdaWarpCtx, kda_warp_ctx, read_qk_act};
@@ -32,8 +32,8 @@ impl FinishNormAcc {
 
     #[inline(always)]
     fn stats(self) -> FinishNormStats {
-        let q_norm = sqrt_f32(warp_sum_f32(self.q_sum) + KDA_DENOM_EPS);
-        let k_norm = sqrt_f32(warp_sum_f32(self.k_sum) + KDA_DENOM_EPS);
+        let q_norm = kda_warp_norm(self.q_sum);
+        let k_norm = kda_warp_norm(self.k_sum);
         FinishNormStats { q_norm, k_norm, q_dot: warp_sum_f32(self.q_dot), k_dot: warp_sum_f32(self.k_dot) }
     }
 }
