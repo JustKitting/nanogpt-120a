@@ -25,7 +25,7 @@ pub use projection::{
 pub use projection_cta::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
     NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_M,
-    NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile,
+    NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile, ProjectionCtaRowPairTiles,
     nvfp4_projection_cta_kernel_body, nvfp4_projection_cta_kernel_body_at_aligned_row_pair,
     nvfp4_projection_cta_nobias_kernel_body, nvfp4_projection_cta_nobias_kernel_body_at,
     nvfp4_projection_cta_nobias_kernel_body_at_aligned,

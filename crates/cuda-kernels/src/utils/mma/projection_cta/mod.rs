@@ -13,7 +13,7 @@ pub(crate) type ProjectionCtaBScales = cuda_device::SharedArray<u32, { tile::NVF
 #[derive(Clone, Copy)]
 pub(crate) struct ProjectionCtaSources<'a> { pub(crate) input_bytes: &'a [u8], pub(crate) input_scales: &'a [u8], pub(crate) weight_bytes: &'a [u8], pub(crate) weight_scales: &'a [u8] }
 pub(crate) struct ProjectionCtaTiles<'a> { pub(crate) a_packs: &'a mut ProjectionCtaAPacks, pub(crate) b_packs: &'a mut ProjectionCtaBPacks, pub(crate) a_scales: &'a mut ProjectionCtaAScales, pub(crate) b_scales: &'a mut ProjectionCtaBScales }
-pub(crate) struct ProjectionCtaRowPairTiles<'a> { pub(crate) a0_packs: &'a mut ProjectionCtaAPacks, pub(crate) a1_packs: &'a mut ProjectionCtaAPacks, pub(crate) b_packs: &'a mut ProjectionCtaBPacks, pub(crate) a0_scales: &'a mut ProjectionCtaAScales, pub(crate) a1_scales: &'a mut ProjectionCtaAScales, pub(crate) b_scales: &'a mut ProjectionCtaBScales }
+pub struct ProjectionCtaRowPairTiles<'a> { pub(crate) a0_packs: &'a mut ProjectionCtaAPacks, pub(crate) a1_packs: &'a mut ProjectionCtaAPacks, pub(crate) b_packs: &'a mut ProjectionCtaBPacks, pub(crate) a0_scales: &'a mut ProjectionCtaAScales, pub(crate) a1_scales: &'a mut ProjectionCtaAScales, pub(crate) b_scales: &'a mut ProjectionCtaBScales }
 
 macro_rules! with_projection_cta_tiles {
     ($body:ident; $($arg:expr),+ $(,)?) => {{
@@ -50,12 +50,10 @@ macro_rules! dispatch_projection_cta_tiles {
                 $crate::mma::Nvfp4ProjectionCtaTile::row_pair(cuda_device::thread::threadIdx_x());
             $aligned(
                 $($arg,)*
-                unsafe { &mut A_PACKS },
-                unsafe { &mut A1_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut A1_SCALES },
-                unsafe { &mut B_SCALES },
+                $crate::mma::ProjectionCtaRowPairTiles {
+                    a0_packs: unsafe { &mut A_PACKS }, a1_packs: unsafe { &mut A1_PACKS }, b_packs: unsafe { &mut B_PACKS },
+                    a0_scales: unsafe { &mut A_SCALES }, a1_scales: unsafe { &mut A1_SCALES }, b_scales: unsafe { &mut B_SCALES },
+                },
                 tile0,
                 tile1,
             )

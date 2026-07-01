@@ -10,6 +10,7 @@ use crate::mma::projection_cta::store::{store_accumulator, store_accumulator_ali
 use crate::mma::projection_cta::tile::{NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile};
 use crate::mma::projection_cta::{
     ProjectionCtaAPacks, ProjectionCtaAScales, ProjectionCtaBPacks, ProjectionCtaBScales,
+    ProjectionCtaRowPairTiles,
 };
 
 macro_rules! nobias_body_at_fn {
@@ -93,17 +94,11 @@ pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
     weight_scales: &[u8],
     out: &mut DisjointSlice<'_, f32>,
     params: Nvfp4ProjectionParams,
-    a_packs: &mut ProjectionCtaAPacks,
-    a1_packs: &mut ProjectionCtaAPacks,
-    b_packs: &mut ProjectionCtaBPacks,
-    a_scales: &mut ProjectionCtaAScales,
-    a1_scales: &mut ProjectionCtaAScales,
-    b_scales: &mut ProjectionCtaBScales,
+    mut tiles: ProjectionCtaRowPairTiles<'_>,
     tile0: Nvfp4ProjectionCtaTile,
     tile1: Nvfp4ProjectionCtaTile,
 ) {
     let sources = crate::mma::projection_cta::ProjectionCtaSources { input_bytes, input_scales, weight_bytes, weight_scales };
-    let mut tiles = crate::mma::projection_cta::ProjectionCtaRowPairTiles { a0_packs: a_packs, a1_packs, b_packs, a0_scales: a_scales, a1_scales, b_scales };
     let (acc0, acc1) = projection_accumulator_aligned_row_pair(
         sources, tile0, tile1, &params, &mut tiles,
     );

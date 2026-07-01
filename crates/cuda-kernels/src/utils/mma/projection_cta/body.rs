@@ -44,17 +44,11 @@ macro_rules! projection_cta_biased_body_fns {
             weight_scales: &[u8],
             $($extra_arg: $extra_ty,)+
             params: $crate::mma::projection::Nvfp4ProjectionParams,
-            a_packs: &mut $crate::mma::ProjectionCtaAPacks,
-            a1_packs: &mut $crate::mma::ProjectionCtaAPacks,
-            b_packs: &mut $crate::mma::ProjectionCtaBPacks,
-            a_scales: &mut $crate::mma::ProjectionCtaAScales,
-            a1_scales: &mut $crate::mma::ProjectionCtaAScales,
-            b_scales: &mut $crate::mma::ProjectionCtaBScales,
+            mut tiles: $crate::mma::ProjectionCtaRowPairTiles<'_>,
             tile0: $crate::mma::Nvfp4ProjectionCtaTile,
             tile1: $crate::mma::Nvfp4ProjectionCtaTile,
         ) {
             let sources = $crate::mma::projection_cta::ProjectionCtaSources { input_bytes, input_scales, weight_bytes, weight_scales };
-            let mut tiles = $crate::mma::projection_cta::ProjectionCtaRowPairTiles { a0_packs: a_packs, a1_packs, b_packs, a0_scales: a_scales, a1_scales, b_scales };
             let (acc0, acc1) =
                 $crate::mma::projection_cta::accumulate::projection_accumulator_aligned_row_pair(
                     sources, tile0, tile1, &params, &mut tiles,

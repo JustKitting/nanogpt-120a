@@ -5,7 +5,7 @@ use crate::mma::{
     nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
     nvfp4_projection_nobias_kernel_body, with_projection_cta_tiles,
     Nvfp4ProjectionCtaTile, Nvfp4ProjectionParams, ProjectionCtaAPacks, ProjectionCtaAScales,
-    ProjectionCtaBPacks, ProjectionCtaBScales,
+    ProjectionCtaBPacks, ProjectionCtaBScales, ProjectionCtaRowPairTiles,
 };
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
@@ -92,12 +92,10 @@ pub(super) mod module {
                 dinput_weight_scales,
                 &mut dinput_out,
                 dinput_params,
-                unsafe { &mut A_PACKS },
-                unsafe { &mut A1_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut A1_SCALES },
-                unsafe { &mut B_SCALES },
+                ProjectionCtaRowPairTiles {
+                    a0_packs: unsafe { &mut A_PACKS }, a1_packs: unsafe { &mut A1_PACKS }, b_packs: unsafe { &mut B_PACKS },
+                    a0_scales: unsafe { &mut A_SCALES }, a1_scales: unsafe { &mut A1_SCALES }, b_scales: unsafe { &mut B_SCALES },
+                },
                 tile0,
                 tile1,
             );
@@ -119,12 +117,10 @@ pub(super) mod module {
                 dweight_weight_scales,
                 &mut dweight_out,
                 dweight_params,
-                unsafe { &mut A_PACKS },
-                unsafe { &mut A1_PACKS },
-                unsafe { &mut B_PACKS },
-                unsafe { &mut A_SCALES },
-                unsafe { &mut A1_SCALES },
-                unsafe { &mut B_SCALES },
+                ProjectionCtaRowPairTiles {
+                    a0_packs: unsafe { &mut A_PACKS }, a1_packs: unsafe { &mut A1_PACKS }, b_packs: unsafe { &mut B_PACKS },
+                    a0_scales: unsafe { &mut A_SCALES }, a1_scales: unsafe { &mut A1_SCALES }, b_scales: unsafe { &mut B_SCALES },
+                },
                 tile0,
                 tile1,
             );
