@@ -1,14 +1,12 @@
 use std::error::Error;
 
-use cuda_core::{CudaStream, DeviceBuffer};
+use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::nvfp4::{
     Nvfp4DecodeModule, Nvfp4DecodeTransposeArgs, Nvfp4RowwiseDecodeTransposeArgs,
 };
 use rust_kernels_cuda::nvfp4_quant::{
     MsEdenDeviceScaleQuantArgs, MsEdenTransposeDeviceScaleQuantArgs, Nvfp4QuantArgs,
-    Nvfp4QuantModule, Nvfp4QuantRowwiseArgs, Nvfp4TransposeMsEdenDeviceScaleQuantArgs,
-    QuartetBackwardMsEdenDeviceScaleQuantArgs, RowAmaxArgs,
-    RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
+    Nvfp4QuantModule, Nvfp4TransposeMsEdenDeviceScaleQuantArgs,
 };
 use rust_kernels_cuda::transpose::{TransposeF32Args, TransposeModule};
 
@@ -17,35 +15,6 @@ mod common;
 mod support;
 
 use support::*;
-
-fn rowwise_quant(
-    stream: &CudaStream,
-    quant: &Nvfp4QuantModule,
-    x: &DeviceBuffer<f32>,
-    source: &mut RowwiseSourceScratch,
-    rows: usize,
-    cols: usize,
-) -> Result<(), Box<dyn Error>> {
-    let mut row_amax = DeviceBuffer::<f32>::zeroed(stream, rows)?;
-    quant.row_amax_f32(RowAmaxArgs {
-        stream,
-        x,
-        out: &mut row_amax,
-        row_count: rows as u32,
-        row_len: cols as u32,
-    })?;
-    quant.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
-        stream,
-        x,
-        amax: &row_amax,
-        out_fp4: &mut source.bytes,
-        out_scales: &mut source.scales,
-        out_global_scale: &mut source.global_scales,
-        group_count: (rows * cols / 16) as u32,
-        row_len: cols as u32,
-    })?;
-    Ok(())
-}
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -119,7 +88,7 @@ fn rowwise_nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), B
     let mut materialized = QuantScratch::new(&stream)?;
     let mut direct = QuantScratch::new(&stream)?;
 
-    rowwise_quant(&stream, &quant, &x_dev, &mut source, ROWS, COLS)?;
+    source.quantize(&stream, &quant, &x_dev, ROWS, COLS)?;
 
     let source_tensor = source.tensor();
     decode.decode_rowwise_transpose_f32(Nvfp4RowwiseDecodeTransposeArgs {
@@ -130,36 +99,10 @@ fn rowwise_nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), B
         cols: COLS as u32,
     })?;
     quant.fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
-        QuartetBackwardMsEdenDeviceScaleQuantArgs {
-            stream: &stream,
-            x: &x_t_dev,
-            out_fp4: &mut materialized.bytes,
-            out_scales: &mut materialized.scales,
-            out_global_scales: &mut materialized.global_scales,
-            out_chunk_amax: &mut materialized.chunk_amax,
-            out_global_scale: &mut materialized.global_scale,
-            row_count: COLS as u32,
-            src_row_len: ROWS as u32,
-            dst_row_len: padded_rows() as u32,
-            sign_seed: SIGN_SEED,
-            scale_seed: SCALE_SEED,
-        },
+        materialized.quartet_args(&stream, &x_t_dev, COLS, ROWS, padded_rows()),
     )?;
     quant.rowwise_nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale(
-        RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs {
-            stream: &stream,
-            input: source_tensor,
-            out_fp4: &mut direct.bytes,
-            out_scales: &mut direct.scales,
-            out_global_scales: &mut direct.global_scales,
-            out_chunk_amax: &mut direct.chunk_amax,
-            out_global_scale: &mut direct.global_scale,
-            source_rows: ROWS as u32,
-            source_cols: COLS as u32,
-            dst_row_len: padded_rows() as u32,
-            sign_seed: SIGN_SEED,
-            scale_seed: SCALE_SEED,
-        },
+        direct.rowwise_transpose_args(&stream, source_tensor, ROWS, COLS, padded_rows()),
     )?;
 
     direct.assert_quartet_eq(&stream, &materialized)?;
@@ -190,7 +133,7 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
     let mut materialized = QuantScratch::new_exact(&stream, LOCAL_COLS, LOCAL_ROWS)?;
     let mut direct = QuantScratch::new_exact(&stream, LOCAL_COLS, LOCAL_ROWS)?;
 
-    rowwise_quant(&stream, &quant, &x_dev, &mut source, LOCAL_ROWS, LOCAL_COLS)?;
+    source.quantize(&stream, &quant, &x_dev, LOCAL_ROWS, LOCAL_COLS)?;
 
     let source_tensor = source.tensor();
     decode.decode_rowwise_transpose_f32(Nvfp4RowwiseDecodeTransposeArgs {
@@ -201,36 +144,10 @@ fn rowwise_nvfp4_transpose_no_chunk_no_pad_matches_materialized_decode()
         cols: LOCAL_COLS as u32,
     })?;
     quant.fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
-        QuartetBackwardMsEdenDeviceScaleQuantArgs {
-            stream: &stream,
-            x: &x_t_dev,
-            out_fp4: &mut materialized.bytes,
-            out_scales: &mut materialized.scales,
-            out_global_scales: &mut materialized.global_scales,
-            out_chunk_amax: &mut materialized.chunk_amax,
-            out_global_scale: &mut materialized.global_scale,
-            row_count: LOCAL_COLS as u32,
-            src_row_len: LOCAL_ROWS as u32,
-            dst_row_len: LOCAL_ROWS as u32,
-            sign_seed: SIGN_SEED,
-            scale_seed: SCALE_SEED,
-        },
+        materialized.quartet_args(&stream, &x_t_dev, LOCAL_COLS, LOCAL_ROWS, LOCAL_ROWS),
     )?;
     quant.rowwise_nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
-        RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs {
-            stream: &stream,
-            input: source_tensor,
-            out_fp4: &mut direct.bytes,
-            out_scales: &mut direct.scales,
-            out_global_scales: &mut direct.global_scales,
-            out_chunk_amax: &mut direct.chunk_amax,
-            out_global_scale: &mut direct.global_scale,
-            source_rows: LOCAL_ROWS as u32,
-            source_cols: LOCAL_COLS as u32,
-            dst_row_len: LOCAL_ROWS as u32,
-            sign_seed: SIGN_SEED,
-            scale_seed: SCALE_SEED,
-        },
+        direct.rowwise_transpose_args(&stream, source_tensor, LOCAL_ROWS, LOCAL_COLS, LOCAL_ROWS),
     )?;
 
     direct.assert_no_chunk_quartet_eq(&stream, &materialized)?;
@@ -271,20 +188,7 @@ fn nvfp4_transpose_ms_eden_matches_materialized_decode() -> Result<(), Box<dyn E
         cols: COLS as u32,
     })?;
     quant.fp32_to_nvfp4_quartet_backward_ms_eden_derived_device_scale(
-        QuartetBackwardMsEdenDeviceScaleQuantArgs {
-            stream: &stream,
-            x: &x_t_dev,
-            out_fp4: &mut materialized.bytes,
-            out_scales: &mut materialized.scales,
-            out_global_scales: &mut materialized.global_scales,
-            out_chunk_amax: &mut materialized.chunk_amax,
-            out_global_scale: &mut materialized.global_scale,
-            row_count: COLS as u32,
-            src_row_len: ROWS as u32,
-            dst_row_len: padded_rows() as u32,
-            sign_seed: SIGN_SEED,
-            scale_seed: SCALE_SEED,
-        },
+        materialized.quartet_args(&stream, &x_t_dev, COLS, ROWS, padded_rows()),
     )?;
     quant.nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale(
         Nvfp4TransposeMsEdenDeviceScaleQuantArgs {

@@ -1,5 +1,9 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
+use rust_kernels_cuda::nvfp4_quant::{
+    Nvfp4QuantModule, Nvfp4QuantRowwiseArgs, QuartetBackwardMsEdenDeviceScaleQuantArgs,
+    RowAmaxArgs, RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs,
+};
 use rust_kernels_cuda::nvfp4_tc_matmul::{
     nvfp4_tc_matmul_bytes, nvfp4_tc_matmul_chunks, nvfp4_tc_matmul_padded_k, nvfp4_tc_matmul_scales,
 };
@@ -56,6 +60,54 @@ impl QuantScratch {
             chunk_amax: DeviceBuffer::zeroed(stream, element_count / 32)?,
             global_scale: DeviceBuffer::zeroed(stream, 1)?,
         })
+    }
+
+    pub(super) fn quartet_args<'a, 'out>(
+        &'out mut self,
+        stream: &'a CudaStream,
+        x: &'a DeviceBuffer<f32>,
+        row_count: usize,
+        src_row_len: usize,
+        dst_row_len: usize,
+    ) -> QuartetBackwardMsEdenDeviceScaleQuantArgs<'a, 'out> {
+        QuartetBackwardMsEdenDeviceScaleQuantArgs {
+            stream,
+            x,
+            out_fp4: &mut self.bytes,
+            out_scales: &mut self.scales,
+            out_global_scales: &mut self.global_scales,
+            out_chunk_amax: &mut self.chunk_amax,
+            out_global_scale: &mut self.global_scale,
+            row_count: row_count as u32,
+            src_row_len: src_row_len as u32,
+            dst_row_len: dst_row_len as u32,
+            sign_seed: SIGN_SEED,
+            scale_seed: SCALE_SEED,
+        }
+    }
+
+    pub(super) fn rowwise_transpose_args<'a, 'out>(
+        &'out mut self,
+        stream: &'a CudaStream,
+        input: Nvfp4RowwiseDeviceTensor<'a>,
+        source_rows: usize,
+        source_cols: usize,
+        dst_row_len: usize,
+    ) -> RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs<'a, 'out> {
+        RowwiseNvfp4TransposeMsEdenDeviceScaleQuantArgs {
+            stream,
+            input,
+            out_fp4: &mut self.bytes,
+            out_scales: &mut self.scales,
+            out_global_scales: &mut self.global_scales,
+            out_chunk_amax: &mut self.chunk_amax,
+            out_global_scale: &mut self.global_scale,
+            source_rows: source_rows as u32,
+            source_cols: source_cols as u32,
+            dst_row_len: dst_row_len as u32,
+            sign_seed: SIGN_SEED,
+            scale_seed: SCALE_SEED,
+        }
     }
 
     pub(super) fn assert_ms_eden_eq(
@@ -134,6 +186,34 @@ impl RowwiseSourceScratch {
             bytes: DeviceBuffer::zeroed(stream, rows * cols / 2)?,
             scales: DeviceBuffer::zeroed(stream, rows * cols / 16)?,
             global_scales: DeviceBuffer::zeroed(stream, rows)?,
+        })
+    }
+
+    pub(super) fn quantize(
+        &mut self,
+        stream: &CudaStream,
+        quant: &Nvfp4QuantModule,
+        x: &DeviceBuffer<f32>,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), DriverError> {
+        let mut row_amax = DeviceBuffer::<f32>::zeroed(stream, rows)?;
+        quant.row_amax_f32(RowAmaxArgs {
+            stream,
+            x,
+            out: &mut row_amax,
+            row_count: rows as u32,
+            row_len: cols as u32,
+        })?;
+        quant.fp32_to_nvfp4_four_six_rowwise(Nvfp4QuantRowwiseArgs {
+            stream,
+            x,
+            amax: &row_amax,
+            out_fp4: &mut self.bytes,
+            out_scales: &mut self.scales,
+            out_global_scale: &mut self.global_scales,
+            group_count: (rows * cols / 16) as u32,
+            row_len: cols as u32,
         })
     }
 
