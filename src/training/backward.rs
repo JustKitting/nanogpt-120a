@@ -2,9 +2,8 @@ use std::time::Instant;
 
 mod loss;
 mod pass;
-mod weights;
 
-use super::optimizer_apply::{WeightUpdateArgs, apply_weight_updates};
+use super::optimizer_apply::{apply_weight_updates, WeightUpdateArgs};
 use super::{TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
 

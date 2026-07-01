@@ -2,14 +2,14 @@ mod tensor;
 
 use cuda_core::CudaStream;
 use gpt2_nvfp4::{
-    AttentionProjectionTensors, Gpt2BlockWeights, Gpt2Weights, MlpDownTensors,
+    AttentionProjectionTensors, Gpt2BackwardWeights, Gpt2BlockWeights, Gpt2Weights, MlpDownTensors,
     MlpProjectionTensors, MlpUpTensors, NextLatWeights,
 };
 
 use crate::AppResult;
 
-pub use self::tensor::{UploadedLayerNorm, UploadedLinear, UploadedNvfp4};
 use self::tensor::{upload_linear, upload_nvfp4};
+pub use self::tensor::{UploadedLayerNorm, UploadedLinear, UploadedNvfp4};
 
 pub struct UploadedModel {
     pub token_embedding: UploadedNvfp4,
@@ -30,6 +30,17 @@ impl UploadedModel {
             ln_f: UploadedLayerNorm::new(stream, &weights.ln_f)?,
             next_latent: UploadedNextLat::new(stream, &weights.next_latent)?,
         })
+    }
+
+    pub fn backward_weights(&self) -> Gpt2BackwardWeights<'_> {
+        Gpt2BackwardWeights {
+            lm_head_weight: self.token_embedding.device(),
+            ln_f: self.ln_f.tensors(),
+            block_ln_1: std::array::from_fn(|i| self.blocks[i].ln_1.tensors()),
+            block_ln_2: std::array::from_fn(|i| self.blocks[i].ln_2.tensors()),
+            attention: std::array::from_fn(|i| self.blocks[i].attention_tensors()),
+            mlp: std::array::from_fn(|i| self.blocks[i].mlp_tensors()),
+        }
     }
 }
 

@@ -1,13 +1,12 @@
-use gpt2_nvfp4::{Gpt2BackwardArgs, Gpt2BackwardSeeds, gpt2_backward};
+use gpt2_nvfp4::{gpt2_backward, Gpt2BackwardArgs, Gpt2BackwardSeeds};
 use rust_kernels_cuda::residual::ResidualGradAccumulateArgs;
 
-use super::weights::backward_weights;
 use crate::training::next_latent::{
-    NextLatBackwardArgs, NextLatBackwardSeeds, backward as next_latent_backward,
+    backward as next_latent_backward, NextLatBackwardArgs, NextLatBackwardSeeds,
 };
 use crate::{
-    AppResult,
     training::{TokenBatch, Trainer},
+    AppResult,
 };
 
 impl Trainer {
@@ -21,7 +20,7 @@ impl Trainer {
                 batch.token_count as u32,
                 &self.buffers.logits,
             );
-            let weights = backward_weights(&self.uploaded);
+            let weights = self.uploaded.backward_weights();
             let backward = self.buffers.backward.parts();
 
             next_latent_backward(NextLatBackwardArgs {
