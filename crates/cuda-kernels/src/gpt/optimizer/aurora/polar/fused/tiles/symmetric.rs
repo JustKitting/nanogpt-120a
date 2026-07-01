@@ -7,7 +7,7 @@ use crate::float_ptx::sqrt_f32;
 
 use super::super::super::super::super::work_grid::WorkGrid;
 use super::super::coefficients::Coefficients;
-use super::super::store::{store_plain, store_plain_transposed, store_symmetric_polynomial};
+use super::super::store::{store_plain_tile, store_plain_transposed_tile, store_symmetric_polynomial_tile};
 use super::compute_tile;
 
 macro_rules! for_upper_triangle_tiles {
@@ -82,17 +82,10 @@ fn run_tile(
     tile_col: u32,
 ) {
     let tile = CtaTile::from_tile(thread::threadIdx_x(), tile_row, tile_col, 0);
-    let (acc0, acc1, acc2, acc3) =
-        compute_tile(source, source, a_tile, b_tile, tile, dim, dim, k, false);
-    store_plain(acc0, tile, tile.warp_n0, out, dim, dim);
-    store_plain(acc1, tile, tile.warp_n0 + 1, out, dim, dim);
-    store_plain(acc2, tile, tile.warp_n0 + 2, out, dim, dim);
-    store_plain(acc3, tile, tile.warp_n0 + 3, out, dim, dim);
+    let acc = compute_tile(source, source, a_tile, b_tile, tile, dim, dim, k, false);
+    store_plain_tile(acc, tile, out, dim, dim);
     if tile_col != tile_row {
-        store_plain_transposed(acc0, tile, tile.warp_n0, out, dim);
-        store_plain_transposed(acc1, tile, tile.warp_n0 + 1, out, dim);
-        store_plain_transposed(acc2, tile, tile.warp_n0 + 2, out, dim);
-        store_plain_transposed(acc3, tile, tile.warp_n0 + 3, out, dim);
+        store_plain_transposed_tile(acc, tile, out, dim);
     }
 }
 
@@ -108,10 +101,6 @@ fn run_polynomial_tile(
     coefficients: Coefficients,
 ) {
     let tile = CtaTile::from_tile(thread::threadIdx_x(), tile_row, tile_col, 0);
-    let (acc0, acc1, acc2, acc3) =
-        compute_tile(source, source, a_tile, b_tile, tile, dim, dim, dim, false);
-    store_symmetric_polynomial(acc0, tile, tile.warp_n0, base, out, dim, coefficients);
-    store_symmetric_polynomial(acc1, tile, tile.warp_n0 + 1, base, out, dim, coefficients);
-    store_symmetric_polynomial(acc2, tile, tile.warp_n0 + 2, base, out, dim, coefficients);
-    store_symmetric_polynomial(acc3, tile, tile.warp_n0 + 3, base, out, dim, coefficients);
+    let acc = compute_tile(source, source, a_tile, b_tile, tile, dim, dim, dim, false);
+    store_symmetric_polynomial_tile(acc, tile, base, out, dim, coefficients);
 }

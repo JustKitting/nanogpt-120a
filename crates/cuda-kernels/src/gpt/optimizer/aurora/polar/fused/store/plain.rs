@@ -14,15 +14,27 @@ macro_rules! store_acc4 {
     }};
 }
 
+macro_rules! store_tile_acc4 {
+    ($store:ident, $acc:ident, $tile:expr, $($arg:expr),+ $(,)?) => {{
+        $store($acc[0], $tile, $tile.warp_n0, $($arg),+); $store($acc[1], $tile, $tile.warp_n0 + 1, $($arg),+); $store($acc[2], $tile, $tile.warp_n0 + 2, $($arg),+); $store($acc[3], $tile, $tile.warp_n0 + 3, $($arg),+);
+    }};
+}
+
 #[inline(always)]
 pub(crate) fn store_plain(acc: [f32; 4], tile: CtaTile, warp_n: u32, out: *mut f32, rows: u32, cols: u32) {
     store_acc4!(store_plain_one, acc, tile, warp_n, out, rows, cols);
 }
 
 #[inline(always)]
+pub(crate) fn store_plain_tile(acc: [[f32; 4]; 4], tile: CtaTile, out: *mut f32, rows: u32, cols: u32) { store_tile_acc4!(store_plain, acc, tile, out, rows, cols); }
+
+#[inline(always)]
 pub(crate) fn store_plain_transposed(acc: [f32; 4], tile: CtaTile, warp_n: u32, out: *mut f32, dim: u32) {
     store_acc4!(store_plain_transposed_one, acc, tile, warp_n, out, dim);
 }
+
+#[inline(always)]
+pub(crate) fn store_plain_transposed_tile(acc: [[f32; 4]; 4], tile: CtaTile, out: *mut f32, dim: u32) { store_tile_acc4!(store_plain_transposed, acc, tile, out, dim); }
 
 #[inline(always)]
 pub(crate) fn store_symmetric_polynomial(
@@ -31,6 +43,9 @@ pub(crate) fn store_symmetric_polynomial(
 ) {
     store_acc4!(store_symmetric_polynomial_one, acc, tile, warp_n, base, out, dim, coefficients);
 }
+
+#[inline(always)]
+pub(crate) fn store_symmetric_polynomial_tile(acc: [[f32; 4]; 4], tile: CtaTile, base: *const f32, out: *mut f32, dim: u32, coefficients: Coefficients) { store_tile_acc4!(store_symmetric_polynomial, acc, tile, base, out, dim, coefficients); }
 
 #[inline(always)]
 fn store_plain_one(acc: f32, tile: CtaTile, warp_n: u32, acc_index: usize, out: *mut f32, rows: u32, cols: u32) {

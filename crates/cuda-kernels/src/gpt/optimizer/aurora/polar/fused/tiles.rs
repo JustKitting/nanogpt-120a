@@ -3,7 +3,7 @@ use cuda_device::{SharedArray, thread};
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_M, CTA_N, CtaTile};
 
 use super::super::super::super::work_grid::WorkGrid;
-use super::store::store_plain;
+use super::store::store_plain_tile;
 
 mod compute;
 use compute::compute_tile;
@@ -31,12 +31,8 @@ pub(super) fn run_plain_tiles(
         let tile_row = tile_index / n_tiles;
         let tile_col = tile_index - tile_row * n_tiles;
         let tile = CtaTile::from_tile(thread::threadIdx_x(), tile_row, tile_col, 0);
-        let (acc0, acc1, acc2, acc3) =
-            compute_tile(a, b, a_tile, b_tile, tile, m, n, k, rhs_transposed);
-        store_plain(acc0, tile, tile.warp_n0, out, m, n);
-        store_plain(acc1, tile, tile.warp_n0 + 1, out, m, n);
-        store_plain(acc2, tile, tile.warp_n0 + 2, out, m, n);
-        store_plain(acc3, tile, tile.warp_n0 + 3, out, m, n);
+        let acc = compute_tile(a, b, a_tile, b_tile, tile, m, n, k, rhs_transposed);
+        store_plain_tile(acc, tile, out, m, n);
         tile_index += work.blocks();
     }
 }
