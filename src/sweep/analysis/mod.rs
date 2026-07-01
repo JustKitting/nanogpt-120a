@@ -38,20 +38,16 @@ pub struct BinaryPrior {
 
 pub fn analyze(trials: &[Trial], config: &SweepConfig) -> SweepAnalysis {
     let observations = logs::observations(trials);
-    let mut models = Vec::new();
     let stability_rows = logs::stability_rows(&observations);
     let stability_prior = binary_prior(&stability_rows);
-    push_model(
-        &mut models,
-        "screen_quality",
-        logs::screen_quality_rows(&observations, config.screen_max_seconds),
-    );
-    push_model(
-        &mut models,
-        "full_quality",
-        logs::full_quality_rows(&observations, config.max_seconds),
-    );
-    push_model(&mut models, "stability", stability_rows);
+    let models = [
+        response_model("screen_quality", logs::screen_quality_rows(&observations, config.screen_max_seconds)),
+        response_model("full_quality", logs::full_quality_rows(&observations, config.max_seconds)),
+        response_model("stability", stability_rows),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
 
     SweepAnalysis {
         models,
@@ -79,14 +75,11 @@ pub fn print_summary(analysis: &SweepAnalysis) {
     }
 }
 
-fn push_model(
-    models: &mut Vec<ResponseModel>,
+fn response_model(
     name: &'static str,
     rows: Vec<(super::candidate::Candidate, f64)>,
-) {
-    if let Some(model) = regression::fit(rows) {
-        models.push(ResponseModel { name, model });
-    }
+) -> Option<ResponseModel> {
+    regression::fit(rows).map(|model| ResponseModel { name, model })
 }
 
 fn binary_prior(rows: &[(super::candidate::Candidate, f64)]) -> Option<BinaryPrior> {
