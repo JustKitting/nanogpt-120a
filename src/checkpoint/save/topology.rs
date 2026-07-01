@@ -3,7 +3,7 @@ use cuda_core::CudaStream;
 use super::{super::format::CheckpointWriter, tensor};
 use crate::{
     AppResult,
-    upload::{UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat},
+    upload::{UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4},
 };
 
 pub(super) fn write_model(
@@ -69,13 +69,7 @@ fn write_layer_norm(
     prefix: &str,
     layer_norm: &UploadedLayerNorm,
 ) -> AppResult {
-    tensor::write(
-        writer,
-        stream,
-        &format!("{prefix}.weight"),
-        &layer_norm.weight,
-    )?;
-    tensor::write(writer, stream, &format!("{prefix}.bias"), &layer_norm.bias)
+    write_pair(writer, stream, prefix, &layer_norm.weight, &layer_norm.bias)
 }
 
 fn write_linear(
@@ -84,8 +78,12 @@ fn write_linear(
     prefix: &str,
     linear: &UploadedLinear,
 ) -> AppResult {
-    tensor::write(writer, stream, &format!("{prefix}.weight"), &linear.weight)?;
-    tensor::write(writer, stream, &format!("{prefix}.bias"), &linear.bias)
+    write_pair(writer, stream, prefix, &linear.weight, &linear.bias)
+}
+
+fn write_pair(writer: &mut CheckpointWriter<impl std::io::Write>, stream: &CudaStream, prefix: &str, weight: &UploadedNvfp4, bias: &UploadedNvfp4) -> AppResult {
+    tensor::write(writer, stream, &format!("{prefix}.weight"), weight)?;
+    tensor::write(writer, stream, &format!("{prefix}.bias"), bias)
 }
 
 fn write_linears<const N: usize>(
