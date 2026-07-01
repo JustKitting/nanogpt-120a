@@ -17,12 +17,6 @@ struct NormalizeSourceToX {
 
 impl NormalizeSourceToX {
     #[inline(always)]
-    fn source_len(self) -> u32 { self.source_rows * self.source_cols }
-
-    #[inline(always)]
-    fn polar_len(self) -> u32 { self.polar_rows * self.polar_cols }
-
-    #[inline(always)]
     fn source_index(self, polar_index: u32) -> u32 {
         if !self.transpose_source {
             return polar_index;
@@ -49,7 +43,7 @@ pub(super) fn normalize_source_to_x(
     let job = NormalizeSourceToX {
         source, x, chunks, source_rows, source_cols, polar_rows, polar_cols, transpose_source,
     };
-    let len = job.source_len();
+    let len = job.source_rows * job.source_cols;
     let tid = thread::threadIdx_x();
     let lane = tid & (WARP_SIZE - 1);
     let warp_in_block = tid / WARP_SIZE;
@@ -102,7 +96,7 @@ fn normalize_source_to_x_from_chunks(
     grid::sync();
 
     let inv_norm = read_f32(job.chunks, 0);
-    let polar_len = job.polar_len();
+    let polar_len = job.polar_rows * job.polar_cols;
     let mut polar_index = work.thread();
     while polar_index < polar_len {
         let src = job.source_index(polar_index);
