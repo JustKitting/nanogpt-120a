@@ -33,8 +33,7 @@ pub(super) fn push_local(
     center: Option<&Candidate>,
     count: usize,
 ) {
-    let target = (pool.len() + count).min(pool.capacity().max(1));
-    push_candidates(pool, used, local::candidates(used, rng, center, target - pool.len()), "local");
+    push_candidates(pool, used, local::candidates(used, rng, center, remaining_slots(pool, count, pool.capacity())), "local");
 }
 
 pub(super) fn push_variance(
@@ -45,8 +44,7 @@ pub(super) fn push_variance(
     analysis: &SweepAnalysis,
     count: usize,
 ) {
-    let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    push_candidates(pool, used, variance::candidates(used, rng, config, analysis, target - pool.len()), "variance");
+    push_candidates(pool, used, variance::candidates(used, rng, config, analysis, remaining_slots(pool, count, config.candidate_samples)), "variance");
 }
 
 pub(super) fn push_coverage(
@@ -57,8 +55,7 @@ pub(super) fn push_coverage(
     observed: &[Candidate],
     count: usize,
 ) {
-    let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    push_candidates(pool, used, coverage::candidates(used, rng, config, observed, target - pool.len()), "coverage");
+    push_candidates(pool, used, coverage::candidates(used, rng, config, observed, remaining_slots(pool, count, config.candidate_samples)), "coverage");
 }
 
 pub(super) fn push_factorial(
@@ -70,8 +67,7 @@ pub(super) fn push_factorial(
     center: Option<&Candidate>,
     count: usize,
 ) {
-    let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    push_candidates(pool, used, factorial::candidates(used, rng, config, analysis, center, target - pool.len()), "factorial");
+    push_candidates(pool, used, factorial::candidates(used, rng, config, analysis, center, remaining_slots(pool, count, config.candidate_samples)), "factorial");
 }
 
 pub(super) fn push_random(
@@ -101,3 +97,5 @@ fn push_candidates(pool: &mut Vec<PooledCandidate>, used: &mut HashSet<String>, 
         push_unique(pool, used, candidate, source);
     }
 }
+
+fn remaining_slots(pool: &[PooledCandidate], count: usize, limit: usize) -> usize { (pool.len() + count).min(limit.max(1)) - pool.len() }
