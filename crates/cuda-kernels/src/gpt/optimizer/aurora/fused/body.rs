@@ -9,92 +9,98 @@ use super::polar_step::run_polar_step;
 use super::quant::quantize_updated_master;
 use super::update::update_master_chunks;
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+#[derive(Clone, Copy)]
+pub(super) struct AuroraMatrixState {
+    pub grad: *const f32, pub momentum: *mut f32, pub z_master: *mut f32, pub x_master: *mut f32,
+    pub out_fp4: *mut u8, pub out_scales: *mut u8, pub out_global_scale: *mut f32,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct AuroraMatrixScratch {
+    pub oriented: *mut f32, pub polar_next: *mut f32, pub polar_x: *mut f32,
+    pub polar_gram: *mut f32, pub polar_ax: *mut f32, pub polar_chunks: *mut f32,
+}
+
+pub(super) struct AuroraMatrixTiles<'a> {
+    pub a_tile: &'a mut SharedArray<u16, CTA_A_ELEMS>,
+    pub b_tile: &'a mut SharedArray<u16, CTA_B_ELEMS>,
+    pub warp_sums: &'a mut SharedArray<f32, { WARPS_PER_BLOCK as usize }>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct AuroraMatrixShape { pub rows: u32, pub cols: u32 }
+
+#[derive(Clone, Copy)]
+pub(super) struct AuroraUpdateScalars {
+    pub mu: f32, pub learning_rate: f32, pub weight_decay: f32,
+    pub average_coefficient: f32, pub iterations: u32,
+}
+
 pub(super) fn aurora_matrix_update_body(
-    grad: *const f32,
-    momentum: *mut f32,
-    z_master: *mut f32,
-    x_master: *mut f32,
-    out_fp4: *mut u8,
-    out_scales: *mut u8,
-    out_global_scale: *mut f32,
-    oriented: *mut f32,
-    polar_next: *mut f32,
-    polar_x: *mut f32,
-    polar_gram: *mut f32,
-    polar_ax: *mut f32,
-    polar_chunks: *mut f32,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
-    warp_sums: &mut SharedArray<f32, { WARPS_PER_BLOCK as usize }>,
+    state: AuroraMatrixState,
+    scratch: AuroraMatrixScratch,
+    tiles: AuroraMatrixTiles<'_>,
     work: WorkGrid,
-    rows: u32,
-    cols: u32,
-    mu: f32,
-    learning_rate: f32,
-    weight_decay: f32,
-    average_coefficient: f32,
-    iterations: u32,
+    shape: AuroraMatrixShape,
+    scalars: AuroraUpdateScalars,
 ) {
-    let len = rows * cols;
-    let transposed = rows < cols;
-    let oriented_ptr = oriented;
+    let len = shape.rows * shape.cols;
+    let transposed = shape.rows < shape.cols;
 
     momentum_orient(
-        grad,
-        momentum,
-        oriented_ptr,
+        state.grad,
+        state.momentum,
+        scratch.oriented,
         work,
-        rows,
-        cols,
-        mu,
+        shape,
+        scalars.mu,
         transposed,
     );
     grid::sync();
 
     let polar_update = run_polar_step(
-        oriented_ptr,
-        polar_next,
-        polar_x,
-        polar_gram,
-        polar_ax,
-        polar_chunks,
-        a_tile,
-        b_tile,
-        warp_sums,
+        scratch.oriented,
+        scratch.polar_next,
+        scratch.polar_x,
+        scratch.polar_gram,
+        scratch.polar_ax,
+        scratch.polar_chunks,
+        tiles.a_tile,
+        tiles.b_tile,
+        tiles.warp_sums,
         work,
-        rows,
-        cols,
+        shape.rows,
+        shape.cols,
         transposed,
-        iterations,
+        scalars.iterations,
     );
 
     // Polar Express returns after a grid-wide sync; update can consume its result directly.
     update_master_chunks(
         polar_update,
-        z_master,
-        x_master,
-        polar_chunks,
-        rows,
-        cols,
+        state.z_master,
+        state.x_master,
+        scratch.polar_chunks,
+        shape.rows,
+        shape.cols,
         len,
-        rows > cols,
-        learning_rate,
-        weight_decay,
-        average_coefficient,
-        warp_sums,
+        shape.rows > shape.cols,
+        scalars.learning_rate,
+        scalars.weight_decay,
+        scalars.average_coefficient,
+        tiles.warp_sums,
         work,
     );
     grid::sync();
 
     quantize_updated_master(
-        x_master,
-        polar_chunks,
-        out_fp4,
-        out_scales,
-        out_global_scale,
+        state.x_master,
+        scratch.polar_chunks,
+        state.out_fp4,
+        state.out_scales,
+        state.out_global_scale,
         len,
-        warp_sums,
+        tiles.warp_sums,
         work,
     );
 }
