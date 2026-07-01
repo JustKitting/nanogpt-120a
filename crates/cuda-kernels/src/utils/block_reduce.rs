@@ -89,15 +89,7 @@ pub(crate) fn block_max_shared_f32_for_warps<const WARPS: usize>(
     warp: u32,
     identity: f32,
 ) -> f32 {
-    block_reduce_f32!(
-        storage,
-        active_warps,
-        local,
-        lane,
-        warp,
-        warp_max_f32,
-        identity
-    )
+    block_reduce_f32!(storage, active_warps, local, lane, warp, warp_max_f32, identity)
 }
 
 #[inline(always)]
