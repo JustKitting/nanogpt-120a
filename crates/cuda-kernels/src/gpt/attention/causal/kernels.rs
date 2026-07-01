@@ -4,7 +4,10 @@ use super::{CAUSAL_MAX_WARPS_PER_BLOCK, CausalAttentionParams};
 
 #[path = "kernels/body.rs"]
 mod body;
-use body::{MAX_CAUSAL_TOKENS, causal_attention_body};
+#[path = "kernels/score.rs"]
+mod score;
+use body::causal_attention_body;
+use score::MAX_CAUSAL_TOKENS;
 
 pub use module::{LoadedModule, from_module};
 
