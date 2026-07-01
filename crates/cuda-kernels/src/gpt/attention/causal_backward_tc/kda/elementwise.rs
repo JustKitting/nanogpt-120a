@@ -8,7 +8,7 @@ use crate::kda_common::{
     linear_thread_index,
 };
 use crate::kda_elementwise::{
-    chunk_cumsum_g_body as shared_chunk_cumsum_g_body, prepare_kda_inputs_body,
+    KdaPrepareOutputs, chunk_cumsum_g_body as shared_chunk_cumsum_g_body, prepare_kda_inputs_body,
 };
 
 pub(crate) fn prepare_kda_backward_inputs_body(
@@ -20,7 +20,7 @@ pub(crate) fn prepare_kda_backward_inputs_body(
     beta: DisjointSlice<f32>,
     params: CausalAttentionParams,
 ) {
-    prepare_kda_inputs_body(qkv, q, k, v, g, beta, params, TC_BACKWARD_THREADS_PER_BLOCK);
+    prepare_kda_inputs_body(qkv, KdaPrepareOutputs { q, k, v, g, beta }, params, TC_BACKWARD_THREADS_PER_BLOCK);
 }
 
 pub(crate) fn chunk_cumsum_g_body(g: DisjointSlice<f32>, params: CausalAttentionParams) {

@@ -3,7 +3,7 @@ use cuda_device::DisjointSlice;
 use super::super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use super::thread_index;
 use crate::attention::CausalAttentionParams;
-use crate::kda_elementwise::prepare_kda_inputs_body;
+use crate::kda_elementwise::{KdaPrepareOutputs, prepare_kda_inputs_body};
 
 pub(in super::super) fn prepare_kda_body(
     qkv: &[f32],
@@ -14,7 +14,7 @@ pub(in super::super) fn prepare_kda_body(
     beta: DisjointSlice<f32>,
     params: CausalAttentionParams,
 ) {
-    prepare_kda_inputs_body(qkv, q, k, v, g, beta, params, TC_FORWARD_THREADS_PER_BLOCK);
+    prepare_kda_inputs_body(qkv, KdaPrepareOutputs { q, k, v, g, beta }, params, TC_FORWARD_THREADS_PER_BLOCK);
 }
 
 pub(in super::super) fn zero_f32_body(mut values: DisjointSlice<f32>, element_count: u32) {

@@ -10,6 +10,12 @@ use crate::warp_reduce::warp_sum_f32;
 
 use super::context::{KdaQkAct, KdaQkvRead, KdaWarpCtx, kda_warp_ctx, read_qk_act};
 
+pub(crate) struct KdaPrepareOutputs<'a> {
+    pub(crate) q: DisjointSlice<'a, f32>, pub(crate) k: DisjointSlice<'a, f32>,
+    pub(crate) v: DisjointSlice<'a, f32>, pub(crate) g: DisjointSlice<'a, f32>,
+    pub(crate) beta: DisjointSlice<'a, f32>,
+}
+
 pub(crate) fn chunk_cumsum_g_body(mut g: DisjointSlice<f32>, params: CausalAttentionParams) {
     let bh = thread::blockIdx_x();
     let chunk = thread::blockIdx_y();
@@ -39,11 +45,7 @@ pub(crate) fn chunk_cumsum_g_body(mut g: DisjointSlice<f32>, params: CausalAtten
 
 pub(crate) fn prepare_kda_inputs_body<T: KdaQkvRead>(
     qkv: &[T],
-    mut q: DisjointSlice<f32>,
-    mut k: DisjointSlice<f32>,
-    mut v: DisjointSlice<f32>,
-    mut g: DisjointSlice<f32>,
-    mut beta: DisjointSlice<f32>,
+    mut out: KdaPrepareOutputs<'_>,
     params: CausalAttentionParams,
     threads_per_block: u32,
 ) {
@@ -76,19 +78,15 @@ pub(crate) fn prepare_kda_inputs_body<T: KdaQkvRead>(
     let k_inv = 1.0 / safe_denom(k_norm);
 
     if dim0 < params.head_dim {
-        write_prepared(
-            qkv, &mut q, &mut k, &mut v, &mut g, ctx, dim0, qk0, q_inv, k_inv, &params,
-        );
+        write_prepared(qkv, &mut out, ctx, dim0, qk0, (q_inv, k_inv), &params);
     }
     if dim1 < params.head_dim {
-        write_prepared(
-            qkv, &mut q, &mut k, &mut v, &mut g, ctx, dim1, qk1, q_inv, k_inv, &params,
-        );
+        write_prepared(qkv, &mut out, ctx, dim1, qk1, (q_inv, k_inv), &params);
     }
     if ctx.lane == 0 {
         let raw_beta = T::read(qkv, beta_index(ctx.row, ctx.head, &params));
         unsafe {
-            *beta.get_unchecked_mut(beta_compact_index(ctx.batch, ctx.token, ctx.head, &params)) =
+            *out.beta.get_unchecked_mut(beta_compact_index(ctx.batch, ctx.token, ctx.head, &params)) =
                 sigmoid(raw_beta);
         }
     }
@@ -96,17 +94,14 @@ pub(crate) fn prepare_kda_inputs_body<T: KdaQkvRead>(
 
 fn write_prepared<T: KdaQkvRead>(
     qkv: &[T],
-    q: &mut DisjointSlice<f32>,
-    k: &mut DisjointSlice<f32>,
-    v: &mut DisjointSlice<f32>,
-    g: &mut DisjointSlice<f32>,
+    out: &mut KdaPrepareOutputs<'_>,
     ctx: KdaWarpCtx,
     dim: u32,
     qk: KdaQkAct,
-    q_inv: f32,
-    k_inv: f32,
+    inv: (f32, f32),
     params: &CausalAttentionParams,
 ) {
+    let (q_inv, k_inv) = inv;
     let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim, params);
     let raw_v = T::read(
         qkv,
@@ -117,9 +112,9 @@ fn write_prepared<T: KdaQkvRead>(
         qkv_index(ctx.row, ctx.head, dim, g_offset(params), params),
     );
     unsafe {
-        *q.get_unchecked_mut(compact) = qk.q_act * q_inv;
-        *k.get_unchecked_mut(compact) = qk.k_act * k_inv;
-        *v.get_unchecked_mut(compact) = silu(raw_v);
-        *g.get_unchecked_mut(compact) = -params.decay_scale * softplus(raw_g);
+        *out.q.get_unchecked_mut(compact) = qk.q_act * q_inv;
+        *out.k.get_unchecked_mut(compact) = qk.k_act * k_inv;
+        *out.v.get_unchecked_mut(compact) = silu(raw_v);
+        *out.g.get_unchecked_mut(compact) = -params.decay_scale * softplus(raw_g);
     }
 }
