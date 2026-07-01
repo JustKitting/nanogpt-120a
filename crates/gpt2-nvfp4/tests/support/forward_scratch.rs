@@ -32,7 +32,6 @@ impl RowwiseNvfp4ScratchBuffers {
     }
 }
 
-#[allow(dead_code)]
 pub struct CausalAttentionTcScratchBuffers {
     q: DeviceBuffer<f32>,
     k: DeviceBuffer<f32>,
@@ -43,7 +42,6 @@ pub struct CausalAttentionTcScratchBuffers {
     chunk_states: DeviceBuffer<u16>,
 }
 
-#[allow(dead_code)]
 impl CausalAttentionTcScratchBuffers {
     pub fn new(
         stream: &CudaStream,
