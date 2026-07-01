@@ -70,27 +70,21 @@ impl NextLatBuffers {
     }
 
     pub(super) fn input_quantize(&mut self) -> RowwiseQuantizeBuffers<'_> {
-        RowwiseQuantizeBuffers {
-            input: &self.normalized,
-            amax: &mut self.normalized_amax,
-            out: self.input_quant.out(),
-        }
+        RowwiseQuantizeBuffers::new(&self.normalized, &mut self.normalized_amax, &mut self.input_quant)
     }
 
     pub(super) fn act1_quantize(&mut self) -> RowwiseQuantizeBuffers<'_> {
-        RowwiseQuantizeBuffers {
-            input: &self.act1,
-            amax: &mut self.normalized_amax,
-            out: self.act1_quant.out(),
-        }
+        RowwiseQuantizeBuffers::new(&self.act1, &mut self.normalized_amax, &mut self.act1_quant)
     }
 
     pub(super) fn act2_quantize(&mut self) -> RowwiseQuantizeBuffers<'_> {
-        RowwiseQuantizeBuffers {
-            input: &self.act2,
-            amax: &mut self.normalized_amax,
-            out: self.act2_quant.out(),
-        }
+        RowwiseQuantizeBuffers::new(&self.act2, &mut self.normalized_amax, &mut self.act2_quant)
+    }
+}
+
+impl<'a> RowwiseQuantizeBuffers<'a> {
+    fn new(input: &'a DeviceBuffer<f32>, amax: &'a mut DeviceBuffer<f32>, out: &'a mut NextLatRowwiseBuffers) -> Self {
+        Self { input, amax, out: out.out() }
     }
 }
 
