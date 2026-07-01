@@ -97,11 +97,9 @@ fn slot_buffers(
     stream: &CudaStream,
     values: &[f32],
 ) -> Result<Vec<DeviceBuffer<f32>>, Box<dyn Error>> {
-    let mut out = Vec::with_capacity(SLOT_COUNT);
-    for _ in 0..SLOT_COUNT {
-        out.push(DeviceBuffer::from_host(stream, values)?);
-    }
-    Ok(out)
+    (0..SLOT_COUNT)
+        .map(|_| DeviceBuffer::from_host(stream, values).map_err(Into::into))
+        .collect()
 }
 
 fn fill_slot_buffers(
@@ -119,9 +117,7 @@ fn zero_slot_buffers<T>(
 where
     T: DeviceCopy,
 {
-    let mut out = Vec::with_capacity(SLOT_COUNT);
-    for _ in 0..SLOT_COUNT {
-        out.push(DeviceBuffer::<T>::zeroed(stream, len)?);
-    }
-    Ok(out)
+    (0..SLOT_COUNT)
+        .map(|_| DeviceBuffer::<T>::zeroed(stream, len).map_err(Into::into))
+        .collect()
 }
