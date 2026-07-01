@@ -1,9 +1,6 @@
 use std::{fs, io, path::PathBuf};
 
-use super::{
-    candidate::{Candidate, MIN_N_LAYER},
-    history::Trial,
-};
+use super::{candidate::Candidate, history::Trial};
 
 mod parse;
 mod record;
@@ -33,19 +30,7 @@ impl Baseline {
     }
 
     pub fn measured_trial(&self) -> Option<Trial> {
-        let record = self.record.as_ref()?;
-        Some(Trial {
-            candidate: record.candidate.clone(),
-            status: "success".to_string(),
-            val_loss: Some(record.val_loss),
-            completed_steps: record.completed_steps,
-            elapsed_s: record.elapsed_s,
-            screen_val_loss: record.screen_loss,
-            screen_completed_steps: record.screen_completed_steps,
-            screen_elapsed_s: record.screen_elapsed_s,
-            screen_reason: record.screen_reason.clone(),
-            log_path: record.log_path.clone(),
-        })
+        self.record.as_ref().map(Record::measured_trial)
     }
 
     pub fn promote_trial(&mut self, trial: &Trial, dry_run: bool) -> io::Result<bool> {
@@ -53,7 +38,7 @@ impl Baseline {
             return Ok(false);
         }
 
-        let Some(record) = trial_record(trial) else {
+        let Some(record) = Record::from_trial(trial) else {
             return Ok(false);
         };
 
@@ -77,21 +62,4 @@ impl Baseline {
             .as_ref()
             .map_or(Ok(()), |record| write::record(&self.path, record))
     }
-}
-
-fn trial_record(trial: &Trial) -> Option<Record> {
-    if trial.status != "success" || trial.candidate.n_layer < MIN_N_LAYER {
-        return None;
-    }
-    Some(Record {
-        val_loss: trial.val_loss.filter(|loss| loss.is_finite())?,
-        completed_steps: trial.completed_steps,
-        elapsed_s: trial.elapsed_s,
-        screen_loss: trial.screen_val_loss,
-        screen_completed_steps: trial.screen_completed_steps,
-        screen_elapsed_s: trial.screen_elapsed_s,
-        screen_reason: trial.screen_reason.clone(),
-        log_path: trial.log_path.clone(),
-        candidate: trial.candidate.clone(),
-    })
 }
