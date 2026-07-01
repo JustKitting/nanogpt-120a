@@ -1,7 +1,4 @@
-use gpt2_nvfp4::{
-    HiddenStateDevice, MlpForwardArgs, MlpProjectionTensors, MlpScratch, MlpWeights,
-    GPT2_CONTEXT_LEN,
-};
+use gpt2_nvfp4::{HiddenStateDevice, MlpForwardArgs, MlpScratch, MlpWeights, GPT2_CONTEXT_LEN};
 use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
@@ -32,10 +29,7 @@ pub fn run() -> TestResult {
             pre_activation: &mut scratch.pre_activation,
             activation: &mut scratch.activation,
         },
-        projections: MlpProjectionTensors {
-            up: weights.up_tensors(),
-            down: weights.down_tensors(),
-        },
+        projections: weights.projections(),
         hidden: HiddenStateDevice {
             stream: &stream,
             batch_size: 1,

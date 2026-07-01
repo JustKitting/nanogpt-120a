@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
 use cuda_core::{CudaStream, DeviceBuffer};
-use gpt2_nvfp4::{Gpt2BlockWeights, LayerNormTensors, LayerNormWeights, Nvfp4Shape, Nvfp4Tensor};
+use gpt2_nvfp4::{
+    AttentionProjectionTensors, Gpt2BlockWeights, LayerNormTensors, LayerNormWeights,
+    MlpDownTensors, MlpProjectionTensors, MlpUpTensors, Nvfp4Shape, Nvfp4Tensor,
+};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
@@ -25,6 +28,30 @@ impl UploadedNvfp4 {
     }
 }
 
+pub fn attention_projection_tensors<'a>(
+    qkv_weight: &'a UploadedNvfp4,
+    qkv_bias: &'a UploadedNvfp4,
+    c_proj_weight: &'a UploadedNvfp4,
+    c_proj_bias: &'a UploadedNvfp4,
+) -> AttentionProjectionTensors<'a> {
+    AttentionProjectionTensors {
+        qkv_weight: qkv_weight.mma(), qkv_bias: qkv_bias.device(),
+        c_proj_weight: c_proj_weight.mma(), c_proj_bias: c_proj_bias.device(),
+    }
+}
+
+pub fn mlp_projection_tensors<'a>(
+    up_weight: &'a UploadedNvfp4,
+    up_bias: &'a UploadedNvfp4,
+    down_weight: &'a UploadedNvfp4,
+    down_bias: &'a UploadedNvfp4,
+) -> MlpProjectionTensors<'a> {
+    MlpProjectionTensors {
+        up: MlpUpTensors { weight: up_weight.mma(), bias: up_bias.device() },
+        down: MlpDownTensors { weight: down_weight.mma(), bias: down_bias.device() },
+    }
+}
+
 pub struct UploadedPair {
     pub weight: UploadedNvfp4,
     pub bias: UploadedNvfp4,
@@ -35,10 +62,7 @@ pub type UploadedLinear = UploadedPair;
 
 impl UploadedPair {
     pub fn tensors(&self) -> LayerNormTensors<'_> {
-        LayerNormTensors {
-            weight: self.weight.device(),
-            bias: self.bias.device(),
-        }
+        LayerNormTensors { weight: self.weight.device(), bias: self.bias.device() }
     }
 }
 
@@ -49,6 +73,16 @@ pub struct UploadedBlock {
     pub ln_2: UploadedLayerNorm,
     pub mlp_up: UploadedLinear,
     pub mlp_down: UploadedLinear,
+}
+
+impl UploadedBlock {
+    pub fn attention_tensors(&self) -> AttentionProjectionTensors<'_> {
+        attention_projection_tensors(&self.attn_qkv.weight, &self.attn_qkv.bias, &self.attn_c_proj.weight, &self.attn_c_proj.bias)
+    }
+
+    pub fn mlp_tensors(&self) -> MlpProjectionTensors<'_> {
+        mlp_projection_tensors(&self.mlp_up.weight, &self.mlp_up.bias, &self.mlp_down.weight, &self.mlp_down.bias)
+    }
 }
 
 pub fn upload_block(stream: &CudaStream, block: &Gpt2BlockWeights) -> TestResult<UploadedBlock> {

@@ -1,10 +1,9 @@
 use cuda_core::CudaStream;
 use gpt2_nvfp4::{
-    HiddenVectorShape, MlpDownTensors, MlpDownWeightShape, MlpUpTensors, MlpUpWeightShape,
-    MlpVectorShape,
+    HiddenVectorShape, MlpDownWeightShape, MlpProjectionTensors, MlpUpWeightShape, MlpVectorShape,
 };
 
-use crate::common::upload::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult, UploadedNvfp4};
+use crate::common::upload::{mlp_projection_tensors, upload_nvfp4_bytes, upload_zero_nvfp4, TestResult, UploadedNvfp4};
 use crate::data::{mlp_down_identity_weight_bytes, mlp_up_repeat_weight_bytes};
 
 pub struct WeightBuffers {
@@ -27,17 +26,7 @@ impl WeightBuffers {
         })
     }
 
-    pub fn up_tensors(&self) -> MlpUpTensors<'_> {
-        MlpUpTensors {
-            weight: self.up_weight.mma(),
-            bias: self.up_bias.device(),
-        }
-    }
-
-    pub fn down_tensors(&self) -> MlpDownTensors<'_> {
-        MlpDownTensors {
-            weight: self.down_weight.mma(),
-            bias: self.down_bias.device(),
-        }
+    pub fn projections(&self) -> MlpProjectionTensors<'_> {
+        mlp_projection_tensors(&self.up_weight, &self.up_bias, &self.down_weight, &self.down_bias)
     }
 }

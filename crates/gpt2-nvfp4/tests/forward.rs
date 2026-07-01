@@ -1,7 +1,6 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionProjectionTensors, Gpt2, Gpt2ForwardArgs, MlpDownTensors, MlpProjectionTensors,
-    MlpUpTensors, TokenEmbeddingArgs, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    Gpt2, Gpt2ForwardArgs, TokenEmbeddingArgs, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::embedding::EmbeddingModule;
@@ -73,24 +72,10 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
         hidden_nvfp4: scratch.hidden_nvfp4.scratch(),
         attention_tc_scratch: scratch.attention_tc.args(),
         mlp_activation_nvfp4: scratch.mlp_activation_nvfp4.scratch(),
-        attention: std::array::from_fn(|i| AttentionProjectionTensors {
-            qkv_weight: blocks[i].attn_qkv.weight.mma(),
-            qkv_bias: blocks[i].attn_qkv.bias.device(),
-            c_proj_weight: blocks[i].attn_c_proj.weight.mma(),
-            c_proj_bias: blocks[i].attn_c_proj.bias.device(),
-        }),
+        attention: std::array::from_fn(|i| blocks[i].attention_tensors()),
         block_ln_1: std::array::from_fn(|i| blocks[i].ln_1.tensors()),
         block_ln_2: std::array::from_fn(|i| blocks[i].ln_2.tensors()),
-        mlp: std::array::from_fn(|i| MlpProjectionTensors {
-            up: MlpUpTensors {
-                weight: blocks[i].mlp_up.weight.mma(),
-                bias: blocks[i].mlp_up.bias.device(),
-            },
-            down: MlpDownTensors {
-                weight: blocks[i].mlp_down.weight.mma(),
-                bias: blocks[i].mlp_down.bias.device(),
-            },
-        }),
+        mlp: std::array::from_fn(|i| blocks[i].mlp_tensors()),
         ln_f: ln_f.tensors(),
         attention_qkv: &mut scratch.qkv,
         attention_log_sum_exp: &mut scratch.attention_log_sum_exp,

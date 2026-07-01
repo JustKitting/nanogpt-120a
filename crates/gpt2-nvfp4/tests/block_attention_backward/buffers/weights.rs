@@ -5,7 +5,7 @@ use gpt2_nvfp4::{
 };
 
 use crate::common::nvfp4::{E2M1_MIN_PAIR, E2M1_ONE_PAIR};
-use crate::common::upload::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult, UploadedNvfp4};
+use crate::common::upload::{attention_projection_tensors, upload_nvfp4_bytes, upload_zero_nvfp4, TestResult, UploadedNvfp4};
 
 pub struct WeightBuffers {
     qkv_weight: UploadedNvfp4,
@@ -36,12 +36,7 @@ impl WeightBuffers {
     }
 
     pub fn projections(&self) -> AttentionProjectionTensors<'_> {
-        AttentionProjectionTensors {
-            qkv_weight: self.qkv_weight.mma(),
-            qkv_bias: self.qkv_bias.device(),
-            c_proj_weight: self.c_proj_weight.mma(),
-            c_proj_bias: self.c_proj_bias.device(),
-        }
+        attention_projection_tensors(&self.qkv_weight, &self.qkv_bias, &self.c_proj_weight, &self.c_proj_bias)
     }
 }
 
