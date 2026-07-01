@@ -11,56 +11,54 @@ pub struct RunResult {
 impl RunResult {
     pub fn update(&mut self, line: &str) {
         if line.starts_with("step=") {
-            if let Some(step) = field(line, "step=").and_then(parse_usize) {
+            if let Some(step) = usize_field(line, "step=") {
                 self.last_step = Some(step);
                 self.completed_steps = Some(step + 1);
             }
-            self.last_elapsed_s = field(line, "elapsed_s=").and_then(parse_f64);
-            self.last_train_loss = field(line, "loss=").and_then(parse_f64);
+            self.last_elapsed_s = f64_field(line, "elapsed_s=");
+            self.last_train_loss = f64_field(line, "loss=");
         }
         if line.starts_with("TrainingProgress ") {
-            if let Some(step) = debug_field(line, "iteration: Some(").and_then(parse_usize) {
+            if let Some(step) = debug_usize(line, "iteration: Some(") {
                 self.last_step = Some(step);
             }
-            if let Some(steps) = debug_field(line, "global_progress: Progress { items_processed: ")
-                .and_then(parse_usize)
-            {
+            if let Some(steps) = debug_usize(line, "global_progress: Progress { items_processed: ") {
                 self.completed_steps = Some(steps);
             }
         }
-        if line.contains("loss=NaN") || line.contains("finite=false") {
-            self.saw_nan = true;
-        }
+        self.saw_nan |= line.contains("loss=NaN") || line.contains("finite=false");
         if line.starts_with("stopped_by_wall_clock=true") {
-            self.completed_steps = field(line, "completed_steps=").and_then(parse_usize);
-            self.last_elapsed_s = field(line, "elapsed_s=").and_then(parse_f64);
+            self.completed_steps = usize_field(line, "completed_steps=");
+            self.last_elapsed_s = f64_field(line, "elapsed_s=");
         }
         if line.starts_with("heldout_eval ") {
-            self.val_loss = field(line, "val_loss=").and_then(parse_f64);
-            self.completed_steps = field(line, "completed_steps=").and_then(parse_usize);
-            self.last_elapsed_s = field(line, "train_elapsed_s=").and_then(parse_f64);
+            self.val_loss = f64_field(line, "val_loss=");
+            self.completed_steps = usize_field(line, "completed_steps=");
+            self.last_elapsed_s = f64_field(line, "train_elapsed_s=");
         }
     }
 }
 
-pub(super) fn field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
-    let start = line.find(prefix)? + prefix.len();
-    let value = &line[start..];
+fn field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
+    let value = &line[line.find(prefix)? + prefix.len()..];
     Some(value.split_whitespace().next().unwrap_or(value))
 }
 
 fn debug_field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
-    let start = line.find(prefix)? + prefix.len();
-    let value = &line[start..];
+    let value = &line[line.find(prefix)? + prefix.len()..];
     Some(value.split([',', ')', '}']).next().unwrap_or(value).trim())
 }
 
-pub(super) fn parse_f64(value: &str) -> Option<f64> {
-    value.parse::<f64>().ok().filter(|value| value.is_finite())
+pub(super) fn f64_field(line: &str, prefix: &str) -> Option<f64> {
+    field(line, prefix)?.parse::<f64>().ok().filter(|value| value.is_finite())
 }
 
-pub(super) fn parse_usize(value: &str) -> Option<usize> {
-    value.parse().ok()
+pub(super) fn usize_field(line: &str, prefix: &str) -> Option<usize> {
+    field(line, prefix)?.parse().ok()
+}
+
+fn debug_usize(line: &str, prefix: &str) -> Option<usize> {
+    debug_field(line, prefix)?.parse().ok()
 }
 
 #[cfg(test)]

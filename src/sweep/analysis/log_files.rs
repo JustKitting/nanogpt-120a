@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use super::super::history::Trial;
-use super::super::parse::{field, parse_f64, parse_usize};
+use super::super::parse::{f64_field, usize_field};
 use super::logs::LogMetrics;
 
 pub fn screen_path(trial: &Trial) -> PathBuf {
@@ -28,13 +28,13 @@ pub fn read_log(path: impl Into<Option<PathBuf>>) -> Option<LogMetrics> {
         metrics.saw_nan |= line.contains("loss=NaN") || line.contains("finite=false");
         metrics.panicked |= line.contains("panicked at") || line.contains("assertion failed");
         if line.starts_with("stopped_by_wall_clock=true") {
-            metrics.elapsed_s = field(line, "elapsed_s=").and_then(parse_f64);
-            metrics.completed_steps = field(line, "completed_steps=").and_then(parse_usize);
+            metrics.elapsed_s = f64_field(line, "elapsed_s=");
+            metrics.completed_steps = usize_field(line, "completed_steps=");
         }
         if line.starts_with("heldout_eval ") {
-            metrics.val_loss = field(line, "val_loss=").and_then(parse_f64);
-            metrics.elapsed_s = field(line, "train_elapsed_s=").and_then(parse_f64);
-            metrics.completed_steps = field(line, "completed_steps=").and_then(parse_usize);
+            metrics.val_loss = f64_field(line, "val_loss=");
+            metrics.elapsed_s = f64_field(line, "train_elapsed_s=");
+            metrics.completed_steps = usize_field(line, "completed_steps=");
         }
     }
     Some(metrics)
