@@ -1,27 +1,28 @@
-use std::error::Error;
-
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
     AttentionBackwardModules, AttentionProjectionTensors, AttentionQkvBackwardArgs, GPT2_N_EMBD,
-    GPT2_QKV, HiddenState, qkv_projection_backward,
+    GPT2_QKV, HiddenState, HiddenVectorShape, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
+    qkv_projection_backward,
 };
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
-use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-use rust_kernels_cuda::nvfp4::{Nvfp4DecodeModule, Nvfp4DeviceTensor};
+use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
 mod common;
+#[path = "common/upload.rs"]
+mod upload_common;
 #[path = "qkv_projection_backward/data.rs"]
 mod data;
 #[path = "qkv_projection_backward/scratch.rs"]
 mod scratch;
 
 use common::{assert_nonzero_finite, cuda_test_context};
+use upload_common::{TestResult, upload_nvfp4_bytes, upload_zero_nvfp4};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
-fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Error>> {
+fn qkv_projection_backward_runs_linear_ms_eden_path() -> TestResult {
     let (_, stream, ptx) = cuda_test_context()?;
     let transpose = TransposeModule::from_module(ptx.clone())?;
     let decode = Nvfp4DecodeModule::from_module(ptx.clone())?;
@@ -31,14 +32,9 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
     let qkv_input_bytes = DeviceBuffer::from_host(&stream, &data::qkv_input_bytes())?;
     let qkv_input_scales = DeviceBuffer::from_host(&stream, &data::hidden_scales())?;
     let qkv_input_globals = DeviceBuffer::from_host(&stream, &data::row_global_scales())?;
-    let qkv_weight_bytes = DeviceBuffer::from_host(&stream, &data::qkv_weight_bytes())?;
-    let qkv_weight_scales = DeviceBuffer::from_host(&stream, &data::one_scales())?;
-    let zero_bytes = DeviceBuffer::from_host(&stream, &data::zero_bytes())?;
-    let one_scales = DeviceBuffer::from_host(&stream, &data::one_scales())?;
     let d_qkv = DeviceBuffer::from_host(&stream, &data::d_qkv_values())?;
     let dummy_f32 = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
     let dummy_u16 = DeviceBuffer::<u16>::zeroed(&stream, 1)?;
-    let global_scale = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
 
     let saved = data::saved_block(
         &qkv_input_bytes,
@@ -47,15 +43,15 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
         &dummy_f32,
         &dummy_u16,
     );
+    let qkv_weight = upload_nvfp4_bytes::<QkvWeightShape>(&stream, data::qkv_weight_bytes())?;
+    let qkv_bias = upload_zero_nvfp4::<QkvVectorShape>(&stream)?;
+    let c_proj_weight = upload_zero_nvfp4::<ResidualWeightShape>(&stream)?;
+    let c_proj_bias = upload_zero_nvfp4::<HiddenVectorShape>(&stream)?;
     let projections = AttentionProjectionTensors {
-        qkv_weight: Nvfp4FourSixMmaWeightTensor::new(
-            &qkv_weight_bytes,
-            &qkv_weight_scales,
-            &global_scale,
-        ),
-        qkv_bias: Nvfp4DeviceTensor::new(&zero_bytes, &one_scales, &global_scale),
-        c_proj_weight: Nvfp4FourSixMmaWeightTensor::new(&zero_bytes, &one_scales, &global_scale),
-        c_proj_bias: Nvfp4DeviceTensor::new(&zero_bytes, &one_scales, &global_scale),
+        qkv_weight: qkv_weight.mma(),
+        qkv_bias: qkv_bias.device(),
+        c_proj_weight: c_proj_weight.mma(),
+        c_proj_bias: c_proj_bias.device(),
     };
     let mut scratch = scratch::QkvBackwardScratch::new(&stream)?;
     let mut d_ln_1_normalized = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
