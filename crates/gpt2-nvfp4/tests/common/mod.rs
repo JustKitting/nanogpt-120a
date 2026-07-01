@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{path::PathBuf, sync::Arc};
 
 use cuda_core::{CudaContext, CudaModule, CudaStream, DriverError};
@@ -31,23 +33,19 @@ pub fn cuda_test_context() -> Result<CudaTestContext, DriverError> {
     Ok((ctx, stream, ptx))
 }
 
-#[allow(dead_code)]
 pub fn assert_nonzero_finite(values: &[f32]) {
     assert!(values.iter().all(|value| value.is_finite()));
     assert!(values.iter().any(|value| value.abs() > 0.0));
 }
 
-#[allow(dead_code)]
 pub fn float_bits(values: &[f32]) -> Vec<u32> {
     values.iter().map(|value| value.to_bits()).collect()
 }
 
-#[allow(dead_code)]
 pub fn row_ones() -> Vec<f32> {
     vec![1.0; GPT2_TOKEN_ROWS]
 }
 
-#[allow(dead_code)]
 pub fn attention_log_sum_exp_values() -> Vec<f32> {
     let mut log_sum_exp = vec![0.0_f32; AttentionLogSumExp::LEN];
     for batch in 0..GPT2_BATCH_SIZE {

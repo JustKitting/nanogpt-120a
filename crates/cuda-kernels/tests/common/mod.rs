@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{path::PathBuf, sync::Arc};
 
 use cuda_core::{CudaContext, CudaModule, CudaStream, DriverError};
@@ -36,7 +38,6 @@ pub fn cuda_test_module<M>(
     Ok((ctx, stream, load(ptx)?))
 }
 
-#[allow(dead_code)]
 pub fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
     actual
         .iter()
@@ -44,7 +45,6 @@ pub fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
         .fold(0.0, |max, (a, e)| max.max((a - e).abs()))
 }
 
-#[allow(dead_code)]
 pub fn assert_close(actual: f32, expected: f32, tolerance: f32) {
     let error = (actual - expected).abs();
     assert!(
@@ -53,14 +53,12 @@ pub fn assert_close(actual: f32, expected: f32, tolerance: f32) {
     );
 }
 
-#[allow(dead_code)]
 pub fn assert_all_close(actual: &[f32], expected: f32, tolerance: f32) {
     for actual in actual {
         assert_close(*actual, expected, tolerance);
     }
 }
 
-#[allow(dead_code)]
 pub fn assert_slice_close(actual: &[f32], expected: &[f32], tolerance: f32) {
     assert_eq!(actual.len(), expected.len());
     for (actual, expected) in actual.iter().zip(expected) {
