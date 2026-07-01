@@ -1,6 +1,6 @@
 use std::error::Error;
 
-#[path = "polar_gram_ns/device.rs"]
+#[path = "polar_gram_ns/device/mod.rs"]
 mod device;
 #[path = "polar_gram_ns/reference.rs"]
 mod reference;
