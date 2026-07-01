@@ -1,36 +1,17 @@
+mod config;
+
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::optimizer::{AdamWUpdateArgs, OptimizerModule};
 
 use crate::upload::UploadedNvfp4;
 
+use config::{ADAM_BETA1, ADAM_BETA2, ADAM_EPS, ADAM_WEIGHT_DECAY};
+pub(crate) use config::adam_debug_config;
+pub(super) use config::{adam_learning_rate, next_latent_adam_learning_rate};
+
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::AdamState;
 use super::timed_ms;
-
-const ADAM_LR: f32 = 2.0e-4;
-const ADAM_WEIGHT_DECAY: f32 = 0.005;
-const ADAM_BETA1: f32 = 0.9;
-const ADAM_BETA2: f32 = 0.95;
-const ADAM_EPS: f32 = 1.0e-10;
-
-#[derive(Clone, Copy)]
-pub(crate) struct AdamDebugConfig {
-    pub learning_rate: f32,
-    pub weight_decay: f32,
-    pub beta1: f32,
-    pub beta2: f32,
-    pub beta1_correction: f32,
-    pub beta2_correction: f32,
-    pub eps: f32,
-}
-
-pub(super) fn adam_learning_rate(step: u32) -> f32 {
-    ADAM_LR * super::super::learning_rate::adam_multiplier(step)
-}
-
-pub(super) fn next_latent_adam_learning_rate(step: u32) -> f32 {
-    ADAM_LR * super::super::learning_rate::next_latent_adam_multiplier(step)
-}
 
 pub(super) struct AdamUpdate<'a, 'scratch> {
     stream: &'a CudaStream,
@@ -114,17 +95,5 @@ impl<'a, 'scratch> AdamUpdate<'a, 'scratch> {
         state: &mut AdamState,
     ) -> Result<f64, DriverError> {
         timed_ms(|| self.update(tensor, grad, state))
-    }
-}
-
-pub(crate) fn adam_debug_config(step: u32) -> AdamDebugConfig {
-    AdamDebugConfig {
-        learning_rate: adam_learning_rate(step),
-        weight_decay: ADAM_WEIGHT_DECAY,
-        beta1: ADAM_BETA1,
-        beta2: ADAM_BETA2,
-        beta1_correction: 1.0 - ADAM_BETA1.powi(step as i32),
-        beta2_correction: 1.0 - ADAM_BETA2.powi(step as i32),
-        eps: ADAM_EPS,
     }
 }
