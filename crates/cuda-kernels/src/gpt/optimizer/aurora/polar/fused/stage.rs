@@ -1,8 +1,17 @@
-use cuda_device::{SharedArray, thread};
+use cuda_device::{thread, SharedArray};
 
 use crate::device_ptr::read_f32;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
-use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
+use crate::f16_tc_matmul::cta_tile::{CtaTile, CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS};
+
+macro_rules! stage_four_offsets {
+    ($stage:ident($($arg:expr),+), $offset:expr) => {{
+        $stage($($arg,)+ $offset);
+        $stage($($arg,)+ $offset + CTA_THREADS);
+        $stage($($arg,)+ $offset + CTA_THREADS * 2);
+        $stage($($arg,)+ $offset + CTA_THREADS * 3);
+    }};
+}
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 pub(super) fn stage_tiles(
@@ -18,41 +27,10 @@ pub(super) fn stage_tiles(
     rhs_transposed: bool,
 ) {
     let offset = thread::threadIdx_x();
-    stage_a(a, a_tile, tile, m, k, k_base, offset);
-    stage_a(a, a_tile, tile, m, k, k_base, offset + CTA_THREADS);
-    stage_a(a, a_tile, tile, m, k, k_base, offset + CTA_THREADS * 2);
-    stage_a(a, a_tile, tile, m, k, k_base, offset + CTA_THREADS * 3);
-
-    stage_b(b, b_tile, tile, n, k, k_base, rhs_transposed, offset);
-    stage_b(
-        b,
-        b_tile,
-        tile,
-        n,
-        k,
-        k_base,
-        rhs_transposed,
-        offset + CTA_THREADS,
-    );
-    stage_b(
-        b,
-        b_tile,
-        tile,
-        n,
-        k,
-        k_base,
-        rhs_transposed,
-        offset + CTA_THREADS * 2,
-    );
-    stage_b(
-        b,
-        b_tile,
-        tile,
-        n,
-        k,
-        k_base,
-        rhs_transposed,
-        offset + CTA_THREADS * 3,
+    stage_four_offsets!(stage_a(a, a_tile, tile, m, k, k_base), offset);
+    stage_four_offsets!(
+        stage_b(b, b_tile, tile, n, k, k_base, rhs_transposed),
+        offset
     );
 }
 
