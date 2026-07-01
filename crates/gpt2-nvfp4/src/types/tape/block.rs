@@ -3,7 +3,7 @@ use rust_kernels_cuda::f16_tc_matmul::{F16ConvertArgs, F16TcMatmulModule};
 
 use super::device_copy::copy_device;
 use super::types::BlockForwardTape;
-use crate::types::BlockForwardSaved;
+use crate::types::{AttentionForwardTape, BlockForwardSaved, MlpForwardTape};
 
 impl<'a> BlockForwardTape<'a> {
     pub(super) fn saved(
@@ -41,6 +41,22 @@ impl<'a> BlockForwardTape<'a> {
             mlp_up_input_nvfp4: self.mlp_up_input_nvfp4.reborrow(),
             mlp_up: &mut *self.mlp_up,
             mlp_down_input_nvfp4: self.mlp_down_input_nvfp4.reborrow(),
+        }
+    }
+
+    pub(crate) fn attention_forward(&mut self) -> AttentionForwardTape<'_> {
+        AttentionForwardTape {
+            qkv_input_nvfp4: self.qkv_input_nvfp4.reborrow(),
+            qkv_f16: &mut *self.qkv,
+            attention_out_f16: &mut *self.attention_out,
+            c_proj_input_nvfp4: self.c_proj_input_nvfp4.reborrow(),
+        }
+    }
+
+    pub(crate) fn mlp_forward(&mut self) -> MlpForwardTape<'_> {
+        MlpForwardTape {
+            up_input_nvfp4: self.mlp_up_input_nvfp4.reborrow(),
+            down_input_nvfp4: self.mlp_down_input_nvfp4.reborrow(),
         }
     }
 
