@@ -8,8 +8,9 @@ mod kda_clip;
 mod layer_norm;
 mod next_latent;
 mod skip;
+mod types;
 mod utils;
 
 pub(crate) use adam::adam_debug_config;
-pub use apply::{apply_weight_updates, WeightUpdateArgs};
+pub use {apply::apply_weight_updates, types::WeightUpdateArgs};
 use utils::timed_ms;
