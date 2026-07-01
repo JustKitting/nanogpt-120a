@@ -82,10 +82,5 @@ fn generation_batch(tokens: &[u32], pad_token: u32) -> AppResult<(Vec<u16>, u32)
         *dst = u16::try_from(token)?;
     }
 
-    let mut windows = Vec::with_capacity(GPT2_BATCH_SIZE * window_len);
-    for _ in 0..GPT2_BATCH_SIZE {
-        windows.extend_from_slice(&one);
-    }
-
-    Ok((windows, row))
+    Ok((one.repeat(GPT2_BATCH_SIZE), row))
 }
