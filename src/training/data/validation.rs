@@ -26,8 +26,7 @@ pub(super) fn validation_windows(path: &Path, tokens: &[u16], start: usize) -> A
 }
 
 pub(super) fn train_end(token_count: usize) -> usize {
-    let validation_tokens = VALIDATION_WINDOWS * (GPT2_SEQ_LEN + 1);
     token_count
-        .saturating_sub(validation_tokens)
+        .saturating_sub(VALIDATION_WINDOWS * (GPT2_SEQ_LEN + 1))
         .max(GPT2_SEQ_LEN + 1)
 }
