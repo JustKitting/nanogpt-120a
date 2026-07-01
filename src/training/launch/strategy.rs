@@ -11,6 +11,7 @@ use super::{CudaLearningComponents, TrainConfig};
 
 mod artifacts;
 mod budget;
+mod events;
 mod run;
 mod validation;
 

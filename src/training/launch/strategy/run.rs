@@ -1,20 +1,17 @@
-use std::sync::Arc;
-
 use burn::train::{
     EventProcessorTraining, Interrupter, LearnerEvent, SupervisedTrainingEventProcessor,
-    TrainLoader, TrainingItem, ValidLoader,
+    TrainLoader, ValidLoader,
 };
 
 use super::{
     artifacts::finish_training_artifacts,
     budget::WallClockBudget,
-    epoch_progress,
+    events::process_train_step,
     validation::{process_validation, validation_input},
     CudaTrainingStrategy, TRAIN_EPOCH,
 };
 use crate::training::launch::{
     config::{load_model_path, should_eval_step, should_log_step},
-    metrics::CudaTrainOutput,
     CudaLearningComponents,
 };
 use crate::training::{debug_metrics, Trainer};
@@ -45,27 +42,19 @@ impl CudaTrainingStrategy {
             let step = completed_steps;
             let log_step = should_log_step(step, self.config.step_cap, self.config.log_interval);
             let window = item.map_err(|err| format!("training dataloader failed: {err}"))?;
-            let source = window.source.display().to_string();
             let batch = trainer.upload_default_batch(&mut train_batch, &window.tokens)?;
             let stats = trainer.train_step(batch, log_step)?;
             completed_steps = step + 1;
 
             if log_step {
-                let output = CudaTrainOutput {
-                    source,
-                    window_offset: window.offset,
-                    batch_size: window.batch_size,
-                    seq_len: window.seq_len,
-                    stats: Arc::new(stats),
-                };
-                debug_logger.log_train_step(step, &output)?;
-                processor.process_train(LearnerEvent::ProcessedItem(TrainingItem::new(
-                    output,
+                process_train_step(
+                    &mut debug_logger,
+                    processor,
+                    step,
+                    &window,
+                    stats,
                     train_iter.progress(),
-                    epoch_progress(),
-                    Some(step),
-                    None,
-                )));
+                )?;
             }
 
             if should_eval_step(step, self.config.step_cap, self.config.eval_interval) {
@@ -74,7 +63,11 @@ impl CudaTrainingStrategy {
 
             let stopped_by_burn = interrupter.should_stop();
             if stopped_by_burn || wall_clock.expired() {
-                let reason = if stopped_by_burn { "burn_interrupter" } else { "wall_clock" };
+                let reason = if stopped_by_burn {
+                    "burn_interrupter"
+                } else {
+                    "wall_clock"
+                };
                 println!(
                     "stopped_by_{reason}=true elapsed_s={:.3} completed_steps={completed_steps}",
                     wall_clock.elapsed_seconds(),
