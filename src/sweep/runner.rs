@@ -59,8 +59,7 @@ pub fn run(config: SweepConfig) -> SweepResult {
             trial.log_path.display()
         );
         history.append_unique(trial.clone())?;
-        let promoted = baseline.promote_trial(&trial, config.dry_run)?;
-        if promoted {
+        if baseline.promote_trial(&trial, config.dry_run)? {
             if let Some(loss) = promoted_screen_loss(&trial) {
                 baseline_screen_loss = Some(loss);
                 baseline_screen_trial = Some(trial.clone());
