@@ -22,7 +22,9 @@ impl Nvfp4QuantModule {
             args.dst_row_len,
             args.transpose_dst_row_len,
         ) {
-            if let Some(pow2) = no_pad.pow2() {
+            if let Some((chunks_per_row_shift, transpose_chunks_per_row_shift)) =
+                no_pad.pow2_shifts()
+            {
                 return Some(
                     self.ms_eden_fp32_pair
                         .fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel(
@@ -38,8 +40,8 @@ impl Nvfp4QuantModule {
                             &*args.out_global_scale,
                             row_pack.grid_dim,
                             args.src_row_len,
-                            pow2.chunks_per_row_shift,
-                            pow2.transpose_chunks_per_row_shift,
+                            chunks_per_row_shift,
+                            transpose_chunks_per_row_shift,
                             args.scale_override,
                             args.sign_seed,
                             args.scale_seed,
