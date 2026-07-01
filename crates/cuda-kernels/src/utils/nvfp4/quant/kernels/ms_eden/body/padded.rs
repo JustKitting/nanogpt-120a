@@ -71,31 +71,7 @@ macro_rules! ms_eden_padded_body {
     };
 }
 
-ms_eden_padded_body!(
-    fp32_to_nvfp4_ms_eden_body,
-    hadamard_input,
-    [src_row_len, dst_row_len],
-    dst_row_len,
-    chunk_amax
-);
-ms_eden_padded_body!(
-    fp32_to_nvfp4_ms_eden_body_no_chunk_amax,
-    hadamard_input,
-    [src_row_len, dst_row_len],
-    dst_row_len,
-    no_chunk_amax
-);
-ms_eden_padded_body!(
-    fp32_transpose_to_nvfp4_ms_eden_body,
-    transposed_hadamard_input,
-    [source_rows, dst_row_len, source_cols],
-    dst_row_len,
-    chunk_amax
-);
-ms_eden_padded_body!(
-    fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax,
-    transposed_hadamard_input,
-    [source_rows, dst_row_len, source_cols],
-    dst_row_len,
-    no_chunk_amax
-);
+ms_eden_padded_body!(fp32_to_nvfp4_ms_eden_body, hadamard_input, [src_row_len, dst_row_len], dst_row_len, chunk_amax);
+ms_eden_padded_body!(fp32_to_nvfp4_ms_eden_body_no_chunk_amax, hadamard_input, [src_row_len, dst_row_len], dst_row_len, no_chunk_amax);
+ms_eden_padded_body!(fp32_transpose_to_nvfp4_ms_eden_body, transposed_hadamard_input, [source_rows, dst_row_len, source_cols], dst_row_len, chunk_amax);
+ms_eden_padded_body!(fp32_transpose_to_nvfp4_ms_eden_body_no_chunk_amax, transposed_hadamard_input, [source_rows, dst_row_len, source_cols], dst_row_len, no_chunk_amax);
