@@ -18,6 +18,8 @@ mod buffers;
 mod common;
 #[path = "block_attention_backward/data.rs"]
 mod data;
+#[path = "common/saved_block.rs"]
+mod saved_block;
 #[path = "common/nvfp4.rs"]
 mod nvfp4_common;
 #[path = "common/upload.rs"]

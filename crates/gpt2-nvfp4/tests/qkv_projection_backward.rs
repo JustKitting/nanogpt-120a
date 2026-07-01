@@ -5,11 +5,13 @@ use gpt2_nvfp4::{
     qkv_projection_backward,
 };
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
-use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
+use rust_kernels_cuda::nvfp4::{Nvfp4DecodeModule, Nvfp4RowwiseDeviceTensor};
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
 mod common;
+#[path = "common/saved_block.rs"]
+mod saved_block;
 #[path = "common/upload.rs"]
 mod upload_common;
 #[path = "qkv_projection_backward/data.rs"]
@@ -18,6 +20,7 @@ mod data;
 mod scratch;
 
 use common::{assert_nonzero_finite, cuda_test_context};
+use saved_block::{SavedBlockParts, saved_block};
 use upload_common::{TestResult, upload_nvfp4_bytes, upload_zero_nvfp4};
 
 #[ignore = "requires generated sm_120a PTX"]
@@ -36,13 +39,20 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> TestResult {
     let dummy_f32 = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
     let dummy_u16 = DeviceBuffer::<u16>::zeroed(&stream, 1)?;
 
-    let saved = data::saved_block(
-        &qkv_input_bytes,
-        &qkv_input_scales,
-        &qkv_input_globals,
-        &dummy_f32,
-        &dummy_u16,
-    );
+    let saved = saved_block(SavedBlockParts {
+        rowwise: Nvfp4RowwiseDeviceTensor::new(
+            &qkv_input_bytes,
+            &qkv_input_scales,
+            &qkv_input_globals,
+        ),
+        residual: &dummy_u16,
+        mean: &dummy_f32,
+        inv_std: &dummy_f32,
+        qkv: &dummy_u16,
+        attention_out: &dummy_u16,
+        attention_log_sum_exp: &dummy_f32,
+        mlp_up: &dummy_u16,
+    });
     let qkv_weight = upload_nvfp4_bytes::<QkvWeightShape>(&stream, data::qkv_weight_bytes())?;
     let qkv_bias = upload_zero_nvfp4::<QkvVectorShape>(&stream)?;
     let c_proj_weight = upload_zero_nvfp4::<ResidualWeightShape>(&stream)?;

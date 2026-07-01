@@ -1,12 +1,10 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{
-    BlockForwardSaved, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, HiddenState, LayerNormSaved,
-    QkvActivation,
-};
+use gpt2_nvfp4::{BlockForwardSaved, GPT2_TOKEN_ROWS, HiddenState, QkvActivation};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use crate::data::{self, E2M1_MIN_PAIR, E4M3_ONE};
 use crate::nvfp4_common::filled_u8;
+use crate::saved_block::{SavedBlockParts, saved_block};
 
 pub struct SavedBuffers {
     hidden_bytes: DeviceBuffer<u8>,
@@ -39,26 +37,15 @@ impl SavedBuffers {
             &self.hidden_scales,
             &self.hidden_globals,
         );
-        let ln = LayerNormSaved {
-            row_count: GPT2_TOKEN_ROWS as u32,
+        saved_block(SavedBlockParts {
+            rowwise,
             residual: &self.hidden_f16,
             mean: &self.mean,
             inv_std: &self.inv_std,
-        };
-        BlockForwardSaved {
-            batch_size: GPT2_BATCH_SIZE as u32,
-            seq_len: GPT2_SEQ_LEN as u32,
-            row_count: GPT2_TOKEN_ROWS as u32,
-            ln_1: ln,
-            qkv_input_nvfp4: rowwise,
             qkv: &self.qkv,
             attention_out: &self.hidden_f16,
             attention_log_sum_exp: &self.log_sum_exp,
-            c_proj_input_nvfp4: rowwise,
-            ln_2: ln,
-            mlp_up_input_nvfp4: rowwise,
             mlp_up: &self.hidden_f16,
-            mlp_down_input_nvfp4: rowwise,
-        }
+        })
     }
 }

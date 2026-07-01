@@ -8,14 +8,18 @@ use gpt2_nvfp4::{
 };
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionBackwardTcArgs};
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
+use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 #[path = "support/attention_core_scratch.rs"]
 mod attention_core_scratch;
 mod common;
 #[path = "attention_core_backward/data.rs"]
 mod data;
+#[path = "common/saved_block.rs"]
+mod saved_block;
 
 use common::{assert_nonzero_finite, cuda_test_context};
+use saved_block::{SavedBlockParts, saved_block};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -33,16 +37,16 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
     let dummy_bytes = DeviceBuffer::<u8>::zeroed(&stream, 1)?;
     let dummy_scales = DeviceBuffer::<u8>::zeroed(&stream, 1)?;
     let dummy_global_scales = DeviceBuffer::<f32>::zeroed(&stream, 1)?;
-    let saved = data::saved_block(
-        &qkv,
-        &attention_out,
-        &log_sum_exp,
-        &dummy,
-        &dummy_u16,
-        &dummy_bytes,
-        &dummy_scales,
-        &dummy_global_scales,
-    );
+    let saved = saved_block(SavedBlockParts {
+        rowwise: Nvfp4RowwiseDeviceTensor::new(&dummy_bytes, &dummy_scales, &dummy_global_scales),
+        residual: &dummy_u16,
+        mean: &dummy,
+        inv_std: &dummy,
+        qkv: &qkv,
+        attention_out: &attention_out,
+        attention_log_sum_exp: &log_sum_exp,
+        mlp_up: &dummy_u16,
+    });
     let mut wrapper_d_qkv = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
     let mut direct_d_qkv = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
     let mut wrapper_scratch = attention_core_scratch::AttentionCoreScratchBuffers::new(&stream)?;
