@@ -4,7 +4,7 @@ use crate::float_ptx::max_f32;
 use crate::mma::projection::Nvfp4ProjectionParams;
 
 use super::super::tile::Nvfp4ProjectionCtaTile;
-use super::common::{affine_pair_scaled, affine_value, row_col};
+use super::common::{affine_pair_scaled, affine_value, aligned_pair, row_col};
 
 struct Relu2StoreArgs<'a, 'pre, 'out> {
     input_global_scales: &'a [f32],
@@ -58,11 +58,7 @@ pub fn store_relu2_accumulator_aligned(
         out,
         params,
     };
-    let row0 = tile.mma_row_base() + tile.group;
-    let row1 = row0 + 8;
-    let col0 = tile.mma_col_base() + tile.thread_in_group * 2;
-    let scale0 = input_global_scales[row0 as usize] * params.weight_global_scale;
-    let scale1 = input_global_scales[row1 as usize] * params.weight_global_scale;
+    let (row0, row1, col0, scale0, scale1) = aligned_pair(tile, input_global_scales, params);
     store_pair_aligned(acc[0], acc[1], row0, col0, scale0, &mut args);
     store_pair_aligned(acc[2], acc[3], row1, col0, scale1, &mut args);
 }

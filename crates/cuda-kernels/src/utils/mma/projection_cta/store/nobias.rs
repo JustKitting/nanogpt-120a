@@ -3,7 +3,7 @@ use cuda_device::DisjointSlice;
 use crate::mma::projection::Nvfp4ProjectionParams;
 
 use super::super::tile::Nvfp4ProjectionCtaTile;
-use super::common::row_col;
+use super::common::{aligned_pair, row_col};
 
 #[inline(always)]
 pub fn store_accumulator(
@@ -24,11 +24,7 @@ pub fn store_accumulator_aligned(
     tile: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
 ) {
-    let row0 = tile.mma_row_base() + tile.group;
-    let row1 = row0 + 8;
-    let col0 = tile.mma_col_base() + tile.thread_in_group * 2;
-    let scale0 = input_global_scales[row0 as usize] * params.weight_global_scale;
-    let scale1 = input_global_scales[row1 as usize] * params.weight_global_scale;
+    let (row0, row1, col0, scale0, scale1) = aligned_pair(tile, input_global_scales, params);
     let offset0 = row0 as usize * params.output_dim as usize + col0 as usize;
     let offset1 = row1 as usize * params.output_dim as usize + col0 as usize;
 

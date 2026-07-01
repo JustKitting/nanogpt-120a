@@ -56,3 +56,11 @@ pub fn row_col(tile: Nvfp4ProjectionCtaTile, index: u32) -> (u32, u32) {
     let col = tile.mma_col_base() + tile.thread_in_group * 2 + (index & 1);
     (row, col)
 }
+
+#[inline(always)]
+pub fn aligned_pair(tile: Nvfp4ProjectionCtaTile, input_global_scales: &[f32], params: &Nvfp4ProjectionParams) -> (u32, u32, u32, f32, f32) {
+    let row0 = tile.mma_row_base() + tile.group;
+    let row1 = row0 + 8;
+    let col0 = tile.mma_col_base() + tile.thread_in_group * 2;
+    (row0, row1, col0, input_global_scales[row0 as usize] * params.weight_global_scale, input_global_scales[row1 as usize] * params.weight_global_scale)
+}
