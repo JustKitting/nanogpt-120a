@@ -87,10 +87,6 @@ fn apply_rope_backward(grad: &mut [f32], dq_rot: &[f32], dk_rot: &[f32]) {
     }
 }
 
-fn log_sum_exp_index(token: usize, head: usize) -> usize {
-    head * TOKEN_COUNT + token
-}
-
 fn qkv_value(qkv: &[f32], token: usize, head: usize, dim: usize, offset: usize) -> f32 {
     qkv[qkv_index(token, head, dim, offset)]
 }
