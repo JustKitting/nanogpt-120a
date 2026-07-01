@@ -41,6 +41,25 @@ pub const fn uses_full_attention(block_index: usize) -> bool {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Gpt2Config;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AttentionDims {
+    pub embedding_dim: u32,
+    pub qkv_dim: u32,
+    pub head_count: u32,
+    pub head_dim: u32,
+}
+
+impl AttentionDims {
+    pub const fn new(use_full_attention: bool) -> Self {
+        Self {
+            embedding_dim: GPT2_N_EMBD as u32,
+            qkv_dim: Gpt2Config::attention_qkv_dim(use_full_attention) as u32,
+            head_count: GPT2_N_HEAD as u32,
+            head_dim: Gpt2Config::head_dim() as u32,
+        }
+    }
+}
+
 impl Gpt2Config {
     pub const fn gpt2_124m() -> Self {
         Self

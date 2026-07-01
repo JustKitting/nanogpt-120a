@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 
 use gpt2_nvfp4::{
-    uses_full_attention, Gpt2Config, GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, NEXTLAT_HIDDEN,
+    uses_full_attention, AttentionDims, GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, NEXTLAT_HIDDEN,
     NEXTLAT_INPUT,
 };
 use rust_kernels_cuda::optimizer::AURORA_MATRIX_PHASES;
@@ -37,7 +37,7 @@ fn all_slots(
 ) -> Vec<HostPtrs> {
     let mut rows = Vec::with_capacity(AURORA_MATRIX_SLOTS);
     for i in 0..GPT2_N_LAYER {
-        let qkv_dim = Gpt2Config::attention_qkv_dim(uses_full_attention(i));
+        let qkv_dim = AttentionDims::new(uses_full_attention(i)).qkv_dim as usize;
         rows.push(ptrs::qkv(uploaded, grads, state, i).shape(GPT2_N_EMBD, qkv_dim));
     }
     append(&mut rows, GPT2_N_EMBD, GPT2_N_EMBD, |i| {

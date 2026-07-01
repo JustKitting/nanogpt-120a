@@ -26,6 +26,7 @@ pub use backward::{
     layer_norm_backward_params, mlp_backward, mlp_side_backward, qkv_projection_backward,
 };
 
+pub use config::AttentionDims;
 pub use config::{
     GPT2_BATCH_SIZE, GPT2_CONTEXT_LEN, GPT2_FULL_ATTENTION_QKV, GPT2_K_OFFSET,
     GPT2_KDA_BETA_OFFSET, GPT2_KDA_G_OFFSET, GPT2_LAYER_NORM_EPSILON, GPT2_MLP, GPT2_N_EMBD,

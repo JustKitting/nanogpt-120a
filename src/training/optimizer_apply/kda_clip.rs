@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DriverError};
-use gpt2_nvfp4::{uses_full_attention, Gpt2Config, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_TOKEN_ROWS};
+use gpt2_nvfp4::{uses_full_attention, AttentionDims, GPT2_TOKEN_ROWS};
 use rust_kernels_cuda::optimizer::KdaAuroraClipArgs;
 
 use crate::training::runtime::Runtime;
@@ -25,7 +25,7 @@ pub(super) fn apply_kda_aurora_clip(
     trace.kda_clip_ms += timed_ms(|| {
         for block_index in 0..uploaded.blocks.len() {
             let full_attention = uses_full_attention(block_index);
-            let qkv_dim = Gpt2Config::attention_qkv_dim(full_attention);
+            let dims = AttentionDims::new(full_attention);
             let block = &mut uploaded.blocks[block_index];
             let qkv_state = &mut state.blocks[block_index].attn_qkv.weight_aurora;
             runtime.optimizer.apply_kda_aurora_clip(KdaAuroraClipArgs {
@@ -41,11 +41,11 @@ pub(super) fn apply_kda_aurora_clip(
                 amax: &mut scratch.amax,
                 chunk_amax: &mut scratch.chunk_amax,
                 row_count: GPT2_TOKEN_ROWS as u32,
-                qkv_dim: qkv_dim as u32,
-                input_dim: GPT2_N_EMBD as u32,
-                embedding_dim: GPT2_N_EMBD as u32,
-                head_count: GPT2_N_HEAD as u32,
-                head_dim: Gpt2Config::head_dim() as u32,
+                qkv_dim: dims.qkv_dim,
+                input_dim: dims.embedding_dim,
+                embedding_dim: dims.embedding_dim,
+                head_count: dims.head_count,
+                head_dim: dims.head_dim,
                 tau: KDA_QK_CLIP_TAU,
                 silu_qk: (!full_attention) as u32,
             })?;

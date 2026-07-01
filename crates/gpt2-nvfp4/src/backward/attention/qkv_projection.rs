@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 
 use super::types::AttentionQkvBackwardArgs;
 use crate::backward::linear::{run_rowwise_linear_backward, RowwiseLinearBackwardPass};
-use crate::{Gpt2Config, GPT2_N_EMBD};
+use crate::AttentionDims;
 
 pub fn qkv_projection_backward(
     args: AttentionQkvBackwardArgs<'_, '_, '_>,
@@ -20,7 +20,7 @@ pub fn qkv_projection_backward(
         scratch,
         seeds,
     } = args;
-    let output_dim = Gpt2Config::attention_qkv_dim(use_full_attention) as u32;
+    let dims = AttentionDims::new(use_full_attention);
 
     run_rowwise_linear_backward(
         modules.linear,
@@ -35,8 +35,8 @@ pub fn qkv_projection_backward(
             dweight: d_attn_qkv_weight,
             dbias: d_attn_qkv_bias,
             row_count: saved.row_count,
-            input_dim: GPT2_N_EMBD as u32,
-            output_dim,
+            input_dim: dims.embedding_dim,
+            output_dim: dims.qkv_dim,
             sign_seed: seeds.sign,
             scale_seed: seeds.scale,
         },
