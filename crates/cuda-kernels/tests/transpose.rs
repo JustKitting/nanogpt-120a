@@ -25,8 +25,7 @@ fn transpose_f32_writes_row_major_transpose() -> Result<(), Box<dyn Error>> {
         cols: COLS as u32,
     })?;
 
-    let output = output_dev.to_host_vec(&stream)?;
-    assert_eq!(output, expected_transpose(&input));
+    assert_eq!(output_dev.to_host_vec(&stream)?, expected_transpose(&input));
     Ok(())
 }
 
