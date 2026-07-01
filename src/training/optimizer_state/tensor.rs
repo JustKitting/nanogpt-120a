@@ -4,6 +4,18 @@ use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 use super::device::{clone_device, decode_master};
 use crate::{training::device_buffer::zero, upload::UploadedNvfp4};
 
+#[derive(Clone, Copy)]
+pub(super) struct StateInit<'a> {
+    stream: &'a CudaStream,
+    decode: &'a Nvfp4DecodeModule,
+}
+
+impl<'a> StateInit<'a> {
+    pub(super) fn new(stream: &'a CudaStream, decode: &'a Nvfp4DecodeModule) -> Self {
+        Self { stream, decode }
+    }
+}
+
 pub(in crate::training) struct AdamState {
     pub(in crate::training) z_master: DeviceBuffer<f32>,
     pub(in crate::training) x_master: DeviceBuffer<f32>,
@@ -12,17 +24,13 @@ pub(in crate::training) struct AdamState {
 }
 
 impl AdamState {
-    pub(super) fn new(
-        stream: &CudaStream,
-        decode: &Nvfp4DecodeModule,
-        tensor: &UploadedNvfp4,
-    ) -> Result<Self, DriverError> {
-        let master = decode_master(stream, decode, tensor)?;
+    pub(super) fn new(init: StateInit<'_>, tensor: &UploadedNvfp4) -> Result<Self, DriverError> {
+        let master = decode_master(init.stream, init.decode, tensor)?;
         Ok(Self {
-            z_master: clone_device(stream, &master)?,
+            z_master: clone_device(init.stream, &master)?,
             x_master: master,
-            first: zero(stream, tensor.len)?,
-            second: zero(stream, tensor.len)?,
+            first: zero(init.stream, tensor.len)?,
+            second: zero(init.stream, tensor.len)?,
         })
     }
 }
@@ -34,16 +42,12 @@ pub(in crate::training) struct AuroraState {
 }
 
 impl AuroraState {
-    pub(super) fn new(
-        stream: &CudaStream,
-        decode: &Nvfp4DecodeModule,
-        tensor: &UploadedNvfp4,
-    ) -> Result<Self, DriverError> {
-        let master = decode_master(stream, decode, tensor)?;
+    pub(super) fn new(init: StateInit<'_>, tensor: &UploadedNvfp4) -> Result<Self, DriverError> {
+        let master = decode_master(init.stream, init.decode, tensor)?;
         Ok(Self {
-            z_master: clone_device(stream, &master)?,
+            z_master: clone_device(init.stream, &master)?,
             x_master: master,
-            momentum: zero(stream, tensor.len)?,
+            momentum: zero(init.stream, tensor.len)?,
         })
     }
 }

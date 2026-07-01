@@ -2,7 +2,7 @@ use cuda_core::{CudaStream, DriverError};
 use gpt2_nvfp4::GPT2_N_LAYER;
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 
-use super::tensor::{AdamState, AuroraState};
+use super::tensor::{AdamState, AuroraState, StateInit};
 use crate::{
     training::{
         device_buffer::block_array,
@@ -28,14 +28,15 @@ impl OptimizerStateBuffers {
         decode: &Nvfp4DecodeModule,
         uploaded: &UploadedModel,
     ) -> Result<Self, DriverError> {
+        let init = StateInit::new(stream, decode);
         Ok(Self {
             step: 0,
             schedule_free_weight_sum: 0.0,
             update_skip: UpdateSkipState::new(),
-            token_embedding: AdamState::new(stream, decode, &uploaded.token_embedding)?,
-            ln_f: LayerNormState::new(stream, decode, &uploaded.ln_f)?,
-            next_latent: NextLatState::new(stream, decode, &uploaded.next_latent)?,
-            blocks: block_array(|i| BlockState::new(stream, decode, &uploaded.blocks[i]))?,
+            token_embedding: AdamState::new(init, &uploaded.token_embedding)?,
+            ln_f: LayerNormState::new(init, &uploaded.ln_f)?,
+            next_latent: NextLatState::new(init, &uploaded.next_latent)?,
+            blocks: block_array(|i| BlockState::new(init, &uploaded.blocks[i]))?,
         })
     }
 
@@ -71,18 +72,14 @@ pub(in crate::training) struct BlockState {
 }
 
 impl BlockState {
-    fn new(
-        stream: &CudaStream,
-        decode: &Nvfp4DecodeModule,
-        block: &UploadedBlock,
-    ) -> Result<Self, DriverError> {
+    fn new(init: StateInit<'_>, block: &UploadedBlock) -> Result<Self, DriverError> {
         Ok(Self {
-            ln_1: LayerNormState::new(stream, decode, &block.ln_1)?,
-            attn_qkv: LinearState::new(stream, decode, &block.attn_qkv)?,
-            attn_c_proj: LinearState::new(stream, decode, &block.attn_c_proj)?,
-            ln_2: LayerNormState::new(stream, decode, &block.ln_2)?,
-            mlp_up: LinearState::new(stream, decode, &block.mlp_up)?,
-            mlp_down: LinearState::new(stream, decode, &block.mlp_down)?,
+            ln_1: LayerNormState::new(init, &block.ln_1)?,
+            attn_qkv: LinearState::new(init, &block.attn_qkv)?,
+            attn_c_proj: LinearState::new(init, &block.attn_c_proj)?,
+            ln_2: LayerNormState::new(init, &block.ln_2)?,
+            mlp_up: LinearState::new(init, &block.mlp_up)?,
+            mlp_down: LinearState::new(init, &block.mlp_down)?,
         })
     }
 }
@@ -95,16 +92,12 @@ pub(in crate::training) struct NextLatState {
 }
 
 impl NextLatState {
-    fn new(
-        stream: &CudaStream,
-        decode: &Nvfp4DecodeModule,
-        next_latent: &UploadedNextLat,
-    ) -> Result<Self, DriverError> {
+    fn new(init: StateInit<'_>, next_latent: &UploadedNextLat) -> Result<Self, DriverError> {
         Ok(Self {
-            norm: LayerNormState::new(stream, decode, &next_latent.norm)?,
-            input_projection: LinearState::new(stream, decode, &next_latent.input_projection)?,
-            transition: LinearState::new(stream, decode, &next_latent.transition)?,
-            output_projection: LinearState::new(stream, decode, &next_latent.output_projection)?,
+            norm: LayerNormState::new(init, &next_latent.norm)?,
+            input_projection: LinearState::new(init, &next_latent.input_projection)?,
+            transition: LinearState::new(init, &next_latent.transition)?,
+            output_projection: LinearState::new(init, &next_latent.output_projection)?,
         })
     }
 }
@@ -115,14 +108,10 @@ pub(in crate::training) struct LayerNormState {
 }
 
 impl LayerNormState {
-    fn new(
-        stream: &CudaStream,
-        decode: &Nvfp4DecodeModule,
-        layer_norm: &UploadedLayerNorm,
-    ) -> Result<Self, DriverError> {
+    fn new(init: StateInit<'_>, layer_norm: &UploadedLayerNorm) -> Result<Self, DriverError> {
         Ok(Self {
-            weight: AdamState::new(stream, decode, &layer_norm.weight)?,
-            bias: AdamState::new(stream, decode, &layer_norm.bias)?,
+            weight: AdamState::new(init, &layer_norm.weight)?,
+            bias: AdamState::new(init, &layer_norm.bias)?,
         })
     }
 }
@@ -133,14 +122,10 @@ pub(in crate::training) struct LinearState {
 }
 
 impl LinearState {
-    fn new(
-        stream: &CudaStream,
-        decode: &Nvfp4DecodeModule,
-        linear: &UploadedLinear,
-    ) -> Result<Self, DriverError> {
+    fn new(init: StateInit<'_>, linear: &UploadedLinear) -> Result<Self, DriverError> {
         Ok(Self {
-            weight_aurora: AuroraState::new(stream, decode, &linear.weight)?,
-            bias: AdamState::new(stream, decode, &linear.bias)?,
+            weight_aurora: AuroraState::new(init, &linear.weight)?,
+            bias: AdamState::new(init, &linear.bias)?,
         })
     }
 }
