@@ -2,7 +2,7 @@ use crate::sweep::{candidate::Candidate, features::regression_features};
 
 use super::super::{
     design,
-    stats::{EPS, mean, stddev},
+    stats::{EPS, mean_stddev},
 };
 use super::{effects, features, linear, model::Model};
 
@@ -14,8 +14,7 @@ pub fn fit(rows: Vec<(Candidate, f64)>) -> Option<Model> {
     }
 
     let y = rows.iter().map(|(_, y)| *y).collect::<Vec<_>>();
-    let y_mean = mean(&y);
-    let y_std = stddev(&y, y_mean);
+    let (y_mean, y_std) = mean_stddev(&y);
     if y_std <= EPS {
         return None;
     }

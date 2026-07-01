@@ -1,5 +1,5 @@
 use super::super::features::{FEATURE_COUNT, FEATURE_NAMES};
-use super::stats::{EPS, mean, stddev};
+use super::stats::{EPS, mean_stddev};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Term {
@@ -33,14 +33,13 @@ pub fn term_name(term: Term) -> String {
 }
 
 pub fn base_stats(rows: &[[f64; FEATURE_COUNT]]) -> BaseStats {
+    let stats = std::array::from_fn(|index| {
+        let values = rows.iter().map(|row| row[index]).collect::<Vec<_>>();
+        mean_stddev(&values)
+    });
     BaseStats {
-        means: std::array::from_fn(|index| {
-            mean(&rows.iter().map(|row| row[index]).collect::<Vec<_>>())
-        }),
-        stds: std::array::from_fn(|index| {
-            let values = rows.iter().map(|row| row[index]).collect::<Vec<_>>();
-            stddev(&values, mean(&values))
-        }),
+        means: stats.map(|(mean, _)| mean),
+        stds: stats.map(|(_, stddev)| stddev),
     }
 }
 
