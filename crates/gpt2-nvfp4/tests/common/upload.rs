@@ -52,6 +52,8 @@ pub fn mlp_projection_tensors<'a>(
     }
 }
 
+pub fn layer_norm_tensors<'a>(weight: &'a UploadedNvfp4, bias: &'a UploadedNvfp4) -> LayerNormTensors<'a> { LayerNormTensors { weight: weight.device(), bias: bias.device() } }
+
 pub struct UploadedPair {
     pub weight: UploadedNvfp4,
     pub bias: UploadedNvfp4,
@@ -62,7 +64,7 @@ pub type UploadedLinear = UploadedPair;
 
 impl UploadedPair {
     pub fn tensors(&self) -> LayerNormTensors<'_> {
-        LayerNormTensors { weight: self.weight.device(), bias: self.bias.device() }
+        layer_norm_tensors(&self.weight, &self.bias)
     }
 }
 
