@@ -20,6 +20,13 @@ pub struct Nvfp4ProjectionParams {
 
 unsafe impl DeviceCopy for Nvfp4ProjectionParams {}
 
+impl Nvfp4ProjectionParams {
+    #[inline(always)]
+    pub fn with_global_scales(self, weight: f32, bias: f32) -> Self {
+        Self { weight_global_scale: weight, bias_global_scale: bias, ..self }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct Nvfp4ProjectionTile {
     pub tile_row: u32,

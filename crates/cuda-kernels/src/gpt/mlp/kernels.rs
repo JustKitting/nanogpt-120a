@@ -29,11 +29,7 @@ mod module {
         mut out: DisjointSlice<f32>,
         params: Nvfp4ProjectionParams,
     ) {
-        let params = Nvfp4ProjectionParams {
-            weight_global_scale: weight_global_scale[0],
-            bias_global_scale: bias_global_scale[0],
-            ..params
-        };
+        let params = params.with_global_scales(weight_global_scale[0], bias_global_scale[0]);
 
         dispatch_projection_cta_tiles!(
             params,
@@ -66,11 +62,7 @@ mod module {
         mut out: DisjointSlice<f32>,
         params: Nvfp4ProjectionParams,
     ) {
-        let params = Nvfp4ProjectionParams {
-            weight_global_scale: weight_global_scale[0],
-            bias_global_scale: bias_global_scale[0],
-            ..params
-        };
+        let params = params.with_global_scales(weight_global_scale[0], bias_global_scale[0]);
 
         dispatch_projection_cta_tiles!(
             params,
