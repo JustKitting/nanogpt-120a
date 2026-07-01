@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{super::config::SweepConfig, SweepAnalysis};
+use super::{super::config::SweepConfig, regression::Effect, SweepAnalysis};
 
 #[derive(Clone, Debug)]
 pub struct FactorBelief {
@@ -21,6 +21,19 @@ struct Accum {
     evidence: usize,
 }
 
+impl Accum {
+    fn add(&mut self, effect: &Effect, weights: &ResponseWeights) {
+        let confidence = directional_confidence(effect.p_positive); self.direction += effect.coefficient * weights.direction * confidence;
+        self.confidence += confidence.abs() * weights.uncertainty.abs();
+        self.variance += effect.stderr * effect.stderr * weights.uncertainty.abs();
+        self.positive_probability += effect.p_positive; self.evidence += 1;
+    }
+
+    fn belief(self, factor: String) -> FactorBelief {
+        FactorBelief { factor, direction: self.direction, confidence: average(self.confidence, self.evidence), variance: average(self.variance, self.evidence), positive_probability: average(self.positive_probability, self.evidence), evidence: self.evidence }
+    }
+}
+
 pub fn factor_beliefs(analysis: &SweepAnalysis, config: &SweepConfig) -> Vec<FactorBelief> {
     let mut factors = BTreeMap::<String, Accum>::new();
     for response in &analysis.models {
@@ -34,26 +47,12 @@ pub fn factor_beliefs(analysis: &SweepAnalysis, config: &SweepConfig) -> Vec<Fac
             .iter()
             .filter(|effect| !effect.name.contains('*'))
         {
-            let confidence = directional_confidence(effect.p_positive);
-            let weighted = effect.coefficient * weights.direction * confidence;
-            let entry = factors.entry(effect.name.clone()).or_default();
-            entry.direction += weighted;
-            entry.confidence += confidence.abs() * weights.uncertainty.abs();
-            entry.variance += effect.stderr * effect.stderr * weights.uncertainty.abs();
-            entry.positive_probability += effect.p_positive;
-            entry.evidence += 1;
+            factors.entry(effect.name.clone()).or_default().add(effect, &weights);
         }
     }
     let mut beliefs = factors
         .into_iter()
-        .map(|(factor, value)| FactorBelief {
-            factor,
-            direction: value.direction,
-            confidence: average(value.confidence, value.evidence),
-            variance: average(value.variance, value.evidence),
-            positive_probability: average(value.positive_probability, value.evidence),
-            evidence: value.evidence,
-        })
+        .map(|(factor, value)| value.belief(factor))
         .collect::<Vec<_>>();
     beliefs.sort_by(|a, b| b.direction.abs().total_cmp(&a.direction.abs()));
     beliefs
