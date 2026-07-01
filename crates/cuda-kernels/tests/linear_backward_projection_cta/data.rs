@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
-use crate::common::nvfp4::E4M3_ONE;
+use crate::common::nvfp4::one_scales;
 
 const TOLERANCE: f32 = 1.0e-7;
 
@@ -18,7 +18,7 @@ pub fn upload_scales(
     rows: usize,
     cols: usize,
 ) -> Result<DeviceBuffer<u8>, DriverError> {
-    DeviceBuffer::from_host(stream, &vec![E4M3_ONE; rows * cols / 16])
+    DeviceBuffer::from_host(stream, &one_scales(rows * cols))
 }
 
 pub fn row_scales(rows: usize, step: f32) -> Vec<f32> {

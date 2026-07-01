@@ -9,7 +9,7 @@ use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 mod common;
 
 use common::max_abs_error;
-use common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE};
+use common::nvfp4::{one_pair_bytes, one_scales};
 
 const ROWS: usize = 2;
 const COLS: usize = 32;
@@ -21,8 +21,6 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let x = sample_residual();
     let d_normalized = sample_grad();
     let (mean, inv_std) = reference_stats(&x, epsilon);
-    let weight_bytes = vec![E2M1_ONE_PAIR; COLS / 2];
-    let weight_scales = vec![E4M3_ONE; COLS / 16];
 
     let (_, stream, ptx) = common::cuda_test_context()?;
     let module = LayerNormBackwardModule::from_module(ptx)?;
@@ -31,8 +29,8 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let grad_dev = DeviceBuffer::from_host(&stream, &d_normalized)?;
     let mean_dev = DeviceBuffer::from_host(&stream, &mean)?;
     let inv_std_dev = DeviceBuffer::from_host(&stream, &inv_std)?;
-    let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
-    let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
+    let weight_bytes_dev = DeviceBuffer::from_host(&stream, &one_pair_bytes(COLS))?;
+    let weight_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(COLS))?;
     let weight_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut dx_dev = DeviceBuffer::<f32>::zeroed(&stream, ROWS * COLS)?;
 

@@ -9,7 +9,7 @@ use rust_kernels_cuda::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 
 mod common;
 
-use common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE};
+use common::nvfp4::{one_pair_bytes, one_scales};
 
 const TOKEN_COUNT: usize = 32;
 const INPUT_DIM: usize = 128;
@@ -23,21 +23,16 @@ fn nextlat_projection_gelu_and_residual_match_reference() -> Result<(), Box<dyn 
     let module = NextLatModule::from_module(ptx)?;
 
     let zeros = vec![0_u8; TOKEN_COUNT * INPUT_DIM / 2];
-    let scales = vec![E4M3_ONE; TOKEN_COUNT * INPUT_DIM / 16];
-    let globals = vec![1.0_f32; TOKEN_COUNT];
     let weight_zeros = vec![0_u8; INPUT_DIM * OUTPUT_DIM / 2];
-    let weight_scales = vec![E4M3_ONE; INPUT_DIM * OUTPUT_DIM / 16];
-    let bias = vec![E2M1_ONE_PAIR; OUTPUT_DIM / 2];
-    let bias_scales = vec![E4M3_ONE; OUTPUT_DIM / 16];
     let global_one = [1.0_f32];
 
     let input_bytes = DeviceBuffer::from_host(&stream, &zeros)?;
-    let input_scales = DeviceBuffer::from_host(&stream, &scales)?;
-    let input_globals = DeviceBuffer::from_host(&stream, &globals)?;
+    let input_scales = DeviceBuffer::from_host(&stream, &one_scales(TOKEN_COUNT * INPUT_DIM))?;
+    let input_globals = DeviceBuffer::from_host(&stream, &vec![1.0_f32; TOKEN_COUNT])?;
     let weight_bytes = DeviceBuffer::from_host(&stream, &weight_zeros)?;
-    let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
-    let bias_bytes = DeviceBuffer::from_host(&stream, &bias)?;
-    let bias_scales_dev = DeviceBuffer::from_host(&stream, &bias_scales)?;
+    let weight_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(INPUT_DIM * OUTPUT_DIM))?;
+    let bias_bytes = DeviceBuffer::from_host(&stream, &one_pair_bytes(OUTPUT_DIM))?;
+    let bias_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(OUTPUT_DIM))?;
     let global_dev = DeviceBuffer::from_host(&stream, &global_one)?;
     let mut projection = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * OUTPUT_DIM)?;
     let mut gelu = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * OUTPUT_DIM)?;

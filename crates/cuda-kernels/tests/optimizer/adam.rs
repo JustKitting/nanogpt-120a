@@ -4,7 +4,7 @@ use cuda_core::{CudaStream, DeviceBuffer};
 use rust_kernels_cuda::optimizer::{AdamWUpdateArgs, OptimizerModule};
 
 use crate::common;
-use crate::common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE};
+use crate::common::nvfp4::{one_pair_bytes, one_scales};
 
 const LEN: usize = 32;
 
@@ -24,8 +24,8 @@ struct AdamFixture {
 impl AdamFixture {
     fn new(stream: &CudaStream) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
-            bytes: DeviceBuffer::from_host(stream, &[E2M1_ONE_PAIR; LEN / 2])?,
-            scales: DeviceBuffer::from_host(stream, &[E4M3_ONE; LEN / 16])?,
+            bytes: DeviceBuffer::from_host(stream, &one_pair_bytes(LEN))?,
+            scales: DeviceBuffer::from_host(stream, &one_scales(LEN))?,
             z_master: DeviceBuffer::from_host(stream, &[1.0_f32; LEN])?,
             x_master: DeviceBuffer::from_host(stream, &[1.0_f32; LEN])?,
             grad: DeviceBuffer::from_host(stream, &[0.5_f32; LEN])?,

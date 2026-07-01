@@ -13,7 +13,7 @@ use rust_kernels_cuda::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 
 mod common;
 
-use common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE, first_col_one_bytes, first_row_one_bytes};
+use common::nvfp4::{first_col_one_bytes, first_row_one_bytes, one_pair_bytes, one_scales};
 
 const TOKEN_COUNT: usize = 64;
 const INPUT_DIM: usize = 64;
@@ -62,31 +62,23 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
     let (_, stream, ptx) = common::cuda_test_context()?;
     let module = LinearBackwardModule::from_module(ptx)?;
 
-    let e_h_bytes = first_col_one_bytes(TOKEN_COUNT, OUTPUT_DIM);
-    let e_h_scales = vec![E4M3_ONE; TOKEN_COUNT * OUTPUT_DIM / 16];
-    let e_h_global_scales = vec![1.0_f32; TOKEN_COUNT];
-
-    let weight_t_h_bytes = first_col_one_bytes(INPUT_DIM, OUTPUT_DIM);
-    let weight_t_h_scales = vec![E4M3_ONE; INPUT_DIM * OUTPUT_DIM / 16];
-
-    let e_t_h_bytes = first_row_one_bytes(OUTPUT_DIM, TOKEN_COUNT);
-    let e_t_h_scales = vec![E4M3_ONE; OUTPUT_DIM * TOKEN_COUNT / 16];
-    let e_t_h_global_scales = vec![1.0_f32; OUTPUT_DIM];
-
-    let input_t_h_bytes = vec![E2M1_ONE_PAIR; INPUT_DIM * TOKEN_COUNT / 2];
-    let input_t_h_scales = vec![E4M3_ONE; INPUT_DIM * TOKEN_COUNT / 16];
-
-    let e_h_bytes_dev = DeviceBuffer::from_host(&stream, &e_h_bytes)?;
-    let e_h_scales_dev = DeviceBuffer::from_host(&stream, &e_h_scales)?;
-    let e_h_global_scales_dev = DeviceBuffer::from_host(&stream, &e_h_global_scales)?;
-    let weight_t_h_bytes_dev = DeviceBuffer::from_host(&stream, &weight_t_h_bytes)?;
-    let weight_t_h_scales_dev = DeviceBuffer::from_host(&stream, &weight_t_h_scales)?;
+    let e_h_bytes_dev =
+        DeviceBuffer::from_host(&stream, &first_col_one_bytes(TOKEN_COUNT, OUTPUT_DIM))?;
+    let e_h_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(TOKEN_COUNT * OUTPUT_DIM))?;
+    let e_h_global_scales_dev = DeviceBuffer::from_host(&stream, &vec![1.0_f32; TOKEN_COUNT])?;
+    let weight_t_h_bytes_dev =
+        DeviceBuffer::from_host(&stream, &first_col_one_bytes(INPUT_DIM, OUTPUT_DIM))?;
+    let weight_t_h_scales_dev =
+        DeviceBuffer::from_host(&stream, &one_scales(INPUT_DIM * OUTPUT_DIM))?;
     let weight_t_h_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
-    let e_t_h_bytes_dev = DeviceBuffer::from_host(&stream, &e_t_h_bytes)?;
-    let e_t_h_scales_dev = DeviceBuffer::from_host(&stream, &e_t_h_scales)?;
-    let e_t_h_global_scales_dev = DeviceBuffer::from_host(&stream, &e_t_h_global_scales)?;
-    let input_t_h_bytes_dev = DeviceBuffer::from_host(&stream, &input_t_h_bytes)?;
-    let input_t_h_scales_dev = DeviceBuffer::from_host(&stream, &input_t_h_scales)?;
+    let e_t_h_bytes_dev =
+        DeviceBuffer::from_host(&stream, &first_row_one_bytes(OUTPUT_DIM, TOKEN_COUNT))?;
+    let e_t_h_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(OUTPUT_DIM * TOKEN_COUNT))?;
+    let e_t_h_global_scales_dev = DeviceBuffer::from_host(&stream, &vec![1.0_f32; OUTPUT_DIM])?;
+    let input_t_h_bytes_dev =
+        DeviceBuffer::from_host(&stream, &one_pair_bytes(INPUT_DIM * TOKEN_COUNT))?;
+    let input_t_h_scales_dev =
+        DeviceBuffer::from_host(&stream, &one_scales(INPUT_DIM * TOKEN_COUNT))?;
     let input_t_h_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut dinput_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * INPUT_DIM)?;
     let mut dweight_dev = DeviceBuffer::<f32>::zeroed(&stream, OUTPUT_DIM * INPUT_DIM)?;

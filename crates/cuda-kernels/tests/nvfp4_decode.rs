@@ -8,7 +8,7 @@ use rust_kernels_cuda::nvfp4::{
 
 mod common;
 
-use common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE};
+use common::nvfp4::{one_pair_bytes, one_scales};
 
 const ROWS: usize = 2;
 const COLS: usize = 16;
@@ -19,8 +19,8 @@ fn nvfp4_decode_transpose_writes_fp32_transpose() -> Result<(), Box<dyn Error>> 
     let (_, stream, ptx) = common::cuda_test_context()?;
     let module = Nvfp4DecodeModule::from_module(ptx)?;
 
-    let bytes = DeviceBuffer::from_host(&stream, &[E2M1_ONE_PAIR; ROWS * COLS / 2])?;
-    let scales = DeviceBuffer::from_host(&stream, &[E4M3_ONE; ROWS * COLS / 16])?;
+    let bytes = DeviceBuffer::from_host(&stream, &one_pair_bytes(ROWS * COLS))?;
+    let scales = DeviceBuffer::from_host(&stream, &one_scales(ROWS * COLS))?;
     let scalar_global_scale = DeviceBuffer::from_host(&stream, &[3.0_f32])?;
     let mut scalar_out = DeviceBuffer::<f32>::zeroed(&stream, ROWS * COLS)?;
     let globals = DeviceBuffer::from_host(&stream, &[1.0_f32, 2.0])?;

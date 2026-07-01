@@ -7,7 +7,7 @@ use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 mod common;
 
-use common::nvfp4::{E4M3_ONE, set_e2m1_one};
+use common::nvfp4::{one_scales, set_e2m1_one};
 
 const TOKEN_COUNT: usize = 2;
 const INPUT_DIM: usize = 64;
@@ -24,20 +24,17 @@ fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error
     set_e2m1_one(&mut input_bytes, 0);
     set_e2m1_one(&mut input_bytes, 1);
     set_e2m1_one(&mut input_bytes, INPUT_DIM + 2);
-    let input_scales = vec![E4M3_ONE; TOKEN_COUNT * INPUT_DIM / 16];
-    let input_global_scales = vec![1.0_f32; TOKEN_COUNT];
 
     let mut weight_bytes = vec![0_u8; VOCAB_SIZE * INPUT_DIM / 2];
     set_e2m1_one(&mut weight_bytes, 0);
     set_e2m1_one(&mut weight_bytes, INPUT_DIM + 1);
     set_e2m1_one(&mut weight_bytes, 2 * INPUT_DIM + 2);
-    let weight_scales = vec![E4M3_ONE; VOCAB_SIZE * INPUT_DIM / 16];
 
     let input_bytes_dev = DeviceBuffer::from_host(&stream, &input_bytes)?;
-    let input_scales_dev = DeviceBuffer::from_host(&stream, &input_scales)?;
-    let input_global_scales_dev = DeviceBuffer::from_host(&stream, &input_global_scales)?;
+    let input_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(TOKEN_COUNT * INPUT_DIM))?;
+    let input_global_scales_dev = DeviceBuffer::from_host(&stream, &vec![1.0_f32; TOKEN_COUNT])?;
     let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
-    let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
+    let weight_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(VOCAB_SIZE * INPUT_DIM))?;
     let weight_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut logits_dev = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * VOCAB_SIZE)?;
 

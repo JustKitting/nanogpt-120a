@@ -7,7 +7,7 @@ use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 mod common;
 
 use common::max_abs_error;
-use common::nvfp4::{E2M1_ONE_PAIR, E4M3_ONE};
+use common::nvfp4::{one_pair_bytes, one_scales};
 
 const GPT_EMBEDDING_DIM: usize = 768;
 
@@ -66,19 +66,16 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let weight_bytes = vec![E2M1_ONE_PAIR; GPT_EMBEDDING_DIM / 2];
-    let weight_scales = vec![E4M3_ONE; GPT_EMBEDDING_DIM / 16];
     let bias_bytes = vec![0_u8; GPT_EMBEDDING_DIM / 2];
-    let bias_scales = vec![E4M3_ONE; GPT_EMBEDDING_DIM / 16];
 
     let (_, stream, ptx) = common::cuda_test_context()?;
     let module = LayerNormModule::from_module(ptx)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
-    let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
-    let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
+    let weight_bytes_dev = DeviceBuffer::from_host(&stream, &one_pair_bytes(GPT_EMBEDDING_DIM))?;
+    let weight_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(GPT_EMBEDDING_DIM))?;
     let bias_bytes_dev = DeviceBuffer::from_host(&stream, &bias_bytes)?;
-    let bias_scales_dev = DeviceBuffer::from_host(&stream, &bias_scales)?;
+    let bias_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(GPT_EMBEDDING_DIM))?;
     let weight_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let bias_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
     let mut out_dev = DeviceBuffer::<f32>::zeroed(&stream, x.len())?;

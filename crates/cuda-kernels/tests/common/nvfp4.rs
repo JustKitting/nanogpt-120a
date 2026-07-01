@@ -3,6 +3,14 @@
 pub const E2M1_ONE_PAIR: u8 = 0x22;
 pub const E4M3_ONE: u8 = 0x38;
 
+pub fn one_pair_bytes(element_count: usize) -> Vec<u8> {
+    vec![E2M1_ONE_PAIR; element_count / 2]
+}
+
+pub fn one_scales(element_count: usize) -> Vec<u8> {
+    vec![E4M3_ONE; element_count / 16]
+}
+
 pub fn set_e2m1_one(bytes: &mut [u8], element: usize) {
     let byte = &mut bytes[element / 2];
     if element & 1 == 0 {
