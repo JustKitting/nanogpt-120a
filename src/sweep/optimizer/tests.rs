@@ -5,7 +5,7 @@ use crate::sweep::{
     candidate::Candidate,
     history::Trial,
     rng::SweepRng,
-    test_fixtures::{basic_candidate, config as sweep_config},
+    test_fixtures::{basic_candidate, config as sweep_config, trial_with_status},
 };
 
 #[test]
@@ -13,18 +13,7 @@ fn marks_build_shape_infeasible_after_failed_run() {
     let config = config();
     let candidate = candidate(32, 8, 2048, 16, 180, 1.0);
     let shapes = infeasible_build_shapes(
-        &[Trial {
-            candidate: candidate.clone(),
-            status: "failed_run".to_string(),
-            val_loss: None,
-            completed_steps: None,
-            elapsed_s: Some(0.0),
-            screen_val_loss: None,
-            screen_completed_steps: None,
-            screen_elapsed_s: None,
-            screen_reason: None,
-            log_path: PathBuf::from("screen.log"),
-        }],
+        &[trial_with_status(candidate.clone(), "failed_run")],
         &config,
     );
 
