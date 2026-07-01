@@ -3,8 +3,8 @@ use std::error::Error;
 use cuda_core::{CudaStream, DeviceBuffer};
 use rust_kernels_cuda::optimizer::{AdamWUpdateArgs, OptimizerModule};
 
-use crate::common;
 use crate::common::nvfp4::{one_pair_bytes, one_scales};
+use crate::common::{self, assert_all_close};
 
 const LEN: usize = 32;
 
@@ -69,14 +69,6 @@ impl AdamFixture {
     }
 }
 
-fn assert_all_close(values: &[f32], expected: f32) {
-    assert!(
-        values
-            .iter()
-            .all(|value| (*value - expected).abs() <= 1.0e-6)
-    );
-}
-
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Error>> {
@@ -89,10 +81,10 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
     let x_master = fixture.x_master.to_host_vec(&stream)?;
     let first = fixture.first.to_host_vec(&stream)?;
     let second = fixture.second.to_host_vec(&stream)?;
-    assert_all_close(&z_master, 0.725);
-    assert_all_close(&x_master, 0.725);
-    assert_all_close(&first, 0.05);
-    assert_all_close(&second, 0.0125);
+    assert_all_close(&z_master, 0.725, 1.0e-6);
+    assert_all_close(&x_master, 0.725, 1.0e-6);
+    assert_all_close(&first, 0.05, 1.0e-6);
+    assert_all_close(&second, 0.0125, 1.0e-6);
     Ok(())
 }
 
@@ -106,7 +98,7 @@ fn nvfp4_adamw_update_applies_schedule_free_average() -> Result<(), Box<dyn Erro
     fixture.apply(&stream, &module, 0.25)?;
     let z_master = fixture.z_master.to_host_vec(&stream)?;
     let x_master = fixture.x_master.to_host_vec(&stream)?;
-    assert_all_close(&z_master, 0.725);
-    assert_all_close(&x_master, 0.93125);
+    assert_all_close(&z_master, 0.725, 1.0e-6);
+    assert_all_close(&x_master, 0.93125, 1.0e-6);
     Ok(())
 }

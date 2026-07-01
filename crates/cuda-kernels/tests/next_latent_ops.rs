@@ -68,19 +68,13 @@ fn nextlat_projection_gelu_and_residual_match_reference() -> Result<(), Box<dyn 
     let out = out.to_host_vec(&stream)?;
     let expected_gelu = reference_gelu(1.0);
 
-    assert_all_close(&projection, 1.0);
-    assert_all_close(&gelu, expected_gelu);
-    assert_all_close(&out, expected_gelu + 0.25);
+    common::assert_all_close(&projection, 1.0, TOLERANCE);
+    common::assert_all_close(&gelu, expected_gelu, TOLERANCE);
+    common::assert_all_close(&out, expected_gelu + 0.25, TOLERANCE);
     Ok(())
 }
 
 fn reference_gelu(x: f32) -> f32 {
     let inner = 0.797_884_6 * (x + 0.044_715 * x * x * x);
     0.5 * x * (1.0 + inner.tanh())
-}
-
-fn assert_all_close(actual: &[f32], expected: f32) {
-    for actual in actual {
-        common::assert_close(*actual, expected, TOLERANCE);
-    }
 }

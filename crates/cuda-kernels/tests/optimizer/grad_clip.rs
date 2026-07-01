@@ -3,7 +3,7 @@ use std::error::Error;
 use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::optimizer::{GRAD_CLIP_VALUES_PER_CHUNK, GradientClipArgs, OptimizerModule};
 
-use crate::common;
+use crate::common::{self, assert_slice_close};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -33,19 +33,13 @@ fn global_clip_scales_all_gradient_buffers_together() -> Result<(), Box<dyn Erro
         max_norm: 6.5,
     })?;
 
-    assert_close(&first.to_host_vec(&stream)?, &[1.5, 2.0, 0.0, 0.0]);
-    assert_close(&second.to_host_vec(&stream)?, &[6.0, 0.0, 0.0, 0.0]);
-    assert_close(&scale.to_host_vec(&stream)?, &[0.5]);
-    assert_close(&norm.to_host_vec(&stream)?, &[13.0]);
+    assert_slice_close(&first.to_host_vec(&stream)?, &[1.5, 2.0, 0.0, 0.0], 1.0e-6);
+    assert_slice_close(&second.to_host_vec(&stream)?, &[6.0, 0.0, 0.0, 0.0], 1.0e-6);
+    assert_slice_close(&scale.to_host_vec(&stream)?, &[0.5], 1.0e-6);
+    assert_slice_close(&norm.to_host_vec(&stream)?, &[13.0], 1.0e-6);
     Ok(())
 }
 
 fn chunks(len: u32) -> u32 {
     len.div_ceil(GRAD_CLIP_VALUES_PER_CHUNK as u32)
-}
-
-fn assert_close(actual: &[f32], expected: &[f32]) {
-    for (actual, expected) in actual.iter().zip(expected.iter()) {
-        assert!((*actual - *expected).abs() <= 1.0e-6);
-    }
 }

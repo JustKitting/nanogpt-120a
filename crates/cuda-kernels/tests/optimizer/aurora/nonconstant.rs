@@ -53,8 +53,16 @@ pub fn run_wide_case() -> Result<(), Box<dyn Error>> {
         WEIGHT_DECAY,
         ITERATIONS as usize,
     );
-    assert_close(&slots.x_masters.remove(0).to_host_vec(&stream)?, &expected);
-    assert_close(&slots.z_masters.remove(0).to_host_vec(&stream)?, &expected);
+    common::assert_slice_close(
+        &slots.x_masters.remove(0).to_host_vec(&stream)?,
+        &expected,
+        2.0e-3,
+    );
+    common::assert_slice_close(
+        &slots.z_masters.remove(0).to_host_vec(&stream)?,
+        &expected,
+        2.0e-3,
+    );
     Ok(())
 }
 
@@ -62,22 +70,4 @@ fn gradient() -> Vec<f32> {
     (0..LEN)
         .map(|i| ((i % 37) as f32 - 18.0) * 0.0003 + ((i / COLS) as f32) * 0.00001)
         .collect()
-}
-
-fn assert_close(actual: &[f32], expected: &[f32]) {
-    let mut max_error = 0.0_f32;
-    let mut max_index = 0;
-    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
-        let error = (actual - expected).abs();
-        if error > max_error {
-            max_error = error;
-            max_index = index;
-        }
-    }
-    assert!(
-        max_error <= 2.0e-3,
-        "max_error={max_error:.8e} index={max_index} actual={:.8e} expected={:.8e}",
-        actual[max_index],
-        expected[max_index],
-    );
 }
