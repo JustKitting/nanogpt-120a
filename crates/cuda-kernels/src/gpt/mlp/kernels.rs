@@ -35,15 +35,9 @@ mod module {
             params,
             nvfp4_projection_cta_kernel_body_at_aligned_row_pair,
             nvfp4_projection_cta_kernel_body;
-            input_bytes,
-            input_scales,
-            input_global_scales,
-            weight_bytes,
-            weight_scales,
-            bias_bytes,
-            bias_scales,
-            &mut out,
-            params,
+            input_bytes, input_scales, input_global_scales,
+            weight_bytes, weight_scales, bias_bytes, bias_scales,
+            &mut out, params,
         );
     }
 
@@ -68,16 +62,9 @@ mod module {
             params,
             nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair,
             nvfp4_projection_cta_relu2_kernel_body;
-            input_bytes,
-            input_scales,
-            input_global_scales,
-            weight_bytes,
-            weight_scales,
-            bias_bytes,
-            bias_scales,
-            &mut pre_activation,
-            &mut out,
-            params,
+            input_bytes, input_scales, input_global_scales,
+            weight_bytes, weight_scales, bias_bytes, bias_scales,
+            &mut pre_activation, &mut out, params,
         );
     }
 
