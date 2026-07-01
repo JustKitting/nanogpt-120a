@@ -23,7 +23,7 @@ impl AttentionModule {
         let batch_head = args.batch_size * args.head_count;
         let scratch = args.scratch;
 
-        self.causal_attention_tc.gather_qkv_forward_kernel(
+        self.causal_attention_tc.base.gather_qkv_forward_kernel(
             args.stream,
             linear_config(
                 batch_head * args.seq_len * args.head_dim,
@@ -46,7 +46,7 @@ impl AttentionModule {
                 n: args.seq_len,
                 k: args.head_dim,
             })?;
-        self.causal_attention_tc.attention_softmax_forward_kernel(
+        self.causal_attention_tc.base.attention_softmax_forward_kernel(
             args.stream,
             launch_config(
                 (args.seq_len, args.head_count, args.batch_size),
@@ -73,19 +73,17 @@ impl AttentionModule {
             TC_FORWARD_THREADS_PER_BLOCK,
         );
         if let Some(attention_out_f16) = args.attention_out_f16 {
-            return self
-                .causal_attention_tc
-                .scatter_attention_forward_save_f16_kernel(
-                    args.stream,
-                    config,
-                    &*scratch.compact_out,
-                    args.out,
-                    attention_out_f16,
-                    params,
-                );
+            return self.causal_attention_tc.base.scatter_attention_forward_save_f16_kernel(
+                args.stream,
+                config,
+                &*scratch.compact_out,
+                args.out,
+                attention_out_f16,
+                params,
+            );
         }
 
-        self.causal_attention_tc.scatter_attention_forward_kernel(
+        self.causal_attention_tc.base.scatter_attention_forward_kernel(
             args.stream,
             config,
             &*scratch.compact_out,

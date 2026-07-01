@@ -34,7 +34,7 @@ impl AttentionModule {
         );
         let mm = kda_launch::MatmulRunner::new(args.stream, args.tc_module, dims.chunk_batch);
         let scratch = args.scratch;
-        let kda = &self.causal_attention_tc;
+        let kda = &self.causal_attention_tc.kda;
         let stream = args.stream;
         let threads = TC_FORWARD_THREADS_PER_BLOCK;
         let linear = |n| linear_config(n, threads);

@@ -62,7 +62,7 @@ impl AttentionModule {
         } = scratch;
         let bwd_elementwise = &self.causal_attention_backward_tc.kda_elementwise;
         let bwd_tc = &self.causal_attention_backward_tc.kda_tc;
-        let fwd = &self.causal_attention_tc;
+        let fwd = &self.causal_attention_tc.kda;
         let threads = TC_BACKWARD_THREADS_PER_BLOCK;
         let batch_cfg = grid_x_config(dims.batch_head, threads);
         let chunk_cfg = kda_launch::chunk_dim_config(dims.batch_head, dims.chunks, threads);
