@@ -24,10 +24,7 @@ pub(super) fn normalized_budget(target: usize, weights: SourceWeights) -> Source
             continue;
         }
         let exact = target as f64 * *weight / total;
-        counts[index] = exact.floor() as usize;
-        if counts[index] == 0 {
-            counts[index] = 1;
-        }
+        counts[index] = (exact.floor() as usize).max(1);
         remainders[index] = (index, exact - exact.floor());
     }
 
