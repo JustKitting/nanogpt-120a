@@ -1,7 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{HiddenState, MlpActivation, GPT2_CONTEXT_LEN};
-
-use crate::common::forward_scratch::RowwiseNvfp4ScratchBuffers;
+use gpt2_nvfp4::{HiddenState, MlpActivation, RowwiseNvfp4Buffers, GPT2_CONTEXT_LEN};
 
 pub struct ScratchBuffers {
     pub residual: DeviceBuffer<f32>,
@@ -9,10 +7,10 @@ pub struct ScratchBuffers {
     pub amax: DeviceBuffer<f32>,
     pub mean: DeviceBuffer<f32>,
     pub inv_std: DeviceBuffer<f32>,
-    pub input_nvfp4: RowwiseNvfp4ScratchBuffers,
+    pub input_nvfp4: RowwiseNvfp4Buffers,
     pub pre_activation: DeviceBuffer<f32>,
     pub activation: DeviceBuffer<f32>,
-    pub activation_nvfp4: RowwiseNvfp4ScratchBuffers,
+    pub activation_nvfp4: RowwiseNvfp4Buffers,
 }
 
 impl ScratchBuffers {
@@ -28,14 +26,10 @@ impl ScratchBuffers {
             amax: DeviceBuffer::from_host(stream, amax)?,
             mean: DeviceBuffer::zeroed(stream, GPT2_CONTEXT_LEN)?,
             inv_std: DeviceBuffer::zeroed(stream, GPT2_CONTEXT_LEN)?,
-            input_nvfp4: RowwiseNvfp4ScratchBuffers::new(
-                stream,
-                HiddenState::LEN,
-                GPT2_CONTEXT_LEN,
-            )?,
+            input_nvfp4: RowwiseNvfp4Buffers::new(stream, HiddenState::LEN, GPT2_CONTEXT_LEN)?,
             pre_activation: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
             activation: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
-            activation_nvfp4: RowwiseNvfp4ScratchBuffers::new(
+            activation_nvfp4: RowwiseNvfp4Buffers::new(
                 stream,
                 MlpActivation::LEN,
                 GPT2_CONTEXT_LEN,

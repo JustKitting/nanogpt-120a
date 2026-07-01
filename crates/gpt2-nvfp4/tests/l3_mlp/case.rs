@@ -27,8 +27,8 @@ pub fn run() -> TestResult {
         module: &mlp_module,
         quant_module: &quant_module,
         scratch: MlpScratch {
-            input_nvfp4: scratch.input_nvfp4.args(),
-            activation_nvfp4: scratch.activation_nvfp4.args(),
+            input_nvfp4: scratch.input_nvfp4.scratch(),
+            activation_nvfp4: scratch.activation_nvfp4.scratch(),
             pre_activation: &mut scratch.pre_activation,
             activation: &mut scratch.activation,
         },

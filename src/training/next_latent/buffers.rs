@@ -1,11 +1,10 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    HiddenState, NextLatHiddenActivation, NextLatInputActivation, RowwiseNvfp4Scratch,
-    GPT2_TOKEN_ROWS,
+    HiddenState, NextLatHiddenActivation, NextLatInputActivation, RowwiseNvfp4Buffers,
+    RowwiseNvfp4Scratch, GPT2_TOKEN_ROWS,
 };
 
 use super::super::device_buffer::zero;
-use super::super::rowwise_nvfp4::RowwiseNvfp4Buffers;
 
 pub struct NextLatBuffers {
     pub(super) next_token_embeddings: DeviceBuffer<f32>,

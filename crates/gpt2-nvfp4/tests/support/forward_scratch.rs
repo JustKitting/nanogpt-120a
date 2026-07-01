@@ -1,36 +1,7 @@
 #![allow(dead_code)]
 
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::RowwiseNvfp4Scratch;
 use rust_kernels_cuda::attention::CausalAttentionTcScratch;
-
-pub struct RowwiseNvfp4ScratchBuffers {
-    bytes: DeviceBuffer<u8>,
-    scales: DeviceBuffer<u8>,
-    global_scales: DeviceBuffer<f32>,
-}
-
-impl RowwiseNvfp4ScratchBuffers {
-    pub fn new(
-        stream: &CudaStream,
-        element_count: usize,
-        row_count: usize,
-    ) -> Result<Self, DriverError> {
-        Ok(Self {
-            bytes: DeviceBuffer::zeroed(stream, element_count / 2)?,
-            scales: DeviceBuffer::zeroed(stream, element_count / 16)?,
-            global_scales: DeviceBuffer::zeroed(stream, row_count)?,
-        })
-    }
-
-    pub fn args(&mut self) -> RowwiseNvfp4Scratch<'_> {
-        RowwiseNvfp4Scratch {
-            bytes: &mut self.bytes,
-            scales: &mut self.scales,
-            global_scales: &mut self.global_scales,
-        }
-    }
-}
 
 pub struct CausalAttentionTcScratchBuffers {
     q: DeviceBuffer<f32>,

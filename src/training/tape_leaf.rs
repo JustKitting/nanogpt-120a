@@ -1,8 +1,8 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_TOKEN_ROWS, HiddenState, LayerNormSaved, LayerNormTape};
+use gpt2_nvfp4::{HiddenState, LayerNormSaved, LayerNormTape, GPT2_TOKEN_ROWS};
 
 use super::device_buffer::zero;
-pub(super) use super::rowwise_nvfp4::RowwiseNvfp4Buffers as RowwiseTapeBuffers;
+pub(super) use gpt2_nvfp4::RowwiseNvfp4Buffers as RowwiseTapeBuffers;
 
 pub struct LayerNormTapeBuffers {
     residual: DeviceBuffer<u16>,

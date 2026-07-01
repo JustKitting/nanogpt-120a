@@ -2,7 +2,7 @@ use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
     AttentionForwardArgs, AttentionLogSumExp, AttentionProjectionTensors, AttentionWeights,
     HiddenState, HiddenStateDevice, HiddenVectorShape, QkvActivation, QkvVectorShape,
-    QkvWeightShape, ResidualWeightShape, GPT2_CONTEXT_LEN, GPT2_N_HEAD,
+    QkvWeightShape, ResidualWeightShape, RowwiseNvfp4Buffers, GPT2_CONTEXT_LEN, GPT2_N_HEAD,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
@@ -19,7 +19,7 @@ use assertions::{
     assert_output_amax, assert_qkv_nonzero,
 };
 use common::cuda_test_context;
-use common::forward_scratch::{CausalAttentionTcScratchBuffers, RowwiseNvfp4ScratchBuffers};
+use common::forward_scratch::CausalAttentionTcScratchBuffers;
 use common::upload::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
 use data::{c_proj_identity_weight_bytes, hidden_input, qkv_identity_weight_bytes, residual_input};
 
@@ -38,8 +38,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> TestRe
     let mut amax_dev = DeviceBuffer::from_host(&stream, &amax)?;
     let mut mean_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
     let mut inv_std_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
-    let mut input_nvfp4 =
-        RowwiseNvfp4ScratchBuffers::new(&stream, HiddenState::LEN, GPT2_CONTEXT_LEN)?;
+    let mut input_nvfp4 = RowwiseNvfp4Buffers::new(&stream, HiddenState::LEN, GPT2_CONTEXT_LEN)?;
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
     let mut attention_log_sum_exp_dev =
         DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
@@ -62,7 +61,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> TestRe
         module: &attention_module,
         tc_module: &tc_module,
         quant_module: &quant_module,
-        input_nvfp4: input_nvfp4.args(),
+        input_nvfp4: input_nvfp4.scratch(),
         tc_scratch: tc_scratch.args(),
         projections: AttentionProjectionTensors {
             qkv_weight: qkv_weight.mma(),

@@ -1,10 +1,10 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    AttentionLogSumExp, HiddenState, Logits, MlpActivation, QkvActivation, GPT2_BATCH_SIZE,
-    GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    AttentionLogSumExp, HiddenState, Logits, MlpActivation, QkvActivation, RowwiseNvfp4Buffers,
+    GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
 };
 
-use crate::common::forward_scratch::{CausalAttentionTcScratchBuffers, RowwiseNvfp4ScratchBuffers};
+use crate::common::forward_scratch::CausalAttentionTcScratchBuffers;
 
 pub struct ForwardScratch {
     pub residual: DeviceBuffer<f32>,
@@ -12,10 +12,10 @@ pub struct ForwardScratch {
     pub normalized_amax: DeviceBuffer<f32>,
     pub mean: DeviceBuffer<f32>,
     pub inv_std: DeviceBuffer<f32>,
-    pub hidden_nvfp4: RowwiseNvfp4ScratchBuffers,
+    pub hidden_nvfp4: RowwiseNvfp4Buffers,
     pub mlp_pre_activation: DeviceBuffer<f32>,
     pub mlp_activation: DeviceBuffer<f32>,
-    pub mlp_activation_nvfp4: RowwiseNvfp4ScratchBuffers,
+    pub mlp_activation_nvfp4: RowwiseNvfp4Buffers,
     pub qkv: DeviceBuffer<f32>,
     pub attention_log_sum_exp: DeviceBuffer<f32>,
     pub attention_tc: CausalAttentionTcScratchBuffers,
@@ -30,14 +30,10 @@ impl ForwardScratch {
             normalized_amax: DeviceBuffer::zeroed(stream, GPT2_TOKEN_ROWS)?,
             mean: DeviceBuffer::zeroed(stream, GPT2_TOKEN_ROWS)?,
             inv_std: DeviceBuffer::zeroed(stream, GPT2_TOKEN_ROWS)?,
-            hidden_nvfp4: RowwiseNvfp4ScratchBuffers::new(
-                stream,
-                HiddenState::LEN,
-                GPT2_TOKEN_ROWS,
-            )?,
+            hidden_nvfp4: RowwiseNvfp4Buffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
             mlp_pre_activation: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
             mlp_activation: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
-            mlp_activation_nvfp4: RowwiseNvfp4ScratchBuffers::new(
+            mlp_activation_nvfp4: RowwiseNvfp4Buffers::new(
                 stream,
                 MlpActivation::LEN,
                 GPT2_TOKEN_ROWS,

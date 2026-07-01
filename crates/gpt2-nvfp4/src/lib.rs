@@ -46,7 +46,7 @@ pub use types::{
     LayerNormGrads, LayerNormSaved, LayerNormTape, LayerNormTensors, LayerNormWeights,
     LinearWeights, MlpActivationNvfp4, MlpDownTensors, MlpForwardArgs, MlpForwardTape,
     MlpProjectionTensors, MlpScratch, MlpUpTensors, MlpWeights, NextLatWeights,
-    RowwiseNvfp4Scratch, RowwiseNvfp4Tape, TokenEmbeddingArgs,
+    RowwiseNvfp4Buffers, RowwiseNvfp4Scratch, RowwiseNvfp4Tape, TokenEmbeddingArgs,
 };
 
 pub use types::{

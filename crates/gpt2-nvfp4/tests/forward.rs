@@ -70,9 +70,9 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
         layer_norm_module: &layer_norm_module,
         mlp_module: &mlp_module,
         lm_head_module: &lm_head_module,
-        hidden_nvfp4: scratch.hidden_nvfp4.args(),
+        hidden_nvfp4: scratch.hidden_nvfp4.scratch(),
         attention_tc_scratch: scratch.attention_tc.args(),
-        mlp_activation_nvfp4: scratch.mlp_activation_nvfp4.args(),
+        mlp_activation_nvfp4: scratch.mlp_activation_nvfp4.scratch(),
         attention: std::array::from_fn(|i| AttentionProjectionTensors {
             qkv_weight: blocks[i].attn_qkv.weight.mma(),
             qkv_bias: blocks[i].attn_qkv.bias.device(),

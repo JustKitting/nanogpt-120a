@@ -1,6 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    AttentionLogSumExp, HiddenState, Logits, MlpActivation, QkvActivation, GPT2_TOKEN_ROWS,
+    AttentionLogSumExp, HiddenState, Logits, MlpActivation, QkvActivation, RowwiseNvfp4Buffers,
+    GPT2_TOKEN_ROWS,
 };
 
 use super::device_buffer::zero;
@@ -11,7 +12,6 @@ use super::optimizer::OptimizerScratch;
 use super::optimizer_aurora::AuroraPointerTables;
 use super::optimizer_state::OptimizerStateBuffers;
 use super::optimizer_tc_scratch::AuroraScratchBuffers;
-use super::rowwise_nvfp4::RowwiseNvfp4Buffers;
 use super::scratch::BackwardScratchBuffers;
 use super::tape::ForwardTapeBuffers;
 use crate::training::runtime::Runtime;
