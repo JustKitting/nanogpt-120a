@@ -1,6 +1,12 @@
 use std::error::Error;
 
-use super::{MAX_ITERATIONS, device, math};
+use super::device::{self, GramCorrectionMode};
+use super::{MAX_ITERATIONS, math};
+
+const SAFETY_VALUES: [f32; 9] = [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08];
+const LATE_SAFETY_VALUES: [f32; 5] = [1.03, 1.04, 1.045, 1.05, 1.06];
+const RAMPED_SAFETY_VALUES: [f32; 4] = [1.04, 1.045, 1.05, 1.06];
+const TUNED_SCHEDULE: [f32; MAX_ITERATIONS] = [1.0, 1.0, 1.04, 1.01, 1.03, 1.08, 1.0, 1.08];
 
 #[derive(Clone)]
 pub(super) struct ScheduleResult {
@@ -71,16 +77,13 @@ impl<'a, 'cuda> ScheduleEval<'a, 'cuda> {
 }
 
 pub(super) fn seed_safety_schedules() -> Vec<[f32; MAX_ITERATIONS]> {
-    let mut schedules = Vec::new();
-    for value in [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08] {
-        schedules.push([value; MAX_ITERATIONS]);
-    }
-    for start in 0..MAX_ITERATIONS {
-        for value in [1.03, 1.04, 1.045, 1.05, 1.06] {
-            schedules.push(late_safety_schedule(start, value));
-        }
-    }
-    for high in [1.04, 1.045, 1.05, 1.06] {
+    let mut schedules = SAFETY_VALUES.map(|value| [value; MAX_ITERATIONS]).to_vec();
+    schedules.extend(
+        (0..MAX_ITERATIONS).flat_map(|start| {
+            LATE_SAFETY_VALUES.map(move |value| late_safety_schedule(start, value))
+        }),
+    );
+    for high in RAMPED_SAFETY_VALUES {
         let mut schedule = [1.0; MAX_ITERATIONS];
         for (iter, slot) in schedule.iter_mut().enumerate() {
             let t = iter as f32 / (MAX_ITERATIONS - 1) as f32;
@@ -132,11 +135,10 @@ pub(super) fn search_best_raw_schedule(
     }
 
     let mut greedy = best.schedule;
-    let values = [1.0, 1.01, 1.02, 1.03, 1.04, 1.045, 1.05, 1.06, 1.08];
     for pass in 0..2 {
         for iter in 0..eval.iterations {
             let mut local_best = best.clone();
-            for value in values {
+            for value in SAFETY_VALUES {
                 let mut candidate = greedy;
                 candidate[iter] = value;
                 let name =
@@ -186,7 +188,7 @@ fn evaluate_schedule(
     name: &str,
     schedule: [f32; MAX_ITERATIONS],
 ) -> Result<ScheduleResult, Box<dyn Error>> {
-    let mode = device::GramCorrectionMode::Nvfp4GramOnlySchedule {
+    let mode = GramCorrectionMode::Nvfp4GramOnlySchedule {
         coefficient_safety: schedule,
     };
     evaluate_mode(eval, name, schedule, mode)
@@ -198,7 +200,7 @@ fn evaluate_stale_reject_schedule(
     period: usize,
     schedule: [f32; MAX_ITERATIONS],
 ) -> Result<ScheduleResult, Box<dyn Error>> {
-    let mode = device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+    let mode = GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
         exact_steps,
         period,
         coefficient_safety: schedule,
@@ -218,7 +220,7 @@ pub(super) fn evaluate_mode(
     eval: ScheduleEval<'_, '_>,
     name: &str,
     schedule: [f32; MAX_ITERATIONS],
-    mode: device::GramCorrectionMode,
+    mode: GramCorrectionMode,
 ) -> Result<ScheduleResult, Box<dyn Error>> {
     let (actual, stats) = eval.polar.gram_form_corrected_iterations(
         eval.source.to_vec(),
@@ -276,47 +278,44 @@ fn schedule_result_name(label: &str, name: String) -> String {
     }
 }
 
-pub(super) fn production_shape_modes() -> [(&'static str, device::GramCorrectionMode); 7] {
-    let tuned_schedule = [1.0, 1.0, 1.04, 1.01, 1.03, 1.08, 1.0, 1.08];
+pub(super) fn production_shape_modes() -> [(&'static str, GramCorrectionMode); 7] {
     [
-        ("nvfp4_raw", device::GramCorrectionMode::Nvfp4GramOnly),
-        (
-            "nvfp4_safety105",
-            device::GramCorrectionMode::Nvfp4GramOnlySafety {
-                coefficient_safety: 1.05,
-            },
-        ),
-        (
-            "nvfp4_tuned_schedule",
-            device::GramCorrectionMode::Nvfp4GramOnlySchedule {
-                coefficient_safety: tuned_schedule,
-            },
-        ),
+        ("nvfp4_raw", GramCorrectionMode::Nvfp4GramOnly),
+        ("nvfp4_safety105", nvfp4_safety_mode(1.05)),
+        ("nvfp4_tuned_schedule", nvfp4_schedule_mode(TUNED_SCHEDULE)),
         (
             "prefix2_stale_reject3_tuned",
-            stale_reject_schedule_mode(2, 3, tuned_schedule),
+            stale_reject_schedule_mode(2, 3, TUNED_SCHEDULE),
         ),
         (
             "prefix3_stale_reject2_tuned",
-            stale_reject_schedule_mode(3, 2, tuned_schedule),
+            stale_reject_schedule_mode(3, 2, TUNED_SCHEDULE),
         ),
         (
             "prefix3_stale_reject3_tuned",
-            stale_reject_schedule_mode(3, 3, tuned_schedule),
+            stale_reject_schedule_mode(3, 3, TUNED_SCHEDULE),
         ),
         (
             "prefix3_stale_reject5_tuned",
-            stale_reject_schedule_mode(3, 5, tuned_schedule),
+            stale_reject_schedule_mode(3, 5, TUNED_SCHEDULE),
         ),
     ]
+}
+
+const fn nvfp4_safety_mode(coefficient_safety: f32) -> GramCorrectionMode {
+    GramCorrectionMode::Nvfp4GramOnlySafety { coefficient_safety }
+}
+
+const fn nvfp4_schedule_mode(coefficient_safety: [f32; MAX_ITERATIONS]) -> GramCorrectionMode {
+    GramCorrectionMode::Nvfp4GramOnlySchedule { coefficient_safety }
 }
 
 const fn stale_reject_schedule_mode(
     exact_steps: usize,
     period: usize,
     coefficient_safety: [f32; MAX_ITERATIONS],
-) -> device::GramCorrectionMode {
-    device::GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+) -> GramCorrectionMode {
+    GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
         exact_steps,
         period,
         coefficient_safety,

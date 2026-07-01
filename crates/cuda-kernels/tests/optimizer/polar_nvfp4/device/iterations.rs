@@ -17,20 +17,20 @@ struct CorrectionGram {
 }
 
 impl CorrectionGram {
-    fn refreshed(values: Vec<f32>) -> Self {
+    fn new(values: Vec<f32>, stale_reject_candidate: bool, refresh: bool) -> Self {
         Self {
             values,
-            stale_reject_candidate: false,
-            refresh: true,
+            stale_reject_candidate,
+            refresh,
         }
     }
 
+    fn refreshed(values: Vec<f32>) -> Self {
+        Self::new(values, false, true)
+    }
+
     fn approximate(values: Vec<f32>) -> Self {
-        Self {
-            values,
-            stale_reject_candidate: false,
-            refresh: false,
-        }
+        Self::new(values, false, false)
     }
 }
 
@@ -257,8 +257,8 @@ impl<'a> Nvfp4Polar<'a> {
             cols,
             iter,
         } = request;
-        Ok(CorrectionGram {
-            values: self.corrected_gram(
+        Ok(CorrectionGram::new(
+            self.corrected_gram(
                 source,
                 rows,
                 cols,
@@ -268,9 +268,9 @@ impl<'a> Nvfp4Polar<'a> {
                 stale_defect,
                 stats,
             )?,
-            stale_reject_candidate: rejects_stale_steps && !refresh,
+            rejects_stale_steps && !refresh,
             refresh,
-        })
+        ))
     }
 
     fn high_precision_gram(
