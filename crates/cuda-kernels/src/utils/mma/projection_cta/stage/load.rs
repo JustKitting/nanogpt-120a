@@ -4,8 +4,7 @@ use crate::mma::projection::load_bytes::{
 };
 
 use super::super::tile::{
-    NVFP4_PROJECTION_CTA_M, NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_PACKS_PER_ROW,
-    Nvfp4ProjectionCtaTile,
+    NVFP4_PROJECTION_CTA_M, NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_PACKS_PER_ROW, Nvfp4ProjectionCtaTile,
 };
 
 const MMA_K: u32 = 64;
@@ -14,10 +13,7 @@ macro_rules! pack_loader_pair {
     ($checked:ident, $aligned:ident, $base:ident, |$row:ident, $col:ident, $params:ident| $bounds:expr, $index:expr) => {
         #[inline(always)]
         pub(super) fn $checked(
-            bytes: &[u8],
-            tile: Nvfp4ProjectionCtaTile,
-            offset: u32,
-            k_base: u32,
+            bytes: &[u8], tile: Nvfp4ProjectionCtaTile, offset: u32, k_base: u32,
             $params: &Nvfp4ProjectionParams,
         ) -> u32 {
             let ($row, $col) = pack_coords(offset, tile.$base, k_base);
@@ -30,10 +26,7 @@ macro_rules! pack_loader_pair {
 
         #[inline(always)]
         pub(super) fn $aligned(
-            bytes: &[u8],
-            tile: Nvfp4ProjectionCtaTile,
-            offset: u32,
-            k_base: u32,
+            bytes: &[u8], tile: Nvfp4ProjectionCtaTile, offset: u32, k_base: u32,
             $params: &Nvfp4ProjectionParams,
         ) -> u32 {
             let ($row, $col) = pack_coords(offset, tile.$base, k_base);
@@ -46,10 +39,7 @@ macro_rules! scale_loader_pair {
     ($checked:ident, $aligned:ident, $base:ident, $rows_per_atom:expr, |$row:ident, $col:ident, $params:ident| $bounds:expr, $index:expr) => {
         #[inline(always)]
         pub(super) fn $checked(
-            scales: &[u8],
-            tile: Nvfp4ProjectionCtaTile,
-            offset: u32,
-            k_base: u32,
+            scales: &[u8], tile: Nvfp4ProjectionCtaTile, offset: u32, k_base: u32,
             $params: &Nvfp4ProjectionParams,
         ) -> u32 {
             let ($row, $col) = scale_coords(offset, tile.$base, $rows_per_atom, k_base);
@@ -62,10 +52,7 @@ macro_rules! scale_loader_pair {
 
         #[inline(always)]
         pub(super) fn $aligned(
-            scales: &[u8],
-            tile: Nvfp4ProjectionCtaTile,
-            offset: u32,
-            k_base: u32,
+            scales: &[u8], tile: Nvfp4ProjectionCtaTile, offset: u32, k_base: u32,
             $params: &Nvfp4ProjectionParams,
         ) -> u32 {
             let ($row, $col) = scale_coords(offset, tile.$base, $rows_per_atom, k_base);
@@ -75,35 +62,25 @@ macro_rules! scale_loader_pair {
 }
 
 pack_loader_pair!(
-    load_a_pack,
-    load_a_pack_aligned,
-    row_base,
+    load_a_pack, load_a_pack_aligned, row_base,
     |global_row, global_col, params| global_row < params.token_count
         && global_col + 7 < params.input_dim,
     global_row * params.input_dim + global_col
 );
 pack_loader_pair!(
-    load_b_pack,
-    load_b_pack_aligned,
-    col_base,
+    load_b_pack, load_b_pack_aligned, col_base,
     |global_col, global_k, params| global_col < params.output_dim
         && global_k + 7 < params.input_dim,
     global_col * params.input_dim + global_k
 );
 scale_loader_pair!(
-    load_a_scale,
-    load_a_scale_aligned,
-    row_base,
-    NVFP4_PROJECTION_CTA_M,
+    load_a_scale, load_a_scale_aligned, row_base, NVFP4_PROJECTION_CTA_M,
     |global_row, scale_k_base, params| global_row < params.token_count
         && scale_k_base < params.input_dim,
     (global_row * params.input_dim + scale_k_base) / 16
 );
 scale_loader_pair!(
-    load_b_scale,
-    load_b_scale_aligned,
-    col_base,
-    NVFP4_PROJECTION_CTA_N,
+    load_b_scale, load_b_scale_aligned, col_base, NVFP4_PROJECTION_CTA_N,
     |global_col, scale_k_base, params| global_col < params.output_dim
         && scale_k_base < params.input_dim,
     global_col * (params.input_dim / 16) + scale_k_base / 16
