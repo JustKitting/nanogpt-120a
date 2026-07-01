@@ -73,18 +73,14 @@ impl Baseline {
     }
 
     fn write(&self) -> io::Result<()> {
-        let Some(record) = &self.record else {
-            return Ok(());
-        };
-        write::record(&self.path, record)
+        self.record
+            .as_ref()
+            .map_or(Ok(()), |record| write::record(&self.path, record))
     }
 }
 
 fn trial_record(trial: &Trial) -> Option<Record> {
-    if trial.status != "success" {
-        return None;
-    }
-    if trial.candidate.n_layer < MIN_N_LAYER {
+    if trial.status != "success" || trial.candidate.n_layer < MIN_N_LAYER {
         return None;
     }
     Some(Record {
