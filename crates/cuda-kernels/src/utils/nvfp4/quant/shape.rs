@@ -46,22 +46,19 @@ impl Fp32PairNoPad {
         dst_row_len: u32,
         transpose_dst_row_len: u32,
     ) -> Option<Self> {
-        (src_row_len == dst_row_len
-            && row_count == transpose_dst_row_len
-            && dst_row_len.is_multiple_of(MS_EDEN_CHUNK_LEN)
-            && transpose_dst_row_len.is_multiple_of(MS_EDEN_CHUNK_LEN))
-        .then_some(Self {
-            chunks_per_row: dst_row_len / MS_EDEN_CHUNK_LEN,
-            transpose_chunks_per_row: transpose_dst_row_len / MS_EDEN_CHUNK_LEN,
+        let chunks_per_row = ms_eden_chunks(dst_row_len)?;
+        let transpose_chunks_per_row = ms_eden_chunks(transpose_dst_row_len)?;
+        (src_row_len == dst_row_len && row_count == transpose_dst_row_len).then_some(Self {
+            chunks_per_row,
+            transpose_chunks_per_row,
         })
     }
 
     pub fn pow2(self) -> Option<Fp32PairNoPadPow2> {
-        (self.chunks_per_row.is_power_of_two() && self.transpose_chunks_per_row.is_power_of_two())
-            .then_some(Fp32PairNoPadPow2 {
-                chunks_per_row_shift: self.chunks_per_row.trailing_zeros(),
-                transpose_chunks_per_row_shift: self.transpose_chunks_per_row.trailing_zeros(),
-            })
+        Some(Fp32PairNoPadPow2 {
+            chunks_per_row_shift: pow2_shift(self.chunks_per_row)?,
+            transpose_chunks_per_row_shift: pow2_shift(self.transpose_chunks_per_row)?,
+        })
     }
 }
 
@@ -79,21 +76,19 @@ pub(super) struct RowwiseTransposeNoPad {
 
 impl RowwiseTransposeNoPad {
     pub fn new(source_rows: u32, source_cols: u32, dst_row_len: u32) -> Option<Self> {
-        if source_rows != dst_row_len || !dst_row_len.is_multiple_of(MS_EDEN_CHUNK_LEN) {
+        if source_rows != dst_row_len {
             return None;
         }
 
-        let chunks_per_row = dst_row_len / MS_EDEN_CHUNK_LEN;
-        chunks_per_row.is_power_of_two().then_some(Self {
+        let chunks_per_row = ms_eden_chunks(dst_row_len)?;
+        Some(Self {
             source_cols,
-            chunks_per_row_shift: chunks_per_row.trailing_zeros(),
+            chunks_per_row_shift: pow2_shift(chunks_per_row)?,
         })
     }
 
     pub fn source_cols_shift(self) -> Option<u32> {
-        self.source_cols
-            .is_power_of_two()
-            .then(|| self.source_cols.trailing_zeros())
+        pow2_shift(self.source_cols)
     }
 }
 
@@ -111,4 +106,14 @@ pub(super) fn four_six_rowwise_pow2(row_len: u32, group_count: u32) -> bool {
 
 pub(super) fn tensor_amax_chunk_count(element_count: u32) -> u32 {
     element_count.div_ceil(kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK)
+}
+
+fn ms_eden_chunks(row_len: u32) -> Option<u32> {
+    row_len
+        .is_multiple_of(MS_EDEN_CHUNK_LEN)
+        .then_some(row_len / MS_EDEN_CHUNK_LEN)
+}
+
+fn pow2_shift(value: u32) -> Option<u32> {
+    value.is_power_of_two().then(|| value.trailing_zeros())
 }
