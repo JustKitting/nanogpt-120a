@@ -80,11 +80,7 @@ fn reference_gelu(x: f32) -> f32 {
 }
 
 fn assert_all_close(actual: &[f32], expected: f32) {
-    for (index, actual) in actual.iter().enumerate() {
-        let error = (actual - expected).abs();
-        assert!(
-            error <= TOLERANCE,
-            "index={index} actual={actual} expected={expected}"
-        );
+    for actual in actual {
+        common::assert_close(*actual, expected, TOLERANCE);
     }
 }

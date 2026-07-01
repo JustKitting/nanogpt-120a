@@ -57,19 +57,11 @@ fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error
     })?;
 
     let logits = logits_dev.to_host_vec(&stream)?;
-    assert_value(logits[0], 1.0);
-    assert_value(logits[1], 1.0);
-    assert_value(logits[2], 0.0);
-    assert_value(logits[VOCAB_SIZE], 0.0);
-    assert_value(logits[VOCAB_SIZE + 1], 0.0);
-    assert_value(logits[VOCAB_SIZE + 2], 1.0);
+    common::assert_close(logits[0], 1.0, TOLERANCE);
+    common::assert_close(logits[1], 1.0, TOLERANCE);
+    common::assert_close(logits[2], 0.0, TOLERANCE);
+    common::assert_close(logits[VOCAB_SIZE], 0.0, TOLERANCE);
+    common::assert_close(logits[VOCAB_SIZE + 1], 0.0, TOLERANCE);
+    common::assert_close(logits[VOCAB_SIZE + 2], 1.0, TOLERANCE);
     Ok(())
-}
-
-fn assert_value(actual: f32, expected: f32) {
-    let error = (actual - expected).abs();
-    assert!(
-        error <= TOLERANCE,
-        "actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
-    );
 }
