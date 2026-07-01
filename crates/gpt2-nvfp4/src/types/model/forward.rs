@@ -1,11 +1,9 @@
-use cuda_core::DriverError;
-use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
-
 use super::args::Gpt2ForwardArgs;
 use super::final_logits::{FinalForwardArgs, finish_forward};
 use super::weights::Gpt2Weights;
 use crate::types::{BlockForwardArgs, HiddenStateDevice};
 use crate::uses_full_attention;
+use cuda_core::DriverError;
 
 pub(super) fn forward<'a>(
     weights: &Gpt2Weights,
@@ -19,6 +17,16 @@ pub(super) fn forward<'a>(
         layer_norm_module,
         mlp_module,
         lm_head_module,
+        tma_module,
+        tma_scale_pack,
+        tma_pad,
+        projection_postop,
+        tma_descriptors,
+        tma_input_scale_packed,
+        tma_wide_input_scale_packed,
+        tma_weight_scale_packed,
+        tma_weight_bytes_padded,
+        tma_residual,
         mut hidden_nvfp4,
         mut attention_tc_scratch,
         mut mlp_activation_nvfp4,
@@ -35,11 +43,7 @@ pub(super) fn forward<'a>(
         mut tape,
     } = args;
 
-    let lm_head_weight = Nvfp4FourSixMmaWeightTensor::new(
-        embeddings.token_embedding.bytes,
-        embeddings.token_embedding.scales,
-        embeddings.token_embedding.global_scale,
-    );
+    let lm_head_weight_device = embeddings.token_embedding;
 
     let mut hidden = weights.embeddings.forward(embeddings)?;
 
@@ -51,9 +55,19 @@ pub(super) fn forward<'a>(
             quant_module,
             layer_norm_module,
             mlp_module,
+            tma_module,
+            tma_scale_pack,
+            tma_pad,
+            projection_postop,
             hidden_nvfp4: hidden_nvfp4.reborrow(),
             attention_tc_scratch: attention_tc_scratch.reborrow(),
             mlp_activation_nvfp4: mlp_activation_nvfp4.reborrow(),
+            tma_descriptors: &mut *tma_descriptors,
+            tma_input_scale_packed: &mut *tma_input_scale_packed,
+            tma_wide_input_scale_packed: &mut *tma_wide_input_scale_packed,
+            tma_weight_scale_packed: &mut *tma_weight_scale_packed,
+            tma_weight_bytes_padded: &mut *tma_weight_bytes_padded,
+            tma_residual: &mut *tma_residual,
             projections: attention[block_index],
             ln_1: block_ln_1[block_index],
             ln_2: block_ln_2[block_index],
@@ -72,9 +86,14 @@ pub(super) fn forward<'a>(
         layer_norm_module,
         quant_module,
         lm_head_module,
+        lm_head_tma_module: tma_module,
+        lm_head_tma_scale_pack: tma_scale_pack,
+        lm_head_tma_descriptors: tma_descriptors,
+        lm_head_input_scale_packed: tma_input_scale_packed,
+        lm_head_weight_scale_packed: tma_weight_scale_packed,
         ln_f,
         hidden_nvfp4,
-        lm_head_weight,
+        lm_head_weight_device,
         logits,
         tape,
         hidden,

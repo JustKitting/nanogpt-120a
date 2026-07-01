@@ -11,6 +11,7 @@ mod diagnostics;
 mod env;
 mod eval;
 mod forward;
+mod forward_tma;
 mod generate;
 mod grad_block;
 mod grad_clip;

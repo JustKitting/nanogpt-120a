@@ -307,8 +307,8 @@ fn store_f32x2_global(out: &mut DisjointSlice<f32>, index: u32, x: f32, y: f32) 
 }
 
 #[inline(always)]
-fn scale_tma_y(mn_base: u32, k_base: u32, mn_extent: u32) -> i32 {
-    Sm120ScaleLayout::tma_y_padded(mn_base, k_base, mn_extent)
+fn scale_tma_y(mn_base: u32, k_base: u32, mn_extent: u32, k_dim: u32) -> i32 {
+    Sm120ScaleLayout::block_major_tma_y_padded(mn_base, k_base, mn_extent, k_dim)
 }
 
 #[inline(always)]
@@ -347,14 +347,14 @@ fn stage_tiles_full_tma_nvfp4(
                 a_scales as *mut u8,
                 a_scale_tma,
                 0,
-                scale_tma_y(tile.row_base, k_base, params.token_count),
+                scale_tma_y(tile.row_base, k_base, params.token_count, params.input_dim),
                 tma_bar,
             );
             cp_async_bulk_tensor_2d_cta_g2s(
                 b_scales as *mut u8,
                 b_scale_tma,
                 0,
-                scale_tma_y(tile.col_base, k_base, params.output_dim),
+                scale_tma_y(tile.col_base, k_base, params.output_dim, params.input_dim),
                 tma_bar,
             );
         }
@@ -503,31 +503,39 @@ fn store_acc_full(
     let row1 = row0 + 8;
     let col0 = tile.mma_col_base(n_repeat) + tile.thread_in_group * 2;
     let output_dim = params.output_dim;
-    let scale = output_scale(params);
+    if col0 + 1 >= output_dim {
+        return;
+    }
+    let scale0 = output_scale(params, row0);
+    let scale1 = output_scale(params, row1);
 
     store_f32x2_global(
         out,
         row0 * output_dim + col0,
-        acc[0] * scale,
-        acc[1] * scale,
+        acc[0] * scale0,
+        acc[1] * scale0,
     );
     store_f32x2_global(
         out,
         row1 * output_dim + col0,
-        acc[2] * scale,
-        acc[3] * scale,
+        acc[2] * scale1,
+        acc[3] * scale1,
     );
 }
 
 #[inline(always)]
-fn output_scale(params: Nvfp4GemmParams) -> f32 {
+fn output_scale(params: Nvfp4GemmParams, row: u32) -> f32 {
     if params.global_scale_mode == 0 {
         return params.weight_global_scale;
     }
     unsafe {
-        params.weight_global_scale
-            * *(params.a_global_scale as usize as *const f32)
-            * *(params.b_global_scale as usize as *const f32)
+        let b_scale = *(params.b_global_scale as usize as *const f32);
+        let a_scale = if params.global_scale_mode == 2 {
+            *((params.a_global_scale as usize as *const f32).add(row as usize))
+        } else {
+            *(params.a_global_scale as usize as *const f32)
+        };
+        params.weight_global_scale * a_scale * b_scale
     }
 }
 

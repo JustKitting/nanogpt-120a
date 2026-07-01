@@ -21,10 +21,12 @@ pub(crate) mod module {
         let stride = thread::blockDim_x() * thread::gridDim_x();
         let mut index = thread::blockIdx_x() * thread::blockDim_x() + thread::threadIdx_x();
         let packed_groups = padded_mn_extent * k_groups;
+        let k_dim = k_groups * Sm120ScaleLayout::VECTOR_SIZE;
         while index < packed_groups {
             let mn = index / k_groups;
             let k_group = index - mn * k_groups;
-            let dst = Sm120ScaleLayout::byte_offset(mn, k_group, padded_mn_extent);
+            let dst =
+                Sm120ScaleLayout::block_major_byte_offset(mn, k_group, padded_mn_extent, k_dim);
             let value = if mn < mn_extent {
                 logical[(mn * k_groups + k_group) as usize]
             } else {

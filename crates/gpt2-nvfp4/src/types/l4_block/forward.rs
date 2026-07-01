@@ -18,6 +18,12 @@ impl Gpt2BlockWeights {
         let mlp_pre_activation = args.mlp_pre_activation;
         let mlp_activation = args.mlp_activation;
         let mut hidden_nvfp4 = args.hidden_nvfp4;
+        let tma_descriptors = args.tma_descriptors;
+        let tma_input_scale_packed = args.tma_input_scale_packed;
+        let tma_wide_input_scale_packed = args.tma_wide_input_scale_packed;
+        let tma_weight_scale_packed = args.tma_weight_scale_packed;
+        let tma_weight_bytes_padded = args.tma_weight_bytes_padded;
+        let tma_residual = args.tma_residual;
         let mut tape = args.tape;
 
         let ln_1 =
@@ -32,9 +38,18 @@ impl Gpt2BlockWeights {
             use_full_attention: args.use_full_attention,
             module: args.attention_module,
             tc_module: args.attention_tc_module,
+            tma_module: args.tma_module,
+            tma_scale_pack: args.tma_scale_pack,
+            tma_pad: args.tma_pad,
+            projection_postop: args.projection_postop,
             quant_module: args.quant_module,
             input_nvfp4: hidden_nvfp4.reborrow(),
             tc_scratch: args.attention_tc_scratch,
+            tma_descriptors: &mut *tma_descriptors,
+            tma_input_scale_packed: &mut *tma_input_scale_packed,
+            tma_weight_scale_packed: &mut *tma_weight_scale_packed,
+            tma_weight_bytes_padded: &mut *tma_weight_bytes_padded,
+            tma_residual: &mut *tma_residual,
             projections: args.projections,
             qkv: &mut *qkv,
             attention_log_sum_exp: &mut *attention_log_sum_exp,
@@ -55,12 +70,20 @@ impl Gpt2BlockWeights {
 
         let hidden = MlpWeights::forward(MlpForwardArgs {
             module: args.mlp_module,
+            tma_module: args.tma_module,
+            tma_scale_pack: args.tma_scale_pack,
+            projection_postop: args.projection_postop,
             quant_module: args.quant_module,
             scratch: MlpScratch {
                 input_nvfp4: hidden_nvfp4.reborrow(),
                 activation_nvfp4: args.mlp_activation_nvfp4,
                 pre_activation: &mut *mlp_pre_activation,
                 activation: &mut *mlp_activation,
+                tma_descriptors: &mut *tma_descriptors,
+                tma_input_scale_packed: &mut *tma_input_scale_packed,
+                tma_wide_input_scale_packed: &mut *tma_wide_input_scale_packed,
+                tma_weight_scale_packed: &mut *tma_weight_scale_packed,
+                tma_residual: &mut *tma_residual,
             },
             projections: args.mlp,
             hidden,

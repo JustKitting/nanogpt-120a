@@ -408,6 +408,26 @@ impl Sm120ScaleLayout {
     }
 
     #[inline(always)]
+    pub const fn block_major_tma_y(mn_base: u32, k_base: u32, _mn_extent: u32, k_dim: u32) -> i32 {
+        let k_atoms = Self::k_atoms(k_dim);
+        let mn_block = mn_base / Self::MN_BLOCK;
+        let k_atom = k_base / Self::K_ATOM;
+        ((mn_block * k_atoms + k_atom) * Self::MN_FAST) as i32
+    }
+
+    #[inline(always)]
+    pub const fn block_major_tma_y_padded(
+        mn_base: u32,
+        k_base: u32,
+        mn_extent: u32,
+        k_dim: u32,
+    ) -> i32 {
+        let padded_mn_extent = Self::padded_mn_extent(mn_extent);
+        let aligned_mn_base = (mn_base / Self::MN_BLOCK) * Self::MN_BLOCK;
+        Self::block_major_tma_y(aligned_mn_base, k_base, padded_mn_extent, k_dim)
+    }
+
+    #[inline(always)]
     pub const fn byte_offset(mn: u32, k_group: u32, mn_extent: u32) -> usize {
         let mn_blocks = mn_extent / Self::MN_BLOCK;
         let mn_block = mn / Self::MN_BLOCK;
@@ -419,6 +439,28 @@ impl Sm120ScaleLayout {
 
         (k_atom * mn_blocks * Self::BYTES_PER_MN_K_ATOM
             + mn_block * Self::BYTES_PER_MN_K_ATOM
+            + mn_fast * Self::TMA_ROW_BYTES
+            + mn_slow * Self::GROUPS_PER_K_ATOM
+            + k_in_atom) as usize
+    }
+
+    #[inline(always)]
+    pub const fn block_major_byte_offset(
+        mn: u32,
+        k_group: u32,
+        _mn_extent: u32,
+        k_dim: u32,
+    ) -> usize {
+        let k_atoms = Self::k_atoms(k_dim);
+        let mn_block = mn / Self::MN_BLOCK;
+        let mn_in_block = mn - mn_block * Self::MN_BLOCK;
+        let mn_fast = mn_in_block % Self::MN_FAST;
+        let mn_slow = mn_in_block / Self::MN_FAST;
+        let k_atom = k_group / Self::GROUPS_PER_K_ATOM;
+        let k_in_atom = k_group % Self::GROUPS_PER_K_ATOM;
+
+        (mn_block * k_atoms * Self::BYTES_PER_MN_K_ATOM
+            + k_atom * Self::BYTES_PER_MN_K_ATOM
             + mn_fast * Self::TMA_ROW_BYTES
             + mn_slow * Self::GROUPS_PER_K_ATOM
             + k_in_atom) as usize

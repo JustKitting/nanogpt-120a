@@ -1,8 +1,12 @@
 use cuda_core::{DeviceBuffer, DriverError};
 use rust_kernels_cuda::layer_norm::LayerNormModule;
-use rust_kernels_cuda::lm_head::{LmHeadArgs, LmHeadModule};
-use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
+use rust_kernels_cuda::lm_head::{LmHeadModule, LmHeadTmaArgs};
+use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
+use rust_kernels_cuda::nvfp4_tma_matmul::{
+    launcher::Nvfp4GemmModule, scale_pack::Sm120ScalePackModule,
+    tma::TmaNvfp4DeviceScaleDescriptors,
+};
 
 use crate::types::{
     Gpt2ForwardTape, HiddenStateDevice, HiddenStateNvfp4, LayerNormTensors, LayerNormWeights,
@@ -13,9 +17,14 @@ pub(super) struct FinalForwardArgs<'a, 'w> {
     pub layer_norm_module: &'a LayerNormModule,
     pub quant_module: &'a Nvfp4QuantModule,
     pub lm_head_module: &'a LmHeadModule,
+    pub lm_head_tma_module: &'a Nvfp4GemmModule,
+    pub lm_head_tma_scale_pack: &'a Sm120ScalePackModule,
+    pub lm_head_tma_descriptors: &'a mut TmaNvfp4DeviceScaleDescriptors,
+    pub lm_head_input_scale_packed: &'a mut DeviceBuffer<u8>,
     pub ln_f: LayerNormTensors<'a>,
     pub hidden_nvfp4: HiddenStateNvfp4<'a>,
-    pub lm_head_weight: Nvfp4FourSixMmaWeightTensor<'a>,
+    pub lm_head_weight_device: Nvfp4DeviceTensor<'a>,
+    pub lm_head_weight_scale_packed: &'a mut DeviceBuffer<u8>,
     pub logits: &'a mut DeviceBuffer<f32>,
     pub tape: Option<Gpt2ForwardTape<'a>>,
     pub hidden: HiddenStateDevice<'a>,
@@ -40,10 +49,15 @@ pub(super) fn finish_forward<'a>(
         tape.lm_head_input_nvfp4.save(hidden.stream, input)?;
     }
 
-    args.lm_head_module.logits(LmHeadArgs {
+    args.lm_head_module.logits_tma(LmHeadTmaArgs {
         stream: hidden.stream,
+        tma: args.lm_head_tma_module,
+        scale_pack: args.lm_head_tma_scale_pack,
+        descriptors: args.lm_head_tma_descriptors,
+        input_scale_packed: args.lm_head_input_scale_packed,
         input,
-        weight: args.lm_head_weight,
+        weight: args.lm_head_weight_device,
+        weight_scale_packed: args.lm_head_weight_scale_packed,
         logits: &mut *args.logits,
         token_count: hidden.row_count,
         input_dim: crate::GPT2_EMBEDDING_DIM,

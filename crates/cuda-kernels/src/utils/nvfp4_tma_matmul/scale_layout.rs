@@ -68,7 +68,7 @@ pub fn sm120_scale_tma_shape_padded(
     }
 }
 
-pub fn sm120_scale_tma_y(mn_base: usize, k_base: usize, mn_extent: usize) -> i32 {
+pub fn sm120_scale_tma_y(mn_base: usize, k_base: usize, mn_extent: usize, k_dim: usize) -> i32 {
     assert!(
         mn_base % SM120_SCALE_MN_BLOCK == 0,
         "scale TMA MN base must be tile aligned"
@@ -82,8 +82,14 @@ pub fn sm120_scale_tma_y(mn_base: usize, k_base: usize, mn_extent: usize) -> i32
         mn_extent % SM120_SCALE_MN_BLOCK == 0,
         "SM120 scale layout requires MN extent divisible by {SM120_SCALE_MN_BLOCK}"
     );
+    validate_scale_shape(mn_extent, k_dim);
 
-    Sm120ScaleLayout::tma_y(mn_base as u32, k_base as u32, mn_extent as u32)
+    Sm120ScaleLayout::block_major_tma_y(
+        mn_base as u32,
+        k_base as u32,
+        mn_extent as u32,
+        k_dim as u32,
+    )
 }
 
 pub fn sm120_scale_packed_len(mn_extent: usize, k_dim: usize) -> usize {
@@ -91,14 +97,20 @@ pub fn sm120_scale_packed_len(mn_extent: usize, k_dim: usize) -> usize {
     Sm120ScaleLayout::packed_len(mn_extent as u32, k_dim as u32)
 }
 
-pub fn sm120_scale_byte_offset(mn: usize, k_group: usize, mn_extent: usize) -> usize {
+pub fn sm120_scale_byte_offset(mn: usize, k_group: usize, mn_extent: usize, k_dim: usize) -> usize {
     assert!(
         mn_extent % SM120_SCALE_MN_BLOCK == 0,
         "SM120 scale layout requires MN extent divisible by {SM120_SCALE_MN_BLOCK}"
     );
     assert!(mn < mn_extent, "MN index is outside the scale extent");
+    validate_scale_shape(mn_extent, k_dim);
 
-    Sm120ScaleLayout::byte_offset(mn as u32, k_group as u32, mn_extent as u32)
+    Sm120ScaleLayout::block_major_byte_offset(
+        mn as u32,
+        k_group as u32,
+        mn_extent as u32,
+        k_dim as u32,
+    )
 }
 
 pub fn sm120_scale_u32_word_offset(mn: usize, k_atom: usize, mn_extent: usize) -> usize {
@@ -146,7 +158,7 @@ pub fn pack_sm120_scale_plane(
     for mn in 0..mn_extent {
         let row_base = mn * logical_row_stride_bytes;
         for k_group in 0..k_groups {
-            let dst = sm120_scale_byte_offset(mn, k_group, mn_extent);
+            let dst = sm120_scale_byte_offset(mn, k_group, mn_extent, k_dim);
             packed[dst] = logical[row_base + k_group];
         }
     }
@@ -178,7 +190,7 @@ pub fn pack_sm120_scale_plane_padded(
     for mn in 0..mn_extent {
         let row_base = mn * logical_row_stride_bytes;
         for k_group in 0..k_groups {
-            let dst = sm120_scale_byte_offset(mn, k_group, padded_mn_extent);
+            let dst = sm120_scale_byte_offset(mn, k_group, padded_mn_extent, k_dim);
             packed[dst] = logical[row_base + k_group];
         }
     }

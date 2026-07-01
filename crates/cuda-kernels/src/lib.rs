@@ -64,6 +64,8 @@ pub mod nvfp4_tc_matmul;
 pub mod nvfp4_tma_matmul;
 #[path = "gpt/optimizer/mod.rs"]
 pub mod optimizer;
+#[path = "gpt/projection_postop.rs"]
+pub mod projection_postop;
 #[path = "utils/quartet.rs"]
 pub mod quartet;
 #[path = "gpt/residual.rs"]
@@ -78,7 +80,7 @@ pub mod warp_reduce;
 pub mod gpt {
     pub use crate::{
         attention, embedding, layer_norm, layer_norm_backward, linear_backward, lm_head, logits,
-        loss, mlp, next_latent, optimizer, residual,
+        loss, mlp, next_latent, optimizer, projection_postop, residual,
     };
 }
 

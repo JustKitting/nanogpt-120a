@@ -5,6 +5,11 @@ use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::lm_head::LmHeadModule;
 use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
+use rust_kernels_cuda::nvfp4_tma_matmul::{
+    launcher::Nvfp4GemmModule, pad::TmaMatrixPadModule, scale_pack::Sm120ScalePackModule,
+    tma::TmaNvfp4DeviceScaleDescriptors,
+};
+use rust_kernels_cuda::projection_postop::ProjectionPostOpModule;
 
 use crate::GPT2_N_LAYER;
 use crate::types::{
@@ -20,6 +25,16 @@ pub struct Gpt2ForwardArgs<'a> {
     pub layer_norm_module: &'a LayerNormModule,
     pub mlp_module: &'a MlpModule,
     pub lm_head_module: &'a LmHeadModule,
+    pub tma_module: &'a Nvfp4GemmModule,
+    pub tma_scale_pack: &'a Sm120ScalePackModule,
+    pub tma_pad: &'a TmaMatrixPadModule,
+    pub projection_postop: &'a ProjectionPostOpModule,
+    pub tma_descriptors: &'a mut TmaNvfp4DeviceScaleDescriptors,
+    pub tma_input_scale_packed: &'a mut DeviceBuffer<u8>,
+    pub tma_wide_input_scale_packed: &'a mut DeviceBuffer<u8>,
+    pub tma_weight_scale_packed: &'a mut DeviceBuffer<u8>,
+    pub tma_weight_bytes_padded: &'a mut DeviceBuffer<u8>,
+    pub tma_residual: &'a mut DeviceBuffer<f32>,
     pub hidden_nvfp4: HiddenStateNvfp4<'a>,
     pub attention_tc_scratch: CausalAttentionTcScratch<'a>,
     pub mlp_activation_nvfp4: MlpActivationNvfp4<'a>,

@@ -26,6 +26,15 @@ pub struct F32CropArgs<'a, 'out> {
     pub input_cols: u32,
 }
 
+pub struct U4RowPadArgs<'a, 'out> {
+    pub stream: &'a CudaStream,
+    pub input: &'a DeviceBuffer<u8>,
+    pub output: &'out mut DeviceBuffer<u8>,
+    pub rows: u32,
+    pub padded_rows: u32,
+    pub cols_u4: u32,
+}
+
 pub struct TmaMatrixPadModule {
     module: module::LoadedModule,
 }
@@ -78,6 +87,22 @@ impl TmaMatrixPadModule {
             args.rows,
             args.cols,
             args.input_cols,
+        )
+    }
+
+    pub fn pad_u4_rows(&self, args: U4RowPadArgs<'_, '_>) -> Result<(), DriverError> {
+        assert!(args.cols_u4.is_multiple_of(2));
+        let row_bytes = args.cols_u4 / 2;
+        assert!(args.input.len() >= args.rows as usize * row_bytes as usize);
+        assert!(args.output.len() >= args.padded_rows as usize * row_bytes as usize);
+        self.module.u4_pad_rows_kernel(
+            args.stream,
+            linear_config(args.padded_rows * row_bytes, THREADS_PER_BLOCK),
+            args.input,
+            args.output,
+            args.rows,
+            args.padded_rows,
+            row_bytes,
         )
     }
 }
@@ -157,6 +182,32 @@ mod module {
             unsafe {
                 *output.get_unchecked_mut(index as usize) =
                     input[(row * input_cols + col) as usize];
+            }
+            index += stride;
+        }
+    }
+
+    #[kernel]
+    pub fn u4_pad_rows_kernel(
+        input: &[u8],
+        mut output: DisjointSlice<u8>,
+        rows: u32,
+        padded_rows: u32,
+        row_bytes: u32,
+    ) {
+        let stride = thread::gridDim_x() * thread::blockDim_x();
+        let mut index = thread::blockIdx_x() * thread::blockDim_x() + thread::threadIdx_x();
+        let len = padded_rows * row_bytes;
+        while index < len {
+            let row = index / row_bytes;
+            let col = index - row * row_bytes;
+            let value = if row < rows {
+                input[(row * row_bytes + col) as usize]
+            } else {
+                0
+            };
+            unsafe {
+                *output.get_unchecked_mut(index as usize) = value;
             }
             index += stride;
         }

@@ -32,8 +32,10 @@ impl UploadedBlock {
     pub fn attention_tensors(&self) -> AttentionProjectionTensors<'_> {
         AttentionProjectionTensors {
             qkv_weight: self.attn_qkv.weight.mma(),
+            qkv_weight_device: self.attn_qkv.weight.device(),
             qkv_bias: self.attn_qkv.bias.device(),
             c_proj_weight: self.attn_c_proj.weight.mma(),
+            c_proj_weight_device: self.attn_c_proj.weight.device(),
             c_proj_bias: self.attn_c_proj.bias.device(),
         }
     }
@@ -42,10 +44,12 @@ impl UploadedBlock {
         MlpProjectionTensors {
             up: MlpUpTensors {
                 weight: self.mlp_up.weight.mma(),
+                weight_device: self.mlp_up.weight.device(),
                 bias: self.mlp_up.bias.device(),
             },
             down: MlpDownTensors {
                 weight: self.mlp_down.weight.mma(),
+                weight_device: self.mlp_down.weight.device(),
                 bias: self.mlp_down.bias.device(),
             },
         }

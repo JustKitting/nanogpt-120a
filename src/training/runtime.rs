@@ -15,7 +15,11 @@ use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::next_latent::NextLatModule;
 use rust_kernels_cuda::nvfp4::Nvfp4DecodeModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
+use rust_kernels_cuda::nvfp4_tma_matmul::{
+    launcher::Nvfp4GemmModule, pad::TmaMatrixPadModule, scale_pack::Sm120ScalePackModule,
+};
 use rust_kernels_cuda::optimizer::OptimizerModule;
+use rust_kernels_cuda::projection_postop::ProjectionPostOpModule;
 use rust_kernels_cuda::residual::ResidualBackwardModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
@@ -39,6 +43,10 @@ pub struct Runtime {
     pub loss: LossModule,
     pub transpose: TransposeModule,
     pub decode: Nvfp4DecodeModule,
+    pub tma_gemm: Nvfp4GemmModule,
+    pub tma_scale_pack: Sm120ScalePackModule,
+    pub tma_pad: TmaMatrixPadModule,
+    pub projection_postop: ProjectionPostOpModule,
     pub linear: LinearBackwardModule,
     pub layer_norm_backward: LayerNormBackwardModule,
     pub residual: ResidualBackwardModule,
@@ -65,6 +73,10 @@ impl Runtime {
             loss: LossModule::from_module(ptx.clone())?,
             transpose: TransposeModule::from_module(ptx.clone())?,
             decode: Nvfp4DecodeModule::from_module(ptx.clone())?,
+            tma_gemm: Nvfp4GemmModule::from_module(ptx.clone())?,
+            tma_scale_pack: Sm120ScalePackModule::from_module(ptx.clone())?,
+            tma_pad: TmaMatrixPadModule::from_module(ptx.clone())?,
+            projection_postop: ProjectionPostOpModule::from_module(ptx.clone())?,
             linear: LinearBackwardModule::from_module(ptx.clone())?,
             layer_norm_backward: LayerNormBackwardModule::from_module(ptx.clone())?,
             residual: ResidualBackwardModule::from_module(ptx.clone())?,

@@ -5,6 +5,7 @@ use gpt2_nvfp4::{
 };
 
 use super::device_buffer::zero;
+use super::forward_tma::ForwardTmaBuffers;
 use super::grad_clip::GradientClipBuffers;
 use super::grads::BackwardBuffers;
 use super::next_latent::{NextLatBuffers, NextLatGradBuffers, NextLatScratchBuffers};
@@ -30,6 +31,7 @@ pub struct TrainBuffers {
     pub qkv: DeviceBuffer<f32>,
     pub log_sum_exp: DeviceBuffer<f32>,
     pub logits: DeviceBuffer<f32>,
+    pub forward_tma: ForwardTmaBuffers,
     pub next_latent: NextLatBuffers,
     pub next_latent_grads: NextLatGradBuffers,
     pub next_latent_scratch: NextLatScratchBuffers,
@@ -74,6 +76,7 @@ impl TrainBuffers {
             qkv: zero(stream, QkvActivation::LEN)?,
             log_sum_exp: zero(stream, AttentionLogSumExp::LEN)?,
             logits: zero(stream, Logits::LEN)?,
+            forward_tma: ForwardTmaBuffers::new(stream)?,
             next_latent: NextLatBuffers::new(stream)?,
             next_latent_grads,
             next_latent_scratch: NextLatScratchBuffers::new(stream)?,
