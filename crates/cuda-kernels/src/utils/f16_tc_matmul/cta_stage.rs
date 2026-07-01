@@ -1,10 +1,11 @@
+#![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
+
 use cuda_device::{SharedArray, thread};
 
 use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
 
 macro_rules! stage_tiles_fn {
     ($name:ident, $check_bounds:expr) => {
-        #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
         pub(super) fn $name(
             a: &[u16],
             b_t: &[u16],
@@ -24,7 +25,6 @@ macro_rules! stage_tiles_fn {
 stage_tiles_fn!(stage_tiles, true);
 stage_tiles_fn!(stage_tiles_aligned, false);
 
-#[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 fn stage_tiles_impl<const CHECK_BOUNDS: bool>(
     a: &[u16],
     b_t: &[u16],

@@ -21,6 +21,21 @@ macro_rules! cta_mma4 {
     }};
 }
 
+macro_rules! cta_accumulate_k_loop4 {
+    ($tile:expr, $a_tile:expr, $b_tile:expr, $k:expr, $k_base:ident,
+     [$acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident]; $stage:block) => {
+        cta_accumulators!($acc0, $acc1, $acc2, $acc3);
+        let mut $k_base = 0;
+        while $k_base < $k {
+            $stage
+            cuda_device::thread::sync_threads();
+            cta_mma4!($a_tile, $b_tile, $tile, $acc0, $acc1, $acc2, $acc3);
+            $crate::f16_tc_matmul::cta_sync::sync_before_next_k($k_base, $k);
+            $k_base += $crate::f16_tc_matmul::cta_tile::CTA_K;
+        }
+    };
+}
+
 macro_rules! cta_store4 {
     ($store:path, $tile:expr, $out:expr, $m:expr, $n:expr, $acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident) => {{
         let tile = $tile;

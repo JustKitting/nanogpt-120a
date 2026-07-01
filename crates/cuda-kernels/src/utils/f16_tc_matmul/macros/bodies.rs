@@ -11,22 +11,16 @@ macro_rules! cta_bt_matmul_body_fn {
             let Some(tile) = $crate::f16_tc_matmul::cta_tile::active_tile(batch_count) else {
                 return;
             };
-            cta_accumulators!(acc0, acc1, acc2, acc3);
             let aligned = m.is_multiple_of($crate::f16_tc_matmul::cta_tile::CTA_M)
                 && n.is_multiple_of($crate::f16_tc_matmul::cta_tile::CTA_N)
                 && k.is_multiple_of($crate::f16_tc_matmul::cta_tile::CTA_K);
-            let mut k_base = 0;
-            while k_base < k {
+            cta_accumulate_k_loop4!(tile, a_tile, b_tile, k, k_base, [acc0, acc1, acc2, acc3]; {
                 if aligned {
                     $stage_aligned(a, b_t, a_tile, b_tile, tile, m, n, k, k_base);
                 } else {
                     $stage(a, b_t, a_tile, b_tile, tile, m, n, k, k_base);
                 }
-                cuda_device::thread::sync_threads();
-                cta_mma4!(a_tile, b_tile, tile, acc0, acc1, acc2, acc3);
-                $crate::f16_tc_matmul::cta_sync::sync_before_next_k(k_base, k);
-                k_base += $crate::f16_tc_matmul::cta_tile::CTA_K;
-            }
+            });
             if aligned {
                 cta_store4!(
                     $crate::f16_tc_matmul::cta_store::store_aligned,
@@ -69,15 +63,9 @@ macro_rules! cta_rhs_matmul_body_fn {
             let Some(tile) = $crate::f16_tc_matmul::cta_tile::active_tile(batch_count) else {
                 return;
             };
-            cta_accumulators!(acc0, acc1, acc2, acc3);
-            let mut k_base = 0;
-            while k_base < k {
+            cta_accumulate_k_loop4!(tile, a_tile, b_tile, k, k_base, [acc0, acc1, acc2, acc3]; {
                 $stage(a, $rhs, a_tile, b_tile, tile, m, n, k, k_base);
-                cuda_device::thread::sync_threads();
-                cta_mma4!(a_tile, b_tile, tile, acc0, acc1, acc2, acc3);
-                $crate::f16_tc_matmul::cta_sync::sync_before_next_k(k_base, k);
-                k_base += $crate::f16_tc_matmul::cta_tile::CTA_K;
-            }
+            });
             cta_store4!(
                 $crate::f16_tc_matmul::cta_store::store,
                 tile,
@@ -106,15 +94,9 @@ macro_rules! cta_add_matmul_body_fn {
             let Some(tile) = $crate::f16_tc_matmul::cta_tile::active_tile(batch_count) else {
                 return;
             };
-            cta_accumulators!(acc0, acc1, acc2, acc3);
-            let mut k_base = 0;
-            while k_base < k {
+            cta_accumulate_k_loop4!(tile, a_tile, b_tile, k, k_base, [acc0, acc1, acc2, acc3]; {
                 $stage(a, $rhs, a_tile, b_tile, tile, m, n, k, k_base);
-                cuda_device::thread::sync_threads();
-                cta_mma4!(a_tile, b_tile, tile, acc0, acc1, acc2, acc3);
-                $crate::f16_tc_matmul::cta_sync::sync_before_next_k(k_base, k);
-                k_base += $crate::f16_tc_matmul::cta_tile::CTA_K;
-            }
+            });
             cta_store_add4!(
                 $crate::f16_tc_matmul::cta_store_add::store_add,
                 tile,
