@@ -12,13 +12,11 @@ use rust_kernels_cuda::transpose::TransposeModule;
 mod common;
 #[path = "qkv_projection_backward/data.rs"]
 mod data;
-#[path = "support/linear_backward_scratch.rs"]
-mod linear_scratch;
 
+use common::linear_backward_scratch::LinearBackwardScratchBuffers;
 use common::saved_block::{saved_block, SavedBlockParts};
 use common::upload::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
 use common::{assert_nonzero_finite, cuda_test_context};
-use linear_scratch::LinearBackwardScratchBuffers;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]

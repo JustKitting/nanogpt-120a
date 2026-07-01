@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::RowwiseNvfp4Scratch;
 use rust_kernels_cuda::attention::CausalAttentionTcScratch;

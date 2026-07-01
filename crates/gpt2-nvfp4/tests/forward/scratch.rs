@@ -4,7 +4,7 @@ use gpt2_nvfp4::{
     GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
 };
 
-use crate::scratch_support::{CausalAttentionTcScratchBuffers, RowwiseNvfp4ScratchBuffers};
+use crate::common::forward_scratch::{CausalAttentionTcScratchBuffers, RowwiseNvfp4ScratchBuffers};
 
 pub struct ForwardScratch {
     pub residual: DeviceBuffer<f32>,

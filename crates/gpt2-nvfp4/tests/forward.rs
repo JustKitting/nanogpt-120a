@@ -14,8 +14,6 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 mod common;
 #[path = "forward/scratch.rs"]
 mod scratch;
-#[path = "support/forward_scratch.rs"]
-mod scratch_support;
 
 use common::cuda_test_context;
 use common::upload::{upload_block, upload_layer_norm, upload_nvfp4, TestResult};

@@ -7,8 +7,6 @@ mod case;
 mod common;
 #[path = "l3_mlp/data.rs"]
 mod data;
-#[path = "support/forward_scratch.rs"]
-mod scratch_support;
 #[path = "l3_mlp/weights.rs"]
 mod weights;
 

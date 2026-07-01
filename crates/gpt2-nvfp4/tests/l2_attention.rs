@@ -13,17 +13,15 @@ mod assertions;
 mod common;
 #[path = "l2_attention/data.rs"]
 mod data;
-#[path = "support/forward_scratch.rs"]
-mod scratch_support;
 
 use assertions::{
     assert_attention_log_sum_exp, assert_attention_matches, assert_c_proj_residual_add,
     assert_output_amax, assert_qkv_nonzero,
 };
 use common::cuda_test_context;
+use common::forward_scratch::{CausalAttentionTcScratchBuffers, RowwiseNvfp4ScratchBuffers};
 use common::upload::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
 use data::{c_proj_identity_weight_bytes, hidden_input, qkv_identity_weight_bytes, residual_input};
-use scratch_support::{CausalAttentionTcScratchBuffers, RowwiseNvfp4ScratchBuffers};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]

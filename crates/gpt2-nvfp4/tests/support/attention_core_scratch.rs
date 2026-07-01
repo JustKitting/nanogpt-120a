@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{AttentionCoreScratch, GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_SEQ_LEN};
 use rust_kernels_cuda::attention::CausalAttentionBackwardTcScratch;

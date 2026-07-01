@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{HiddenState, MlpActivation, GPT2_CONTEXT_LEN};
 
-use crate::scratch_support::RowwiseNvfp4ScratchBuffers;
+use crate::common::forward_scratch::RowwiseNvfp4ScratchBuffers;
 
 pub struct ScratchBuffers {
     pub residual: DeviceBuffer<f32>,

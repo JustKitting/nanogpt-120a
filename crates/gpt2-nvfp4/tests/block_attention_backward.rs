@@ -11,15 +11,11 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::residual::ResidualBackwardModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
-#[path = "support/attention_core_scratch.rs"]
-mod attention_core_scratch;
 #[path = "block_attention_backward/buffers/mod.rs"]
 mod buffers;
 mod common;
 #[path = "block_attention_backward/data.rs"]
 mod data;
-#[path = "support/linear_backward_scratch.rs"]
-mod linear_scratch;
 #[path = "block_attention_backward/scratch.rs"]
 mod scratch;
 

@@ -10,12 +10,11 @@ use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionBackwardTcArg
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
-#[path = "support/attention_core_scratch.rs"]
-mod attention_core_scratch;
 mod common;
 #[path = "attention_core_backward/data.rs"]
 mod data;
 
+use common::attention_core_scratch::AttentionCoreScratchBuffers;
 use common::saved_block::{saved_block, SavedBlockParts};
 use common::{assert_nonzero_finite, attention_log_sum_exp_values, cuda_test_context, float_bits};
 
@@ -47,8 +46,8 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
     });
     let mut wrapper_d_qkv = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
     let mut direct_d_qkv = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
-    let mut wrapper_scratch = attention_core_scratch::AttentionCoreScratchBuffers::new(&stream)?;
-    let mut direct_scratch = attention_core_scratch::AttentionCoreScratchBuffers::new(&stream)?;
+    let mut wrapper_scratch = AttentionCoreScratchBuffers::new(&stream)?;
+    let mut direct_scratch = AttentionCoreScratchBuffers::new(&stream)?;
 
     gpt2_causal_attention_backward(AttentionCoreBackwardArgs {
         use_full_attention: false,
