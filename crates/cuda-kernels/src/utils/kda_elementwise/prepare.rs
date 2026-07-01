@@ -16,6 +16,21 @@ pub(crate) struct KdaPrepareOutputs<'a> {
     pub(crate) beta: DisjointSlice<'a, f32>,
 }
 
+#[derive(Clone, Copy)]
+struct PrepareNormAcc { q_sum: f32, k_sum: f32 }
+
+impl PrepareNormAcc {
+    #[inline(always)]
+    fn zero() -> Self { Self { q_sum: 0.0, k_sum: 0.0 } }
+
+    #[inline(always)]
+    fn inv(self, scale: f32) -> (f32, f32) {
+        let q_norm = sqrt_f32(warp_sum_f32(self.q_sum) + KDA_DENOM_EPS);
+        let k_norm = sqrt_f32(warp_sum_f32(self.k_sum) + KDA_DENOM_EPS);
+        (scale / safe_denom(q_norm), 1.0 / safe_denom(k_norm))
+    }
+}
+
 pub(crate) fn chunk_cumsum_g_body(mut g: DisjointSlice<f32>, params: CausalAttentionParams) {
     let bh = thread::blockIdx_x();
     let chunk = thread::blockIdx_y();
@@ -44,44 +59,25 @@ pub(crate) fn chunk_cumsum_g_body(mut g: DisjointSlice<f32>, params: CausalAtten
 }
 
 pub(crate) fn prepare_kda_inputs_body<T: KdaQkvRead>(
-    qkv: &[T],
-    mut out: KdaPrepareOutputs<'_>,
-    params: CausalAttentionParams,
-    threads_per_block: u32,
+    qkv: &[T], mut out: KdaPrepareOutputs<'_>, params: CausalAttentionParams, threads_per_block: u32,
 ) {
     let ctx = kda_warp_ctx(threads_per_block, &params);
     if !ctx.valid {
         return;
     }
 
-    let mut q_sum = 0.0;
-    let mut k_sum = 0.0;
-    let mut qk0 = KdaQkAct::zero();
+    let mut acc = PrepareNormAcc::zero();
     let dim0 = ctx.lane;
-    if dim0 < params.head_dim {
-        qk0 = read_qk_act(qkv, ctx.row, ctx.head, dim0, &params);
-        q_sum = fma_f32(qk0.q_act, qk0.q_act, q_sum);
-        k_sum = fma_f32(qk0.k_act, qk0.k_act, k_sum);
-    }
-
-    let mut qk1 = KdaQkAct::zero();
+    let qk0 = read_prepare_dim(qkv, ctx, dim0, &params, &mut acc);
     let dim1 = ctx.lane + 32;
-    if dim1 < params.head_dim {
-        qk1 = read_qk_act(qkv, ctx.row, ctx.head, dim1, &params);
-        q_sum = fma_f32(qk1.q_act, qk1.q_act, q_sum);
-        k_sum = fma_f32(qk1.k_act, qk1.k_act, k_sum);
-    }
-
-    let q_norm = sqrt_f32(warp_sum_f32(q_sum) + KDA_DENOM_EPS);
-    let k_norm = sqrt_f32(warp_sum_f32(k_sum) + KDA_DENOM_EPS);
-    let q_inv = params.scale / safe_denom(q_norm);
-    let k_inv = 1.0 / safe_denom(k_norm);
+    let qk1 = read_prepare_dim(qkv, ctx, dim1, &params, &mut acc);
+    let inv = acc.inv(params.scale);
 
     if dim0 < params.head_dim {
-        write_prepared(qkv, &mut out, ctx, dim0, qk0, (q_inv, k_inv), &params);
+        write_prepared(qkv, &mut out, ctx, dim0, qk0, inv, &params);
     }
     if dim1 < params.head_dim {
-        write_prepared(qkv, &mut out, ctx, dim1, qk1, (q_inv, k_inv), &params);
+        write_prepared(qkv, &mut out, ctx, dim1, qk1, inv, &params);
     }
     if ctx.lane == 0 {
         let raw_beta = T::read(qkv, beta_index(ctx.row, ctx.head, &params));
@@ -92,25 +88,28 @@ pub(crate) fn prepare_kda_inputs_body<T: KdaQkvRead>(
     }
 }
 
+#[inline(always)]
+fn read_prepare_dim<T: KdaQkvRead>(
+    qkv: &[T], ctx: KdaWarpCtx, dim: u32, params: &CausalAttentionParams, acc: &mut PrepareNormAcc,
+) -> KdaQkAct {
+    if dim >= params.head_dim {
+        return KdaQkAct::zero();
+    }
+
+    let qk = read_qk_act(qkv, ctx.row, ctx.head, dim, params);
+    acc.q_sum = fma_f32(qk.q_act, qk.q_act, acc.q_sum);
+    acc.k_sum = fma_f32(qk.k_act, qk.k_act, acc.k_sum);
+    qk
+}
+
 fn write_prepared<T: KdaQkvRead>(
-    qkv: &[T],
-    out: &mut KdaPrepareOutputs<'_>,
-    ctx: KdaWarpCtx,
-    dim: u32,
-    qk: KdaQkAct,
-    inv: (f32, f32),
-    params: &CausalAttentionParams,
+    qkv: &[T], out: &mut KdaPrepareOutputs<'_>, ctx: KdaWarpCtx, dim: u32,
+    qk: KdaQkAct, inv: (f32, f32), params: &CausalAttentionParams,
 ) {
     let (q_inv, k_inv) = inv;
     let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim, params);
-    let raw_v = T::read(
-        qkv,
-        qkv_index(ctx.row, ctx.head, dim, v_offset(params), params),
-    );
-    let raw_g = T::read(
-        qkv,
-        qkv_index(ctx.row, ctx.head, dim, g_offset(params), params),
-    );
+    let raw_v = T::read(qkv, qkv_index(ctx.row, ctx.head, dim, v_offset(params), params));
+    let raw_g = T::read(qkv, qkv_index(ctx.row, ctx.head, dim, g_offset(params), params));
     unsafe {
         *out.q.get_unchecked_mut(compact) = qk.q_act * q_inv;
         *out.k.get_unchecked_mut(compact) = qk.k_act * k_inv;
