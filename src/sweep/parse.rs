@@ -43,7 +43,7 @@ impl RunResult {
     }
 }
 
-fn field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
+pub(super) fn field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
     let start = line.find(prefix)? + prefix.len();
     let value = &line[start..];
     Some(value.split_whitespace().next().unwrap_or(value))
@@ -55,11 +55,11 @@ fn debug_field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
     Some(value.split([',', ')', '}']).next().unwrap_or(value).trim())
 }
 
-fn parse_f64(value: &str) -> Option<f64> {
+pub(super) fn parse_f64(value: &str) -> Option<f64> {
     value.parse::<f64>().ok().filter(|value| value.is_finite())
 }
 
-fn parse_usize(value: &str) -> Option<usize> {
+pub(super) fn parse_usize(value: &str) -> Option<usize> {
     value.parse().ok()
 }
 

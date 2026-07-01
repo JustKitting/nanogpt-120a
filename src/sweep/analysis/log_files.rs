@@ -1,6 +1,8 @@
 use std::{fs, path::PathBuf};
 
-use super::{super::history::Trial, logs::LogMetrics};
+use super::super::history::Trial;
+use super::super::parse::{field, parse_f64, parse_usize};
+use super::logs::LogMetrics;
 
 pub fn screen_path(trial: &Trial) -> PathBuf {
     if trial
@@ -40,17 +42,4 @@ pub fn read_log(path: impl Into<Option<PathBuf>>) -> Option<LogMetrics> {
         }
     }
     Some(metrics)
-}
-
-fn field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
-    let start = line.find(prefix)? + prefix.len();
-    Some(line[start..].split_whitespace().next().unwrap_or(""))
-}
-
-fn parse_f64(value: &str) -> Option<f64> {
-    value.parse::<f64>().ok().filter(|value| value.is_finite())
-}
-
-fn parse_usize(value: &str) -> Option<usize> {
-    value.parse().ok()
 }
