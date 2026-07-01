@@ -67,34 +67,9 @@ impl AttentionModule {
         let batch_cfg = grid_x_config(dims.batch_head, threads);
         let chunk_cfg = kda_launch::chunk_dim_config(dims.batch_head, dims.chunks, threads);
         let matrix_cfg = grid_x_config(dims.chunk_batch, threads);
-        macro_rules! bwd_linear {
-            ($kernel:ident, $n:expr; $($arg:expr),* $(,)?) => {
-                bwd_elementwise.$kernel(stream, linear_config($n, threads), $($arg,)* params)?;
-            };
-        }
-        macro_rules! bwd_chunk {
-            ($kernel:ident; $($arg:expr),* $(,)?) => {
-                bwd_tc.$kernel(stream, chunk_cfg, $($arg,)* params)?;
-            };
-        }
-        macro_rules! bwd_elementwise_chunk {
-            ($kernel:ident; $($arg:expr),* $(,)?) => {
-                bwd_elementwise.$kernel(stream, chunk_cfg, $($arg,)* params)?;
-            };
-        }
-        macro_rules! bwd_batch {
-            ($kernel:ident; $($arg:expr),* $(,)?) => {
-                bwd_tc.$kernel(stream, batch_cfg, $($arg,)* params)?;
-            };
-        }
-        macro_rules! fwd_linear {
-            ($kernel:ident, $n:expr; $($arg:expr),* $(,)?) => {
-                fwd.$kernel(stream, linear_config($n, threads), $($arg,)* params)?;
-            };
-        }
-        macro_rules! fwd_matrix {
-            ($kernel:ident; $($arg:expr),* $(,)?) => {
-                fwd.$kernel(stream, matrix_cfg, $($arg,)* params)?;
+        macro_rules! launch {
+            ($target:ident.$kernel:ident($config:expr; $($arg:expr),* $(,)?)) => {
+                $target.$kernel(stream, $config, $($arg,)* params)?;
             };
         }
         macro_rules! mm_in {
@@ -113,43 +88,43 @@ impl AttentionModule {
             };
         }
 
-        bwd_linear!(prepare_kda_backward_inputs_kernel, dims.batch_head * seq_len * 32; qkv, qg, kg, vbeta, g, beta);
-        bwd_elementwise_chunk!(chunk_cumsum_kda_backward_g_kernel; g);
-        fwd_linear!(make_kda_qg_kneg_kernel, dims.compact_elems; qg, kg, g, kneg_vnew_dqg_dv);
-        fwd_linear!(make_kda_kg_kpos_vbeta_kernel, dims.compact_elems; kg, vbeta, g, beta, kpos_u_dw);
+        launch!(bwd_elementwise.prepare_kda_backward_inputs_kernel(linear_config(dims.batch_head * seq_len * 32, threads); qkv, qg, kg, vbeta, g, beta));
+        launch!(bwd_elementwise.chunk_cumsum_kda_backward_g_kernel(chunk_cfg; g));
+        launch!(fwd.make_kda_qg_kneg_kernel(linear_config(dims.compact_elems, threads); qg, kg, g, kneg_vnew_dqg_dv));
+        launch!(fwd.make_kda_kg_kpos_vbeta_kernel(linear_config(dims.compact_elems, threads); kg, vbeta, g, beta, kpos_u_dw));
         mm_in!(kpos_u_dw, kneg_vnew_dqg_dv, chunk_matrix, dims.cch());
-        fwd_matrix!(mask_kda_akk_kernel; chunk_matrix);
-        fwd_matrix!(solve_kda_akk_inv_kernel; chunk_matrix);
+        launch!(fwd.mask_kda_akk_kernel(matrix_cfg; chunk_matrix));
+        launch!(fwd.solve_kda_akk_inv_kernel(matrix_cfg; chunk_matrix));
         mm_rhs!(chunk_matrix, kpos_u_dw, w_du_dq, dims.chc());
         mm_rhs!(chunk_matrix, vbeta, kpos_u_dw, dims.chc());
         mm_in!(qg, kneg_vnew_dqg_dv, aqk_or_dm, dims.cch());
-        fwd_linear!(mask_kda_aqk_kernel, dims.chunk_matrix_elems; aqk_or_dm);
-        bwd_chunk!(chunk_kda_vnew_from_state_kernel; w_du_dq, kpos_u_dw, chunk_states, kneg_vnew_dqg_dv);
-        bwd_linear!(gather_kda_dout_kernel, dims.compact_elems; d_out, dout_daqk_dvbeta);
+        launch!(fwd.mask_kda_aqk_kernel(linear_config(dims.chunk_matrix_elems, threads); aqk_or_dm));
+        launch!(bwd_tc.chunk_kda_vnew_from_state_kernel(chunk_cfg; w_du_dq, kpos_u_dw, chunk_states, kneg_vnew_dqg_dv));
+        launch!(bwd_elementwise.gather_kda_dout_kernel(linear_config(dims.compact_elems, threads); d_out, dout_daqk_dvbeta));
         mm_in!(dout_daqk_dvbeta, kneg_vnew_dqg_dv, local_grad, dims.cch());
-        fwd_linear!(mask_kda_aqk_kernel, dims.chunk_matrix_elems; local_grad);
+        launch!(fwd.mask_kda_aqk_kernel(linear_config(dims.chunk_matrix_elems, threads); local_grad));
         mm_at_rhs!(aqk_or_dm, dout_daqk_dvbeta, kpos_u_dw, dims.chc());
-        bwd_batch!(chunkwise_kda_backward_kernel; qg, kg, kpos_u_dw, w_du_dq, aqk_or_dm, g, chunk_states, d_out, dh_states_or_kneg, local_grad);
-        bwd_chunk!(chunk_kda_dkg_from_vnew_dh_kernel; kneg_vnew_dqg_dv, dh_states_or_kneg, dkg_from_state);
-        bwd_chunk!(chunk_kda_dw_from_du_state_kernel; kpos_u_dw, chunk_states, w_du_dq);
-        bwd_chunk!(chunk_kda_dqg_from_dout_state_kernel; dout_daqk_dvbeta, chunk_states, kneg_vnew_dqg_dv);
-        bwd_linear!(make_kda_backward_kneg_from_kg_kernel, dims.compact_elems; kg, g, dh_states_or_kneg);
+        launch!(bwd_tc.chunkwise_kda_backward_kernel(batch_cfg; qg, kg, kpos_u_dw, w_du_dq, aqk_or_dm, g, chunk_states, d_out, dh_states_or_kneg, local_grad));
+        launch!(bwd_tc.chunk_kda_dkg_from_vnew_dh_kernel(chunk_cfg; kneg_vnew_dqg_dv, dh_states_or_kneg, dkg_from_state));
+        launch!(bwd_tc.chunk_kda_dw_from_du_state_kernel(chunk_cfg; kpos_u_dw, chunk_states, w_du_dq));
+        launch!(bwd_tc.chunk_kda_dqg_from_dout_state_kernel(chunk_cfg; dout_daqk_dvbeta, chunk_states, kneg_vnew_dqg_dv));
+        launch!(bwd_elementwise.make_kda_backward_kneg_from_kg_kernel(linear_config(dims.compact_elems, threads); kg, g, dh_states_or_kneg));
         mm_in!(local_grad, dh_states_or_kneg, dout_daqk_dvbeta, dims.chc());
-        bwd_linear!(add_kda_compact_kernel, dims.compact_elems; kneg_vnew_dqg_dv, dout_daqk_dvbeta);
+        launch!(bwd_elementwise.add_kda_compact_kernel(linear_config(dims.compact_elems, threads); kneg_vnew_dqg_dv, dout_daqk_dvbeta));
         mm_at_rhs!(local_grad, qg, dka_dg, dims.chc());
         mm_at_rhs!(chunk_matrix, w_du_dq, dh_states_or_kneg, dims.chc());
         mm_at_rhs!(chunk_matrix, kpos_u_dw, dout_daqk_dvbeta, dims.chc());
-        bwd_chunk!(chunk_intra_kda_dm_kernel; kg, vbeta, g, beta, kpos_u_dw, w_du_dq, aqk_or_dm);
+        launch!(bwd_tc.chunk_intra_kda_dm_kernel(chunk_cfg; kg, vbeta, g, beta, kpos_u_dw, w_du_dq, aqk_or_dm));
         mm_in!(aqk_or_dm, chunk_matrix, local_grad, dims.ccc());
         mm_at_rhs!(chunk_matrix, local_grad, aqk_or_dm, dims.ccc());
-        bwd_linear!(make_kda_strict_neg_matrix_kernel, dims.chunk_matrix_elems; aqk_or_dm, chunk_matrix);
-        bwd_linear!(make_kda_backward_kneg_from_kg_kernel, dims.compact_elems; kg, g, kpos_u_dw);
+        launch!(bwd_elementwise.make_kda_strict_neg_matrix_kernel(linear_config(dims.chunk_matrix_elems, threads); aqk_or_dm, chunk_matrix));
+        launch!(bwd_elementwise.make_kda_backward_kneg_from_kg_kernel(linear_config(dims.compact_elems, threads); kg, g, kpos_u_dw));
         mm_rhs!(chunk_matrix, kpos_u_dw, d_kneg_from_inverse, dims.chc());
-        bwd_linear!(make_kda_backward_kpos_from_kg_kernel, dims.compact_elems; kg, g, beta, kpos_u_dw);
+        launch!(bwd_elementwise.make_kda_backward_kpos_from_kg_kernel(linear_config(dims.compact_elems, threads); kg, g, beta, kpos_u_dw));
         mm_at_rhs!(chunk_matrix, kpos_u_dw, local_grad, dims.chc());
-        bwd_chunk!(chunk_intra_kda_backward_kernel; qg, kg, vbeta, g, beta, kneg_vnew_dqg_dv, dkg_from_state, dka_dg, dh_states_or_kneg, dout_daqk_dvbeta, d_kneg_from_inverse, local_grad, w_du_dq, chunk_matrix, d_beta);
+        launch!(bwd_tc.chunk_intra_kda_backward_kernel(chunk_cfg; qg, kg, vbeta, g, beta, kneg_vnew_dqg_dv, dkg_from_state, dka_dg, dh_states_or_kneg, dout_daqk_dvbeta, d_kneg_from_inverse, local_grad, w_du_dq, chunk_matrix, d_beta));
         // After chunk_intra_kda_backward_kernel these reused buffers hold final compact gradients.
-        bwd_linear!(finish_kda_backward_kernel, dims.batch_head * seq_len * 32; qkv, w_du_dq, chunk_matrix, kneg_vnew_dqg_dv, dka_dg, d_beta, d_qkv);
+        launch!(bwd_elementwise.finish_kda_backward_kernel(linear_config(dims.batch_head * seq_len * 32, threads); qkv, w_du_dq, chunk_matrix, kneg_vnew_dqg_dv, dka_dg, d_beta, d_qkv));
         Ok(())
     }
 }
