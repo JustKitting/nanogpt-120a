@@ -1,14 +1,15 @@
+mod phase;
+
 use cuda_device::{DisjointSlice, thread};
 
 use super::super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::cta_tile::CtaTile;
-use crate::kda_backward::{
-    load_chunk_state, stage_compact_t_a, stage_compact_t_a_disjoint, stage_hidden_dout_b_t,
-    store_dh_quads,
-};
+use crate::kda_backward::load_chunk_state;
 use crate::kda_common::{batch_head, chunk_count, kda_tc_shape, state_elems};
-use crate::kda_tc::{CompactStore::Add, CompactTileCtx, CtaATile, CtaBTile, KdaStateTile, stage_compact_a as stage_dm_compact_a, stage_compact_b_t_disjoint, stage_shared_state_b_t, store_compact_quads, tc_stage_loop};
+use crate::kda_tc::{CompactTileCtx, CtaATile, CtaBTile, KdaStateTile};
+
+use phase::{add_kg_dh_to_du_tc, compute_prev_dh_tc};
 
 #[derive(Clone, Copy)]
 pub(crate) struct KdaChunkwiseInputs<'a> { pub(crate) qg: &'a [f32], pub(crate) kg: &'a [f32], pub(crate) g: &'a [f32], pub(crate) chunk_states: &'a [u16], pub(crate) d_out: &'a [f32] }
@@ -45,15 +46,7 @@ pub(crate) fn chunkwise_kda_backward_body(
         let chunk = chunk_remaining - 1;
         let start = chunk * params.chunk_size;
         let end = params.seq_len.min(start + params.chunk_size);
-        load_chunk_state(
-            inputs.chunk_states,
-            state,
-            bh,
-            chunk,
-            state_elems,
-            &params,
-            TC_BACKWARD_THREADS_PER_BLOCK,
-        );
+        load_chunk_state(inputs.chunk_states, state, bh, chunk, state_elems, &params, TC_BACKWARD_THREADS_PER_BLOCK);
 
         idx = tid;
         let d_h_base = ((bh * chunks + chunk) * state_elems) as usize;
@@ -81,46 +74,4 @@ pub(crate) fn chunkwise_kda_backward_body(
 
         chunk_remaining -= 1;
     }
-}
-
-fn add_kg_dh_to_du_tc(
-    kg: &[f32], d_u: &mut DisjointSlice<f32>,
-    d_h_next: &KdaStateTile,
-    a_tile: &mut CtaATile, b_tile: &mut CtaBTile,
-    ctx: CompactTileCtx<'_>,
-) {
-    let mut acc = [[0.0_f32; 4]; 4];
-    tc_stage_loop!(ctx.tile, a_tile, b_tile, acc; k_base < ctx.params.head_dim; {
-        stage_dm_compact_a(kg, a_tile, ctx, k_base);
-    } {
-        stage_shared_state_b_t(d_h_next, b_tile, ctx, k_base);
-    });
-
-    store_compact_quads(acc, d_u, ctx, Add);
-}
-
-fn compute_prev_dh_tc(
-    inputs: KdaChunkwiseInputs<'_>,
-    grads: &mut KdaChunkwiseGrads<'_>,
-    states: (&KdaStateTile, &mut KdaStateTile),
-    tiles: (&mut CtaATile, &mut CtaBTile),
-    compact_ctx: CompactTileCtx<'_>,
-) {
-    let (d_h_next, d_h) = states;
-    let (a_tile, b_tile) = tiles;
-    let mut acc = [[0.0_f32; 4]; 4];
-
-    tc_stage_loop!(compact_ctx.tile, a_tile, b_tile, acc; k_base < compact_ctx.params.chunk_size; {
-        stage_compact_t_a(inputs.qg, a_tile, compact_ctx, k_base, 1.0);
-    } {
-        stage_hidden_dout_b_t(inputs.d_out, b_tile, compact_ctx, k_base);
-    });
-
-    tc_stage_loop!(compact_ctx.tile, a_tile, b_tile, acc; k_base < compact_ctx.params.chunk_size; {
-        stage_compact_t_a_disjoint(&mut grads.w_to_dw, a_tile, compact_ctx, k_base, -1.0);
-    } {
-        stage_compact_b_t_disjoint(&mut grads.u_to_du, b_tile, compact_ctx, k_base);
-    });
-
-    store_dh_quads(acc, d_h_next, d_h, inputs.g, compact_ctx);
 }
