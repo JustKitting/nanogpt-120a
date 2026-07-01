@@ -22,13 +22,8 @@ pub(super) mod module {
     ) {
         params.weight_global_scale = weight_global_scale[0];
         nvfp4_projection_nobias_kernel_body(
-            input_bytes,
-            input_scales,
-            input_global_scales,
-            weight_bytes,
-            weight_scales,
-            &mut out,
-            params,
+            input_bytes, input_scales, input_global_scales,
+            weight_bytes, weight_scales, &mut out, params,
         );
     }
 
@@ -42,13 +37,8 @@ pub(super) mod module {
         params.weight_global_scale = weight_global_scale[0];
         with_projection_cta_tiles!(
             nvfp4_projection_cta_nobias_kernel_body;
-            input_bytes,
-            input_scales,
-            input_global_scales,
-            weight_bytes,
-            weight_scales,
-            &mut out,
-            params,
+            input_bytes, input_scales, input_global_scales,
+            weight_bytes, weight_scales, &mut out, params,
         );
     }
 
@@ -90,16 +80,9 @@ pub(super) mod module {
 
             dinput_params.weight_global_scale = dinput_weight_global_scale[0];
             nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
-                dinput_input_bytes,
-                dinput_input_scales,
-                dinput_input_global_scales,
-                dinput_weight_bytes,
-                dinput_weight_scales,
-                &mut dinput_out,
-                dinput_params,
-                row_pair_tiles!(),
-                tile0,
-                tile1,
+                dinput_input_bytes, dinput_input_scales, dinput_input_global_scales,
+                dinput_weight_bytes, dinput_weight_scales, &mut dinput_out, dinput_params,
+                row_pair_tiles!(), tile0, tile1,
             );
         } else {
             let dweight_tile_index = tile_index - dinput_tile_count;
@@ -112,16 +95,9 @@ pub(super) mod module {
 
             dweight_params.weight_global_scale = dweight_weight_global_scale[0];
             nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
-                dweight_input_bytes,
-                dweight_input_scales,
-                dweight_input_global_scales,
-                dweight_weight_bytes,
-                dweight_weight_scales,
-                &mut dweight_out,
-                dweight_params,
-                row_pair_tiles!(),
-                tile0,
-                tile1,
+                dweight_input_bytes, dweight_input_scales, dweight_input_global_scales,
+                dweight_weight_bytes, dweight_weight_scales, &mut dweight_out, dweight_params,
+                row_pair_tiles!(), tile0, tile1,
             );
         }
     }
