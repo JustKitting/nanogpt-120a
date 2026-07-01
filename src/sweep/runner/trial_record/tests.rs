@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use crate::sweep::history::Trial;
-use crate::sweep::test_fixtures::basic_candidate;
+use crate::sweep::test_fixtures::{basic_candidate, success_trial};
 
 use super::{current_baseline_trial, promoted_screen_loss};
 
@@ -11,16 +11,13 @@ fn reads_promoted_screen_loss_from_decision_artifact() {
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("screen_decision.env"), "SCREEN_LOSS=3.250000\n").unwrap();
     let trial = Trial {
-        candidate: candidate(),
-        status: "success".to_string(),
-        val_loss: Some(3.0),
         completed_steps: Some(100),
-        elapsed_s: Some(900.0),
         screen_val_loss: Some(3.25),
         screen_completed_steps: Some(500),
         screen_elapsed_s: Some(90.0),
         screen_reason: Some("screen_loss_improved".to_string()),
         log_path: dir.join("train.log"),
+        ..success_trial(candidate(), 3.0)
     };
 
     assert_eq!(promoted_screen_loss(&trial), Some(3.25));
@@ -30,16 +27,13 @@ fn reads_promoted_screen_loss_from_decision_artifact() {
 #[test]
 fn current_screened_baseline_replaces_stale_baseline_screen_metrics() {
     let measured = Trial {
-        candidate: candidate(),
-        status: "success".to_string(),
-        val_loss: Some(3.5),
         completed_steps: Some(3000),
-        elapsed_s: Some(900.0),
         screen_val_loss: Some(6.9),
         screen_completed_steps: Some(500),
         screen_elapsed_s: Some(180.0),
         screen_reason: Some("old_screen".to_string()),
         log_path: PathBuf::from("old/train.log"),
+        ..success_trial(candidate(), 3.5)
     };
     let screened = Trial {
         screen_val_loss: Some(6.2),
