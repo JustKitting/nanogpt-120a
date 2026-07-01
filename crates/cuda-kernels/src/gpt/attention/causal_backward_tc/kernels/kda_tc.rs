@@ -14,10 +14,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunk_kda_vnew_from_state_kernel(
-        w: &[f32],
-        u: &[f32],
-        chunk_states: &[u16],
-        v_new: DisjointSlice<f32>,
+        w: &[f32], u: &[f32], chunk_states: &[u16], v_new: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         with_tc_ab_tiles!(chunk_state_matmul_body; w, u, chunk_states, v_new, params; ChunkStateMatmulMode::VNew);
@@ -25,9 +22,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunk_kda_dw_from_du_state_kernel(
-        d_u: &[f32],
-        chunk_states: &[u16],
-        d_w: DisjointSlice<f32>,
+        d_u: &[f32], chunk_states: &[u16], d_w: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         with_tc_ab_tiles!(chunk_state_matmul_body; d_u, d_u, chunk_states, d_w, params; ChunkStateMatmulMode::Dw);
@@ -35,9 +30,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunk_kda_dqg_from_dout_state_kernel(
-        d_out_compact: &[f32],
-        chunk_states: &[u16],
-        d_qg: DisjointSlice<f32>,
+        d_out_compact: &[f32], chunk_states: &[u16], d_qg: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         with_tc_ab_tiles!(chunk_state_matmul_body; d_out_compact, d_out_compact, chunk_states, d_qg, params; ChunkStateMatmulMode::Dqg);
@@ -45,9 +38,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunk_kda_dkg_from_vnew_dh_kernel(
-        v_new: &[f32],
-        d_h_states: &[f32],
-        d_kg: DisjointSlice<f32>,
+        v_new: &[f32], d_h_states: &[f32], d_kg: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         with_tc_ab_tiles!(chunk_kda_dkg_from_vnew_dh_body; v_new, d_h_states, d_kg, params);
@@ -55,16 +46,9 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunkwise_kda_backward_kernel(
-        qg: &[f32],
-        kg: &[f32],
-        u_to_du: DisjointSlice<f32>,
-        w_to_dw: DisjointSlice<f32>,
-        _aqk: &[f32],
-        g: &[f32],
-        chunk_states: &[u16],
-        d_out: &[f32],
-        d_h_states: DisjointSlice<f32>,
-        _d_aqk: DisjointSlice<f32>,
+        qg: &[f32], kg: &[f32], u_to_du: DisjointSlice<f32>, w_to_dw: DisjointSlice<f32>,
+        _aqk: &[f32], g: &[f32], chunk_states: &[u16], d_out: &[f32],
+        d_h_states: DisjointSlice<f32>, _d_aqk: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         let inputs = KdaChunkwiseInputs { qg, kg, g, chunk_states, d_out };
@@ -74,12 +58,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunk_intra_kda_dm_kernel(
-        kg: &[f32],
-        vbeta: &[f32],
-        g: &[f32],
-        beta: &[f32],
-        d_u: &[f32],
-        d_w: &[f32],
+        kg: &[f32], vbeta: &[f32], g: &[f32], beta: &[f32], d_u: &[f32], d_w: &[f32],
         d_m: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
@@ -88,21 +67,10 @@ pub(super) mod module {
 
     #[kernel]
     pub fn chunk_intra_kda_backward_kernel(
-        qg: &[f32],
-        kg: &[f32],
-        vbeta: &[f32],
-        g: &[f32],
-        beta: &[f32],
-        d_qg_to_dv: DisjointSlice<f32>,
-        d_kg: &[f32],
-        d_k_a_to_dg: DisjointSlice<f32>,
-        d_kpos_m: &[f32],
-        d_vbeta_m: &[f32],
-        d_kneg_from_b: &[f32],
-        d_kpos_from_b_t: &[f32],
-        d_q: DisjointSlice<f32>,
-        d_k: DisjointSlice<f32>,
-        d_beta: DisjointSlice<f32>,
+        qg: &[f32], kg: &[f32], vbeta: &[f32], g: &[f32], beta: &[f32],
+        d_qg_to_dv: DisjointSlice<f32>, d_kg: &[f32], d_k_a_to_dg: DisjointSlice<f32>,
+        d_kpos_m: &[f32], d_vbeta_m: &[f32], d_kneg_from_b: &[f32], d_kpos_from_b_t: &[f32],
+        d_q: DisjointSlice<f32>, d_k: DisjointSlice<f32>, d_beta: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         let inputs = KdaIntraInputs { qg, kg, vbeta, g, beta, d_kg, d_kpos_m, d_vbeta_m, d_kneg_from_b, d_kpos_from_b_t };
