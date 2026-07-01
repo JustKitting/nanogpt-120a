@@ -35,17 +35,13 @@ pub(crate) mod module {
 
         let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
             amax4_f32(
-                rowwise_value_at(bytes, scales, global_scales, cols, i0),
-                rowwise_value_at(bytes, scales, global_scales, cols, i1),
-                rowwise_value_at(bytes, scales, global_scales, cols, i2),
-                rowwise_value_at(bytes, scales, global_scales, cols, i3),
+                rowwise_value_at(bytes, scales, global_scales, cols, i0), rowwise_value_at(bytes, scales, global_scales, cols, i1),
+                rowwise_value_at(bytes, scales, global_scales, cols, i2), rowwise_value_at(bytes, scales, global_scales, cols, i3),
             )
         } else {
             max4_f32(
-                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i0, element_count),
-                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i1, element_count),
-                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i2, element_count),
-                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i3, element_count),
+                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i0, element_count), checked_rowwise_abs_value(bytes, scales, global_scales, cols, i1, element_count),
+                checked_rowwise_abs_value(bytes, scales, global_scales, cols, i2, element_count), checked_rowwise_abs_value(bytes, scales, global_scales, cols, i3, element_count),
             )
         };
 
@@ -64,17 +60,13 @@ pub(crate) mod module {
 
         let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
             amax4_f32(
-                nvfp4_value_at(bytes, scales, global_scale, i0),
-                nvfp4_value_at(bytes, scales, global_scale, i1),
-                nvfp4_value_at(bytes, scales, global_scale, i2),
-                nvfp4_value_at(bytes, scales, global_scale, i3),
+                nvfp4_value_at(bytes, scales, global_scale, i0), nvfp4_value_at(bytes, scales, global_scale, i1),
+                nvfp4_value_at(bytes, scales, global_scale, i2), nvfp4_value_at(bytes, scales, global_scale, i3),
             )
         } else {
             max4_f32(
-                checked_nvfp4_abs_value(bytes, scales, global_scale, i0, element_count),
-                checked_nvfp4_abs_value(bytes, scales, global_scale, i1, element_count),
-                checked_nvfp4_abs_value(bytes, scales, global_scale, i2, element_count),
-                checked_nvfp4_abs_value(bytes, scales, global_scale, i3, element_count),
+                checked_nvfp4_abs_value(bytes, scales, global_scale, i0, element_count), checked_nvfp4_abs_value(bytes, scales, global_scale, i1, element_count),
+                checked_nvfp4_abs_value(bytes, scales, global_scale, i2, element_count), checked_nvfp4_abs_value(bytes, scales, global_scale, i3, element_count),
             )
         };
 
@@ -96,10 +88,8 @@ pub(crate) mod module {
             local_amax = max_f32(
                 local_amax,
                 max4_f32(
-                    chunk_amax_or_zero(chunk_amax, chunk, chunk_count),
-                    chunk_amax_or_zero(chunk_amax, chunk + stride, chunk_count),
-                    chunk_amax_or_zero(chunk_amax, chunk + stride * 2, chunk_count),
-                    chunk_amax_or_zero(chunk_amax, chunk + stride * 3, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk, chunk_count), chunk_amax_or_zero(chunk_amax, chunk + stride, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk + stride * 2, chunk_count), chunk_amax_or_zero(chunk_amax, chunk + stride * 3, chunk_count),
                 ),
             );
             chunk += stride * 4;
@@ -109,8 +99,7 @@ pub(crate) mod module {
             unsafe { block_max_leader_f32(&mut AMAX_REDUCE, local_amax, lane, warp_in_block) }
         {
             unsafe {
-                *out_global_scale.get_unchecked_mut(0) =
-                    quartet_backward_ms_eden_global_scale(amax);
+                *out_global_scale.get_unchecked_mut(0) = quartet_backward_ms_eden_global_scale(amax);
             }
         }
     }
