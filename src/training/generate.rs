@@ -1,15 +1,13 @@
 use cuda_core::DeviceBuffer;
-use gpt2_nvfp4::GPT2_VOCAB_SIZE;
+use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_VOCAB_SIZE};
 use llama2_tokenizer::Llama2Tokenizer;
-use rust_kernels_cuda::logits::{LOGITS_TOP_K, LogitsTopKArgs};
+use rust_kernels_cuda::logits::{LogitsTopKArgs, LOGITS_TOP_K};
 
 use super::{TokenBatch, Trainer};
 use crate::AppResult;
 
-mod batch;
 mod sampling;
 
-use batch::generation_batch;
 use sampling::sample_top_k;
 
 #[derive(Clone, Copy, Debug)]
@@ -70,4 +68,24 @@ impl Trainer {
 
         tokenizer.decode(&tokens)
     }
+}
+
+fn generation_batch(tokens: &[u32], pad_token: u32) -> AppResult<(Vec<u16>, u32)> {
+    let context_len = tokens.len().min(GPT2_SEQ_LEN);
+    let context_start = tokens.len() - context_len;
+    let row = context_len.saturating_sub(1) as u32;
+    let window_len = GPT2_SEQ_LEN + 1;
+    let pad = u16::try_from(pad_token)?;
+    let mut one = vec![pad; window_len];
+
+    for (dst, &token) in one.iter_mut().zip(tokens[context_start..].iter()) {
+        *dst = u16::try_from(token)?;
+    }
+
+    let mut windows = Vec::with_capacity(GPT2_BATCH_SIZE * window_len);
+    for _ in 0..GPT2_BATCH_SIZE {
+        windows.extend_from_slice(&one);
+    }
+
+    Ok((windows, row))
 }
