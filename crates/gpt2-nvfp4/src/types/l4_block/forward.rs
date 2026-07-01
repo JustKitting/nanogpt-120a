@@ -4,8 +4,8 @@ use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use super::args::BlockForwardArgs;
 use super::weights::Gpt2BlockWeights;
 use crate::types::{
-    AttentionForwardArgs, AttentionWeights, HiddenStateDevice, LayerNormForwardArgs, LayerNormTape,
-    LayerNormWeights, MlpForwardArgs, MlpScratch, MlpWeights,
+    AttentionForwardArgs, AttentionWeights, HiddenStateDevice, LayerNormWeights, MlpForwardArgs,
+    MlpScratch, MlpWeights,
 };
 
 impl Gpt2BlockWeights {
@@ -22,8 +22,9 @@ impl Gpt2BlockWeights {
 
         let ln_1 =
             LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_1, args.hidden);
-        let hidden =
-            forward_layer_norm(&self.ln_1, ln_1, tape.as_mut().map(|tape| &mut tape.ln_1))?;
+        let hidden = self
+            .ln_1
+            .forward_with_tape(ln_1, tape.as_mut().map(|tape| &mut tape.ln_1))?;
 
         let attention_tape = tape.as_mut().map(|tape| tape.attention_forward());
 
@@ -46,8 +47,9 @@ impl Gpt2BlockWeights {
         }
 
         let ln_2 = LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_2, hidden);
-        let hidden =
-            forward_layer_norm(&self.ln_2, ln_2, tape.as_mut().map(|tape| &mut tape.ln_2))?;
+        let hidden = self
+            .ln_2
+            .forward_with_tape(ln_2, tape.as_mut().map(|tape| &mut tape.ln_2))?;
 
         let mlp_tape = tape.as_mut().map(|tape| tape.mlp_forward());
 
@@ -71,20 +73,6 @@ impl Gpt2BlockWeights {
             mlp_pre_activation,
             hidden,
         )
-    }
-}
-
-fn forward_layer_norm<'a>(
-    weights: &LayerNormWeights,
-    args: LayerNormForwardArgs<'a>,
-    tape: Option<&mut LayerNormTape<'_>>,
-) -> Result<HiddenStateDevice<'a>, DriverError> {
-    if let Some(tape) = tape {
-        let hidden = weights.forward_save_residual_f16(args, &mut *tape.residual)?;
-        tape.save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
-        Ok(hidden)
-    } else {
-        weights.forward(args)
     }
 }
 

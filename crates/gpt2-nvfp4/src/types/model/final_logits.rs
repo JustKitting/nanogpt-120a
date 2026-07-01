@@ -27,16 +27,9 @@ pub(super) fn finish_forward<'a>(
     let mut hidden_nvfp4 = args.hidden_nvfp4;
     let mut tape = args.tape;
     let ln_f = LayerNormWeights::input_from_block(args.layer_norm_module, args.ln_f, args.hidden);
-    let hidden = if let Some(tape) = tape.as_mut() {
-        let hidden = args
-            .ln_f_weights
-            .forward_save_residual_f16(ln_f, &mut *tape.final_norm.residual)?;
-        tape.final_norm
-            .save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
-        hidden
-    } else {
-        args.ln_f_weights.forward(ln_f)?
-    };
+    let hidden = args
+        .ln_f_weights
+        .forward_with_tape(ln_f, tape.as_mut().map(|tape| &mut tape.final_norm))?;
 
     hidden_nvfp4.quantize_precomputed_amax(
         args.quant_module,

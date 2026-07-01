@@ -5,7 +5,7 @@ use rust_kernels_cuda::layer_norm::{
 
 use super::args::{LayerNormForwardArgs, LayerNormTensors};
 use super::weights::LayerNormWeights;
-use crate::types::HiddenStateDevice;
+use crate::types::{HiddenStateDevice, LayerNormTape};
 use crate::{GPT2_LAYER_NORM_EPSILON, GPT2_N_EMBD};
 
 impl LayerNormWeights {
@@ -42,6 +42,20 @@ impl LayerNormWeights {
         })?;
 
         Ok(hidden)
+    }
+
+    pub fn forward_with_tape<'a>(
+        &self,
+        args: LayerNormForwardArgs<'a>,
+        tape: Option<&mut LayerNormTape<'_>>,
+    ) -> Result<HiddenStateDevice<'a>, DriverError> {
+        if let Some(tape) = tape {
+            let hidden = self.forward_save_residual_f16(args, &mut *tape.residual)?;
+            tape.save_stats(hidden.stream, hidden.mean, hidden.inv_std)?;
+            Ok(hidden)
+        } else {
+            self.forward(args)
+        }
     }
 
     pub fn forward_save_residual_f16<'a>(
