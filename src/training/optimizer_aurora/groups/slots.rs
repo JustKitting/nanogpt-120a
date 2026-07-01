@@ -1,13 +1,13 @@
 use std::cmp::Reverse;
 
 use gpt2_nvfp4::{
-    GPT2_FULL_ATTENTION_QKV, GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, GPT2_QKV, NEXTLAT_HIDDEN,
-    NEXTLAT_INPUT, uses_full_attention,
+    uses_full_attention, Gpt2Config, GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, NEXTLAT_HIDDEN,
+    NEXTLAT_INPUT,
 };
 use rust_kernels_cuda::optimizer::AURORA_MATRIX_PHASES;
 
 use super::super::AURORA_MATRIX_SLOTS;
-use super::{HostPtrs, padding::AuroraPaddingBuffers, ptrs};
+use super::{padding::AuroraPaddingBuffers, ptrs, HostPtrs};
 use crate::{
     training::{
         grads::BackwardBuffers, learning_rate, next_latent::NextLatGradBuffers,
@@ -37,11 +37,7 @@ fn all_slots(
 ) -> Vec<HostPtrs> {
     let mut rows = Vec::with_capacity(AURORA_MATRIX_SLOTS);
     for i in 0..GPT2_N_LAYER {
-        let qkv_dim = if uses_full_attention(i) {
-            GPT2_FULL_ATTENTION_QKV
-        } else {
-            GPT2_QKV
-        };
+        let qkv_dim = Gpt2Config::attention_qkv_dim(uses_full_attention(i));
         rows.push(ptrs::qkv(uploaded, grads, state, i).shape(GPT2_N_EMBD, qkv_dim));
     }
     append(&mut rows, GPT2_N_EMBD, GPT2_N_EMBD, |i| {

@@ -11,11 +11,7 @@ pub(super) fn forward<'a, 'scratch>(
 ) -> Result<HiddenStateDevice<'a>, DriverError> {
     let mut input_nvfp4 = args.input_nvfp4;
     let mut tape = args.tape;
-    let qkv_dim = if args.use_full_attention {
-        crate::GPT2_FULL_ATTENTION_QKV
-    } else {
-        crate::GPT2_QKV
-    } as u32;
+    let qkv_dim = crate::Gpt2Config::attention_qkv_dim(args.use_full_attention) as u32;
     let hidden = args.hidden;
 
     input_nvfp4.quantize_precomputed_amax(

@@ -2,16 +2,12 @@ use cuda_core::DriverError;
 use rust_kernels_cuda::attention::CausalAttentionBackwardTcArgs;
 
 use super::types::AttentionCoreBackwardArgs;
-use crate::{GPT2_FULL_ATTENTION_QKV, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV};
+use crate::{Gpt2Config, GPT2_N_EMBD, GPT2_N_HEAD};
 
 pub fn causal_attention_backward(
     args: AttentionCoreBackwardArgs<'_, '_, '_>,
 ) -> Result<(), DriverError> {
-    let qkv_dim = if args.use_full_attention {
-        GPT2_FULL_ATTENTION_QKV
-    } else {
-        GPT2_QKV
-    } as u32;
+    let qkv_dim = Gpt2Config::attention_qkv_dim(args.use_full_attention) as u32;
     let tc_args = CausalAttentionBackwardTcArgs {
         stream: args.stream,
         tc_module: args.tc_module,

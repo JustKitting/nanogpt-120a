@@ -1,17 +1,14 @@
 use cuda_core::{CudaStream, DriverError};
-use gpt2_nvfp4::{
-    GPT2_FULL_ATTENTION_QKV, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, GPT2_TOKEN_ROWS,
-    uses_full_attention,
-};
+use gpt2_nvfp4::{uses_full_attention, Gpt2Config, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_TOKEN_ROWS};
 use rust_kernels_cuda::optimizer::KdaAuroraClipArgs;
 
 use crate::training::runtime::Runtime;
 use crate::upload::UploadedModel;
 
-use super::super::OptimizerTrace;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::OptimizerStateBuffers;
 use super::super::tape::ForwardTapeBuffers;
+use super::super::OptimizerTrace;
 use super::timed_ms;
 
 const KDA_QK_CLIP_TAU: f32 = 100.0;
@@ -28,11 +25,7 @@ pub(super) fn apply_kda_aurora_clip(
     trace.kda_clip_ms += timed_ms(|| {
         for block_index in 0..uploaded.blocks.len() {
             let full_attention = uses_full_attention(block_index);
-            let qkv_dim = if full_attention {
-                GPT2_FULL_ATTENTION_QKV
-            } else {
-                GPT2_QKV
-            };
+            let qkv_dim = Gpt2Config::attention_qkv_dim(full_attention);
             let block = &mut uploaded.blocks[block_index];
             let qkv_state = &mut state.blocks[block_index].attn_qkv.weight_aurora;
             runtime.optimizer.apply_kda_aurora_clip(KdaAuroraClipArgs {

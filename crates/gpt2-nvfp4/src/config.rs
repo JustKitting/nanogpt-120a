@@ -61,4 +61,12 @@ impl Gpt2Config {
     pub const fn mlp_hidden(self) -> usize {
         GPT2_MLP
     }
+
+    pub const fn attention_qkv_dim(use_full_attention: bool) -> usize {
+        if use_full_attention {
+            GPT2_FULL_ATTENTION_QKV
+        } else {
+            GPT2_QKV
+        }
+    }
 }
