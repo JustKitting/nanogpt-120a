@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use gpt2_nvfp4::{
     AttentionBackwardModules, BlockAttentionBackwardArgs, BlockAttentionBackwardModules,
     BlockAttentionBackwardSeeds, Gpt2Rng, attention_side_backward,
@@ -22,6 +20,8 @@ mod common;
 mod data;
 #[path = "common/nvfp4.rs"]
 mod nvfp4_common;
+#[path = "common/upload.rs"]
+mod upload_common;
 #[path = "block_attention_backward/scratch.rs"]
 mod scratch;
 
@@ -29,7 +29,7 @@ use common::{assert_nonzero_finite, cuda_test_context};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
-fn block_attention_side_backward_runs_full_chain() -> Result<(), Box<dyn Error>> {
+fn block_attention_side_backward_runs_full_chain() -> upload_common::TestResult {
     let (_, stream, ptx) = cuda_test_context()?;
     let saved = buffers::SavedBuffers::new(&stream)?;
     let weights = buffers::WeightBuffers::new(&stream)?;
