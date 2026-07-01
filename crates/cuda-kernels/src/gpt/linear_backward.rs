@@ -20,13 +20,13 @@ pub use args::{
 pub use bias::LINEAR_BIAS_THREADS_PER_BLOCK;
 
 pub struct LinearBackwardModule {
-    module: kernels::module::LoadedModule,
+    module: kernels::LoadedModule,
 }
 
 impl LinearBackwardModule {
     pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
         Ok(Self {
-            module: kernels::module::from_module(module)?,
+            module: kernels::from_module(module)?,
         })
     }
 

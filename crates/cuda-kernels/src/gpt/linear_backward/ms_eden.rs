@@ -19,7 +19,7 @@ impl LinearBackwardModule {
         let quantize = QuantizeContext::for_args(&args);
 
         if let Some(dbias) = args.dbias {
-            self.module.linear_bias_grad_kernel(
+            self.module.bias.linear_bias_grad_kernel(
                 args.stream,
                 grid_x_config(
                     bias::grid_dim(args.output_dim),

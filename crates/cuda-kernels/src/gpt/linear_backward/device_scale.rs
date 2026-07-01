@@ -18,7 +18,7 @@ impl LinearBackwardModule {
         let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
         let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
 
-        self.module.linear_backward_projection_device_scale_kernel(
+        self.module.projection.linear_backward_projection_device_scale_kernel(
             args.stream,
             launch_config(
                 projection_grid_dim(args.token_count, args.input_dim),
@@ -34,7 +34,7 @@ impl LinearBackwardModule {
             linear_backward_projection_params(args.token_count, dinput_k, args.input_dim),
         )?;
 
-        self.module.linear_backward_projection_device_scale_kernel(
+        self.module.projection.linear_backward_projection_device_scale_kernel(
             args.stream,
             launch_config(
                 projection_grid_dim(args.output_dim, args.input_dim),
@@ -70,6 +70,7 @@ impl LinearBackwardModule {
         let dweight_tiles = projection_cta_row_pair_tile_count(args.output_dim, args.input_dim);
 
         self.module
+            .projection
             .linear_backward_projection_pair_cta_device_scale_kernel(
                 args.stream,
                 grid_x_config(dinput_tiles + dweight_tiles, NVFP4_PROJECTION_CTA_THREADS),
