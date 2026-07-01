@@ -26,6 +26,17 @@ pub struct ResidualBackwardModule {
     module: kernels::LoadedModule,
 }
 
+macro_rules! residual_launcher {
+    ($method:ident, $args:ty, $kernel:ident, $($buffer:ident),+) => {
+        pub fn $method(&self, args: $args) -> Result<(), DriverError> {
+            self.module.$kernel(
+                args.stream, linear_config(args.len, THREADS_PER_BLOCK),
+                $(args.$buffer,)* args.out, args.len,
+            )
+        }
+    };
+}
+
 impl ResidualBackwardModule {
     pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
         Ok(Self {
@@ -33,29 +44,8 @@ impl ResidualBackwardModule {
         })
     }
 
-    pub fn grad_add(&self, args: ResidualGradAddArgs<'_, '_>) -> Result<(), DriverError> {
-        self.module.residual_grad_add_kernel(
-            args.stream,
-            linear_config(args.len, THREADS_PER_BLOCK),
-            args.direct,
-            args.branch,
-            args.out,
-            args.len,
-        )
-    }
-
-    pub fn grad_accumulate(
-        &self,
-        args: ResidualGradAccumulateArgs<'_, '_>,
-    ) -> Result<(), DriverError> {
-        self.module.residual_grad_accumulate_kernel(
-            args.stream,
-            linear_config(args.len, THREADS_PER_BLOCK),
-            args.branch,
-            args.out,
-            args.len,
-        )
-    }
+    residual_launcher!(grad_add, ResidualGradAddArgs<'_, '_>, residual_grad_add_kernel, direct, branch);
+    residual_launcher!(grad_accumulate, ResidualGradAccumulateArgs<'_, '_>, residual_grad_accumulate_kernel, branch);
 }
 
 #[cuda_module]
@@ -63,29 +53,31 @@ mod kernels {
     use super::*;
 
     #[kernel]
-    pub fn residual_grad_add_kernel(
-        direct: &[f32],
-        branch: &[f32],
-        mut out: DisjointSlice<f32>,
-        len: u32,
-    ) {
-        let index = thread::blockIdx_x() * THREADS_PER_BLOCK + thread::threadIdx_x();
-        if index < len {
+    pub fn residual_grad_add_kernel(direct: &[f32], branch: &[f32], mut out: DisjointSlice<f32>, len: u32) {
+        if let Some(index) = residual_index(len) {
             unsafe {
-                *out.get_unchecked_mut(index as usize) =
-                    direct[index as usize] + branch[index as usize];
+                *out.get_unchecked_mut(index) = direct[index] + branch[index];
             }
         }
     }
 
     #[kernel]
     pub fn residual_grad_accumulate_kernel(branch: &[f32], mut out: DisjointSlice<f32>, len: u32) {
+        if let Some(index) = residual_index(len) {
+            unsafe {
+                let slot = out.get_unchecked_mut(index);
+                *slot += branch[index];
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn residual_index(len: u32) -> Option<usize> {
         let index = thread::blockIdx_x() * THREADS_PER_BLOCK + thread::threadIdx_x();
         if index < len {
-            unsafe {
-                let slot = out.get_unchecked_mut(index as usize);
-                *slot += branch[index as usize];
-            }
+            Some(index as usize)
+        } else {
+            None
         }
     }
 }
