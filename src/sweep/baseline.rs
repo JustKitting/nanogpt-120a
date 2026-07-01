@@ -69,8 +69,7 @@ impl Baseline {
     fn is_improvement(&self, val_loss: f64) -> bool {
         self.record
             .as_ref()
-            .map(|record| val_loss < record.val_loss)
-            .unwrap_or(true)
+            .is_none_or(|record| val_loss < record.val_loss)
     }
 
     fn write(&self) -> io::Result<()> {
