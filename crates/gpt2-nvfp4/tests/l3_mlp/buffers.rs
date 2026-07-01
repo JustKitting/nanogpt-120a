@@ -1,5 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_CONTEXT_LEN, HiddenState, MlpActivation};
+use gpt2_nvfp4::{HiddenState, MlpActivation, GPT2_CONTEXT_LEN};
+
+use crate::scratch_support::RowwiseNvfp4ScratchBuffers;
 
 pub struct ScratchBuffers {
     pub residual: DeviceBuffer<f32>,
@@ -7,14 +9,10 @@ pub struct ScratchBuffers {
     pub amax: DeviceBuffer<f32>,
     pub mean: DeviceBuffer<f32>,
     pub inv_std: DeviceBuffer<f32>,
-    pub input_bytes: DeviceBuffer<u8>,
-    pub input_scales: DeviceBuffer<u8>,
-    pub input_global_scales: DeviceBuffer<f32>,
+    pub input_nvfp4: RowwiseNvfp4ScratchBuffers,
     pub pre_activation: DeviceBuffer<f32>,
     pub activation: DeviceBuffer<f32>,
-    pub activation_bytes: DeviceBuffer<u8>,
-    pub activation_scales: DeviceBuffer<u8>,
-    pub activation_global_scales: DeviceBuffer<f32>,
+    pub activation_nvfp4: RowwiseNvfp4ScratchBuffers,
 }
 
 impl ScratchBuffers {
@@ -30,14 +28,18 @@ impl ScratchBuffers {
             amax: DeviceBuffer::from_host(stream, amax)?,
             mean: DeviceBuffer::zeroed(stream, GPT2_CONTEXT_LEN)?,
             inv_std: DeviceBuffer::zeroed(stream, GPT2_CONTEXT_LEN)?,
-            input_bytes: DeviceBuffer::zeroed(stream, HiddenState::LEN / 2)?,
-            input_scales: DeviceBuffer::zeroed(stream, HiddenState::LEN / 16)?,
-            input_global_scales: DeviceBuffer::zeroed(stream, GPT2_CONTEXT_LEN)?,
+            input_nvfp4: RowwiseNvfp4ScratchBuffers::new(
+                stream,
+                HiddenState::LEN,
+                GPT2_CONTEXT_LEN,
+            )?,
             pre_activation: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
             activation: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
-            activation_bytes: DeviceBuffer::zeroed(stream, MlpActivation::LEN / 2)?,
-            activation_scales: DeviceBuffer::zeroed(stream, MlpActivation::LEN / 16)?,
-            activation_global_scales: DeviceBuffer::zeroed(stream, GPT2_CONTEXT_LEN)?,
+            activation_nvfp4: RowwiseNvfp4ScratchBuffers::new(
+                stream,
+                MlpActivation::LEN,
+                GPT2_CONTEXT_LEN,
+            )?,
         })
     }
 }

@@ -4,46 +4,54 @@ use gpt2_nvfp4::{
     GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
 };
 
-const ATTENTION_SQUARE: usize = GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN * GPT2_SEQ_LEN;
+use crate::scratch_support::{CausalAttentionTcScratchBuffers, RowwiseNvfp4ScratchBuffers};
 
-macro_rules! forward_scratch {
-    ($($name:ident: $ty:ty = $len:expr),+ $(,)?) => {
-        pub struct ForwardScratch {
-            $(pub $name: DeviceBuffer<$ty>,)+
-        }
-
-        impl ForwardScratch {
-            pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
-                Ok(Self {
-                    $($name: DeviceBuffer::<$ty>::zeroed(stream, $len)?,)+
-                })
-            }
-        }
-    };
+pub struct ForwardScratch {
+    pub residual: DeviceBuffer<f32>,
+    pub normalized: DeviceBuffer<f32>,
+    pub normalized_amax: DeviceBuffer<f32>,
+    pub mean: DeviceBuffer<f32>,
+    pub inv_std: DeviceBuffer<f32>,
+    pub hidden_nvfp4: RowwiseNvfp4ScratchBuffers,
+    pub mlp_pre_activation: DeviceBuffer<f32>,
+    pub mlp_activation: DeviceBuffer<f32>,
+    pub mlp_activation_nvfp4: RowwiseNvfp4ScratchBuffers,
+    pub qkv: DeviceBuffer<f32>,
+    pub attention_log_sum_exp: DeviceBuffer<f32>,
+    pub attention_tc: CausalAttentionTcScratchBuffers,
+    pub logits: DeviceBuffer<f32>,
 }
 
-forward_scratch! {
-    residual: f32 = HiddenState::LEN,
-    normalized: f32 = HiddenState::LEN,
-    normalized_amax: f32 = GPT2_TOKEN_ROWS,
-    mean: f32 = GPT2_TOKEN_ROWS,
-    inv_std: f32 = GPT2_TOKEN_ROWS,
-    hidden_bytes: u8 = HiddenState::LEN / 2,
-    hidden_scales: u8 = HiddenState::LEN / 16,
-    hidden_global_scales: f32 = GPT2_TOKEN_ROWS,
-    mlp_pre_activation: f32 = MlpActivation::LEN,
-    mlp_activation: f32 = MlpActivation::LEN,
-    mlp_activation_bytes: u8 = MlpActivation::LEN / 2,
-    mlp_activation_scales: u8 = MlpActivation::LEN / 16,
-    mlp_activation_global_scales: f32 = GPT2_TOKEN_ROWS,
-    qkv: f32 = QkvActivation::LEN,
-    attention_log_sum_exp: f32 = AttentionLogSumExp::LEN,
-    tc_q: f32 = HiddenState::LEN,
-    tc_k: f32 = HiddenState::LEN,
-    tc_v: f32 = HiddenState::LEN,
-    tc_scores: f32 = ATTENTION_SQUARE,
-    tc_probs: f32 = ATTENTION_SQUARE,
-    tc_out: f32 = HiddenState::LEN,
-    tc_chunk_states: u16 = HiddenState::LEN,
-    logits: f32 = Logits::LEN,
+impl ForwardScratch {
+    pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
+        Ok(Self {
+            residual: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
+            normalized: DeviceBuffer::zeroed(stream, HiddenState::LEN)?,
+            normalized_amax: DeviceBuffer::zeroed(stream, GPT2_TOKEN_ROWS)?,
+            mean: DeviceBuffer::zeroed(stream, GPT2_TOKEN_ROWS)?,
+            inv_std: DeviceBuffer::zeroed(stream, GPT2_TOKEN_ROWS)?,
+            hidden_nvfp4: RowwiseNvfp4ScratchBuffers::new(
+                stream,
+                HiddenState::LEN,
+                GPT2_TOKEN_ROWS,
+            )?,
+            mlp_pre_activation: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
+            mlp_activation: DeviceBuffer::zeroed(stream, MlpActivation::LEN)?,
+            mlp_activation_nvfp4: RowwiseNvfp4ScratchBuffers::new(
+                stream,
+                MlpActivation::LEN,
+                GPT2_TOKEN_ROWS,
+            )?,
+            qkv: DeviceBuffer::zeroed(stream, QkvActivation::LEN)?,
+            attention_log_sum_exp: DeviceBuffer::zeroed(stream, AttentionLogSumExp::LEN)?,
+            attention_tc: CausalAttentionTcScratchBuffers::new(
+                stream,
+                HiddenState::LEN,
+                GPT2_BATCH_SIZE,
+                GPT2_N_HEAD,
+                GPT2_SEQ_LEN,
+            )?,
+            logits: DeviceBuffer::zeroed(stream, Logits::LEN)?,
+        })
+    }
 }

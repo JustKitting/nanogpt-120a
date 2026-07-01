@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use gpt2_nvfp4::{
-    GPT2_CONTEXT_LEN, HiddenStateDevice, HiddenStateNvfp4, MlpActivationNvfp4, MlpForwardArgs,
-    MlpProjectionTensors, MlpScratch, MlpWeights,
+    HiddenStateDevice, MlpForwardArgs, MlpProjectionTensors, MlpScratch, MlpWeights,
+    GPT2_CONTEXT_LEN,
 };
 use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
@@ -28,16 +28,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         module: &mlp_module,
         quant_module: &quant_module,
         scratch: MlpScratch {
-            input_nvfp4: HiddenStateNvfp4 {
-                bytes: &mut scratch.input_bytes,
-                scales: &mut scratch.input_scales,
-                global_scales: &mut scratch.input_global_scales,
-            },
-            activation_nvfp4: MlpActivationNvfp4 {
-                bytes: &mut scratch.activation_bytes,
-                scales: &mut scratch.activation_scales,
-                global_scales: &mut scratch.activation_global_scales,
-            },
+            input_nvfp4: scratch.input_nvfp4.args(),
+            activation_nvfp4: scratch.activation_nvfp4.args(),
             pre_activation: &mut scratch.pre_activation,
             activation: &mut scratch.activation,
         },

@@ -1,10 +1,9 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionProjectionTensors, Gpt2, Gpt2ForwardArgs, HiddenStateNvfp4, MlpActivationNvfp4,
-    MlpDownTensors, MlpProjectionTensors, MlpUpTensors, TokenEmbeddingArgs, GPT2_BATCH_SIZE,
-    GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    AttentionProjectionTensors, Gpt2, Gpt2ForwardArgs, MlpDownTensors, MlpProjectionTensors,
+    MlpUpTensors, TokenEmbeddingArgs, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
 };
-use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionTcScratch};
+use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::embedding::EmbeddingModule;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
 use rust_kernels_cuda::layer_norm::LayerNormModule;
@@ -15,6 +14,8 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 mod common;
 #[path = "forward/scratch.rs"]
 mod scratch;
+#[path = "support/forward_scratch.rs"]
+mod scratch_support;
 #[path = "common/upload.rs"]
 mod upload_common;
 
@@ -73,25 +74,9 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
         layer_norm_module: &layer_norm_module,
         mlp_module: &mlp_module,
         lm_head_module: &lm_head_module,
-        hidden_nvfp4: HiddenStateNvfp4 {
-            bytes: &mut scratch.hidden_bytes,
-            scales: &mut scratch.hidden_scales,
-            global_scales: &mut scratch.hidden_global_scales,
-        },
-        attention_tc_scratch: CausalAttentionTcScratch {
-            q: &mut scratch.tc_q,
-            k: &mut scratch.tc_k,
-            v: &mut scratch.tc_v,
-            scores: &mut scratch.tc_scores,
-            probs: &mut scratch.tc_probs,
-            compact_out: &mut scratch.tc_out,
-            chunk_states: &mut scratch.tc_chunk_states,
-        },
-        mlp_activation_nvfp4: MlpActivationNvfp4 {
-            bytes: &mut scratch.mlp_activation_bytes,
-            scales: &mut scratch.mlp_activation_scales,
-            global_scales: &mut scratch.mlp_activation_global_scales,
-        },
+        hidden_nvfp4: scratch.hidden_nvfp4.args(),
+        attention_tc_scratch: scratch.attention_tc.args(),
+        mlp_activation_nvfp4: scratch.mlp_activation_nvfp4.args(),
         attention: std::array::from_fn(|i| AttentionProjectionTensors {
             qkv_weight: blocks[i].attn_qkv.weight.mma(),
             qkv_bias: blocks[i].attn_qkv.bias.device(),
