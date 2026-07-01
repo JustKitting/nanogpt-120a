@@ -72,6 +72,11 @@ pub(super) mod module {
         static mut A1_SCALES: ProjectionCtaAScales = ProjectionCtaAScales::UNINIT;
         static mut B_SCALES: ProjectionCtaBScales = ProjectionCtaBScales::UNINIT;
 
+        macro_rules! row_pair_tiles { () => { ProjectionCtaRowPairTiles {
+            a0_packs: unsafe { &mut A_PACKS }, a1_packs: unsafe { &mut A1_PACKS }, b_packs: unsafe { &mut B_PACKS },
+            a0_scales: unsafe { &mut A_SCALES }, a1_scales: unsafe { &mut A1_SCALES }, b_scales: unsafe { &mut B_SCALES },
+        } }; }
+
         let tile_index = thread::blockIdx_x();
         let thread_id = thread::threadIdx_x();
 
@@ -92,10 +97,7 @@ pub(super) mod module {
                 dinput_weight_scales,
                 &mut dinput_out,
                 dinput_params,
-                ProjectionCtaRowPairTiles {
-                    a0_packs: unsafe { &mut A_PACKS }, a1_packs: unsafe { &mut A1_PACKS }, b_packs: unsafe { &mut B_PACKS },
-                    a0_scales: unsafe { &mut A_SCALES }, a1_scales: unsafe { &mut A1_SCALES }, b_scales: unsafe { &mut B_SCALES },
-                },
+                row_pair_tiles!(),
                 tile0,
                 tile1,
             );
@@ -117,10 +119,7 @@ pub(super) mod module {
                 dweight_weight_scales,
                 &mut dweight_out,
                 dweight_params,
-                ProjectionCtaRowPairTiles {
-                    a0_packs: unsafe { &mut A_PACKS }, a1_packs: unsafe { &mut A1_PACKS }, b_packs: unsafe { &mut B_PACKS },
-                    a0_scales: unsafe { &mut A_SCALES }, a1_scales: unsafe { &mut A1_SCALES }, b_scales: unsafe { &mut B_SCALES },
-                },
+                row_pair_tiles!(),
                 tile0,
                 tile1,
             );
