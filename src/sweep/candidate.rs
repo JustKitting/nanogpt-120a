@@ -47,13 +47,8 @@ impl Candidate {
 
     pub fn key(&self) -> String {
         format!(
-            "b{}_l{}_d{}_h{}_p{}_c{}_lr{:.4}_alr{:.4}_nlr{:.4}_w{}_s{:.2}_b{:.2}_r{:.2}",
-            self.batch_size,
-            self.n_layer,
-            self.n_embd,
-            self.n_head,
-            self.aurora_phases,
-            self.aurora_blocks,
+            "{}_lr{:.4}_alr{:.4}_nlr{:.4}_w{}_s{:.2}_b{:.2}_r{:.2}",
+            self.build_key(),
             self.lr_scale,
             self.adam_lr_scale,
             self.nextlat_lr_scale,
