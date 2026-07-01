@@ -5,11 +5,7 @@ use super::super::parse::{field, parse_f64, parse_usize};
 use super::logs::LogMetrics;
 
 pub fn screen_path(trial: &Trial) -> PathBuf {
-    if trial
-        .log_path
-        .file_name()
-        .is_some_and(|name| name == "screen.log")
-    {
+    if has_log_file(trial, "screen.log") {
         trial.log_path.clone()
     } else {
         trial.log_path.with_file_name("screen.log")
@@ -17,11 +13,11 @@ pub fn screen_path(trial: &Trial) -> PathBuf {
 }
 
 pub fn full_path(trial: &Trial) -> Option<PathBuf> {
-    (trial
-        .log_path
-        .file_name()
-        .is_some_and(|name| name == "train.log"))
-    .then(|| trial.log_path.clone())
+    has_log_file(trial, "train.log").then(|| trial.log_path.clone())
+}
+
+fn has_log_file(trial: &Trial, file_name: &str) -> bool {
+    trial.log_path.file_name().is_some_and(|name| name == file_name)
 }
 
 pub fn read_log(path: impl Into<Option<PathBuf>>) -> Option<LogMetrics> {
