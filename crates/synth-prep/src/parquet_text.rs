@@ -35,15 +35,13 @@ fn tokenize_synth_batch(
     tokenizer: &Llama2Tokenizer,
     writer: &mut ShardWriter,
 ) -> AppResult<()> {
-    let query = string_column(batch, "query")?;
-    let reasoning = string_column(batch, "synthetic_reasoning")?;
-    let answer = string_column(batch, "synthetic_answer")?;
+    let sections = [("Query", string_column(batch, "query")?), ("Reasoning", string_column(batch, "synthetic_reasoning")?), ("Answer", string_column(batch, "synthetic_answer")?)];
 
     for row in 0..batch.num_rows() {
         let mut text = String::new();
-        append_section(&mut text, "Query", query.get(row));
-        append_section(&mut text, "Reasoning", reasoning.get(row));
-        append_section(&mut text, "Answer", answer.get(row));
+        for (label, column) in &sections {
+            append_section(&mut text, label, column.get(row));
+        }
 
         if !text.is_empty() {
             tokenize_doc(&text, tokenizer, writer)?;
