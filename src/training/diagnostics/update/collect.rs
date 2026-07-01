@@ -18,12 +18,7 @@ pub(in crate::training::diagnostics) fn collect_update_snapshots(
     average_coefficient: f32,
 ) -> AppResult<Vec<PendingTensorUpdateDiagnostics>> {
     let mut collector = UpdateSnapshotCollector::new(stream, step, average_coefficient);
-    collector.push_adam(
-        "token_embedding",
-        &uploaded.token_embedding,
-        &grads.d_lm_head_weight,
-        &state.token_embedding,
-    )?;
+    collector.push_adam("token_embedding", &uploaded.token_embedding, &grads.d_lm_head_weight, &state.token_embedding)?;
     collector.push_layer_norm("ln_f", &uploaded.ln_f, &grads.final_norm, &state.ln_f)?;
 
     for (index, ((block, grad), state)) in uploaded
@@ -59,25 +54,10 @@ fn collect_block_updates(
         };
     }
 
-    collector.push_layer_norm(
-        &format!("block{index}.ln_1"),
-        &block.ln_1,
-        &grad.ln_1,
-        &state.ln_1,
-    )?;
+    collector.push_layer_norm(&format!("block{index}.ln_1"), &block.ln_1, &grad.ln_1, &state.ln_1)?;
     collect_linear!("attn_qkv", attn_qkv, d_attn_qkv_weight, d_attn_qkv_bias);
-    collect_linear!(
-        "attn_c_proj",
-        attn_c_proj,
-        d_attn_c_proj_weight,
-        d_attn_c_proj_bias
-    );
-    collector.push_layer_norm(
-        &format!("block{index}.ln_2"),
-        &block.ln_2,
-        &grad.ln_2,
-        &state.ln_2,
-    )?;
+    collect_linear!("attn_c_proj", attn_c_proj, d_attn_c_proj_weight, d_attn_c_proj_bias);
+    collector.push_layer_norm(&format!("block{index}.ln_2"), &block.ln_2, &grad.ln_2, &state.ln_2)?;
     collect_linear!("mlp_up", mlp_up, d_mlp_c_fc_weight, d_mlp_c_fc_bias);
     collect_linear!("mlp_down", mlp_down, d_mlp_c_proj_weight, d_mlp_c_proj_bias);
     Ok(())
@@ -92,10 +72,5 @@ fn collect_linear_updates(
     state: &LinearState,
 ) -> AppResult {
     collector.push_observed(&format!("{name}.weight"), &linear.weight, weight_grad)?;
-    collector.push_adam(
-        &format!("{name}.bias"),
-        &linear.bias,
-        bias_grad,
-        &state.bias,
-    )
+    collector.push_adam(&format!("{name}.bias"), &linear.bias, bias_grad, &state.bias)
 }

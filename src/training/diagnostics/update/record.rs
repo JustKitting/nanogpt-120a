@@ -36,18 +36,8 @@ impl<'a> UpdateSnapshotCollector<'a> {
         grads: &LayerNormGradBuffers,
         state: &LayerNormState,
     ) -> AppResult {
-        self.push_adam(
-            &format!("{name}.weight"),
-            &layer_norm.weight,
-            &grads.d_weight,
-            &state.weight,
-        )?;
-        self.push_adam(
-            &format!("{name}.bias"),
-            &layer_norm.bias,
-            &grads.d_bias,
-            &state.bias,
-        )
+        self.push_adam(&format!("{name}.weight"), &layer_norm.weight, &grads.d_weight, &state.weight)?;
+        self.push_adam(&format!("{name}.bias"), &layer_norm.bias, &grads.d_bias, &state.bias)
     }
 
     pub(super) fn push_adam(
