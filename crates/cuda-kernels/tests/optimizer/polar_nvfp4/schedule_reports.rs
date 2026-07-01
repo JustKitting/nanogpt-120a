@@ -32,11 +32,7 @@ fn nvfp4_gram_form_safety_schedule_search() -> TestResult {
 #[test]
 fn nvfp4_gram_form_ratio_schedule_search() -> TestResult {
     with_polar(|polar| {
-        for (name, rows, cols) in [
-            ("square_ratio", 128, 128),
-            ("qkv_ratio", 128, 384),
-            ("mlp_ratio", 128, 512),
-        ] {
+        for (name, rows, cols) in [("square_ratio", 128, 128), ("qkv_ratio", 128, 384), ("mlp_ratio", 128, 512)] {
             let source = math::normalized_source(&math::gradient(rows, cols), rows, cols);
             let (expected, _) = polar.gram_form_corrected_iterations(
                 source.clone(),
@@ -45,8 +41,7 @@ fn nvfp4_gram_form_ratio_schedule_search() -> TestResult {
                 PRODUCTION_ITERATIONS,
                 device::GramCorrectionMode::HighPrecision,
             )?;
-            let eval =
-                ScheduleEval::new(polar, &source, &expected, rows, cols, PRODUCTION_ITERATIONS);
+            let eval = ScheduleEval::new(polar, &source, &expected, rows, cols, PRODUCTION_ITERATIONS);
             let raw = evaluate_mode(
                 eval,
                 "nvfp4_raw",
@@ -81,11 +76,7 @@ fn nvfp4_gram_form_ratio_schedule_search() -> TestResult {
 #[test]
 fn nvfp4_gram_form_production_shapes_report() -> TestResult {
     with_polar(|polar| {
-        for (name, rows, cols) in [
-            ("attn_c_proj_square", 1024, 1024),
-            ("attn_qkv_rect", 1024, 3072),
-            ("mlp_up_rect", 1024, 4096),
-        ] {
+        for (name, rows, cols) in [("attn_c_proj_square", 1024, 1024), ("attn_qkv_rect", 1024, 3072), ("mlp_up_rect", 1024, 4096)] {
             let source = math::normalized_source(&math::gradient(rows, cols), rows, cols);
             let (expected, expected_stats) = polar.gram_form_corrected_iterations(
                 source.clone(),
@@ -102,13 +93,7 @@ fn nvfp4_gram_form_production_shapes_report() -> TestResult {
             );
 
             for (mode_name, mode) in production_shape_modes() {
-                let (actual, stats) = polar.gram_form_corrected_iterations(
-                    source.clone(),
-                    rows,
-                    cols,
-                    PRODUCTION_ITERATIONS,
-                    mode,
-                )?;
+                let (actual, stats) = polar.gram_form_corrected_iterations(source.clone(), rows, cols, PRODUCTION_ITERATIONS, mode)?;
                 let finite = actual.iter().all(|value| value.is_finite());
                 let (cosine, rel_l2, max_abs) =
                     math::finite_error_metrics(&actual, &expected, finite);
