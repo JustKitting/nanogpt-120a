@@ -5,16 +5,17 @@ mod stage;
 mod store;
 mod tile;
 
+pub(crate) type ProjectionCtaAPacks = cuda_device::SharedArray<u32, { tile::NVFP4_PROJECTION_CTA_A_PACKS }>;
+pub(crate) type ProjectionCtaBPacks = cuda_device::SharedArray<u32, { tile::NVFP4_PROJECTION_CTA_B_PACKS }>;
+pub(crate) type ProjectionCtaAScales = cuda_device::SharedArray<u32, { tile::NVFP4_PROJECTION_CTA_A_SCALES }>;
+pub(crate) type ProjectionCtaBScales = cuda_device::SharedArray<u32, { tile::NVFP4_PROJECTION_CTA_B_SCALES }>;
+
 macro_rules! with_projection_cta_tiles {
     ($body:ident; $($arg:expr),+ $(,)?) => {{
-        static mut A_PACKS: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_PACKS }> =
-            cuda_device::SharedArray::UNINIT;
-        static mut B_PACKS: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_B_PACKS }> =
-            cuda_device::SharedArray::UNINIT;
-        static mut A_SCALES: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_SCALES }> =
-            cuda_device::SharedArray::UNINIT;
-        static mut B_SCALES: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_B_SCALES }> =
-            cuda_device::SharedArray::UNINIT;
+        static mut A_PACKS: $crate::mma::ProjectionCtaAPacks = cuda_device::SharedArray::UNINIT;
+        static mut B_PACKS: $crate::mma::ProjectionCtaBPacks = cuda_device::SharedArray::UNINIT;
+        static mut A_SCALES: $crate::mma::ProjectionCtaAScales = cuda_device::SharedArray::UNINIT;
+        static mut B_SCALES: $crate::mma::ProjectionCtaBScales = cuda_device::SharedArray::UNINIT;
 
         $body(
             $($arg,)*
@@ -28,18 +29,12 @@ macro_rules! with_projection_cta_tiles {
 
 macro_rules! dispatch_projection_cta_tiles {
     ($params:expr, $aligned:ident, $generic:ident; $($arg:expr),+ $(,)?) => {{
-        static mut A_PACKS: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_PACKS }> =
-            cuda_device::SharedArray::UNINIT;
-        static mut A1_PACKS: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_PACKS }> =
-            cuda_device::SharedArray::UNINIT;
-        static mut B_PACKS: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_B_PACKS }> =
-            cuda_device::SharedArray::UNINIT;
-        static mut A_SCALES: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_SCALES }> =
-            cuda_device::SharedArray::UNINIT;
-        static mut A1_SCALES: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_SCALES }> =
-            cuda_device::SharedArray::UNINIT;
-        static mut B_SCALES: cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_B_SCALES }> =
-            cuda_device::SharedArray::UNINIT;
+        static mut A_PACKS: $crate::mma::ProjectionCtaAPacks = cuda_device::SharedArray::UNINIT;
+        static mut A1_PACKS: $crate::mma::ProjectionCtaAPacks = cuda_device::SharedArray::UNINIT;
+        static mut B_PACKS: $crate::mma::ProjectionCtaBPacks = cuda_device::SharedArray::UNINIT;
+        static mut A_SCALES: $crate::mma::ProjectionCtaAScales = cuda_device::SharedArray::UNINIT;
+        static mut A1_SCALES: $crate::mma::ProjectionCtaAScales = cuda_device::SharedArray::UNINIT;
+        static mut B_SCALES: $crate::mma::ProjectionCtaBScales = cuda_device::SharedArray::UNINIT;
 
         if $crate::mma::projection_cta_shape_aligned(
             ($params).token_count,

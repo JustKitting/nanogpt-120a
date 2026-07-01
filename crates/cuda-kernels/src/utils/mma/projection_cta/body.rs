@@ -16,10 +16,10 @@ macro_rules! projection_cta_biased_body_fns {
             weight_scales: &[u8],
             $($extra_arg: $extra_ty,)+
             params: $crate::mma::projection::Nvfp4ProjectionParams,
-            a_packs: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_PACKS }>,
-            b_packs: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_B_PACKS }>,
-            a_scales: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_SCALES }>,
-            b_scales: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_B_SCALES }>,
+            a_packs: &mut $crate::mma::ProjectionCtaAPacks,
+            b_packs: &mut $crate::mma::ProjectionCtaBPacks,
+            a_scales: &mut $crate::mma::ProjectionCtaAScales,
+            b_scales: &mut $crate::mma::ProjectionCtaBScales,
         ) {
             let thread_id = cuda_device::thread::threadIdx_x();
             if thread_id >= $crate::mma::NVFP4_PROJECTION_CTA_THREADS {
@@ -51,12 +51,12 @@ macro_rules! projection_cta_biased_body_fns {
             weight_scales: &[u8],
             $($extra_arg: $extra_ty,)+
             params: $crate::mma::projection::Nvfp4ProjectionParams,
-            a_packs: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_PACKS }>,
-            a1_packs: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_PACKS }>,
-            b_packs: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_B_PACKS }>,
-            a_scales: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_SCALES }>,
-            a1_scales: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_A_SCALES }>,
-            b_scales: &mut cuda_device::SharedArray<u32, { $crate::mma::NVFP4_PROJECTION_CTA_B_SCALES }>,
+            a_packs: &mut $crate::mma::ProjectionCtaAPacks,
+            a1_packs: &mut $crate::mma::ProjectionCtaAPacks,
+            b_packs: &mut $crate::mma::ProjectionCtaBPacks,
+            a_scales: &mut $crate::mma::ProjectionCtaAScales,
+            a1_scales: &mut $crate::mma::ProjectionCtaAScales,
+            b_scales: &mut $crate::mma::ProjectionCtaBScales,
             tile0: $crate::mma::Nvfp4ProjectionCtaTile,
             tile1: $crate::mma::Nvfp4ProjectionCtaTile,
         ) {

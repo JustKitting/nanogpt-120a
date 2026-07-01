@@ -1,15 +1,15 @@
 #![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 
-use cuda_device::{DisjointSlice, SharedArray, thread};
+use cuda_device::{DisjointSlice, thread};
 
 use crate::mma::projection::Nvfp4ProjectionParams;
 use crate::mma::projection_cta::accumulate::{
     projection_accumulator, projection_accumulator_aligned, projection_accumulator_aligned_row_pair,
 };
 use crate::mma::projection_cta::store::{store_accumulator, store_accumulator_aligned};
-use crate::mma::projection_cta::tile::{
-    NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
-    NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile,
+use crate::mma::projection_cta::tile::{NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile};
+use crate::mma::projection_cta::{
+    ProjectionCtaAPacks, ProjectionCtaAScales, ProjectionCtaBPacks, ProjectionCtaBScales,
 };
 
 macro_rules! nobias_body_at_fn {
@@ -22,10 +22,10 @@ macro_rules! nobias_body_at_fn {
             weight_scales: &[u8],
             out: &mut DisjointSlice<'_, f32>,
             params: Nvfp4ProjectionParams,
-            a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-            b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-            a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-            b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+            a_packs: &mut ProjectionCtaAPacks,
+            b_packs: &mut ProjectionCtaBPacks,
+            a_scales: &mut ProjectionCtaAScales,
+            b_scales: &mut ProjectionCtaBScales,
             tile: Nvfp4ProjectionCtaTile,
         ) {
             let acc = $accumulator(
@@ -54,10 +54,10 @@ pub fn nvfp4_projection_cta_nobias_kernel_body(
     weight_scales: &[u8],
     out: &mut DisjointSlice<'_, f32>,
     params: Nvfp4ProjectionParams,
-    a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-    a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+    a_packs: &mut ProjectionCtaAPacks,
+    b_packs: &mut ProjectionCtaBPacks,
+    a_scales: &mut ProjectionCtaAScales,
+    b_scales: &mut ProjectionCtaBScales,
 ) {
     let thread_id = thread::threadIdx_x();
     if thread_id >= NVFP4_PROJECTION_CTA_THREADS {
@@ -100,12 +100,12 @@ pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
     weight_scales: &[u8],
     out: &mut DisjointSlice<'_, f32>,
     params: Nvfp4ProjectionParams,
-    a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    a1_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-    a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    a1_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+    a_packs: &mut ProjectionCtaAPacks,
+    a1_packs: &mut ProjectionCtaAPacks,
+    b_packs: &mut ProjectionCtaBPacks,
+    a_scales: &mut ProjectionCtaAScales,
+    a1_scales: &mut ProjectionCtaAScales,
+    b_scales: &mut ProjectionCtaBScales,
     tile0: Nvfp4ProjectionCtaTile,
     tile1: Nvfp4ProjectionCtaTile,
 ) {

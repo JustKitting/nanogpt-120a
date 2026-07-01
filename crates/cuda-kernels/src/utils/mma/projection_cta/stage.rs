@@ -1,4 +1,4 @@
-use cuda_device::{SharedArray, thread};
+use cuda_device::thread;
 
 use crate::mma::projection::Nvfp4ProjectionParams;
 
@@ -13,6 +13,7 @@ use super::tile::{
     NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
     NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionCtaTile,
 };
+use super::{ProjectionCtaAPacks, ProjectionCtaAScales, ProjectionCtaBPacks, ProjectionCtaBScales};
 
 macro_rules! stage_tiles_fn {
     ($name:ident, $load_a_pack:ident, $load_b_pack:ident, $load_a_scale:ident, $load_b_scale:ident) => {
@@ -24,10 +25,10 @@ macro_rules! stage_tiles_fn {
             tile: Nvfp4ProjectionCtaTile,
             k_base: u32,
             params: &Nvfp4ProjectionParams,
-            a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-            b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-            a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-            b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+            a_packs: &mut ProjectionCtaAPacks,
+            b_packs: &mut ProjectionCtaBPacks,
+            a_scales: &mut ProjectionCtaAScales,
+            b_scales: &mut ProjectionCtaBScales,
         ) {
             let thread_id = thread::threadIdx_x();
             let mut offset = thread_id;
@@ -84,12 +85,12 @@ pub fn stage_row_pair_tiles_aligned(
     tile1: Nvfp4ProjectionCtaTile,
     k_base: u32,
     params: &Nvfp4ProjectionParams,
-    a0_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    a1_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-    a0_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    a1_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+    a0_packs: &mut ProjectionCtaAPacks,
+    a1_packs: &mut ProjectionCtaAPacks,
+    b_packs: &mut ProjectionCtaBPacks,
+    a0_scales: &mut ProjectionCtaAScales,
+    a1_scales: &mut ProjectionCtaAScales,
+    b_scales: &mut ProjectionCtaBScales,
 ) {
     let thread_id = thread::threadIdx_x();
     let mut offset = thread_id;

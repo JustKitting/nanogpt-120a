@@ -1,16 +1,14 @@
-use cuda_device::SharedArray;
-
 use super::tile::{
-    NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
-    NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_M, NVFP4_PROJECTION_CTA_N,
-    NVFP4_PROJECTION_CTA_PACKS_PER_ROW, Nvfp4ProjectionCtaTile,
+    NVFP4_PROJECTION_CTA_M, NVFP4_PROJECTION_CTA_N, NVFP4_PROJECTION_CTA_PACKS_PER_ROW,
+    Nvfp4ProjectionCtaTile,
 };
+use super::{ProjectionCtaAPacks, ProjectionCtaAScales, ProjectionCtaBPacks, ProjectionCtaBScales};
 
 const MMA_PACKS_PER_ROW: u32 = 8;
 
 #[inline(always)]
 pub fn load_a_fragments(
-    a_packs: &SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
+    a_packs: &ProjectionCtaAPacks,
     tile: Nvfp4ProjectionCtaTile,
     k_atom: u32,
 ) -> [u32; 4] {
@@ -24,7 +22,7 @@ pub fn load_a_fragments(
 
 #[inline(always)]
 pub fn load_b_fragments(
-    b_packs: &SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
+    b_packs: &ProjectionCtaBPacks,
     tile: Nvfp4ProjectionCtaTile,
     k_atom: u32,
 ) -> [u32; 2] {
@@ -36,7 +34,7 @@ pub fn load_b_fragments(
 
 #[inline(always)]
 pub fn load_a_scale4(
-    a_scales: &SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
+    a_scales: &ProjectionCtaAScales,
     tile: Nvfp4ProjectionCtaTile,
     k_atom: u32,
 ) -> u32 {
@@ -46,7 +44,7 @@ pub fn load_a_scale4(
 
 #[inline(always)]
 pub fn load_b_scale4(
-    b_scales: &SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+    b_scales: &ProjectionCtaBScales,
     tile: Nvfp4ProjectionCtaTile,
     k_atom: u32,
 ) -> u32 {
@@ -56,7 +54,7 @@ pub fn load_b_scale4(
 
 #[inline(always)]
 fn load_a_fragment(
-    a_packs: &SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
+    a_packs: &ProjectionCtaAPacks,
     tile: Nvfp4ProjectionCtaTile,
     k_atom: u32,
     register: u32,
@@ -68,7 +66,7 @@ fn load_a_fragment(
 
 #[inline(always)]
 fn load_b_fragment(
-    b_packs: &SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
+    b_packs: &ProjectionCtaBPacks,
     tile: Nvfp4ProjectionCtaTile,
     k_atom: u32,
     register: u32,

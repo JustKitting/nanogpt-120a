@@ -1,15 +1,12 @@
-use cuda_device::{SharedArray, thread};
+use cuda_device::thread;
 
 use crate::mma::mma_m16n8k64_scale4x_ue4m3;
 use crate::mma::projection::Nvfp4ProjectionParams;
 
 use super::load::{load_a_fragments, load_a_scale4, load_b_fragments, load_b_scale4};
 use super::stage::{stage_row_pair_tiles_aligned, stage_tiles, stage_tiles_aligned};
-use super::tile::{
-    NVFP4_PROJECTION_CTA_A_PACKS, NVFP4_PROJECTION_CTA_A_SCALES, NVFP4_PROJECTION_CTA_B_PACKS,
-    NVFP4_PROJECTION_CTA_B_SCALES, NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_K_ATOMS,
-    Nvfp4ProjectionCtaTile,
-};
+use super::tile::{NVFP4_PROJECTION_CTA_K, NVFP4_PROJECTION_CTA_K_ATOMS, Nvfp4ProjectionCtaTile};
+use super::{ProjectionCtaAPacks, ProjectionCtaAScales, ProjectionCtaBPacks, ProjectionCtaBScales};
 
 macro_rules! projection_accumulator_fn {
     ($name:ident, $stage_tiles:ident) => {
@@ -21,10 +18,10 @@ macro_rules! projection_accumulator_fn {
             weight_scales: &[u8],
             tile: Nvfp4ProjectionCtaTile,
             params: &Nvfp4ProjectionParams,
-            a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-            b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-            a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-            b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+            a_packs: &mut ProjectionCtaAPacks,
+            b_packs: &mut ProjectionCtaBPacks,
+            a_scales: &mut ProjectionCtaAScales,
+            b_scales: &mut ProjectionCtaBScales,
         ) -> [f32; 4] {
             let mut acc = [0.0_f32; 4];
             let mut k_base = 0;
@@ -76,12 +73,12 @@ pub fn projection_accumulator_aligned_row_pair(
     tile0: Nvfp4ProjectionCtaTile,
     tile1: Nvfp4ProjectionCtaTile,
     params: &Nvfp4ProjectionParams,
-    a_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    a1_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_PACKS>,
-    b_packs: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_PACKS>,
-    a_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    a1_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_A_SCALES>,
-    b_scales: &mut SharedArray<u32, NVFP4_PROJECTION_CTA_B_SCALES>,
+    a_packs: &mut ProjectionCtaAPacks,
+    a1_packs: &mut ProjectionCtaAPacks,
+    b_packs: &mut ProjectionCtaBPacks,
+    a_scales: &mut ProjectionCtaAScales,
+    a1_scales: &mut ProjectionCtaAScales,
+    b_scales: &mut ProjectionCtaBScales,
 ) -> ([f32; 4], [f32; 4]) {
     let mut acc0 = [0.0_f32; 4];
     let mut acc1 = [0.0_f32; 4];
