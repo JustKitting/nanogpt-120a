@@ -22,12 +22,7 @@ pub(super) fn validation_windows(path: &Path, tokens: &[u16], start: usize) -> A
         .into());
     }
 
-    let mut validation_tokens = Vec::with_capacity(needed);
-    for batch in 0..VALIDATION_WINDOWS {
-        let offset = start + batch * len;
-        validation_tokens.extend_from_slice(&tokens[offset..offset + len]);
-    }
-    Ok(validation_tokens)
+    Ok(tokens[start..start + needed].to_vec())
 }
 
 pub(super) fn train_end(token_count: usize) -> usize {
