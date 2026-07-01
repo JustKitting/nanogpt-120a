@@ -33,10 +33,6 @@ impl LinearScratch {
         })
     }
 
-    pub fn attention(&mut self) -> AttentionCProjScratch<'_> {
-        self.c_proj()
-    }
-
     pub fn c_proj(&mut self) -> AttentionCProjScratch<'_> {
         let (error_t, weight_t, input_t, linear) = self.parts();
         AttentionCProjScratch {

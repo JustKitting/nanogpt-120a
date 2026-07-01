@@ -31,9 +31,9 @@ impl BackwardScratchBuffers {
         Gpt2BackwardScratch {
             final_head: self.final_head.final_head(),
             attention: BlockAttentionBackwardScratch {
-                c_proj: self.attention_c_proj.attention(),
+                c_proj: self.attention_c_proj.c_proj(),
                 core: self.attention_core.args(),
-                qkv: self.attention_qkv.attention(),
+                qkv: self.attention_qkv.qkv(),
             },
             mlp: MlpBackwardScratch {
                 down_error_t,
