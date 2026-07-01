@@ -16,13 +16,11 @@ mod data;
 mod linear_scratch;
 #[path = "common/saved_block.rs"]
 mod saved_block;
-#[path = "common/upload.rs"]
-mod upload_common;
 
+use common::upload::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
 use common::{assert_nonzero_finite, cuda_test_context};
 use linear_scratch::LinearBackwardScratchBuffers;
 use saved_block::{saved_block, SavedBlockParts};
-use upload_common::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]

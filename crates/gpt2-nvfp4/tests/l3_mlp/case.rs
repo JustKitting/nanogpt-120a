@@ -8,8 +8,8 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use crate::assertions::{assert_down_projection_residual_add, assert_relu2_samples};
 use crate::buffers::ScratchBuffers;
 use crate::common::cuda_test_context;
+use crate::common::upload::TestResult;
 use crate::data::{normalized_input, residual_input};
-use crate::upload_common::TestResult;
 use crate::weights::WeightBuffers;
 
 pub fn run() -> TestResult {

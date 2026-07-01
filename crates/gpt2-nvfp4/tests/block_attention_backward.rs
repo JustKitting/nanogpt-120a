@@ -24,14 +24,13 @@ mod linear_scratch;
 mod saved_block;
 #[path = "block_attention_backward/scratch.rs"]
 mod scratch;
-#[path = "common/upload.rs"]
-mod upload_common;
 
+use common::upload::TestResult;
 use common::{assert_nonzero_finite, cuda_test_context};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
-fn block_attention_side_backward_runs_full_chain() -> upload_common::TestResult {
+fn block_attention_side_backward_runs_full_chain() -> TestResult {
     let (_, stream, ptx) = cuda_test_context()?;
     let saved = buffers::SavedBuffers::new(&stream)?;
     let weights = buffers::WeightBuffers::new(&stream)?;

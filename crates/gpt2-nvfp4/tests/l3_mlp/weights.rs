@@ -4,8 +4,8 @@ use gpt2_nvfp4::{
     MlpVectorShape,
 };
 
+use crate::common::upload::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult, UploadedNvfp4};
 use crate::data::{mlp_down_identity_weight_bytes, mlp_up_repeat_weight_bytes};
-use crate::upload_common::{TestResult, UploadedNvfp4, upload_nvfp4_bytes, upload_zero_nvfp4};
 
 pub struct WeightBuffers {
     up_weight: UploadedNvfp4,

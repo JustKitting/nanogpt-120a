@@ -9,13 +9,13 @@ mod common;
 mod data;
 #[path = "support/forward_scratch.rs"]
 mod scratch_support;
-#[path = "common/upload.rs"]
-mod upload_common;
 #[path = "l3_mlp/weights.rs"]
 mod weights;
 
+use common::upload::TestResult;
+
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
-fn mlp_forward_projects_relu2_downprojects_and_residual_adds() -> upload_common::TestResult {
+fn mlp_forward_projects_relu2_downprojects_and_residual_adds() -> TestResult {
     case::run()
 }
