@@ -34,18 +34,17 @@ impl Llama2Tokenizer {
     }
 
     pub fn encode(&self, text: &str) -> AppResult<Vec<u32>> {
-        Ok(self
-            .tokenizer
-            .encode(text, true)
-            .map_err(tokenizer_error)?
-            .get_ids()
-            .to_vec())
+        self.encode_with_special_tokens(text, true)
     }
 
     pub fn encode_ordinary(&self, text: &str) -> AppResult<Vec<u32>> {
+        self.encode_with_special_tokens(text, false)
+    }
+
+    fn encode_with_special_tokens(&self, text: &str, add_special_tokens: bool) -> AppResult<Vec<u32>> {
         Ok(self
             .tokenizer
-            .encode(text, false)
+            .encode(text, add_special_tokens)
             .map_err(tokenizer_error)?
             .get_ids()
             .to_vec())
