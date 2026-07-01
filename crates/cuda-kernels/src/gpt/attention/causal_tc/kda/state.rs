@@ -1,11 +1,15 @@
+mod phase;
+
 use cuda_device::{DisjointSlice, thread};
 
 use super::super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
-use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_K, CTA_THREADS, CtaTile};
-use crate::kda_common::{batch_head, chunk_count, chunk_g_last_index, compact_index, kda_decay_exp, kda_tc_shape, state_elems};
-use crate::kda_tc::{CompactTileCtx, CtaATile, CtaBTile, CtaTiles, KdaStateTile, add_shared_state_quads, stage_compact_a, stage_compact_b_t_disjoint as stage_vnew_b_t_disjoint, stage_shared_state_b_t, store_vnew_quads, tc_stage_loop};
+use crate::f16_tc_matmul::cta_tile::CtaTile;
+use crate::kda_common::{batch_head, chunk_count, kda_tc_shape, state_elems};
+use crate::kda_tc::{CompactTileCtx, CtaTiles, KdaStateTile};
+
+use phase::{compute_kg_vnew_add_state, compute_ws_to_vnew, decay_state};
 
 #[derive(Clone, Copy)]
 pub(in super::super) struct KdaStateSaveInputs<'a> { pub(in super::super) kg: &'a [f32], pub(in super::super) w: &'a [f32], pub(in super::super) u: &'a [f32], pub(in super::super) chunk_g_last: &'a [f32] }
@@ -61,63 +65,5 @@ pub(in super::super) fn chunk_kda_state_save_body(
         thread::sync_threads();
 
         chunk += 1;
-    }
-}
-
-fn compute_ws_to_vnew(
-    w: &[f32], u: &[f32], v_new: &mut DisjointSlice<f32>, state: &KdaStateTile,
-    a_tile: &mut CtaATile, b_tile: &mut CtaBTile,
-    ctx: CompactTileCtx<'_>,
-) {
-    let mut acc = [[0.0_f32; 4]; 4];
-    tc_stage_loop!(ctx.tile, a_tile, b_tile, acc; k_base < ctx.params.head_dim; {
-        stage_compact_a(w, a_tile, ctx, k_base);
-    } {
-        stage_shared_state_b_t(state, b_tile, ctx, k_base);
-    });
-    store_vnew_quads(acc, u, v_new, ctx);
-}
-
-fn compute_kg_vnew_add_state(
-    k: &[f32], v_new: &mut DisjointSlice<f32>, state: &mut KdaStateTile,
-    a_tile: &mut CtaATile, b_tile: &mut CtaBTile,
-    ctx: CompactTileCtx<'_>,
-) {
-    let mut acc = [[0.0_f32; 4]; 4];
-    tc_stage_loop!(ctx.tile, a_tile, b_tile, acc; k_base < ctx.params.chunk_size; {
-        stage_kg_t_a(k, a_tile, ctx, k_base);
-    } {
-        stage_vnew_b_t_disjoint(v_new, b_tile, ctx, k_base);
-    });
-    add_shared_state_quads(acc, ctx.tile, state, ctx.params);
-}
-
-fn decay_state(
-    state: &mut KdaStateTile, chunk_g_last: &[f32], bh: u32, chunk: u32, tid: u32,
-    ctx: CompactTileCtx<'_>,
-) {
-    let state_elems = state_elems(ctx.params);
-    let mut linear = tid;
-    while linear < state_elems {
-        let k_dim = linear / ctx.params.head_dim;
-        let g_last = chunk_g_last[chunk_g_last_index(bh, chunk, k_dim, ctx.params)];
-        state[linear as usize] *= kda_decay_exp(g_last);
-        linear += TC_FORWARD_THREADS_PER_BLOCK;
-    }
-}
-
-fn stage_kg_t_a(src: &[f32], a_tile: &mut CtaATile, ctx: CompactTileCtx<'_>, k_base: u32) {
-    let mut offset = thread::threadIdx_x();
-    while offset < CTA_A_ELEMS as u32 {
-        let row = offset / CTA_K;
-        let col = offset - row * CTA_K;
-        let dim = ctx.tile.row_base + row;
-        let token = ctx.start + k_base + col;
-        a_tile[offset as usize] = if dim < ctx.params.head_dim && token < ctx.end {
-            cvt_rn_f16_f32(src[compact_index(ctx.batch, token, ctx.head, dim, ctx.params)])
-        } else {
-            0
-        };
-        offset += CTA_THREADS;
     }
 }
