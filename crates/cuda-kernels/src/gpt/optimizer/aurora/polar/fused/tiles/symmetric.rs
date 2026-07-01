@@ -1,14 +1,27 @@
 #![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 
-use cuda_device::{SharedArray, thread};
+use cuda_device::{thread, SharedArray};
 
-use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_M, CtaTile};
+use crate::f16_tc_matmul::cta_tile::{CtaTile, CTA_A_ELEMS, CTA_B_ELEMS, CTA_M};
 use crate::float_ptx::sqrt_f32;
 
 use super::super::super::super::super::work_grid::WorkGrid;
 use super::super::coefficients::Coefficients;
 use super::super::store::{store_plain, store_plain_transposed, store_symmetric_polynomial};
 use super::compute_tile;
+
+macro_rules! for_upper_triangle_tiles {
+    ($work:expr, $dim:expr, |$tile_row:ident, $tile_col:ident| $body:block) => {{
+        let tile_dim = $dim.div_ceil(CTA_M);
+        let tile_count = tile_dim * (tile_dim + 1) / 2;
+        let mut tile_index = $work.block();
+        while tile_index < tile_count {
+            let ($tile_row, $tile_col) = upper_triangle_tile(tile_index, tile_dim);
+            $body
+            tile_index += $work.blocks();
+        }
+    }};
+}
 
 pub(crate) fn run_symmetric_tiles(
     source: *const f32,
@@ -19,15 +32,9 @@ pub(crate) fn run_symmetric_tiles(
     dim: u32,
     k: u32,
 ) {
-    let tile_dim = dim.div_ceil(CTA_M);
-    let tile_count = tile_dim * (tile_dim + 1) / 2;
-    let mut tile_index = work.block();
-
-    while tile_index < tile_count {
-        let (tile_row, tile_col) = upper_triangle_tile(tile_index, tile_dim);
+    for_upper_triangle_tiles!(work, dim, |tile_row, tile_col| {
         run_tile(source, out, a_tile, b_tile, dim, k, tile_row, tile_col);
-        tile_index += work.blocks();
-    }
+    });
 }
 
 pub(crate) fn run_symmetric_polynomial_tiles(
@@ -40,12 +47,7 @@ pub(crate) fn run_symmetric_polynomial_tiles(
     dim: u32,
     coefficients: Coefficients,
 ) {
-    let tile_dim = dim.div_ceil(CTA_M);
-    let tile_count = tile_dim * (tile_dim + 1) / 2;
-    let mut tile_index = work.block();
-
-    while tile_index < tile_count {
-        let (tile_row, tile_col) = upper_triangle_tile(tile_index, tile_dim);
+    for_upper_triangle_tiles!(work, dim, |tile_row, tile_col| {
         run_polynomial_tile(
             source,
             base,
@@ -57,8 +59,7 @@ pub(crate) fn run_symmetric_polynomial_tiles(
             tile_col,
             coefficients,
         );
-        tile_index += work.blocks();
-    }
+    });
 }
 
 #[inline(always)]
