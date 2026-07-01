@@ -1,4 +1,4 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
+use cuda_device::{cuda_module, kernel, thread, DisjointSlice, SharedArray};
 
 use crate::amax::{amax4_f32, max4_f32};
 use crate::block_reduce::{block_max_leader_f32, block_max_store_f32};
@@ -6,10 +6,10 @@ use crate::float_ptx::max_f32;
 use crate::quartet::quartet_backward_ms_eden_global_scale;
 use crate::warp_reduce::thread_lane_warp;
 
-use super::AMAX_WARPS_PER_BLOCK;
 use super::input::{
     checked_nvfp4_abs_value, checked_rowwise_abs_value, nvfp4_value_at, rowwise_value_at,
 };
+use super::AMAX_WARPS_PER_BLOCK;
 use crate::nvfp4_quant::kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK;
 
 #[cuda_module]
@@ -28,15 +28,8 @@ pub(crate) mod module {
         rows: u32,
         cols: u32,
     ) {
-        let chunk = thread::blockIdx_x();
-        let (thread, lane, warp_in_block) = thread_lane_warp();
-        let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
         let element_count = rows * cols;
-        let stride = thread::blockDim_x();
-        let i0 = base + thread;
-        let i1 = i0 + stride;
-        let i2 = i1 + stride;
-        let i3 = i2 + stride;
+        let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = chunk_amax_indices();
 
         let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
             amax4_f32(
@@ -65,14 +58,7 @@ pub(crate) mod module {
         mut out: DisjointSlice<f32>,
         element_count: u32,
     ) {
-        let chunk = thread::blockIdx_x();
-        let (thread, lane, warp_in_block) = thread_lane_warp();
-        let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
-        let stride = thread::blockDim_x();
-        let i0 = base + thread;
-        let i1 = i0 + stride;
-        let i2 = i1 + stride;
-        let i3 = i2 + stride;
+        let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = chunk_amax_indices();
 
         let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
             amax4_f32(
@@ -134,5 +120,18 @@ pub(crate) mod module {
         } else {
             0.0
         }
+    }
+
+    #[inline(always)]
+    fn chunk_amax_indices() -> (u32, u32, u32, u32, u32, u32, u32, u32) {
+        let chunk = thread::blockIdx_x();
+        let (thread, lane, warp_in_block) = thread_lane_warp();
+        let base = chunk * TENSOR_AMAX_VALUES_PER_BLOCK;
+        let stride = thread::blockDim_x();
+        let i0 = base + thread;
+        let i1 = i0 + stride;
+        let i2 = i1 + stride;
+        let i3 = i2 + stride;
+        (chunk, lane, warp_in_block, base, i0, i1, i2, i3)
     }
 }
