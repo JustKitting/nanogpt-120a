@@ -27,14 +27,10 @@ pub(in crate::training::launch) fn build_run_info(dataset: &str, config: &TrainC
     push_info(&mut info, "step_cap", config.step_cap);
     push_info(&mut info, "log_interval", config.log_interval);
     push_info(&mut info, "max_seconds", config.max_seconds);
-    push_info(
-        &mut info,
-        "eval_interval",
-        config
-            .eval_interval
-            .map(|value| value.to_string())
-            .unwrap_or_else(|| "none".to_string()),
-    );
+    let eval_interval = config
+        .eval_interval
+        .map_or_else(|| "none".to_string(), |value| value.to_string());
+    push_info(&mut info, "eval_interval", eval_interval);
     push_info(&mut info, "seed", format!("{:#x}", config.seed));
     push_run_env(&mut info);
     info
