@@ -11,7 +11,10 @@ pub(super) fn forward<'a, 'scratch>(
 ) -> Result<HiddenStateDevice<'a>, DriverError> {
     let mut input_nvfp4 = args.input_nvfp4;
     let mut tape = args.tape;
+    let embedding_dim = crate::GPT2_N_EMBD as u32;
     let qkv_dim = crate::Gpt2Config::attention_qkv_dim(args.use_full_attention) as u32;
+    let head_count = crate::GPT2_N_HEAD as u32;
+    let head_dim = crate::Gpt2Config::head_dim() as u32;
     let hidden = args.hidden;
 
     input_nvfp4.quantize_precomputed_amax(
@@ -20,7 +23,7 @@ pub(super) fn forward<'a, 'scratch>(
         &*hidden.normalized,
         &*hidden.normalized_amax,
         hidden.row_count,
-        crate::GPT2_N_EMBD as u32,
+        embedding_dim,
     )?;
 
     let input = input_nvfp4.device();
@@ -35,7 +38,7 @@ pub(super) fn forward<'a, 'scratch>(
         bias: args.projections.qkv_bias,
         out: args.qkv,
         token_count: hidden.row_count,
-        input_dim: crate::GPT2_N_EMBD as u32,
+        input_dim: embedding_dim,
         output_dim: qkv_dim,
     })?;
 
@@ -47,10 +50,10 @@ pub(super) fn forward<'a, 'scratch>(
             row_count: hidden.row_count,
             seq_len: hidden.seq_len,
             batch_size: hidden.batch_size,
-            embedding_dim: crate::GPT2_N_EMBD as u32,
+            embedding_dim,
             qkv_dim,
-            head_count: crate::GPT2_N_HEAD as u32,
-            head_dim: crate::Gpt2Config::head_dim() as u32,
+            head_count,
+            head_dim,
         })?;
     }
 
@@ -72,10 +75,10 @@ pub(super) fn forward<'a, 'scratch>(
         row_count: hidden.row_count,
         seq_len: hidden.seq_len,
         batch_size: hidden.batch_size,
-        embedding_dim: crate::GPT2_N_EMBD as u32,
+        embedding_dim,
         qkv_dim,
-        head_count: crate::GPT2_N_HEAD as u32,
-        head_dim: crate::Gpt2Config::head_dim() as u32,
+        head_count,
+        head_dim,
     };
     if args.use_full_attention {
         args.module.causal_attention_tc(attention_args)?;
@@ -89,7 +92,7 @@ pub(super) fn forward<'a, 'scratch>(
         &*hidden.normalized,
         &mut *hidden.normalized_amax,
         hidden.row_count,
-        crate::GPT2_N_EMBD as u32,
+        embedding_dim,
     )?;
 
     let input = input_nvfp4.device();
@@ -104,7 +107,7 @@ pub(super) fn forward<'a, 'scratch>(
         bias: args.projections.c_proj_bias,
         residual: &mut *hidden.residual,
         token_count: hidden.row_count,
-        embedding_dim: crate::GPT2_N_EMBD as u32,
+        embedding_dim,
     })?;
 
     Ok(hidden)
