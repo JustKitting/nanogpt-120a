@@ -11,6 +11,7 @@ use super::optimizer::OptimizerScratch;
 use super::optimizer_aurora::AuroraPointerTables;
 use super::optimizer_state::OptimizerStateBuffers;
 use super::optimizer_tc_scratch::AuroraScratchBuffers;
+use super::rowwise_nvfp4::RowwiseNvfp4Buffers;
 use super::scratch::BackwardScratchBuffers;
 use super::tape::ForwardTapeBuffers;
 use crate::training::runtime::Runtime;
@@ -22,14 +23,10 @@ pub struct TrainBuffers {
     pub normalized_amax: DeviceBuffer<f32>,
     pub mean: DeviceBuffer<f32>,
     pub inv_std: DeviceBuffer<f32>,
-    pub hidden_bytes: DeviceBuffer<u8>,
-    pub hidden_scales: DeviceBuffer<u8>,
-    pub hidden_globals: DeviceBuffer<f32>,
+    pub hidden_nvfp4: RowwiseNvfp4Buffers,
     pub mlp_pre: DeviceBuffer<f32>,
     pub mlp_act: DeviceBuffer<f32>,
-    pub mlp_bytes: DeviceBuffer<u8>,
-    pub mlp_scales: DeviceBuffer<u8>,
-    pub mlp_globals: DeviceBuffer<f32>,
+    pub mlp_activation_nvfp4: RowwiseNvfp4Buffers,
     pub qkv: DeviceBuffer<f32>,
     pub log_sum_exp: DeviceBuffer<f32>,
     pub logits: DeviceBuffer<f32>,
@@ -70,14 +67,10 @@ impl TrainBuffers {
             normalized_amax: zero(stream, GPT2_TOKEN_ROWS)?,
             mean: zero(stream, GPT2_TOKEN_ROWS)?,
             inv_std: zero(stream, GPT2_TOKEN_ROWS)?,
-            hidden_bytes: zero(stream, HiddenState::LEN / 2)?,
-            hidden_scales: zero(stream, HiddenState::LEN / 16)?,
-            hidden_globals: zero(stream, GPT2_TOKEN_ROWS)?,
+            hidden_nvfp4: RowwiseNvfp4Buffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
             mlp_pre: zero(stream, MlpActivation::LEN)?,
             mlp_act: zero(stream, MlpActivation::LEN)?,
-            mlp_bytes: zero(stream, MlpActivation::LEN / 2)?,
-            mlp_scales: zero(stream, MlpActivation::LEN / 16)?,
-            mlp_globals: zero(stream, GPT2_TOKEN_ROWS)?,
+            mlp_activation_nvfp4: RowwiseNvfp4Buffers::new(stream, MlpActivation::LEN, GPT2_TOKEN_ROWS)?,
             qkv: zero(stream, QkvActivation::LEN)?,
             log_sum_exp: zero(stream, AttentionLogSumExp::LEN)?,
             logits: zero(stream, Logits::LEN)?,

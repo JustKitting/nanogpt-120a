@@ -1,6 +1,4 @@
-use gpt2_nvfp4::{
-    GPT2_VOCAB_SIZE, Gpt2ForwardArgs, HiddenStateNvfp4, MlpActivationNvfp4, TokenEmbeddingArgs,
-};
+use gpt2_nvfp4::{GPT2_VOCAB_SIZE, Gpt2ForwardArgs, TokenEmbeddingArgs};
 
 use super::next_latent::{NextLatForwardArgs, forward as next_latent_forward};
 use super::{TokenBatch, TrainStats, Trainer};
@@ -33,17 +31,9 @@ impl Trainer {
             layer_norm_module: &self.runtime.layer_norm,
             mlp_module: &self.runtime.mlp,
             lm_head_module: &self.runtime.lm_head,
-            hidden_nvfp4: HiddenStateNvfp4 {
-                bytes: &mut buffers.hidden_bytes,
-                scales: &mut buffers.hidden_scales,
-                global_scales: &mut buffers.hidden_globals,
-            },
+            hidden_nvfp4: buffers.hidden_nvfp4.scratch(),
             attention_tc_scratch: buffers.scratch.attention_core.forward_tc(),
-            mlp_activation_nvfp4: MlpActivationNvfp4 {
-                bytes: &mut buffers.mlp_bytes,
-                scales: &mut buffers.mlp_scales,
-                global_scales: &mut buffers.mlp_globals,
-            },
+            mlp_activation_nvfp4: buffers.mlp_activation_nvfp4.scratch(),
             attention: std::array::from_fn(|i| uploaded.blocks[i].attention_tensors()),
             block_ln_1: std::array::from_fn(|i| uploaded.blocks[i].ln_1.tensors()),
             block_ln_2: std::array::from_fn(|i| uploaded.blocks[i].ln_2.tensors()),

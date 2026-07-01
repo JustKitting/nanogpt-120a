@@ -1,8 +1,8 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_TOKEN_ROWS, HiddenState, LayerNormSaved, LayerNormTape, RowwiseNvfp4Tape};
-use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
+use gpt2_nvfp4::{GPT2_TOKEN_ROWS, HiddenState, LayerNormSaved, LayerNormTape};
 
 use super::device_buffer::zero;
+pub(super) use super::rowwise_nvfp4::RowwiseNvfp4Buffers as RowwiseTapeBuffers;
 
 pub struct LayerNormTapeBuffers {
     residual: DeviceBuffer<u16>,
@@ -34,33 +34,5 @@ impl LayerNormTapeBuffers {
             mean: &self.mean,
             inv_std: &self.inv_std,
         }
-    }
-}
-
-pub struct RowwiseTapeBuffers {
-    bytes: DeviceBuffer<u8>,
-    scales: DeviceBuffer<u8>,
-    global_scales: DeviceBuffer<f32>,
-}
-
-impl RowwiseTapeBuffers {
-    pub fn new(stream: &CudaStream, elements: usize, rows: usize) -> Result<Self, DriverError> {
-        Ok(Self {
-            bytes: zero(stream, elements / 2)?,
-            scales: zero(stream, elements / 16)?,
-            global_scales: zero(stream, rows)?,
-        })
-    }
-
-    pub fn tape(&mut self) -> RowwiseNvfp4Tape<'_> {
-        RowwiseNvfp4Tape {
-            bytes: &mut self.bytes,
-            scales: &mut self.scales,
-            global_scales: &mut self.global_scales,
-        }
-    }
-
-    pub fn saved(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        Nvfp4RowwiseDeviceTensor::new(&self.bytes, &self.scales, &self.global_scales)
     }
 }

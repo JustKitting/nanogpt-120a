@@ -28,6 +28,7 @@ mod optimizer_aurora;
 mod optimizer_state;
 mod optimizer_tc_scratch;
 pub(crate) mod runtime;
+mod rowwise_nvfp4;
 mod save;
 mod schedule_free;
 mod scratch;
