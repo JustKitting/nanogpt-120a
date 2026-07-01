@@ -15,11 +15,9 @@ mod attention_core_scratch;
 mod common;
 #[path = "attention_core_backward/data.rs"]
 mod data;
-#[path = "common/saved_block.rs"]
-mod saved_block;
 
+use common::saved_block::{saved_block, SavedBlockParts};
 use common::{assert_nonzero_finite, attention_log_sum_exp_values, cuda_test_context, float_bits};
-use saved_block::{saved_block, SavedBlockParts};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]

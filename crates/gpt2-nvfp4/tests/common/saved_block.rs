@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
     BlockForwardSaved, LayerNormSaved, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,

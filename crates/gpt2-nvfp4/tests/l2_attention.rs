@@ -13,8 +13,6 @@ mod assertions;
 mod common;
 #[path = "l2_attention/data.rs"]
 mod data;
-#[path = "common/f16.rs"]
-mod f16_common;
 #[path = "support/forward_scratch.rs"]
 mod scratch_support;
 

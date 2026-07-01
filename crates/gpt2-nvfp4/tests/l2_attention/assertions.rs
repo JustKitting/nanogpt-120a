@@ -1,6 +1,6 @@
 use gpt2_nvfp4::{HiddenState, GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV};
 
-use super::f16_common::tc_f16;
+use crate::common::f16::tc_f16;
 
 const HEAD_DIM: usize = GPT2_N_EMBD / GPT2_N_HEAD;
 const ATTENTION_TOLERANCE: f32 = 1.0e-6;

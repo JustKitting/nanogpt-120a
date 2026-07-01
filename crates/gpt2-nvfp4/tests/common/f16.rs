@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub fn tc_f16(value: f32) -> f32 {
     f16_bits_to_f32(f32_to_f16_bits(value))
 }

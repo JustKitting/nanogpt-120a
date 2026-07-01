@@ -3,7 +3,7 @@ use gpt2_nvfp4::{BlockForwardSaved, HiddenState, QkvActivation, GPT2_TOKEN_ROWS}
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use crate::common::nvfp4::{filled_u8, E2M1_MIN_PAIR, E4M3_ONE};
-use crate::saved_block::{saved_block, SavedBlockParts};
+use crate::common::saved_block::{saved_block, SavedBlockParts};
 
 pub struct SavedBuffers {
     hidden_bytes: DeviceBuffer<u8>,

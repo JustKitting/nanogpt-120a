@@ -3,7 +3,9 @@ use std::{path::PathBuf, sync::Arc};
 use cuda_core::{CudaContext, CudaModule, CudaStream, DriverError};
 use gpt2_nvfp4::{AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS};
 
+pub mod f16;
 pub mod nvfp4;
+pub mod saved_block;
 pub mod upload;
 
 pub type CudaTestContext = (Arc<CudaContext>, Arc<CudaStream>, Arc<CudaModule>);
