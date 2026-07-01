@@ -21,7 +21,6 @@ pub struct Observation {
 #[derive(Clone, Copy, Default)]
 pub struct LogMetrics {
     pub val_loss: Option<f64>,
-    pub completed_steps: Option<usize>,
     pub elapsed_s: Option<f64>,
     pub saw_nan: bool,
     pub panicked: bool,

@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use super::super::history::Trial;
-use super::super::parse::{f64_field, usize_field};
+use super::super::parse::RunResult;
 use super::logs::LogMetrics;
 
 pub fn screen_path(trial: &Trial) -> PathBuf {
@@ -23,19 +23,16 @@ fn has_log_file(trial: &Trial, file_name: &str) -> bool {
 pub fn read_log(path: impl Into<Option<PathBuf>>) -> Option<LogMetrics> {
     let path = path.into()?;
     let text = fs::read_to_string(path).ok()?;
-    let mut metrics = LogMetrics::default();
+    let mut result = RunResult::default();
+    let mut panicked = false;
     for line in text.lines() {
-        metrics.saw_nan |= line.contains("loss=NaN") || line.contains("finite=false");
-        metrics.panicked |= line.contains("panicked at") || line.contains("assertion failed");
-        if line.starts_with("stopped_by_wall_clock=true") {
-            metrics.elapsed_s = f64_field(line, "elapsed_s=");
-            metrics.completed_steps = usize_field(line, "completed_steps=");
-        }
-        if line.starts_with("heldout_eval ") {
-            metrics.val_loss = f64_field(line, "val_loss=");
-            metrics.elapsed_s = f64_field(line, "train_elapsed_s=");
-            metrics.completed_steps = usize_field(line, "completed_steps=");
-        }
+        result.update(line);
+        panicked |= line.contains("panicked at") || line.contains("assertion failed");
     }
-    Some(metrics)
+    Some(LogMetrics {
+        val_loss: result.val_loss,
+        elapsed_s: result.last_elapsed_s,
+        saw_nan: result.saw_nan,
+        panicked,
+    })
 }
