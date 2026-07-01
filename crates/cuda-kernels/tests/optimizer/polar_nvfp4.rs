@@ -12,7 +12,7 @@ mod device;
 mod math;
 #[path = "polar_nvfp4/mode_cases.rs"]
 mod mode_cases;
-#[path = "polar_nvfp4/schedule.rs"]
+#[path = "polar_nvfp4/schedule/mod.rs"]
 mod schedule;
 #[path = "polar_nvfp4/scratch.rs"]
 mod scratch;
