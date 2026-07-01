@@ -59,19 +59,8 @@ fn nextlat_concat_and_shifted_smooth_l1_match_reference() -> Result<(), Box<dyn 
     let expected_concat = reference::concat(&next_token_embeddings, &current_states);
     let (expected_losses, expected_grad) = reference::smooth_l1(&predicted, &current_states);
 
-    assert_all_close(&concat, &expected_concat);
-    assert_all_close(&losses, &expected_losses);
-    assert_all_close(&d_pred, &expected_grad);
+    common::assert_slice_close(&concat, &expected_concat, TOLERANCE);
+    common::assert_slice_close(&losses, &expected_losses, TOLERANCE);
+    common::assert_slice_close(&d_pred, &expected_grad, TOLERANCE);
     Ok(())
-}
-
-fn assert_all_close(actual: &[f32], expected: &[f32]) {
-    assert_eq!(actual.len(), expected.len());
-    for (index, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
-        let error = (actual - expected).abs();
-        assert!(
-            error <= TOLERANCE,
-            "index={index} actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
-        );
-    }
 }

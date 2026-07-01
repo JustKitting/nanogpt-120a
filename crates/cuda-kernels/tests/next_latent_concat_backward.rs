@@ -36,8 +36,8 @@ fn nextlat_concat_backward_splits_reference() -> Result<(), Box<dyn Error>> {
     let d_current = d_current_dev.to_host_vec(&stream)?;
     let (expected_next, expected_current) = reference(&d_concat, &d_predicted);
 
-    assert_all_close(&d_next, &expected_next);
-    assert_all_close(&d_current, &expected_current);
+    common::assert_slice_close(&d_next, &expected_next, TOLERANCE);
+    common::assert_slice_close(&d_current, &expected_current, TOLERANCE);
     Ok(())
 }
 
@@ -57,15 +57,4 @@ fn reference(d_concat: &[f32], d_predicted: &[f32]) -> (Vec<f32>, Vec<f32>) {
         }
     }
     (d_next, d_current)
-}
-
-fn assert_all_close(actual: &[f32], expected: &[f32]) {
-    assert_eq!(actual.len(), expected.len());
-    for (index, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
-        let error = (actual - expected).abs();
-        assert!(
-            error <= TOLERANCE,
-            "index={index} actual={actual:.8e} expected={expected:.8e} error={error:.8e}"
-        );
-    }
 }
