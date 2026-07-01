@@ -13,6 +13,7 @@ pub use activations::{
 pub use backward::{
     AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
     AttentionCProjScratch, AttentionCoreBackwardArgs, AttentionCoreScratch,
+    AttentionCoreScratchBuffers,
     AttentionQkvBackwardArgs, AttentionQkvScratch, BlockAttentionBackwardArgs,
     BlockAttentionBackwardModules, BlockAttentionBackwardScratch, BlockAttentionBackwardSeeds,
     BlockMlpBackwardArgs, BlockMlpBackwardModules, FinalHeadBackwardArgs, FinalHeadBackwardModules,

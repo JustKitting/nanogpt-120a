@@ -12,6 +12,7 @@ mod scratch_reborrow;
 pub use attention::{
     AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
     AttentionCProjScratch, AttentionCoreBackwardArgs, AttentionCoreScratch,
+    AttentionCoreScratchBuffers,
     AttentionQkvBackwardArgs, AttentionQkvScratch, c_proj_backward as attention_c_proj_backward,
     causal_attention_backward, qkv_projection_backward,
 };

@@ -5,8 +5,6 @@ use std::{path::PathBuf, sync::Arc};
 use cuda_core::{CudaContext, CudaModule, CudaStream, DriverError};
 use gpt2_nvfp4::{AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS};
 
-#[path = "../support/attention_core_scratch.rs"]
-pub mod attention_core_scratch;
 pub mod f16;
 #[path = "../support/forward_scratch.rs"]
 pub mod forward_scratch;

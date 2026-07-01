@@ -1,7 +1,6 @@
 #[macro_use]
 mod metric_fields;
 
-mod attention_core_scratch;
 mod backward;
 mod batch;
 mod buffers;
@@ -27,8 +26,8 @@ mod optimizer_apply;
 mod optimizer_aurora;
 mod optimizer_state;
 mod optimizer_tc_scratch;
-pub(crate) mod runtime;
 mod rowwise_nvfp4;
+pub(crate) mod runtime;
 mod save;
 mod schedule_free;
 mod scratch;

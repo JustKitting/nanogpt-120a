@@ -1,8 +1,8 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{AttentionCoreScratch, GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_SEQ_LEN};
 use rust_kernels_cuda::attention::{CausalAttentionBackwardTcScratch, CausalAttentionTcScratch};
 
-use super::device_buffer::zero;
+use super::scratch::AttentionCoreScratch;
+use crate::{GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_SEQ_LEN};
 
 pub struct AttentionCoreScratchBuffers {
     softmax_d: DeviceBuffer<f32>,
@@ -32,28 +32,29 @@ impl AttentionCoreScratchBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         let compact = GPT2_BATCH_SIZE * GPT2_SEQ_LEN * GPT2_N_EMBD;
         let square = GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN * GPT2_SEQ_LEN;
+        let batch_head_rows = GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN;
         Ok(Self {
-            softmax_d: zero(stream, GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN)?,
-            q: zero(stream, compact)?,
-            k: zero(stream, compact)?,
-            v: zero(stream, compact)?,
-            backward_q: zero(stream, compact)?,
-            backward_k: zero(stream, compact)?,
-            backward_v: zero(stream, compact)?,
-            backward_d_out: zero(stream, compact)?,
-            d_out: zero(stream, compact)?,
-            scores: zero(stream, square)?,
-            dot: zero(stream, square)?,
-            p: zero(stream, square)?,
-            ds: zero(stream, square)?,
-            d_q: zero(stream, compact)?,
-            d_k: zero(stream, compact)?,
-            d_v: zero(stream, compact)?,
-            kda_d_q: zero(stream, compact)?,
-            kda_d_k: zero(stream, compact)?,
-            kda_d_v: zero(stream, compact)?,
-            kda_d_g: zero(stream, compact)?,
-            kda_d_beta: zero(stream, GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN)?,
+            softmax_d: DeviceBuffer::zeroed(stream, batch_head_rows)?,
+            q: DeviceBuffer::zeroed(stream, compact)?,
+            k: DeviceBuffer::zeroed(stream, compact)?,
+            v: DeviceBuffer::zeroed(stream, compact)?,
+            backward_q: DeviceBuffer::zeroed(stream, compact)?,
+            backward_k: DeviceBuffer::zeroed(stream, compact)?,
+            backward_v: DeviceBuffer::zeroed(stream, compact)?,
+            backward_d_out: DeviceBuffer::zeroed(stream, compact)?,
+            d_out: DeviceBuffer::zeroed(stream, compact)?,
+            scores: DeviceBuffer::zeroed(stream, square)?,
+            dot: DeviceBuffer::zeroed(stream, square)?,
+            p: DeviceBuffer::zeroed(stream, square)?,
+            ds: DeviceBuffer::zeroed(stream, square)?,
+            d_q: DeviceBuffer::zeroed(stream, compact)?,
+            d_k: DeviceBuffer::zeroed(stream, compact)?,
+            d_v: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_q: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_k: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_v: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_g: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_beta: DeviceBuffer::zeroed(stream, batch_head_rows)?,
         })
     }
 
