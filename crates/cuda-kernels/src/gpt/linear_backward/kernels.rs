@@ -14,14 +14,11 @@ use super::{LINEAR_BIAS_THREADS_PER_BLOCK, bias};
 pub(super) mod module {
     use super::*;
 
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn linear_backward_projection_device_scale_kernel(
-        input_bytes: &[u8],
-        input_scales: &[u8],
-        input_global_scales: &[f32],
-        weight_bytes: &[u8],
-        weight_scales: &[u8],
-        weight_global_scale: &[f32],
+        input_bytes: &[u8], input_scales: &[u8], input_global_scales: &[f32],
+        weight_bytes: &[u8], weight_scales: &[u8], weight_global_scale: &[f32],
         mut out: DisjointSlice<f32>,
         mut params: Nvfp4ProjectionParams,
     ) {
@@ -37,14 +34,11 @@ pub(super) mod module {
         );
     }
 
+    #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn linear_backward_projection_cta_device_scale_kernel(
-        input_bytes: &[u8],
-        input_scales: &[u8],
-        input_global_scales: &[f32],
-        weight_bytes: &[u8],
-        weight_scales: &[u8],
-        weight_global_scale: &[f32],
+        input_bytes: &[u8], input_scales: &[u8], input_global_scales: &[f32],
+        weight_bytes: &[u8], weight_scales: &[u8], weight_global_scale: &[f32],
         mut out: DisjointSlice<f32>,
         mut params: Nvfp4ProjectionParams,
     ) {
@@ -64,25 +58,14 @@ pub(super) mod module {
     #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
     #[kernel]
     pub fn linear_backward_projection_pair_cta_device_scale_kernel(
-        dinput_input_bytes: &[u8],
-        dinput_input_scales: &[u8],
-        dinput_input_global_scales: &[f32],
-        dinput_weight_bytes: &[u8],
-        dinput_weight_scales: &[u8],
-        dinput_weight_global_scale: &[f32],
+        dinput_input_bytes: &[u8], dinput_input_scales: &[u8], dinput_input_global_scales: &[f32],
+        dinput_weight_bytes: &[u8], dinput_weight_scales: &[u8], dinput_weight_global_scale: &[f32],
         mut dinput_out: DisjointSlice<f32>,
-        dinput_grid_col_mask: u32,
-        dinput_grid_col_shift: u32,
-        dinput_tile_count: u32,
-        dweight_input_bytes: &[u8],
-        dweight_input_scales: &[u8],
-        dweight_input_global_scales: &[f32],
-        dweight_weight_bytes: &[u8],
-        dweight_weight_scales: &[u8],
-        dweight_weight_global_scale: &[f32],
+        dinput_grid_col_mask: u32, dinput_grid_col_shift: u32, dinput_tile_count: u32,
+        dweight_input_bytes: &[u8], dweight_input_scales: &[u8], dweight_input_global_scales: &[f32],
+        dweight_weight_bytes: &[u8], dweight_weight_scales: &[u8], dweight_weight_global_scale: &[f32],
         mut dweight_out: DisjointSlice<f32>,
-        dweight_grid_col_mask: u32,
-        dweight_grid_col_shift: u32,
+        dweight_grid_col_mask: u32, dweight_grid_col_shift: u32,
         mut dinput_params: Nvfp4ProjectionParams,
         mut dweight_params: Nvfp4ProjectionParams,
     ) {
@@ -154,10 +137,7 @@ pub(super) mod module {
 
     #[kernel]
     pub fn linear_bias_grad_kernel(
-        e: &[f32],
-        mut dbias: DisjointSlice<f32>,
-        token_count: u32,
-        output_dim: u32,
+        e: &[f32], mut dbias: DisjointSlice<f32>, token_count: u32, output_dim: u32,
     ) {
         static mut LOCAL_SUMS: SharedArray<f32, { LINEAR_BIAS_THREADS_PER_BLOCK as usize }> =
             SharedArray::UNINIT;
