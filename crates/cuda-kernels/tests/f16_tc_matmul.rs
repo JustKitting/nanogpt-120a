@@ -16,8 +16,7 @@ const TOLERANCE: f32 = 1.0e-6;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn batched_f16_tc_matmul_matches_power_of_two_reference() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = F16TcMatmulModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(F16TcMatmulModule::from_module)?;
     let a = DeviceBuffer::from_host(&stream, &vec![0.125_f32; BATCH * M * K])?;
     let b = DeviceBuffer::from_host(&stream, &vec![0.25_f32; BATCH * N * K])?;
     let mut out = DeviceBuffer::<f32>::zeroed(&stream, BATCH * M * N)?;

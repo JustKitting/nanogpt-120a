@@ -12,8 +12,7 @@ fn residual_grad_add_matches_reference() -> Result<(), Box<dyn Error>> {
     let direct: Vec<f32> = (0..LEN).map(|i| i as f32 * 0.25 - 8.0).collect();
     let branch: Vec<f32> = (0..LEN).map(|i| 3.0 - i as f32 * 0.125).collect();
 
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = ResidualBackwardModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(ResidualBackwardModule::from_module)?;
 
     let direct_dev = DeviceBuffer::from_host(&stream, &direct)?;
     let branch_dev = DeviceBuffer::from_host(&stream, &branch)?;

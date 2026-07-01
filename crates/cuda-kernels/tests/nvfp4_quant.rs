@@ -15,8 +15,7 @@ fn fp32_to_nvfp4_four_six_writes_quantized_outputs() -> Result<(), Box<dyn Error
     ];
     let amax = [x.iter().fold(0.0f32, |max, value| max.max(value.abs()))];
 
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = Nvfp4QuantModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(Nvfp4QuantModule::from_module)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let amax_dev = DeviceBuffer::from_host(&stream, &amax)?;
@@ -51,8 +50,7 @@ fn fp32_to_nvfp4_ms_eden_writes_rotated_quantized_outputs() -> Result<(), Box<dy
         .map(|index| (index as f32 - 31.5) * 0.03125)
         .collect::<Vec<_>>();
 
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = Nvfp4QuantModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(Nvfp4QuantModule::from_module)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let mut fp4_dev = DeviceBuffer::<u8>::zeroed(&stream, x.len() / 2)?;

@@ -19,8 +19,7 @@ const TOLERANCE: f32 = 1.0e-6;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nextlat_projection_gelu_and_residual_match_reference() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = NextLatModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(NextLatModule::from_module)?;
 
     let zeros = vec![0_u8; TOKEN_COUNT * INPUT_DIM / 2];
     let weight_zeros = vec![0_u8; INPUT_DIM * OUTPUT_DIM / 2];

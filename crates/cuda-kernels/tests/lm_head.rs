@@ -17,8 +17,7 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = LmHeadModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(LmHeadModule::from_module)?;
 
     let mut input_bytes = vec![0_u8; TOKEN_COUNT * INPUT_DIM / 2];
     set_e2m1_one(&mut input_bytes, 0);

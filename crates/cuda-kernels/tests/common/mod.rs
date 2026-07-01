@@ -27,6 +27,13 @@ pub fn cuda_test_context() -> Result<CudaTestContext, DriverError> {
     Ok((ctx, stream, ptx))
 }
 
+pub fn cuda_test_module<M>(
+    load: impl FnOnce(Arc<CudaModule>) -> Result<M, DriverError>,
+) -> Result<(Arc<CudaContext>, Arc<CudaStream>, M), DriverError> {
+    let (ctx, stream, ptx) = cuda_test_context()?;
+    Ok((ctx, stream, load(ptx)?))
+}
+
 #[allow(dead_code)]
 pub fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
     actual

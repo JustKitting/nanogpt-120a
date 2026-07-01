@@ -16,8 +16,7 @@ const WEIGHT_DECAY: f32 = 0.1;
 const ITERATIONS: u32 = 5;
 
 pub fn run_wide_case() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = OptimizerModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(OptimizerModule::from_module)?;
     let grad = gradient();
     let mut slots = Slots::new(&stream, &grad)?;
     let mut scratch = Scratch::new(&stream, LEN, ROWS)?;

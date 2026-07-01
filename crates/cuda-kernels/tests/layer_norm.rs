@@ -32,8 +32,7 @@ fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
         beta[col] = -0.125 + col as f32 * 0.005;
     }
 
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = LayerNormModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(LayerNormModule::from_module)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let gamma_dev = DeviceBuffer::from_host(&stream, &gamma)?;
@@ -73,8 +72,7 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
 
     let bias_bytes = vec![0_u8; GPT_EMBEDDING_DIM / 2];
 
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = LayerNormModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(LayerNormModule::from_module)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let weight_bytes_dev = DeviceBuffer::from_host(&stream, &one_pair_bytes(GPT_EMBEDDING_DIM))?;

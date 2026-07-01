@@ -12,8 +12,7 @@ fn embedding_lookup_grad_accumulates_duplicate_tokens() -> Result<(), Box<dyn Er
     const EMBEDDING_DIM: usize = 4;
     const VOCAB_SIZE: usize = 5;
 
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = OptimizerModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(OptimizerModule::from_module)?;
 
     let tokens = DeviceBuffer::from_host(&stream, &[2_u32, 2, 3])?;
     let residual = DeviceBuffer::from_host(

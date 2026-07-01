@@ -16,8 +16,7 @@ const COLS: usize = 16;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nvfp4_decode_transpose_writes_fp32_transpose() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = Nvfp4DecodeModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(Nvfp4DecodeModule::from_module)?;
 
     let bytes = DeviceBuffer::from_host(&stream, &one_pair_bytes(ROWS * COLS))?;
     let scales = DeviceBuffer::from_host(&stream, &one_scales(ROWS * COLS))?;

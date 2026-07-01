@@ -10,8 +10,7 @@ use crate::polar_reference::polar_first_iteration_scalar;
 use super::buffers::{SLOT_COUNT, Scratch, Slots, assert_quantized_slot_matches, descriptors};
 
 pub fn run_first_iteration_case(row_count: usize, col_count: usize) -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = OptimizerModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(OptimizerModule::from_module)?;
     let len = row_count * col_count;
     let gram_dim = row_count.min(col_count);
     let mut slots = Slots::with_repeated_grad(&stream, GRAD_VALUE, len)?;

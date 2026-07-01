@@ -18,8 +18,7 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn cta_projection_matches_warp_projection() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = LinearBackwardModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(LinearBackwardModule::from_module)?;
     let tensors = ProjectionTensors::new(&stream)?;
 
     let mut old_dinput = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * INPUT_DIM)?;

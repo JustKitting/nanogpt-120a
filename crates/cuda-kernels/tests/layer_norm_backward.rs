@@ -25,8 +25,7 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
     let d_normalized = sample_grad();
     let (mean, inv_std) = reference_row_stats(&x, ROWS, COLS, epsilon);
 
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = LayerNormBackwardModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(LayerNormBackwardModule::from_module)?;
 
     let x_dev = DeviceBuffer::from_host(&stream, &x)?;
     let grad_dev = DeviceBuffer::from_host(&stream, &d_normalized)?;

@@ -12,8 +12,7 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nextlat_concat_backward_splits_reference() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = NextLatModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(NextLatModule::from_module)?;
 
     let d_concat = values(ROW_COUNT * EMBED * 2, 0.375);
     let d_predicted = values(ROW_COUNT * EMBED, -0.25);

@@ -72,8 +72,7 @@ impl AdamFixture {
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = OptimizerModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(OptimizerModule::from_module)?;
     let mut fixture = AdamFixture::new(&stream)?;
 
     fixture.apply(&stream, &module, 1.0)?;
@@ -91,8 +90,7 @@ fn nvfp4_adamw_update_tracks_moments_and_requantizes() -> Result<(), Box<dyn Err
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nvfp4_adamw_update_applies_schedule_free_average() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = OptimizerModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(OptimizerModule::from_module)?;
     let mut fixture = AdamFixture::new(&stream)?;
 
     fixture.apply(&stream, &module, 0.25)?;

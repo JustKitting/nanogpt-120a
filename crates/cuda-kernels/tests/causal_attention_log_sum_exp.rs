@@ -15,8 +15,7 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn causal_attention_writes_log_sum_exp() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = AttentionModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(AttentionModule::from_module)?;
     let run = run_attention(&stream, &module, vec![0.0_f32; TOKEN_COUNT * QKV_DIM], 1)?;
 
     assert!(run.out.iter().all(|value| value.abs() <= TOLERANCE));
@@ -35,8 +34,7 @@ fn causal_attention_writes_log_sum_exp() -> Result<(), Box<dyn Error>> {
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn causal_attention_batch_isolation() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = AttentionModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(AttentionModule::from_module)?;
 
     let first = run_attention(&stream, &module, sample_qkv(0.25), 2)?;
     let second = run_attention(&stream, &module, sample_qkv(8.0), 2)?;

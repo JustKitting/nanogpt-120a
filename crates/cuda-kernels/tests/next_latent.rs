@@ -18,8 +18,7 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nextlat_concat_and_shifted_smooth_l1_match_reference() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = NextLatModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(NextLatModule::from_module)?;
 
     let next_token_embeddings = reference::values(0.25);
     let current_states = reference::values(-0.5);

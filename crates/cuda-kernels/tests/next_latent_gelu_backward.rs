@@ -11,8 +11,7 @@ const TOLERANCE: f32 = 1.0e-6;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn nextlat_gelu_backward_matches_reference() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = NextLatModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(NextLatModule::from_module)?;
 
     let input = values(-4.0, 0.03125);
     let d_out = values(0.25, 0.00390625);

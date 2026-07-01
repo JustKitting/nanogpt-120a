@@ -8,8 +8,7 @@ use crate::common::{self, assert_slice_close};
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn global_clip_scales_all_gradient_buffers_together() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = OptimizerModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(OptimizerModule::from_module)?;
 
     let first = DeviceBuffer::from_host(&stream, &[3.0_f32, 4.0, 0.0, 0.0])?;
     let second = DeviceBuffer::from_host(&stream, &[12.0_f32, 0.0, 0.0, 0.0])?;

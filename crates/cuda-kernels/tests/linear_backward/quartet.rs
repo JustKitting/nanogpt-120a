@@ -11,8 +11,7 @@ use common::nvfp4::{first_col_one_bytes, first_row_one_bytes, one_pair_bytes, on
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> TestResult {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = LinearBackwardModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(LinearBackwardModule::from_module)?;
 
     let e_h_bytes_dev =
         DeviceBuffer::from_host(&stream, &first_col_one_bytes(TOKEN_COUNT, OUTPUT_DIM))?;

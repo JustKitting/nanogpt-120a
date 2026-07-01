@@ -12,8 +12,7 @@ const TOLERANCE: f32 = 1.0e-7;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = LossModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(LossModule::from_module)?;
 
     let logits = [
         0.0_f32,

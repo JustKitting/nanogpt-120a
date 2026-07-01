@@ -11,8 +11,7 @@ const COLS: usize = 11;
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn transpose_f32_writes_row_major_transpose() -> Result<(), Box<dyn Error>> {
-    let (_, stream, ptx) = common::cuda_test_context()?;
-    let module = TransposeModule::from_module(ptx)?;
+    let (_, stream, module) = common::cuda_test_module(TransposeModule::from_module)?;
 
     let input = input_matrix();
     let input_dev = DeviceBuffer::from_host(&stream, &input)?;
