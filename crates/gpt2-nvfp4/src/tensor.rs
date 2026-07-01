@@ -1,6 +1,7 @@
 use std::fmt;
 use std::marker::PhantomData;
 
+#[derive(Clone)]
 pub struct FixedBytes<const N: usize>(Box<[u8; N]>);
 
 impl<const N: usize> FixedBytes<N> {
@@ -27,14 +28,6 @@ impl<const N: usize> AsMut<[u8]> for FixedBytes<N> {
     }
 }
 
-impl<const N: usize> Clone for FixedBytes<N> {
-    fn clone(&self) -> Self {
-        let mut bytes = Self::zeroed();
-        bytes.as_mut().copy_from_slice(self.as_ref());
-        bytes
-    }
-}
-
 impl<const N: usize> fmt::Debug for FixedBytes<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FixedBytes")
@@ -56,6 +49,7 @@ pub trait Nvfp4Shape {
     fn zero_scales() -> Self::Scales;
 }
 
+#[derive(Clone)]
 pub struct Nvfp4Tensor<S: Nvfp4Shape> {
     pub bytes: S::Bytes,
     pub scales: S::Scales,
@@ -85,12 +79,6 @@ impl<S: Nvfp4Shape> Nvfp4Tensor<S> {
 
     pub fn is_empty(&self) -> bool {
         Self::LEN == 0
-    }
-}
-
-impl<S: Nvfp4Shape> Clone for Nvfp4Tensor<S> {
-    fn clone(&self) -> Self {
-        Self::new(self.bytes.clone(), self.scales.clone(), self.global_scale)
     }
 }
 
