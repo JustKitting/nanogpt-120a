@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::super::{
-    candidate::{Candidate, valid_aurora_phases},
+    candidate::{valid_aurora_phases, Candidate},
     candidate_space as space,
     rng::SweepRng,
 };
@@ -44,29 +44,24 @@ pub fn candidates(
 }
 
 fn nearby_batch(center: usize, rng: &mut SweepRng) -> usize {
-    let values = space::BATCH_SIZE;
-    let Some(index) = values.iter().position(|value| *value == center) else {
-        return rng.choose(&values);
-    };
-    let lo = index.saturating_sub(1);
-    let hi = (index + 1).min(values.len() - 1);
-    values[lo + rng.usize(hi - lo + 1)]
+    nearby_value(&space::BATCH_SIZE, center, rng).expect("batch size candidates are nonempty")
 }
 
 fn nearby_phase(candidate: &Candidate, rng: &mut SweepRng) -> usize {
     let phases = valid_aurora_phases(candidate.n_layer * 4, candidate.aurora_blocks);
-    if phases.is_empty() {
-        return candidate.aurora_phases;
+    nearby_value(&phases, candidate.aurora_phases, rng).unwrap_or(candidate.aurora_phases)
+}
+
+fn nearby_value(values: &[usize], center: usize, rng: &mut SweepRng) -> Option<usize> {
+    if values.is_empty() {
+        return None;
     }
-    let Some(index) = phases
-        .iter()
-        .position(|phase| *phase == candidate.aurora_phases)
-    else {
-        return rng.choose(&phases);
+    let Some(index) = values.iter().position(|value| *value == center) else {
+        return Some(rng.choose(values));
     };
     let lo = index.saturating_sub(1);
-    let hi = (index + 1).min(phases.len() - 1);
-    phases[lo + rng.usize(hi - lo + 1)]
+    let hi = (index + 1).min(values.len() - 1);
+    Some(values[lo + rng.usize(hi - lo + 1)])
 }
 
 fn jitter_log(value: f64, rng: &mut SweepRng, radius: f64) -> f64 {
