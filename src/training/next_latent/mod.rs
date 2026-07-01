@@ -1,5 +1,4 @@
 mod backward;
-mod backward_activation;
 mod backward_linear;
 mod backward_linear_call;
 mod backward_norm;
@@ -10,8 +9,8 @@ mod projection;
 mod quantize;
 mod scratch;
 
-pub use backward::{NextLatBackwardArgs, NextLatBackwardSeeds, backward};
+pub use backward::{backward, NextLatBackwardArgs, NextLatBackwardSeeds};
 pub use buffers::NextLatBuffers;
-pub use forward::{NextLatForwardArgs, forward};
+pub use forward::{forward, NextLatForwardArgs};
 pub use grads::NextLatGradBuffers;
 pub use scratch::NextLatScratchBuffers;

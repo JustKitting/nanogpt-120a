@@ -1,11 +1,12 @@
-use cuda_core::{CudaStream, DriverError};
-use gpt2_nvfp4::{GPT2_N_EMBD, Gpt2Rng, NEXTLAT_HIDDEN};
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
+use gpt2_nvfp4::{Gpt2Rng, GPT2_N_EMBD, NEXTLAT_HIDDEN};
 use rust_kernels_cuda::layer_norm_backward::LayerNormBackwardModule;
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
-use rust_kernels_cuda::next_latent::{NextLatConcatBackwardArgs, NextLatModule};
+use rust_kernels_cuda::next_latent::{
+    NextLatConcatBackwardArgs, NextLatGeluBackwardArgs, NextLatModule,
+};
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
-use super::backward_activation::gelu_backward;
 use super::backward_linear::{
     input_projection_backward, output_projection_backward, transition_backward,
 };
@@ -81,5 +82,22 @@ pub fn backward(mut args: NextLatBackwardArgs<'_, '_, '_>) -> Result<(), DriverE
         d_current_states: &mut args.grads.d_current_states,
         row_count: args.row_count,
         embedding_dim: GPT2_N_EMBD as u32,
+    })
+}
+
+fn gelu_backward(
+    module: &NextLatModule,
+    stream: &CudaStream,
+    input: &DeviceBuffer<f32>,
+    d_out: &DeviceBuffer<f32>,
+    d_input: &mut DeviceBuffer<f32>,
+    len: u32,
+) -> Result<(), DriverError> {
+    module.gelu_backward(NextLatGeluBackwardArgs {
+        stream,
+        input,
+        d_out,
+        d_input,
+        len,
     })
 }
