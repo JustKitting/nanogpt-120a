@@ -34,9 +34,7 @@ pub(super) fn push_local(
     count: usize,
 ) {
     let target = (pool.len() + count).min(pool.capacity().max(1));
-    for candidate in local::candidates(used, rng, center, target - pool.len()) {
-        push_unique(pool, used, candidate, "local");
-    }
+    push_candidates(pool, used, local::candidates(used, rng, center, target - pool.len()), "local");
 }
 
 pub(super) fn push_variance(
@@ -48,9 +46,7 @@ pub(super) fn push_variance(
     count: usize,
 ) {
     let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    for candidate in variance::candidates(used, rng, config, analysis, target - pool.len()) {
-        push_unique(pool, used, candidate, "variance");
-    }
+    push_candidates(pool, used, variance::candidates(used, rng, config, analysis, target - pool.len()), "variance");
 }
 
 pub(super) fn push_coverage(
@@ -62,9 +58,7 @@ pub(super) fn push_coverage(
     count: usize,
 ) {
     let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    for candidate in coverage::candidates(used, rng, config, observed, target - pool.len()) {
-        push_unique(pool, used, candidate, "coverage");
-    }
+    push_candidates(pool, used, coverage::candidates(used, rng, config, observed, target - pool.len()), "coverage");
 }
 
 pub(super) fn push_factorial(
@@ -77,10 +71,7 @@ pub(super) fn push_factorial(
     count: usize,
 ) {
     let target = (pool.len() + count).min(config.candidate_samples.max(1));
-    for candidate in factorial::candidates(used, rng, config, analysis, center, target - pool.len())
-    {
-        push_unique(pool, used, candidate, "factorial");
-    }
+    push_candidates(pool, used, factorial::candidates(used, rng, config, analysis, center, target - pool.len()), "factorial");
 }
 
 pub(super) fn push_random(
@@ -102,5 +93,11 @@ fn push_unique(
 ) {
     if used.insert(candidate.key()) {
         pool.push(PooledCandidate { candidate, source });
+    }
+}
+
+fn push_candidates(pool: &mut Vec<PooledCandidate>, used: &mut HashSet<String>, candidates: impl IntoIterator<Item = Candidate>, source: &'static str) {
+    for candidate in candidates {
+        push_unique(pool, used, candidate, source);
     }
 }
