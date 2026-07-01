@@ -24,9 +24,8 @@ struct Accum {
 pub fn factor_beliefs(analysis: &SweepAnalysis, config: &SweepConfig) -> Vec<FactorBelief> {
     let mut factors = BTreeMap::<String, Accum>::new();
     for response in &analysis.models {
-        let direction_weight = direction_weight(response.name, config);
-        let uncertainty_weight = uncertainty_weight(response.name, config);
-        if direction_weight == 0.0 && uncertainty_weight == 0.0 {
+        let weights = response_weights(response.name, config);
+        if weights.direction == 0.0 && weights.uncertainty == 0.0 {
             continue;
         }
         for effect in response
@@ -36,11 +35,11 @@ pub fn factor_beliefs(analysis: &SweepAnalysis, config: &SweepConfig) -> Vec<Fac
             .filter(|effect| !effect.name.contains('*'))
         {
             let confidence = directional_confidence(effect.p_positive);
-            let weighted = effect.coefficient * direction_weight * confidence;
+            let weighted = effect.coefficient * weights.direction * confidence;
             let entry = factors.entry(effect.name.clone()).or_default();
             entry.direction += weighted;
-            entry.confidence += confidence.abs() * uncertainty_weight.abs();
-            entry.variance += effect.stderr * effect.stderr * uncertainty_weight.abs();
+            entry.confidence += confidence.abs() * weights.uncertainty.abs();
+            entry.variance += effect.stderr * effect.stderr * weights.uncertainty.abs();
             entry.positive_probability += effect.p_positive;
             entry.evidence += 1;
         }
@@ -89,20 +88,14 @@ fn average(value: f64, count: usize) -> f64 {
     }
 }
 
-fn direction_weight(name: &str, config: &SweepConfig) -> f64 {
-    if name.contains("quality") {
-        config.sweep_quality_weight
-    } else {
-        0.0
-    }
-}
+struct ResponseWeights { direction: f64, uncertainty: f64 }
 
-fn uncertainty_weight(name: &str, config: &SweepConfig) -> f64 {
+fn response_weights(name: &str, config: &SweepConfig) -> ResponseWeights {
     if name.contains("quality") {
-        config.sweep_quality_weight
+        ResponseWeights { direction: config.sweep_quality_weight, uncertainty: config.sweep_quality_weight }
     } else if name == "stability" {
-        config.sweep_stability_weight
+        ResponseWeights { direction: 0.0, uncertainty: config.sweep_stability_weight }
     } else {
-        0.0
+        ResponseWeights { direction: 0.0, uncertainty: 0.0 }
     }
 }
