@@ -65,21 +65,14 @@ pub fn upload_layer_norm(
     stream: &CudaStream,
     layer_norm: &LayerNormWeights,
 ) -> TestResult<UploadedLayerNorm> {
-    Ok(UploadedLayerNorm {
-        weight: upload_nvfp4(stream, &layer_norm.weight)?,
-        bias: upload_nvfp4(stream, &layer_norm.bias)?,
-    })
+    Ok(uploaded_pair(upload_nvfp4(stream, &layer_norm.weight)?, upload_nvfp4(stream, &layer_norm.bias)?))
 }
 
 pub fn upload_nvfp4<S: Nvfp4Shape>(
     stream: &CudaStream,
     tensor: &Nvfp4Tensor<S>,
 ) -> TestResult<UploadedNvfp4> {
-    Ok(UploadedNvfp4 {
-        bytes: DeviceBuffer::from_host(stream, tensor.bytes.as_ref())?,
-        scales: DeviceBuffer::from_host(stream, tensor.scales.as_ref())?,
-        global_scale: DeviceBuffer::from_host(stream, &[tensor.global_scale])?,
-    })
+    upload_nvfp4_parts(stream, tensor.bytes.as_ref(), tensor.scales.as_ref(), tensor.global_scale)
 }
 
 pub fn upload_nvfp4_bytes<S: Nvfp4Shape>(
@@ -87,10 +80,14 @@ pub fn upload_nvfp4_bytes<S: Nvfp4Shape>(
     bytes: Vec<u8>,
 ) -> TestResult<UploadedNvfp4> {
     assert_eq!(bytes.len(), S::BYTE_LEN);
+    upload_nvfp4_parts(stream, &bytes, &vec![E4M3_ONE; S::SCALE_LEN], 1.0)
+}
+
+fn upload_nvfp4_parts(stream: &CudaStream, bytes: &[u8], scales: &[u8], global_scale: f32) -> TestResult<UploadedNvfp4> {
     Ok(UploadedNvfp4 {
-        bytes: DeviceBuffer::from_host(stream, &bytes)?,
-        scales: DeviceBuffer::from_host(stream, &vec![E4M3_ONE; S::SCALE_LEN])?,
-        global_scale: DeviceBuffer::from_host(stream, &[1.0_f32])?,
+        bytes: DeviceBuffer::from_host(stream, bytes)?,
+        scales: DeviceBuffer::from_host(stream, scales)?,
+        global_scale: DeviceBuffer::from_host(stream, &[global_scale])?,
     })
 }
 
@@ -102,8 +99,9 @@ fn upload_linear<W: Nvfp4Shape, B: Nvfp4Shape>(
     stream: &CudaStream,
     linear: &gpt2_nvfp4::LinearWeights<W, B>,
 ) -> TestResult<UploadedLinear> {
-    Ok(UploadedLinear {
-        weight: upload_nvfp4(stream, &linear.weight)?,
-        bias: upload_nvfp4(stream, &linear.bias)?,
-    })
+    Ok(uploaded_pair(upload_nvfp4(stream, &linear.weight)?, upload_nvfp4(stream, &linear.bias)?))
+}
+
+fn uploaded_pair(weight: UploadedNvfp4, bias: UploadedNvfp4) -> UploadedPair {
+    UploadedPair { weight, bias }
 }
