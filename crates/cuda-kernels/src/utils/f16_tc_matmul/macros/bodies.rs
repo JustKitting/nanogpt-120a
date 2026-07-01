@@ -2,15 +2,11 @@ macro_rules! cta_bt_matmul_body_fn {
     ($name:ident, $lhs_ty:ty, $rhs_ty:ty, $stage:path, $stage_aligned:path) => {
         #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
         pub(super) fn $name(
-            a: &[$lhs_ty],
-            b_t: &[$rhs_ty],
+            a: &[$lhs_ty], b_t: &[$rhs_ty],
             mut out: cuda_device::DisjointSlice<f32>,
             a_tile: &mut $crate::f16_tc_matmul::CtaATile,
             b_tile: &mut $crate::f16_tc_matmul::CtaBTile,
-            batch_count: u32,
-            m: u32,
-            n: u32,
-            k: u32,
+            batch_count: u32, m: u32, n: u32, k: u32,
         ) {
             let Some(tile) = $crate::f16_tc_matmul::cta_tile::active_tile(batch_count) else {
                 return;
@@ -64,15 +60,11 @@ macro_rules! cta_rhs_matmul_body_fn {
     ($name:ident, $rhs:ident: $rhs_ty:ty, $stage:path) => {
         #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
         pub(super) fn $name(
-            a: &[f32],
-            $rhs: &[$rhs_ty],
+            a: &[f32], $rhs: &[$rhs_ty],
             mut out: cuda_device::DisjointSlice<f32>,
             a_tile: &mut $crate::f16_tc_matmul::CtaATile,
             b_tile: &mut $crate::f16_tc_matmul::CtaBTile,
-            batch_count: u32,
-            m: u32,
-            n: u32,
-            k: u32,
+            batch_count: u32, m: u32, n: u32, k: u32,
         ) {
             let Some(tile) = $crate::f16_tc_matmul::cta_tile::active_tile(batch_count) else {
                 return;
@@ -105,18 +97,11 @@ macro_rules! cta_add_matmul_body_fn {
     ($name:ident, $rhs:ident, $stage:path) => {
         #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
         pub(super) fn $name(
-            a: &[f32],
-            $rhs: &[f32],
-            base: &[f32],
+            a: &[f32], $rhs: &[f32], base: &[f32],
             mut out: cuda_device::DisjointSlice<f32>,
             a_tile: &mut $crate::f16_tc_matmul::CtaATile,
             b_tile: &mut $crate::f16_tc_matmul::CtaBTile,
-            batch_count: u32,
-            m: u32,
-            n: u32,
-            k: u32,
-            base_scale: f32,
-            matmul_scale: f32,
+            batch_count: u32, m: u32, n: u32, k: u32, base_scale: f32, matmul_scale: f32,
         ) {
             let Some(tile) = $crate::f16_tc_matmul::cta_tile::active_tile(batch_count) else {
                 return;
