@@ -13,6 +13,9 @@ use reduce::{block_reduce_max, block_reduce_sum};
 pub(super) const WARPS_PER_BLOCK: usize = (TC_FORWARD_THREADS_PER_BLOCK / 32) as usize;
 pub(super) const NEG_INFINITY: f32 = -3.4028235e38_f32;
 
+#[derive(Clone, Copy)]
+struct SoftmaxRow<'a> { batch: u32, head: u32, query: u32, tid: u32, params: &'a CausalAttentionParams }
+
 pub(super) fn softmax_body(
     scores: &[f32],
     mut probs: DisjointSlice<f32>,
@@ -25,24 +28,25 @@ pub(super) fn softmax_body(
     let batch = thread::blockIdx_z();
     let tid = thread::threadIdx_x();
     let row = batch * params.seq_len + query;
+    let ctx = SoftmaxRow { batch, head, query, tid, params: &params };
     if row >= params.row_count {
-        zero_prob_row(&mut probs, batch, head, query, tid, params);
+        zero_prob_row(&mut probs, ctx);
         if tid == 0 {
             unsafe {
-                *log_sum_exp.get_unchecked_mut(log_sum_exp_index(batch, query, head, &params)) =
+                *log_sum_exp.get_unchecked_mut(log_sum_exp_index(batch, query, head, ctx.params)) =
                     0.0;
             }
         }
         return;
     }
 
-    let max_score = query_max(scores, query, head, batch, tid, params, reduce);
+    let max_score = query_max(scores, ctx, reduce);
     let denom = safe_positive_denom(query_denom(
-        scores, query, head, batch, tid, params, max_score, reduce,
+        scores, ctx, max_score, reduce,
     ));
     if tid == 0 {
         unsafe {
-            *log_sum_exp.get_unchecked_mut(log_sum_exp_index(batch, query, head, &params)) =
+            *log_sum_exp.get_unchecked_mut(log_sum_exp_index(batch, query, head, ctx.params)) =
                 max_score + ln_f32(denom);
         }
     }
@@ -50,12 +54,12 @@ pub(super) fn softmax_body(
     let mut key = tid;
     while key < params.seq_len {
         let prob = if key <= query {
-            exp_f32(score(scores, batch, head, query, key, &params) - max_score) / denom
+            exp_f32(score(scores, batch, head, query, key, ctx.params) - max_score) / denom
         } else {
             0.0
         };
         unsafe {
-            *probs.get_unchecked_mut(score_index(batch, head, query, key, &params)) = prob;
+            *probs.get_unchecked_mut(score_index(batch, head, query, key, ctx.params)) = prob;
         }
         key += TC_FORWARD_THREADS_PER_BLOCK;
     }
@@ -63,16 +67,12 @@ pub(super) fn softmax_body(
 
 fn zero_prob_row(
     probs: &mut DisjointSlice<f32>,
-    batch: u32,
-    head: u32,
-    query: u32,
-    tid: u32,
-    params: CausalAttentionParams,
+    ctx: SoftmaxRow<'_>,
 ) {
-    let mut key = tid;
-    while key < params.seq_len {
+    let mut key = ctx.tid;
+    while key < ctx.params.seq_len {
         unsafe {
-            *probs.get_unchecked_mut(score_index(batch, head, query, key, &params)) = 0.0;
+            *probs.get_unchecked_mut(score_index(ctx.batch, ctx.head, ctx.query, key, ctx.params)) = 0.0;
         }
         key += TC_FORWARD_THREADS_PER_BLOCK;
     }
@@ -80,37 +80,29 @@ fn zero_prob_row(
 
 fn query_max(
     scores: &[f32],
-    query: u32,
-    head: u32,
-    batch: u32,
-    tid: u32,
-    params: CausalAttentionParams,
+    ctx: SoftmaxRow<'_>,
     reduce: &mut SharedArray<f32, WARPS_PER_BLOCK>,
 ) -> f32 {
     let mut local = NEG_INFINITY;
-    let mut key = tid;
-    while key <= query {
-        local = max_f32(local, score(scores, batch, head, query, key, &params));
+    let mut key = ctx.tid;
+    while key <= ctx.query {
+        local = max_f32(local, score(scores, ctx.batch, ctx.head, ctx.query, key, ctx.params));
         key += TC_FORWARD_THREADS_PER_BLOCK;
     }
-    block_reduce_max(local, tid, reduce)
+    block_reduce_max(local, ctx.tid, reduce)
 }
 
 fn query_denom(
     scores: &[f32],
-    query: u32,
-    head: u32,
-    batch: u32,
-    tid: u32,
-    params: CausalAttentionParams,
+    ctx: SoftmaxRow<'_>,
     max_score: f32,
     reduce: &mut SharedArray<f32, WARPS_PER_BLOCK>,
 ) -> f32 {
     let mut local = 0.0;
-    let mut key = tid;
-    while key <= query {
-        local += exp_f32(score(scores, batch, head, query, key, &params) - max_score);
+    let mut key = ctx.tid;
+    while key <= ctx.query {
+        local += exp_f32(score(scores, ctx.batch, ctx.head, ctx.query, key, ctx.params) - max_score);
         key += TC_FORWARD_THREADS_PER_BLOCK;
     }
-    block_reduce_sum(local, tid, reduce)
+    block_reduce_sum(local, ctx.tid, reduce)
 }
