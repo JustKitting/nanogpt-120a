@@ -14,27 +14,22 @@ use super::output::{build_run_info, RunOutput};
 use super::render::{default_renderer, BoxedMetricsRenderer};
 use super::strategy::CudaTrainingStrategy;
 use super::CudaLearningComponents;
+use crate::training::data::VALIDATION_WINDOWS;
 use crate::training::{debug_metrics, TokenDataLoader};
 use crate::AppResult;
 
 pub(crate) fn launch_from_env() -> AppResult {
-    let dataset = TokenDataLoader::training_dataset_name();
+    let (dataset, data) = TokenDataLoader::from_training_dataset()?;
     let config = TrainConfig::from_env();
     let interrupter = Interrupter::new();
-    run(dataset, config, interrupter)
-}
-
-fn run(dataset: String, config: TrainConfig, interrupter: Interrupter) -> AppResult {
     let run_label = format!("{}s", config.max_seconds.round() as u64);
     let run_output = RunOutput::new(&dataset, &run_label)?;
     let metrics_dir = run_output.path("metrics");
     println!("run_dir={}", run_output.dir().display());
     println!("metrics_dir={}", metrics_dir.display());
 
-    let data = TokenDataLoader::from_training_dataset()?;
     let training_tokens = data.token_count();
     let validation_tokens = data.validation_tokens()?;
-    let validation_window_count = TokenDataLoader::validation_window_count();
 
     run_output.write_info(&build_run_info(&dataset, &config))?;
     println!(
@@ -45,7 +40,7 @@ fn run(dataset: String, config: TrainConfig, interrupter: Interrupter) -> AppRes
     let train_loader: Arc<dyn DataLoader<BurnBackend, CudaTrainInput>> =
         Arc::new(CudaTrainDataLoader::new(data, config.step_cap));
     let valid_loader: Arc<dyn DataLoader<BurnInnerBackend, CudaValidInput>> = Arc::new(
-        CudaValidDataLoader::new(validation_tokens, validation_window_count),
+        CudaValidDataLoader::new(validation_tokens, VALIDATION_WINDOWS),
     );
     let strategy_result = Arc::new(Mutex::new(None));
     let strategy = Arc::new(CudaTrainingStrategy::new(

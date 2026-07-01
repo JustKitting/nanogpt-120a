@@ -4,7 +4,7 @@ use gpt2_nvfp4::GPT2_SEQ_LEN;
 
 use crate::AppResult;
 
-pub(super) const VALIDATION_WINDOWS: usize = 4;
+pub(in crate::training) const VALIDATION_WINDOWS: usize = 4;
 
 pub(super) fn validation_windows(path: &Path, tokens: &[u16], start: usize) -> AppResult<Vec<u16>> {
     let len = GPT2_SEQ_LEN + 1;

@@ -9,28 +9,22 @@ use super::{
         DATASET_SYNTH,
     },
     synth, tokens,
-    validation::{train_end, VALIDATION_WINDOWS},
+    validation::train_end,
     TokenDataLoader,
 };
 
 impl TokenDataLoader {
-    pub fn training_dataset_name() -> String {
-        training_dataset()
-    }
-
-    pub fn validation_window_count() -> usize {
-        VALIDATION_WINDOWS
-    }
-
-    pub fn from_training_dataset() -> AppResult<Self> {
-        match training_dataset().as_str() {
+    pub fn from_training_dataset() -> AppResult<(String, Self)> {
+        let dataset = training_dataset();
+        let loader = match dataset.as_str() {
             DATASET_SYNTH => Self::from_synth(),
             DATASET_SHAKESPEARE => Self::from_shakespeare(),
             dataset => Err(format!(
                 "unknown TRAIN_DATASET={dataset}; expected synth or shakespeare"
             )
             .into()),
-        }
+        }?;
+        Ok((dataset, loader))
     }
 
     pub fn from_synth() -> AppResult<Self> {

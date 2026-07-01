@@ -8,6 +8,8 @@ mod synth;
 mod tokens;
 mod validation;
 
+pub(in crate::training) use validation::VALIDATION_WINDOWS;
+
 pub struct TokenDataLoader {
     path: PathBuf,
     train_paths: Vec<PathBuf>,
