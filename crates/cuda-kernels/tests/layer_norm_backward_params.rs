@@ -43,8 +43,8 @@ fn layer_norm_backward_params_match_reference() -> Result<(), Box<dyn Error>> {
     let d_weight = d_weight_dev.to_host_vec(&stream)?;
     let d_bias = d_bias_dev.to_host_vec(&stream)?;
     let (expected_weight, expected_bias) = reference_param_grads(&x, &dy, &mean, &inv_std);
-    assert_max_error(&d_weight, &expected_weight);
-    assert_max_error(&d_bias, &expected_bias);
+    common::assert_slice_close(&d_weight, &expected_weight, 1.0e-7);
+    common::assert_slice_close(&d_bias, &expected_bias, 1.0e-7);
     Ok(())
 }
 
@@ -96,14 +96,4 @@ fn reference_param_grads(
         }
     }
     (d_weight, d_bias)
-}
-
-fn assert_max_error(actual: &[f32], expected: &[f32]) {
-    let error = actual
-        .iter()
-        .zip(expected)
-        .fold(0.0f32, |max, (actual, expected)| {
-            max.max((actual - expected).abs())
-        });
-    assert!(error <= 1.0e-7, "max_abs_error={error:.8e}");
 }
