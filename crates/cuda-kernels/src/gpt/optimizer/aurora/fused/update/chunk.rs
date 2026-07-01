@@ -3,24 +3,39 @@ use crate::f16_tc_matmul::cta_tile::CTA_THREADS;
 
 use super::one::update_one;
 
-macro_rules! update_at {
-    ($u:expr, $z:expr, $x:expr, $rows:expr, $cols:expr, $len:expr, $transposed:expr,
-     $scale:expr, $lr:expr, $wd:expr, $avg:expr, $base:expr, $tid:expr, $mul:expr) => {
+struct UpdateChunk {
+    u: *const f32,
+    z_master: *mut f32,
+    x_master: *mut f32,
+    rows: u32,
+    cols: u32,
+    len: u32,
+    transposed: bool,
+    scale: f32,
+    learning_rate: f32,
+    weight_decay: f32,
+    average_coefficient: f32,
+    base: u32,
+    tid: u32,
+}
+
+impl UpdateChunk {
+    fn at(&self, mul: u32) -> f32 {
         update_one(
-            $u,
-            $z,
-            $x,
-            $rows,
-            $cols,
-            $len,
-            $transposed,
-            $scale,
-            $lr,
-            $wd,
-            $avg,
-            $base + $tid + CTA_THREADS * $mul,
+            self.u,
+            self.z_master,
+            self.x_master,
+            self.rows,
+            self.cols,
+            self.len,
+            self.transposed,
+            self.scale,
+            self.learning_rate,
+            self.weight_decay,
+            self.average_coefficient,
+            self.base + self.tid + CTA_THREADS * mul,
         )
-    };
+    }
 }
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
@@ -39,70 +54,20 @@ pub(super) fn update_four_amax(
     base: u32,
     tid: u32,
 ) -> f32 {
-    max4_f32(
-        update_at!(
-            u,
-            z_master,
-            x_master,
-            rows,
-            cols,
-            len,
-            transposed,
-            scale,
-            learning_rate,
-            weight_decay,
-            average_coefficient,
-            base,
-            tid,
-            0
-        ),
-        update_at!(
-            u,
-            z_master,
-            x_master,
-            rows,
-            cols,
-            len,
-            transposed,
-            scale,
-            learning_rate,
-            weight_decay,
-            average_coefficient,
-            base,
-            tid,
-            1
-        ),
-        update_at!(
-            u,
-            z_master,
-            x_master,
-            rows,
-            cols,
-            len,
-            transposed,
-            scale,
-            learning_rate,
-            weight_decay,
-            average_coefficient,
-            base,
-            tid,
-            2
-        ),
-        update_at!(
-            u,
-            z_master,
-            x_master,
-            rows,
-            cols,
-            len,
-            transposed,
-            scale,
-            learning_rate,
-            weight_decay,
-            average_coefficient,
-            base,
-            tid,
-            3
-        ),
-    )
+    let chunk = UpdateChunk {
+        u,
+        z_master,
+        x_master,
+        rows,
+        cols,
+        len,
+        transposed,
+        scale,
+        learning_rate,
+        weight_decay,
+        average_coefficient,
+        base,
+        tid,
+    };
+    max4_f32(chunk.at(0), chunk.at(1), chunk.at(2), chunk.at(3))
 }
