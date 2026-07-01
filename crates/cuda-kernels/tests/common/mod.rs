@@ -38,13 +38,6 @@ pub fn cuda_test_module<M>(
     Ok((ctx, stream, load(ptx)?))
 }
 
-pub fn max_abs_error(actual: &[f32], expected: &[f32]) -> f32 {
-    actual
-        .iter()
-        .zip(expected)
-        .fold(0.0, |max, (a, e)| max.max((a - e).abs()))
-}
-
 pub fn assert_close(actual: f32, expected: f32, tolerance: f32) {
     let error = (actual - expected).abs();
     assert!(

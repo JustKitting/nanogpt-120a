@@ -10,7 +10,6 @@ mod common;
 #[path = "layer_norm/stats.rs"]
 mod stats;
 
-use common::max_abs_error;
 use common::nvfp4::{one_pair_bytes, one_scales};
 use stats::{reference_row_stats, sample_rows};
 
@@ -54,8 +53,7 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
 
     let dx = dx_dev.to_host_vec(&stream)?;
     let expected = reference_backward_input(&x, &d_normalized, &mean, &inv_std);
-    let error = max_abs_error(&dx, &expected);
-    assert!(error <= 1.0e-8, "max_abs_error={error:.8e}");
+    common::assert_slice_close(&dx, &expected, 1.0e-8);
     Ok(())
 }
 
