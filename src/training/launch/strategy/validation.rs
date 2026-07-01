@@ -1,16 +1,12 @@
 use std::time::Instant;
 
-use burn::data::dataloader::Progress;
-use burn::train::{
-    EventProcessorTraining, LearnerEvent, SupervisedTrainingEventProcessor, TrainingItem,
-    ValidLoader,
-};
+use burn::train::{SupervisedTrainingEventProcessor, ValidLoader};
 
 use super::super::super::Trainer;
 use super::super::{
     data_loader::CudaValidationInput, metrics::CudaValidOutput, CudaLearningComponents,
 };
-use super::epoch_progress;
+use super::events::process_valid_step;
 use crate::AppResult;
 
 pub(super) fn process_validation(
@@ -28,14 +24,7 @@ pub(super) fn process_validation(
         window_count: validation.window_count,
         completed_steps,
     };
-    processor.process_valid(LearnerEvent::ProcessedItem(TrainingItem::new(
-        output.clone(),
-        Progress::new(validation.window_count, validation.window_count),
-        epoch_progress(),
-        Some(step),
-        None,
-    )));
-    Ok(output)
+    Ok(process_valid_step(processor, step, output))
 }
 
 pub(super) fn validation_input(

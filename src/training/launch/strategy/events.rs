@@ -8,7 +8,7 @@ use burn::train::{
 use super::{epoch_progress, CudaLearningComponents};
 use crate::training::data::TokenWindowBatch;
 use crate::training::debug_metrics::DebugTraceLogger;
-use crate::training::launch::metrics::CudaTrainOutput;
+use crate::training::launch::metrics::{CudaTrainOutput, CudaValidOutput};
 use crate::training::TrainStats;
 use crate::AppResult;
 
@@ -36,4 +36,19 @@ pub(super) fn process_train_step(
         None,
     )));
     Ok(())
+}
+
+pub(super) fn process_valid_step(
+    processor: &mut SupervisedTrainingEventProcessor<CudaLearningComponents>,
+    step: usize,
+    output: CudaValidOutput,
+) -> CudaValidOutput {
+    processor.process_valid(LearnerEvent::ProcessedItem(TrainingItem::new(
+        output.clone(),
+        Progress::new(output.window_count, output.window_count),
+        epoch_progress(),
+        Some(step),
+        None,
+    )));
+    output
 }
