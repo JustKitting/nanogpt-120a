@@ -1,7 +1,6 @@
 use cuda_core::DriverError;
 use rust_kernels_cuda::mlp::{MlpDownResidualArgs, MlpUpRelu2Args};
 
-use super::quantize::quantize_activation;
 use super::tensors::MlpForwardArgs;
 use crate::types::HiddenStateDevice;
 
@@ -39,13 +38,13 @@ pub(super) fn forward<'a, 'scratch>(
         output_dim: crate::GPT2_MLP as u32,
     })?;
 
-    quantize_activation(
+    activation_nvfp4.quantize_row_amax(
         args.quant_module,
         hidden.stream,
         args.scratch.activation,
-        activation_nvfp4.reborrow(),
         &mut *hidden.normalized_amax,
         hidden.row_count,
+        crate::GPT2_MLP as u32,
     )?;
 
     let input = activation_nvfp4.device();

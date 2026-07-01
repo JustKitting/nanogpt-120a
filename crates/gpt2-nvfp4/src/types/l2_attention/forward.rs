@@ -3,7 +3,6 @@ use rust_kernels_cuda::attention::{
     ApplyRopeArgs, CProjArgs, CausalAttentionTcArgs, QkvProjectionArgs,
 };
 
-use super::quantize::requantize_attention;
 use super::tensors::AttentionForwardArgs;
 use crate::types::HiddenStateDevice;
 
@@ -88,13 +87,13 @@ pub(super) fn forward<'a, 'scratch>(
         args.module.kda_attention_tc(attention_args)?;
     }
 
-    requantize_attention(
+    input_nvfp4.quantize_row_amax(
         args.quant_module,
         hidden.stream,
-        input_nvfp4.reborrow(),
         &*hidden.normalized,
         &mut *hidden.normalized_amax,
         hidden.row_count,
+        crate::GPT2_N_EMBD as u32,
     )?;
 
     let input = input_nvfp4.device();

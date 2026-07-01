@@ -1,5 +1,4 @@
 mod forward;
-mod quantize;
 mod tape;
 mod tensors;
 mod weights;
