@@ -42,13 +42,13 @@ impl NextLatBuffers {
             normalized_amax: zero(stream, GPT2_TOKEN_ROWS)?,
             mean: zero(stream, GPT2_TOKEN_ROWS)?,
             inv_std: zero(stream, GPT2_TOKEN_ROWS)?,
-            input_quant: rowwise_quant(stream, NextLatInputActivation::LEN)?,
+            input_quant: RowwiseNvfp4Buffers::gpt2_rows(stream, NextLatInputActivation::LEN)?,
             pre1: zero(stream, NextLatHiddenActivation::LEN)?,
             act1: zero(stream, NextLatHiddenActivation::LEN)?,
-            act1_quant: rowwise_quant(stream, NextLatHiddenActivation::LEN)?,
+            act1_quant: RowwiseNvfp4Buffers::gpt2_rows(stream, NextLatHiddenActivation::LEN)?,
             pre2: zero(stream, NextLatHiddenActivation::LEN)?,
             act2: zero(stream, NextLatHiddenActivation::LEN)?,
-            act2_quant: rowwise_quant(stream, NextLatHiddenActivation::LEN)?,
+            act2_quant: RowwiseNvfp4Buffers::gpt2_rows(stream, NextLatHiddenActivation::LEN)?,
             delta: zero(stream, HiddenState::LEN)?,
             predicted: zero(stream, HiddenState::LEN)?,
             losses: zero(stream, GPT2_TOKEN_ROWS)?,
@@ -75,10 +75,6 @@ impl NextLatBuffers {
     pub(super) fn act2_quantize(&mut self) -> RowwiseQuantizeBuffers<'_> {
         RowwiseQuantizeBuffers::new(&self.act2, &mut self.normalized_amax, &mut self.act2_quant)
     }
-}
-
-fn rowwise_quant(stream: &CudaStream, elements: usize) -> Result<RowwiseNvfp4Buffers, DriverError> {
-    RowwiseNvfp4Buffers::new(stream, elements, GPT2_TOKEN_ROWS)
 }
 
 impl<'a> RowwiseQuantizeBuffers<'a> {

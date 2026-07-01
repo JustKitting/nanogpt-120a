@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_N_LAYER, GPT2_TOKEN_ROWS, Gpt2ForwardSaved, Gpt2ForwardTape, HiddenState};
+use gpt2_nvfp4::{Gpt2ForwardSaved, Gpt2ForwardTape, HiddenState, GPT2_N_LAYER};
 
 use super::device_buffer::block_array;
 use super::tape_block::BlockTapeBuffers;
@@ -16,7 +16,7 @@ impl ForwardTapeBuffers {
         Ok(Self {
             blocks: block_array(|_| BlockTapeBuffers::new(stream))?,
             final_norm: LayerNormTapeBuffers::new(stream)?,
-            lm_head_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
+            lm_head_input: RowwiseTapeBuffers::gpt2_rows(stream, HiddenState::LEN)?,
         })
     }
 

@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    AttentionLogSumExp, GPT2_TOKEN_ROWS, HiddenState, Logits, MlpActivation, QkvActivation,
+    AttentionLogSumExp, HiddenState, Logits, MlpActivation, QkvActivation, GPT2_TOKEN_ROWS,
 };
 
 use super::device_buffer::zero;
@@ -67,10 +67,10 @@ impl TrainBuffers {
             normalized_amax: zero(stream, GPT2_TOKEN_ROWS)?,
             mean: zero(stream, GPT2_TOKEN_ROWS)?,
             inv_std: zero(stream, GPT2_TOKEN_ROWS)?,
-            hidden_nvfp4: RowwiseNvfp4Buffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
+            hidden_nvfp4: RowwiseNvfp4Buffers::gpt2_rows(stream, HiddenState::LEN)?,
             mlp_pre: zero(stream, MlpActivation::LEN)?,
             mlp_act: zero(stream, MlpActivation::LEN)?,
-            mlp_activation_nvfp4: RowwiseNvfp4Buffers::new(stream, MlpActivation::LEN, GPT2_TOKEN_ROWS)?,
+            mlp_activation_nvfp4: RowwiseNvfp4Buffers::gpt2_rows(stream, MlpActivation::LEN)?,
             qkv: zero(stream, QkvActivation::LEN)?,
             log_sum_exp: zero(stream, AttentionLogSumExp::LEN)?,
             logits: zero(stream, Logits::LEN)?,

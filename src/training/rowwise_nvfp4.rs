@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{RowwiseNvfp4Scratch, RowwiseNvfp4Tape};
+use gpt2_nvfp4::{RowwiseNvfp4Scratch, RowwiseNvfp4Tape, GPT2_TOKEN_ROWS};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use super::device_buffer::zero;
@@ -11,15 +11,11 @@ pub(crate) struct RowwiseNvfp4Buffers {
 }
 
 impl RowwiseNvfp4Buffers {
-    pub(crate) fn new(
-        stream: &CudaStream,
-        elements: usize,
-        rows: usize,
-    ) -> Result<Self, DriverError> {
+    pub(crate) fn gpt2_rows(stream: &CudaStream, elements: usize) -> Result<Self, DriverError> {
         Ok(Self {
             bytes: zero(stream, elements / 2)?,
             scales: zero(stream, elements / 16)?,
-            global_scales: zero(stream, rows)?,
+            global_scales: zero(stream, GPT2_TOKEN_ROWS)?,
         })
     }
 

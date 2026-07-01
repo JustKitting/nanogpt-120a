@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    AttentionLogSumExp, BlockForwardSaved, BlockForwardTape, GPT2_TOKEN_ROWS, HiddenState,
-    MlpActivation, QkvActivation,
+    AttentionLogSumExp, BlockForwardSaved, BlockForwardTape, HiddenState, MlpActivation,
+    QkvActivation,
 };
 
 use super::device_buffer::zero;
@@ -24,15 +24,15 @@ impl BlockTapeBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
             ln_1: LayerNormTapeBuffers::new(stream)?,
-            qkv_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
+            qkv_input: RowwiseTapeBuffers::gpt2_rows(stream, HiddenState::LEN)?,
             qkv: zero(stream, QkvActivation::LEN)?,
             attention_out: zero(stream, HiddenState::LEN)?,
             attention_log_sum_exp: zero(stream, AttentionLogSumExp::LEN)?,
-            c_proj_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
+            c_proj_input: RowwiseTapeBuffers::gpt2_rows(stream, HiddenState::LEN)?,
             ln_2: LayerNormTapeBuffers::new(stream)?,
-            mlp_up_input: RowwiseTapeBuffers::new(stream, HiddenState::LEN, GPT2_TOKEN_ROWS)?,
+            mlp_up_input: RowwiseTapeBuffers::gpt2_rows(stream, HiddenState::LEN)?,
             mlp_up: zero(stream, MlpActivation::LEN)?,
-            mlp_down_input: RowwiseTapeBuffers::new(stream, MlpActivation::LEN, GPT2_TOKEN_ROWS)?,
+            mlp_down_input: RowwiseTapeBuffers::gpt2_rows(stream, MlpActivation::LEN)?,
         })
     }
 
