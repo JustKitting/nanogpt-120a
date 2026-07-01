@@ -12,12 +12,8 @@ use crate::kda_elementwise::{
 };
 
 pub(crate) fn prepare_kda_backward_inputs_body(
-    qkv: &[u16],
-    q: DisjointSlice<f32>,
-    k: DisjointSlice<f32>,
-    v: DisjointSlice<f32>,
-    g: DisjointSlice<f32>,
-    beta: DisjointSlice<f32>,
+    qkv: &[u16], q: DisjointSlice<f32>, k: DisjointSlice<f32>,
+    v: DisjointSlice<f32>, g: DisjointSlice<f32>, beta: DisjointSlice<f32>,
     params: CausalAttentionParams,
 ) {
     prepare_kda_inputs_body(qkv, KdaPrepareOutputs { q, k, v, g, beta }, params, TC_BACKWARD_THREADS_PER_BLOCK);
@@ -28,9 +24,7 @@ pub(crate) fn chunk_cumsum_g_body(g: DisjointSlice<f32>, params: CausalAttention
 }
 
 pub(crate) fn gather_kda_dout_body(
-    d_out: &[f32],
-    mut compact_out: DisjointSlice<f32>,
-    params: CausalAttentionParams,
+    d_out: &[f32], mut compact_out: DisjointSlice<f32>, params: CausalAttentionParams,
 ) {
     let Some(index) = thread_index(compact_elems(&params)) else {
         return;
@@ -43,9 +37,7 @@ pub(crate) fn gather_kda_dout_body(
 }
 
 pub(crate) fn add_kda_compact_body(
-    mut dst: DisjointSlice<f32>,
-    src: &[f32],
-    params: CausalAttentionParams,
+    mut dst: DisjointSlice<f32>, src: &[f32], params: CausalAttentionParams,
 ) {
     let Some(index) = thread_index(compact_elems(&params)) else {
         return;
@@ -56,10 +48,7 @@ pub(crate) fn add_kda_compact_body(
 }
 
 pub(crate) fn make_kda_kneg_from_kg_body(
-    kg: &[f32],
-    g: &[f32],
-    mut kneg: DisjointSlice<f32>,
-    params: CausalAttentionParams,
+    kg: &[f32], g: &[f32], mut kneg: DisjointSlice<f32>, params: CausalAttentionParams,
 ) {
     let Some(index) = thread_index(compact_elems(&params)) else {
         return;
@@ -73,10 +62,7 @@ pub(crate) fn make_kda_kneg_from_kg_body(
 }
 
 pub(crate) fn make_kda_kpos_from_kg_body(
-    kg: &[f32],
-    g: &[f32],
-    beta: &[f32],
-    mut kpos: DisjointSlice<f32>,
+    kg: &[f32], g: &[f32], beta: &[f32], mut kpos: DisjointSlice<f32>,
     params: CausalAttentionParams,
 ) {
     let Some(index) = thread_index(compact_elems(&params)) else {
@@ -95,9 +81,7 @@ pub(crate) fn make_kda_kpos_from_kg_body(
 }
 
 pub(crate) fn make_kda_strict_neg_matrix_body(
-    src: &[f32],
-    mut dst: DisjointSlice<f32>,
-    params: CausalAttentionParams,
+    src: &[f32], mut dst: DisjointSlice<f32>, params: CausalAttentionParams,
 ) {
     let chunks = chunk_count(&params);
     let matrix_elems = chunk_matrix_elems(&params);
