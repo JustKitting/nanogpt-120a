@@ -4,6 +4,7 @@ use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use crate::common::nvfp4::{filled_u8, E2M1_MIN_PAIR, E4M3_ONE};
 use crate::common::saved_block::{saved_block, SavedBlockParts};
+use crate::common::{attention_log_sum_exp_values, row_ones};
 
 pub struct SavedBuffers {
     hidden_bytes: DeviceBuffer<u8>,
@@ -21,15 +22,12 @@ impl SavedBuffers {
         Ok(Self {
             hidden_bytes: filled_u8(stream, HiddenState::LEN / 2, E2M1_MIN_PAIR)?,
             hidden_scales: filled_u8(stream, HiddenState::LEN / 16, E4M3_ONE)?,
-            hidden_globals: DeviceBuffer::from_host(stream, &crate::common::row_ones())?,
+            hidden_globals: DeviceBuffer::from_host(stream, &row_ones())?,
             hidden_f16: DeviceBuffer::from_host(stream, &vec![0x2e66_u16; HiddenState::LEN])?,
             qkv: DeviceBuffer::from_host(stream, &vec![0x3c00_u16; QkvActivation::LEN])?,
-            log_sum_exp: DeviceBuffer::from_host(
-                stream,
-                &crate::common::attention_log_sum_exp_values(),
-            )?,
+            log_sum_exp: DeviceBuffer::from_host(stream, &attention_log_sum_exp_values())?,
             mean: DeviceBuffer::zeroed(stream, GPT2_TOKEN_ROWS)?,
-            inv_std: DeviceBuffer::from_host(stream, &crate::common::row_ones())?,
+            inv_std: DeviceBuffer::from_host(stream, &row_ones())?,
         })
     }
 
