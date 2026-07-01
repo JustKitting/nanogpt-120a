@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use cuda_core::DeviceBuffer;
+use cuda_core::{CudaStream, DeviceBuffer};
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionArgs};
 
 mod common;
@@ -17,34 +17,15 @@ const TOLERANCE: f32 = 1.0e-7;
 fn causal_attention_writes_log_sum_exp() -> Result<(), Box<dyn Error>> {
     let (_, stream, ptx) = common::cuda_test_context()?;
     let module = AttentionModule::from_module(ptx)?;
+    let run = run_attention(&stream, &module, vec![0.0_f32; TOKEN_COUNT * QKV_DIM], 1)?;
 
-    let qkv = DeviceBuffer::from_host(&stream, &vec![0.0_f32; TOKEN_COUNT * QKV_DIM])?;
-    let mut out = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * EMBEDDING_DIM)?;
-    let mut log_sum_exp = DeviceBuffer::<f32>::zeroed(&stream, TOKEN_COUNT * HEAD_COUNT)?;
-
-    module.causal_attention(CausalAttentionArgs {
-        stream: &stream,
-        qkv: &qkv,
-        out: &mut out,
-        log_sum_exp: &mut log_sum_exp,
-        row_count: TOKEN_COUNT as u32,
-        seq_len: TOKEN_COUNT as u32,
-        batch_size: 1,
-        embedding_dim: EMBEDDING_DIM as u32,
-        qkv_dim: QKV_DIM as u32,
-        head_count: HEAD_COUNT as u32,
-        head_dim: HEAD_DIM as u32,
-    })?;
-
-    let actual_out = out.to_host_vec(&stream)?;
-    let actual_log_sum_exp = log_sum_exp.to_host_vec(&stream)?;
-    assert!(actual_out.iter().all(|value| value.abs() <= TOLERANCE));
+    assert!(run.out.iter().all(|value| value.abs() <= TOLERANCE));
 
     for head in 0..HEAD_COUNT {
         let base = head * TOKEN_COUNT;
-        assert!(actual_log_sum_exp[base].abs() <= TOLERANCE);
+        assert!(run.log_sum_exp[base].abs() <= TOLERANCE);
         for token in 1..TOKEN_COUNT {
-            assert!(actual_log_sum_exp[base + token] > actual_log_sum_exp[base + token - 1]);
+            assert!(run.log_sum_exp[base + token] > run.log_sum_exp[base + token - 1]);
         }
     }
 
@@ -57,8 +38,8 @@ fn causal_attention_batch_isolation() -> Result<(), Box<dyn Error>> {
     let (_, stream, ptx) = common::cuda_test_context()?;
     let module = AttentionModule::from_module(ptx)?;
 
-    let first = run_batched_attention(&stream, &module, sample_qkv(0.25))?;
-    let second = run_batched_attention(&stream, &module, sample_qkv(8.0))?;
+    let first = run_attention(&stream, &module, sample_qkv(0.25), 2)?;
+    let second = run_attention(&stream, &module, sample_qkv(8.0), 2)?;
 
     let sample0_out_len = TOKEN_COUNT * EMBEDDING_DIM;
     let sample0_log_sum_exp_len = HEAD_COUNT * TOKEN_COUNT;
@@ -79,25 +60,25 @@ struct AttentionRun {
     log_sum_exp: Vec<f32>,
 }
 
-fn run_batched_attention(
-    stream: &cuda_core::CudaStream,
+fn run_attention(
+    stream: &CudaStream,
     module: &AttentionModule,
     qkv_values: Vec<f32>,
+    batch_size: usize,
 ) -> Result<AttentionRun, Box<dyn Error>> {
-    const BATCH_SIZE: usize = 2;
     let qkv = DeviceBuffer::from_host(stream, &qkv_values)?;
-    let mut out = DeviceBuffer::<f32>::zeroed(stream, BATCH_SIZE * TOKEN_COUNT * EMBEDDING_DIM)?;
+    let mut out = DeviceBuffer::<f32>::zeroed(stream, batch_size * TOKEN_COUNT * EMBEDDING_DIM)?;
     let mut log_sum_exp =
-        DeviceBuffer::<f32>::zeroed(stream, BATCH_SIZE * HEAD_COUNT * TOKEN_COUNT)?;
+        DeviceBuffer::<f32>::zeroed(stream, batch_size * HEAD_COUNT * TOKEN_COUNT)?;
 
     module.causal_attention(CausalAttentionArgs {
         stream,
         qkv: &qkv,
         out: &mut out,
         log_sum_exp: &mut log_sum_exp,
-        row_count: (BATCH_SIZE * TOKEN_COUNT) as u32,
+        row_count: (batch_size * TOKEN_COUNT) as u32,
         seq_len: TOKEN_COUNT as u32,
-        batch_size: BATCH_SIZE as u32,
+        batch_size: batch_size as u32,
         embedding_dim: EMBEDDING_DIM as u32,
         qkv_dim: QKV_DIM as u32,
         head_count: HEAD_COUNT as u32,
