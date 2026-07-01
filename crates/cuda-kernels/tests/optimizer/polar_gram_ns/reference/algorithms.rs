@@ -1,40 +1,6 @@
 use crate::polar_coefficients::coefficients;
 use crate::polar_reference::{matmul_f16, polar_next};
 
-pub use crate::polar_reference::{cosine, normalized_polar_source, relative_l2};
-
-pub fn first_iteration_update(
-    grad: &[f32],
-    rows: usize,
-    cols: usize,
-    mu: f32,
-    learning_rate: f32,
-    weight_decay: f32,
-    iterations: usize,
-) -> Vec<f32> {
-    let nesterov: Vec<f32> = grad
-        .iter()
-        .map(|g| (1.0 - mu).mul_add(*g, mu * (1.0 - mu) * *g))
-        .collect();
-    let polar = normalized_polar_source(&nesterov, rows, cols);
-    let update = stabilized_gram_ns(polar, rows.min(cols), rows.max(cols), iterations, &[2]);
-    let scale = 0.2 * (rows.max(cols) as f32).sqrt();
-    let decay = 1.0 - learning_rate * weight_decay;
-
-    (0..rows * cols)
-        .map(|index| {
-            let update_index = if rows > cols {
-                let row = index / cols;
-                let col = index - row * cols;
-                col * rows + row
-            } else {
-                index
-            };
-            decay - learning_rate * scale * update[update_index]
-        })
-        .collect()
-}
-
 pub fn standard_polar(mut x: Vec<f32>, rows: usize, cols: usize, iterations: usize) -> Vec<f32> {
     for iter in 0..iterations {
         let gram = matmul_f16(&x, &x, rows, rows, cols, true);
@@ -97,43 +63,6 @@ pub fn stabilized_gram_ns(
         rows,
         false,
     )
-}
-
-pub fn standard_cost(iterations: usize, aspect_ratio: usize) -> ProductCost {
-    ProductCost {
-        rectangular_products: iterations * 2,
-        weighted_products: iterations * (2 * aspect_ratio + 1),
-    }
-}
-
-pub fn stabilized_gram_ns_cost(
-    iterations: usize,
-    aspect_ratio: usize,
-    resets: &[usize],
-) -> ProductCost {
-    let restart_count = resets
-        .iter()
-        .filter(|&&iter| iter != 0 && iter < iterations)
-        .count();
-    let rectangular_products = 1 + restart_count * 2 + 1;
-    let weighted_products = 4 * iterations + 6 * aspect_ratio * restart_count - 6 * restart_count;
-
-    ProductCost {
-        rectangular_products,
-        weighted_products,
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct ProductCost {
-    pub rectangular_products: usize,
-    pub weighted_products: usize,
-}
-
-pub fn gradient(rows: usize, cols: usize) -> Vec<f32> {
-    (0..rows * cols)
-        .map(|i| ((i % 37) as f32 - 18.0) * 0.0009 + ((i / cols) as f32) * 0.00002)
-        .collect()
 }
 
 fn linear2(a: &[f32], a_scale: f32, b: &[f32], b_scale: f32) -> Vec<f32> {

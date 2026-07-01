@@ -2,7 +2,7 @@ use std::error::Error;
 
 #[path = "polar_gram_ns/device/mod.rs"]
 mod device;
-#[path = "polar_gram_ns/reference.rs"]
+#[path = "polar_gram_ns/reference/mod.rs"]
 mod reference;
 
 use crate::polar_vector;
