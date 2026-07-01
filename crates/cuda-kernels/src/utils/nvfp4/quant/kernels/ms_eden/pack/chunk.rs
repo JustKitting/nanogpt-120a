@@ -22,8 +22,7 @@ pub(in super::super) fn ms_eden_pack_chunk(
     scale_override: f32,
     scale_seed: u32,
 ) {
-    let (value, lane) =
-        pack_chunk_value(input, out_global_scales, chunk, dst_row_len, global_scale);
+    let (value, lane) = pack_chunk_value(input, out_global_scales, chunk, dst_row_len, global_scale);
 
     let chunk_amax = warp_max_f32(abs_f32(value));
     if lane == 0 {
@@ -32,15 +31,7 @@ pub(in super::super) fn ms_eden_pack_chunk(
         }
     }
 
-    ms_eden_pack_payload(
-        value,
-        out_fp4,
-        out_scales,
-        chunk,
-        global_scale,
-        scale_override,
-        scale_seed,
-    );
+    ms_eden_pack_payload(value, out_fp4, out_scales, chunk, global_scale, scale_override, scale_seed);
 }
 
 #[inline(always)]
@@ -57,15 +48,7 @@ pub(in super::super) fn ms_eden_pack_chunk_no_chunk_amax(
 ) {
     let (value, _) = pack_chunk_value(input, out_global_scales, chunk, dst_row_len, global_scale);
 
-    ms_eden_pack_payload(
-        value,
-        out_fp4,
-        out_scales,
-        chunk,
-        global_scale,
-        scale_override,
-        scale_seed,
-    );
+    ms_eden_pack_payload(value, out_fp4, out_scales, chunk, global_scale, scale_override, scale_seed);
 }
 
 #[inline(always)]
@@ -90,15 +73,7 @@ pub(in super::super) fn ms_eden_pack_chunk_no_chunk_amax_row(
         }
     }
 
-    ms_eden_pack_payload(
-        value,
-        out_fp4,
-        out_scales,
-        chunk,
-        global_scale,
-        scale_override,
-        scale_seed,
-    );
+    ms_eden_pack_payload(value, out_fp4, out_scales, chunk, global_scale, scale_override, scale_seed);
 }
 
 #[inline(always)]
