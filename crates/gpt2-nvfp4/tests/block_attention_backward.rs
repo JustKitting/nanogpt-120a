@@ -1,6 +1,6 @@
 use gpt2_nvfp4::{
-    AttentionBackwardModules, BlockAttentionBackwardArgs, BlockAttentionBackwardModules,
-    BlockAttentionBackwardSeeds, Gpt2Rng, attention_side_backward,
+    attention_side_backward, AttentionBackwardModules, BlockAttentionBackwardArgs,
+    BlockAttentionBackwardModules, BlockAttentionBackwardSeeds, Gpt2Rng,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
@@ -18,14 +18,16 @@ mod buffers;
 mod common;
 #[path = "block_attention_backward/data.rs"]
 mod data;
-#[path = "common/saved_block.rs"]
-mod saved_block;
+#[path = "support/linear_backward_scratch.rs"]
+mod linear_scratch;
 #[path = "common/nvfp4.rs"]
 mod nvfp4_common;
-#[path = "common/upload.rs"]
-mod upload_common;
+#[path = "common/saved_block.rs"]
+mod saved_block;
 #[path = "block_attention_backward/scratch.rs"]
 mod scratch;
+#[path = "common/upload.rs"]
+mod upload_common;
 
 use common::{assert_nonzero_finite, cuda_test_context};
 

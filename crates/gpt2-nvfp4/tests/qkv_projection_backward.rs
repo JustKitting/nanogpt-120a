@@ -1,8 +1,8 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionBackwardModules, AttentionProjectionTensors, AttentionQkvBackwardArgs, GPT2_N_EMBD,
-    GPT2_QKV, HiddenState, HiddenVectorShape, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
-    qkv_projection_backward,
+    qkv_projection_backward, AttentionBackwardModules, AttentionProjectionTensors,
+    AttentionQkvBackwardArgs, HiddenState, HiddenVectorShape, QkvVectorShape, QkvWeightShape,
+    ResidualWeightShape, GPT2_N_EMBD, GPT2_QKV,
 };
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
 use rust_kernels_cuda::nvfp4::{Nvfp4DecodeModule, Nvfp4RowwiseDeviceTensor};
@@ -10,18 +10,19 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
 mod common;
+#[path = "qkv_projection_backward/data.rs"]
+mod data;
+#[path = "support/linear_backward_scratch.rs"]
+mod linear_scratch;
 #[path = "common/saved_block.rs"]
 mod saved_block;
 #[path = "common/upload.rs"]
 mod upload_common;
-#[path = "qkv_projection_backward/data.rs"]
-mod data;
-#[path = "qkv_projection_backward/scratch.rs"]
-mod scratch;
 
 use common::{assert_nonzero_finite, cuda_test_context};
-use saved_block::{SavedBlockParts, saved_block};
-use upload_common::{TestResult, upload_nvfp4_bytes, upload_zero_nvfp4};
+use linear_scratch::LinearBackwardScratchBuffers;
+use saved_block::{saved_block, SavedBlockParts};
+use upload_common::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -63,7 +64,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> TestResult {
         c_proj_weight: c_proj_weight.mma(),
         c_proj_bias: c_proj_bias.device(),
     };
-    let mut scratch = scratch::QkvBackwardScratch::new(&stream)?;
+    let mut scratch = LinearBackwardScratchBuffers::new(&stream, GPT2_N_EMBD, GPT2_QKV)?;
     let mut d_ln_1_normalized = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut d_attn_qkv_weight = DeviceBuffer::<f32>::zeroed(&stream, GPT2_N_EMBD * GPT2_QKV)?;
     let mut d_attn_qkv_bias = DeviceBuffer::<f32>::zeroed(&stream, GPT2_QKV)?;
@@ -83,7 +84,7 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> TestResult {
         d_ln_1_normalized: &mut d_ln_1_normalized,
         d_attn_qkv_weight: &mut d_attn_qkv_weight,
         d_attn_qkv_bias: &mut d_attn_qkv_bias,
-        scratch: scratch.as_attention_scratch(),
+        scratch: scratch.qkv(),
         seeds: data::seeds(),
     })?;
 
