@@ -6,6 +6,7 @@ use gpt2_nvfp4::{
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use crate::data::{self, E2M1_MIN_PAIR, E4M3_ONE};
+use crate::nvfp4_common::filled_u8;
 
 pub struct SavedBuffers {
     hidden_bytes: DeviceBuffer<u8>,
@@ -21,11 +22,8 @@ pub struct SavedBuffers {
 impl SavedBuffers {
     pub fn new(stream: &CudaStream) -> Result<Self, DriverError> {
         Ok(Self {
-            hidden_bytes: DeviceBuffer::from_host(
-                stream,
-                &vec![E2M1_MIN_PAIR; HiddenState::LEN / 2],
-            )?,
-            hidden_scales: DeviceBuffer::from_host(stream, &vec![E4M3_ONE; HiddenState::LEN / 16])?,
+            hidden_bytes: filled_u8(stream, HiddenState::LEN / 2, E2M1_MIN_PAIR)?,
+            hidden_scales: filled_u8(stream, HiddenState::LEN / 16, E4M3_ONE)?,
             hidden_globals: DeviceBuffer::from_host(stream, &data::row_global_scales())?,
             hidden_f16: DeviceBuffer::from_host(stream, &vec![0x2e66_u16; HiddenState::LEN])?,
             qkv: DeviceBuffer::from_host(stream, &vec![0x3c00_u16; QkvActivation::LEN])?,

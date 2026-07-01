@@ -7,6 +7,7 @@ use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 use crate::data::{E2M1_MIN_PAIR, E2M1_ONE_PAIR, E4M3_ONE};
+use crate::nvfp4_common::filled_u8;
 
 pub struct WeightBuffers {
     qkv_weight_bytes: DeviceBuffer<u8>,
@@ -82,8 +83,4 @@ impl WeightBuffers {
             ),
         }
     }
-}
-
-fn filled_u8(stream: &CudaStream, len: usize, value: u8) -> Result<DeviceBuffer<u8>, DriverError> {
-    DeviceBuffer::from_host(stream, &vec![value; len])
 }

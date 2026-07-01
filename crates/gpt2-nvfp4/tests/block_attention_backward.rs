@@ -20,6 +20,8 @@ mod buffers;
 mod common;
 #[path = "block_attention_backward/data.rs"]
 mod data;
+#[path = "common/nvfp4.rs"]
+mod nvfp4_common;
 #[path = "block_attention_backward/scratch.rs"]
 mod scratch;
 
