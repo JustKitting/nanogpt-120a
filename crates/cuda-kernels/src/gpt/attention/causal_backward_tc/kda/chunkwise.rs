@@ -1,17 +1,14 @@
-use cuda_device::{DisjointSlice, SharedArray, thread};
+use cuda_device::{DisjointSlice, thread};
 
 use super::super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
-use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CtaTile};
+use crate::f16_tc_matmul::cta_tile::CtaTile;
 use crate::kda_backward::{
     load_chunk_state, stage_compact_t_a, stage_compact_t_a_disjoint, stage_hidden_dout_b_t,
     store_dh_quads,
 };
-use crate::kda_common::{KDA_STATE_ELEMS, batch_head, chunk_count, kda_tc_shape, state_elems};
-use crate::kda_tc::{
-    CompactStore::Add, CompactTileCtx, stage_compact_a as stage_dm_compact_a,
-    stage_compact_b_t_disjoint, stage_shared_state_b_t, store_compact_quads, tc_stage_loop,
-};
+use crate::kda_common::{batch_head, chunk_count, kda_tc_shape, state_elems};
+use crate::kda_tc::{CompactStore::Add, CompactTileCtx, CtaATile, CtaBTile, KdaStateTile, stage_compact_a as stage_dm_compact_a, stage_compact_b_t_disjoint, stage_shared_state_b_t, store_compact_quads, tc_stage_loop};
 
 pub(crate) fn chunkwise_kda_backward_body(
     qg: &[f32], kg: &[f32], mut u_to_du: DisjointSlice<f32>, mut w_to_dw: DisjointSlice<f32>,
@@ -19,9 +16,8 @@ pub(crate) fn chunkwise_kda_backward_body(
     mut d_h_states: DisjointSlice<f32>,
     _d_aqk: DisjointSlice<f32>,
     params: CausalAttentionParams,
-    state: &mut SharedArray<f32, KDA_STATE_ELEMS>, d_h_next: &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    d_h: &mut SharedArray<f32, KDA_STATE_ELEMS>, a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    state: &mut KdaStateTile, d_h_next: &mut KdaStateTile, d_h: &mut KdaStateTile,
+    a_tile: &mut CtaATile, b_tile: &mut CtaBTile,
 ) {
     let bh = thread::blockIdx_x();
     let tid = thread::threadIdx_x();
@@ -90,8 +86,8 @@ pub(crate) fn chunkwise_kda_backward_body(
 
 fn add_kg_dh_to_du_tc(
     kg: &[f32], d_u: &mut DisjointSlice<f32>,
-    d_h_next: &SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>, b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    d_h_next: &KdaStateTile,
+    a_tile: &mut CtaATile, b_tile: &mut CtaBTile,
     ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
@@ -107,8 +103,8 @@ fn add_kg_dh_to_du_tc(
 fn compute_prev_dh_tc(
     inputs: (&[f32], &[f32], &[f32]),
     grads: (&mut DisjointSlice<f32>, &mut DisjointSlice<f32>),
-    states: (&SharedArray<f32, KDA_STATE_ELEMS>, &mut SharedArray<f32, KDA_STATE_ELEMS>),
-    tiles: (&mut SharedArray<u16, CTA_A_ELEMS>, &mut SharedArray<u16, CTA_B_ELEMS>),
+    states: (&KdaStateTile, &mut KdaStateTile),
+    tiles: (&mut CtaATile, &mut CtaBTile),
     compact_ctx: CompactTileCtx<'_>,
 ) {
     let (qg, g, d_out) = inputs;

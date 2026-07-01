@@ -1,9 +1,8 @@
-use cuda_device::{DisjointSlice, SharedArray, thread};
+use cuda_device::{DisjointSlice, thread};
 
 use crate::attention::CausalAttentionParams;
-use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
 use crate::kda_tc::{
-    CompactStore::SetScaled, KdaChunkTileCtx, StateTileLayout, StateTileSource,
+    CompactStore::SetScaled, CtaATile, CtaBTile, KdaChunkTileCtx, StateTileLayout, StateTileSource,
     stage_compact_a as stage_dm_compact_a, stage_state_b_t, store_compact_quads, store_vnew_quads,
     tc_stage_loop,
 };
@@ -13,8 +12,8 @@ pub(crate) fn chunk_kda_dkg_from_vnew_dh_body(
     d_h_states: &[f32],
     mut d_kg: DisjointSlice<f32>,
     params: CausalAttentionParams,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    a_tile: &mut CtaATile,
+    b_tile: &mut CtaBTile,
 ) {
     let Some(ctx) = KdaChunkTileCtx::from_block(&params) else {
         return;
@@ -45,8 +44,8 @@ pub(crate) fn chunk_state_matmul_body(
     state_u16: &[u16],
     mut out: DisjointSlice<f32>,
     params: CausalAttentionParams,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    a_tile: &mut CtaATile,
+    b_tile: &mut CtaBTile,
     mode: ChunkStateMatmulMode,
 ) {
     let Some(ctx) = KdaChunkTileCtx::from_block(&params) else {

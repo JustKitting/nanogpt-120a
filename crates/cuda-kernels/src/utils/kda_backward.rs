@@ -1,18 +1,16 @@
-use cuda_device::{DisjointSlice, SharedArray, thread};
+use cuda_device::{DisjointSlice, thread};
 
 use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::{cvt_f32_f16, cvt_rn_f16_f32};
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS};
-use crate::kda_common::{
-    KDA_STATE_ELEMS, chunk_state_index, compact_index, hidden_index, kda_decay_exp,
-};
-use crate::kda_tc::{CompactTileCtx, compact_fragment_coords, for_acc_fragments};
+use crate::kda_common::{chunk_state_index, compact_index, hidden_index, kda_decay_exp};
+use crate::kda_tc::{CompactTileCtx, CtaATile, CtaBTile, KdaStateTile, compact_fragment_coords, for_acc_fragments};
 
 macro_rules! stage_compact_t_a_fn {
     ($name:ident, $src:ident: $src_ty:ty, $index:ident, $read:expr) => {
         pub(crate) fn $name(
             $src: $src_ty,
-            a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+            a_tile: &mut CtaATile,
             ctx: CompactTileCtx<'_>,
             k_base: u32,
             scale: f32,
@@ -45,7 +43,7 @@ stage_compact_t_a_fn!(
 
 pub(crate) fn stage_hidden_dout_b_t(
     d_out: &[f32],
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    b_tile: &mut CtaBTile,
     ctx: CompactTileCtx<'_>,
     k_base: u32,
 ) {
@@ -66,7 +64,7 @@ pub(crate) fn stage_hidden_dout_b_t(
 
 pub(crate) fn load_chunk_state(
     chunk_states: &[u16],
-    state: &mut SharedArray<f32, KDA_STATE_ELEMS>,
+    state: &mut KdaStateTile,
     bh: u32,
     chunk: u32,
     state_elems: u32,
@@ -83,8 +81,8 @@ pub(crate) fn load_chunk_state(
 
 pub(crate) fn store_dh_quads(
     acc: [[f32; 4]; 4],
-    d_h_next: &SharedArray<f32, KDA_STATE_ELEMS>,
-    d_h: &mut SharedArray<f32, KDA_STATE_ELEMS>,
+    d_h_next: &KdaStateTile,
+    d_h: &mut KdaStateTile,
     g: &[f32],
     ctx: CompactTileCtx<'_>,
 ) {

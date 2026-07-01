@@ -1,25 +1,17 @@
-use cuda_device::{DisjointSlice, SharedArray, thread};
+use cuda_device::{DisjointSlice, thread};
 
 use super::super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
-use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
-use crate::kda_common::{
-    KDA_STATE_ELEMS, batch_head, chunk_count, chunk_g_last_index, compact_index, kda_decay_exp,
-    kda_tc_shape, state_elems,
-};
-use crate::kda_tc::{
-    CompactTileCtx, add_shared_state_quads, stage_compact_a,
-    stage_compact_b_t_disjoint as stage_vnew_b_t_disjoint, stage_shared_state_b_t,
-    store_vnew_quads, tc_stage_loop,
-};
+use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_K, CTA_THREADS, CtaTile};
+use crate::kda_common::{batch_head, chunk_count, chunk_g_last_index, compact_index, kda_decay_exp, kda_tc_shape, state_elems};
+use crate::kda_tc::{CompactTileCtx, CtaATile, CtaBTile, KdaStateTile, add_shared_state_quads, stage_compact_a, stage_compact_b_t_disjoint as stage_vnew_b_t_disjoint, stage_shared_state_b_t, store_vnew_quads, tc_stage_loop};
 
 pub(in super::super) fn chunk_kda_state_save_body(
     kg: &[f32], mut v_new: DisjointSlice<f32>, w: &[f32], u: &[f32], chunk_g_last: &[f32],
     mut chunk_states: DisjointSlice<u16>,
     params: CausalAttentionParams,
-    state: &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>, b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    state: &mut KdaStateTile, a_tile: &mut CtaATile, b_tile: &mut CtaBTile,
 ) {
     let bh = thread::blockIdx_x();
     let tid = thread::threadIdx_x();
@@ -70,8 +62,8 @@ pub(in super::super) fn chunk_kda_state_save_body(
 
 fn compute_ws_to_vnew(
     w: &[f32], u: &[f32], v_new: &mut DisjointSlice<f32>,
-    state: &SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>, b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    state: &KdaStateTile,
+    a_tile: &mut CtaATile, b_tile: &mut CtaBTile,
     ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
@@ -85,8 +77,8 @@ fn compute_ws_to_vnew(
 
 fn compute_kg_vnew_add_state(
     k: &[f32], v_new: &mut DisjointSlice<f32>,
-    state: &mut SharedArray<f32, KDA_STATE_ELEMS>,
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>, b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    state: &mut KdaStateTile,
+    a_tile: &mut CtaATile, b_tile: &mut CtaBTile,
     ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
@@ -99,7 +91,7 @@ fn compute_kg_vnew_add_state(
 }
 
 fn decay_state(
-    state: &mut SharedArray<f32, KDA_STATE_ELEMS>,
+    state: &mut KdaStateTile,
     chunk_g_last: &[f32],
     bh: u32, chunk: u32, tid: u32,
     ctx: CompactTileCtx<'_>,
@@ -116,7 +108,7 @@ fn decay_state(
 
 fn stage_kg_t_a(
     src: &[f32],
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+    a_tile: &mut CtaATile,
     ctx: CompactTileCtx<'_>, k_base: u32,
 ) {
     let mut offset = thread::threadIdx_x();
