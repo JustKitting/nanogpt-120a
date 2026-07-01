@@ -3,13 +3,14 @@ use std::path::PathBuf;
 use crate::AppResult;
 
 use super::{
-    TokenDataLoader, shakespeare,
+    shakespeare,
     source::{
-        DATASET_SHAKESPEARE, DATASET_SYNTH, repeat_first_window, token_count_paths,
-        training_dataset,
+        repeat_first_window, token_count_paths, training_dataset, DATASET_SHAKESPEARE,
+        DATASET_SYNTH,
     },
     synth, tokens,
-    validation::{VALIDATION_WINDOWS, train_end},
+    validation::{train_end, VALIDATION_WINDOWS},
+    TokenDataLoader,
 };
 
 impl TokenDataLoader {
@@ -61,17 +62,13 @@ impl TokenDataLoader {
             .cloned()
             .ok_or("training dataset has no train shards")?;
         let tokens = tokens::read_u16_tokens(&path)?;
-        let train_end = if validation.is_some() {
-            tokens.len()
-        } else if reserve_validation_tail {
+        let train_end = if validation.is_none() && reserve_validation_tail {
             train_end(tokens.len())
         } else {
             tokens.len()
         };
         let total_train_tokens = token_count_paths(&train_paths)?;
-        let (validation_path, validation_tokens) = validation
-            .map(|(path, tokens)| (Some(path), Some(tokens)))
-            .unwrap_or((None, None));
+        let (validation_path, validation_tokens) = validation.unzip();
         Ok(Self {
             path,
             train_paths,
