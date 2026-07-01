@@ -37,7 +37,7 @@ pub(super) fn finish_forward<'a>(
         &*hidden.normalized,
         &*hidden.normalized_amax,
         hidden.row_count,
-        crate::GPT2_N_EMBD as u32,
+        crate::GPT2_EMBEDDING_DIM,
     )?;
 
     let input = hidden_nvfp4.device();
@@ -51,8 +51,8 @@ pub(super) fn finish_forward<'a>(
         weight: args.lm_head_weight,
         logits: &mut *args.logits,
         token_count: hidden.row_count,
-        input_dim: crate::GPT2_N_EMBD as u32,
-        vocab_size: crate::GPT2_VOCAB_SIZE as u32,
+        input_dim: crate::GPT2_EMBEDDING_DIM,
+        vocab_size: crate::GPT2_VOCAB_DIM,
     })?;
 
     Ok(hidden)

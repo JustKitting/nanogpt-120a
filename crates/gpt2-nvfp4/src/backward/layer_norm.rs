@@ -3,7 +3,7 @@ use rust_kernels_cuda::layer_norm_backward::{
     LayerNormBackwardInputArgs, LayerNormBackwardModule, LayerNormBackwardParamArgs,
 };
 
-use crate::GPT2_N_EMBD;
+use crate::GPT2_EMBEDDING_DIM;
 use crate::{LayerNormGrads, LayerNormSaved, LayerNormTensors};
 
 pub struct Gpt2LayerNormBackwardInputArgs<'a, 'out> {
@@ -44,7 +44,7 @@ pub fn layer_norm_backward_input(
         weight: args.weights.weight,
         d_residual: args.d_residual,
         row_count: args.saved.row_count,
-        embedding_dim: GPT2_N_EMBD as u32,
+        embedding_dim: GPT2_EMBEDDING_DIM,
     })
 }
 
@@ -60,7 +60,7 @@ pub fn layer_norm_backward_params(
         d_weight: args.d_weight,
         d_bias: args.d_bias,
         row_count: args.saved.row_count,
-        embedding_dim: GPT2_N_EMBD as u32,
+        embedding_dim: GPT2_EMBEDDING_DIM,
     })
 }
 

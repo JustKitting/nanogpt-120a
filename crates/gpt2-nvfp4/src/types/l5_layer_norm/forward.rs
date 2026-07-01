@@ -6,7 +6,7 @@ use rust_kernels_cuda::layer_norm::{
 use super::args::{LayerNormForwardArgs, LayerNormTensors};
 use super::weights::LayerNormWeights;
 use crate::types::{HiddenStateDevice, LayerNormTape};
-use crate::{GPT2_LAYER_NORM_EPSILON, GPT2_N_EMBD};
+use crate::{GPT2_EMBEDDING_DIM, GPT2_LAYER_NORM_EPSILON};
 
 impl LayerNormWeights {
     pub fn input_from_block<'a>(
@@ -37,7 +37,7 @@ impl LayerNormWeights {
             mean: &mut *hidden.mean,
             inv_std: &mut *hidden.inv_std,
             row_count: hidden.row_count,
-            embedding_dim: GPT2_N_EMBD as u32,
+            embedding_dim: GPT2_EMBEDDING_DIM,
             epsilon: GPT2_LAYER_NORM_EPSILON,
         })?;
 
@@ -77,7 +77,7 @@ impl LayerNormWeights {
                 inv_std: &mut *hidden.inv_std,
                 residual_f16,
                 row_count: hidden.row_count,
-                embedding_dim: GPT2_N_EMBD as u32,
+                embedding_dim: GPT2_EMBEDDING_DIM,
                 epsilon: GPT2_LAYER_NORM_EPSILON,
             })?;
 

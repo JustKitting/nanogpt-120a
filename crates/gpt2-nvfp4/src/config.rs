@@ -10,6 +10,9 @@ pub const GPT2_MLP: usize = 4 * GPT2_N_EMBD;
 pub const GPT2_FULL_ATTENTION_QKV: usize = 3 * GPT2_N_EMBD;
 pub const GPT2_KDA_ACTIVE_QKV: usize = 4 * GPT2_N_EMBD + GPT2_N_HEAD;
 pub const GPT2_QKV: usize = align_kda_qkv(GPT2_KDA_ACTIVE_QKV);
+pub const GPT2_EMBEDDING_DIM: u32 = GPT2_N_EMBD as u32;
+pub const GPT2_MLP_DIM: u32 = GPT2_MLP as u32;
+pub const GPT2_VOCAB_DIM: u32 = GPT2_VOCAB_SIZE as u32;
 pub const GPT2_Q_OFFSET: usize = 0;
 pub const GPT2_K_OFFSET: usize = GPT2_N_EMBD;
 pub const GPT2_V_OFFSET: usize = 2 * GPT2_N_EMBD;
@@ -52,7 +55,7 @@ pub struct AttentionDims {
 impl AttentionDims {
     pub const fn new(use_full_attention: bool) -> Self {
         Self {
-            embedding_dim: GPT2_N_EMBD as u32,
+            embedding_dim: GPT2_EMBEDDING_DIM,
             qkv_dim: Gpt2Config::attention_qkv_dim(use_full_attention) as u32,
             head_count: GPT2_N_HEAD as u32,
             head_dim: Gpt2Config::head_dim() as u32,

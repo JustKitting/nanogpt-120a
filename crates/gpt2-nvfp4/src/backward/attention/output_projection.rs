@@ -1,8 +1,8 @@
 use cuda_core::DriverError;
 
 use super::types::AttentionCProjBackwardArgs;
-use crate::backward::linear::{RowwiseLinearBackwardPass, run_rowwise_linear_backward};
-use crate::GPT2_N_EMBD;
+use crate::backward::linear::{run_rowwise_linear_backward, RowwiseLinearBackwardPass};
+use crate::GPT2_EMBEDDING_DIM;
 
 pub fn c_proj_backward(args: AttentionCProjBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
     let AttentionCProjBackwardArgs {
@@ -30,8 +30,8 @@ pub fn c_proj_backward(args: AttentionCProjBackwardArgs<'_, '_, '_>) -> Result<(
             dweight: d_attn_c_proj_weight,
             dbias: d_attn_c_proj_bias,
             row_count: saved.row_count,
-            input_dim: GPT2_N_EMBD as u32,
-            output_dim: GPT2_N_EMBD as u32,
+            input_dim: GPT2_EMBEDDING_DIM,
+            output_dim: GPT2_EMBEDDING_DIM,
             sign_seed: seeds.sign,
             scale_seed: seeds.scale,
             e: d_residual_after_attention,

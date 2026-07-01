@@ -5,7 +5,7 @@ use super::final_head::run_final_head;
 use super::types::Gpt2BackwardArgs;
 use crate::backward::{layer_norm_backward, Gpt2LayerNormBackwardArgs};
 use crate::types::Gpt2BackwardGrads;
-use crate::{GPT2_N_EMBD, GPT2_N_LAYER};
+use crate::{GPT2_EMBEDDING_DIM, GPT2_N_LAYER};
 use rust_kernels_cuda::residual::ResidualGradAccumulateArgs;
 
 pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
@@ -51,7 +51,7 @@ pub fn backward(args: Gpt2BackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
                 stream,
                 branch: extra,
                 out: &mut *final_norm.d_normalized,
-                len: saved.row_count * GPT2_N_EMBD as u32,
+                len: saved.row_count * GPT2_EMBEDDING_DIM,
             })?;
     }
     layer_norm_backward(Gpt2LayerNormBackwardArgs {

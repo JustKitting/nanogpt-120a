@@ -14,6 +14,6 @@ pub(super) fn residual_grad_add(
         direct,
         branch,
         out,
-        len: row_count * crate::GPT2_N_EMBD as u32,
+        len: row_count * crate::GPT2_EMBEDDING_DIM,
     })
 }

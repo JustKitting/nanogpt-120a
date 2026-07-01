@@ -18,7 +18,7 @@ pub(super) fn forward<'a, 'scratch>(
         &*hidden.normalized,
         &*hidden.normalized_amax,
         hidden.row_count,
-        crate::GPT2_N_EMBD as u32,
+        crate::GPT2_EMBEDDING_DIM,
     )?;
 
     let input = input_nvfp4.device();
@@ -34,8 +34,8 @@ pub(super) fn forward<'a, 'scratch>(
         pre_activation: args.scratch.pre_activation,
         out: args.scratch.activation,
         token_count: hidden.row_count,
-        input_dim: crate::GPT2_N_EMBD as u32,
-        output_dim: crate::GPT2_MLP as u32,
+        input_dim: crate::GPT2_EMBEDDING_DIM,
+        output_dim: crate::GPT2_MLP_DIM,
     })?;
 
     activation_nvfp4.quantize_row_amax(
@@ -44,7 +44,7 @@ pub(super) fn forward<'a, 'scratch>(
         args.scratch.activation,
         &mut *hidden.normalized_amax,
         hidden.row_count,
-        crate::GPT2_MLP as u32,
+        crate::GPT2_MLP_DIM,
     )?;
 
     let input = activation_nvfp4.device();
@@ -59,8 +59,8 @@ pub(super) fn forward<'a, 'scratch>(
         bias: args.projections.down.bias,
         residual: &mut *hidden.residual,
         token_count: hidden.row_count,
-        input_dim: crate::GPT2_MLP as u32,
-        output_dim: crate::GPT2_N_EMBD as u32,
+        input_dim: crate::GPT2_MLP_DIM,
+        output_dim: crate::GPT2_EMBEDDING_DIM,
     })?;
 
     Ok(hidden)

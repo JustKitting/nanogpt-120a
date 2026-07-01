@@ -5,8 +5,8 @@ use rust_kernels_cuda::linear_backward::{
 use rust_kernels_cuda::loss::CrossEntropyArgs;
 
 use super::args::FinalHeadBackwardArgs;
-use crate::backward::linear::{LinearBackwardCall, run_linear_backward};
-use crate::{GPT2_N_EMBD, GPT2_VOCAB_SIZE};
+use crate::backward::linear::{run_linear_backward, LinearBackwardCall};
+use crate::{GPT2_EMBEDDING_DIM, GPT2_VOCAB_DIM};
 
 pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {
     let FinalHeadBackwardArgs {
@@ -33,7 +33,7 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         dlogits,
         dlogits_row_amax: &mut *scratch.linear.e_h.chunk_amax,
         token_count: row_count,
-        vocab_size: GPT2_VOCAB_SIZE as u32,
+        vocab_size: GPT2_VOCAB_DIM,
     })?;
     run_linear_backward(LinearBackwardCall {
         stream,
@@ -47,8 +47,8 @@ pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverErr
         dweight: d_lm_head_weight,
         dbias: None,
         token_count: row_count,
-        input_dim: GPT2_N_EMBD as u32,
-        output_dim: GPT2_VOCAB_SIZE as u32,
+        input_dim: GPT2_EMBEDDING_DIM,
+        output_dim: GPT2_VOCAB_DIM,
         sign_seed: seeds.sign,
         scale_seed: seeds.scale,
         precomputed_e_amax_chunks: Some(row_count),
