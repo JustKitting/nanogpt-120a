@@ -48,13 +48,8 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
     let row_amax = row_amax_dev.to_host_vec(&stream)?;
     let expected = expected_loss_and_grad(&logits, &targets);
 
-    for (actual, expected) in losses.iter().zip(expected.0.iter()) {
-        common::assert_close(*actual, *expected, TOLERANCE);
-    }
-
-    for (actual, expected) in dlogits.iter().zip(expected.1.iter()) {
-        common::assert_close(*actual, *expected, TOLERANCE);
-    }
+    common::assert_slice_close(&losses, &expected.0, TOLERANCE);
+    common::assert_slice_close(&dlogits, &expected.1, TOLERANCE);
 
     for (row, actual_amax) in row_amax.iter().enumerate() {
         let base = row * VOCAB_SIZE;

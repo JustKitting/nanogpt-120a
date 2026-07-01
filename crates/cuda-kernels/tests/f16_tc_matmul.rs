@@ -35,9 +35,7 @@ fn batched_f16_tc_matmul_matches_power_of_two_reference() -> Result<(), Box<dyn 
         k: K as u32,
     })?;
 
-    for value in out.to_host_vec(&stream)? {
-        common::assert_close(value, 0.5, TOLERANCE);
-    }
+    common::assert_all_close(&out.to_host_vec(&stream)?, 0.5, TOLERANCE);
     Ok(())
 }
 

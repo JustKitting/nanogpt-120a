@@ -40,9 +40,7 @@ fn cta_tiled_f16_tc_matmul_add_matches_reference() -> Result<(), Box<dyn Error>>
         matmul_scale: 3.0,
     })?;
 
-    for value in out.to_host_vec(&stream)? {
-        common::assert_close(value, 4.0, TOLERANCE);
-    }
+    common::assert_all_close(&out.to_host_vec(&stream)?, 4.0, TOLERANCE);
     Ok(())
 }
 
@@ -70,9 +68,7 @@ fn cta_tiled_f16_tc_rhs_transposed_base_matches_reference() -> Result<(), Box<dy
         matmul_scale: 3.0,
     })?;
 
-    for value in out.to_host_vec(&stream)? {
-        common::assert_close(value, 4.0, TOLERANCE);
-    }
+    common::assert_all_close(&out.to_host_vec(&stream)?, 4.0, TOLERANCE);
     Ok(())
 }
 

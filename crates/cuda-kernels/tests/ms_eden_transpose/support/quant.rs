@@ -9,22 +9,14 @@ use rust_kernels_cuda::nvfp4_tc_matmul::{
 
 use super::{COLS, ROWS, SCALE_SEED, SIGN_SEED};
 
+mod assert;
+
 pub(in super::super) struct QuantScratch {
     pub(in super::super) bytes: DeviceBuffer<u8>,
     pub(in super::super) scales: DeviceBuffer<u8>,
     pub(in super::super) global_scales: DeviceBuffer<f32>,
     pub(in super::super) chunk_amax: DeviceBuffer<f32>,
     pub(in super::super) global_scale: DeviceBuffer<f32>,
-}
-
-macro_rules! assert_buffer_fields_eq {
-    ($stream:expr, $actual:expr, $expected:expr, [$($field:ident),+ $(,)?]) => {{
-        $(assert_eq!(
-            $actual.$field.to_host_vec($stream)?,
-            $expected.$field.to_host_vec($stream)?
-        );)+
-        Ok(())
-    }};
 }
 
 impl QuantScratch {
@@ -103,40 +95,5 @@ impl QuantScratch {
             sign_seed: SIGN_SEED,
             scale_seed: SCALE_SEED,
         }
-    }
-
-    pub(in super::super) fn assert_ms_eden_eq(
-        &self,
-        stream: &CudaStream,
-        expected: &Self,
-    ) -> Result<(), DriverError> {
-        assert_buffer_fields_eq!(
-            stream,
-            self,
-            expected,
-            [bytes, scales, global_scales, chunk_amax]
-        )
-    }
-
-    pub(in super::super) fn assert_quartet_eq(
-        &self,
-        stream: &CudaStream,
-        expected: &Self,
-    ) -> Result<(), DriverError> {
-        self.assert_ms_eden_eq(stream, expected)?;
-        assert_buffer_fields_eq!(stream, self, expected, [global_scale])
-    }
-
-    pub(in super::super) fn assert_no_chunk_quartet_eq(
-        &self,
-        stream: &CudaStream,
-        expected: &Self,
-    ) -> Result<(), DriverError> {
-        assert_buffer_fields_eq!(
-            stream,
-            self,
-            expected,
-            [bytes, scales, global_scales, global_scale]
-        )
     }
 }
