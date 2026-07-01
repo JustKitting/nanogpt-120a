@@ -1,12 +1,12 @@
 use cuda_core::CudaStream;
 
-use crate::AppResult;
 use crate::upload::UploadedModel;
+use crate::AppResult;
 
 use super::types::TrainingDiagnostics;
 use super::update::{
-    PendingTensorUpdateDiagnostics, changed_bytes, collect_update_snapshots,
-    finish_update_snapshots,
+    changed_bytes, collect_update_snapshots, finish_update_snapshots,
+    PendingTensorUpdateDiagnostics,
 };
 use super::util::{f32_buffer_stats, hash_bytes};
 use crate::training::grads::BackwardBuffers;
@@ -71,25 +71,20 @@ impl PendingTrainingDiagnostics {
         self.diagnostics.token_embedding_changed_bytes =
             changed_bytes(&self.token_embedding_bytes_before, &after);
         self.diagnostics.token_embedding_hash_after = hash_bytes(&after);
-        self.diagnostics.updates = finish_update_snapshots(stream, uploaded, self.updates)?;
-        self.diagnostics.positive_update_dot_count = self
-            .diagnostics
-            .updates
+        let updates = finish_update_snapshots(stream, uploaded, self.updates)?;
+        self.diagnostics.positive_update_dot_count = updates
             .iter()
             .filter(|update| update.delta_grad_dot > 0.0)
             .count();
-        self.diagnostics.zero_grad_changed_count = self
-            .diagnostics
-            .updates
+        self.diagnostics.zero_grad_changed_count = updates
             .iter()
             .filter(|update| update.grad_nonzero == 0 && update.changed_bytes > 0)
             .count();
-        self.diagnostics.max_update_to_weight_rms = self
-            .diagnostics
-            .updates
+        self.diagnostics.max_update_to_weight_rms = updates
             .iter()
             .map(|update| update.update_to_weight_rms)
             .fold(0.0, f32::max);
+        self.diagnostics.updates = updates;
         Ok(self.diagnostics)
     }
 }
