@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 
 use super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use super::types::CausalAttentionTcArgs;
-use crate::attention::{AttentionModule, CausalAttentionParams};
+use crate::attention::AttentionModule;
 use crate::f16_tc_matmul::F16ConvertArgs;
 use crate::kda_launch::{self, KDA_HEAD_DIM};
 use crate::launch::{grid_x_config, linear_config};
@@ -16,15 +16,7 @@ impl AttentionModule {
             args.head_dim, KDA_HEAD_DIM,
             "KDA path currently expects head_dim=64"
         );
-        let params = CausalAttentionParams::new(
-            args.row_count,
-            args.seq_len,
-            args.batch_size,
-            args.embedding_dim,
-            args.qkv_dim,
-            args.head_count,
-            args.head_dim,
-        );
+        let params = args.params();
         let dims = kda_launch::LaunchDims::new(
             args.batch_size,
             args.head_count,

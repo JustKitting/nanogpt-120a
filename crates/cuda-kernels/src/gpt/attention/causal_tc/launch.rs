@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 
 use super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use super::types::CausalAttentionTcArgs;
-use crate::attention::{AttentionModule, CausalAttentionParams};
+use crate::attention::AttentionModule;
 use crate::f16_tc_matmul::{F16TcMatmulF32Args, F16TcMatmulF32RhsArgs};
 use crate::launch::{launch_config, linear_config};
 
@@ -11,15 +11,7 @@ impl AttentionModule {
         &self,
         args: CausalAttentionTcArgs<'_, '_, '_>,
     ) -> Result<(), DriverError> {
-        let params = CausalAttentionParams::new(
-            args.row_count,
-            args.seq_len,
-            args.batch_size,
-            args.embedding_dim,
-            args.qkv_dim,
-            args.head_count,
-            args.head_dim,
-        );
+        let params = args.params();
         let batch_head = args.batch_size * args.head_count;
         let scratch = args.scratch;
 

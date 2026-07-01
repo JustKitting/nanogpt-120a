@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 
 use super::gather::TC_BACKWARD_THREADS_PER_BLOCK;
 use super::types::{CausalAttentionBackwardTcArgs, CausalAttentionBackwardTcScratch};
-use crate::attention::{AttentionModule, CausalAttentionParams};
+use crate::attention::AttentionModule;
 use crate::kda_launch::{self, KDA_HEAD_DIM};
 use crate::launch::{grid_x_config, linear_config};
 
@@ -15,6 +15,7 @@ impl AttentionModule {
             args.head_dim, KDA_HEAD_DIM,
             "KDA path currently expects head_dim=64"
         );
+        let params = args.params();
         let CausalAttentionBackwardTcArgs {
             stream,
             tc_module,
@@ -25,17 +26,14 @@ impl AttentionModule {
             softmax_d: beta,
             d_qkv,
             scratch,
-            row_count,
+            row_count: _,
             seq_len,
             batch_size,
-            embedding_dim,
-            qkv_dim,
+            embedding_dim: _,
+            qkv_dim: _,
             head_count,
             head_dim,
         } = args;
-        let params = CausalAttentionParams::new(
-            row_count, seq_len, batch_size, embedding_dim, qkv_dim, head_count, head_dim,
-        );
         let dims = kda_launch::LaunchDims::new(batch_size, head_count, seq_len, head_dim, params.chunk_size);
         let mm = kda_launch::MatmulRunner::new(stream, tc_module, dims.chunk_batch);
         let CausalAttentionBackwardTcScratch {

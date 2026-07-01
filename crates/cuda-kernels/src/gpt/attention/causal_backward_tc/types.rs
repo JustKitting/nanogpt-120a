@@ -1,5 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer};
 
+use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::F16TcMatmulModule;
 
 pub struct CausalAttentionBackwardTcScratch<'a> {
@@ -42,6 +43,12 @@ pub struct CausalAttentionBackwardTcArgs<'a, 'scratch, 'out> {
     pub qkv_dim: u32,
     pub head_count: u32,
     pub head_dim: u32,
+}
+
+impl CausalAttentionBackwardTcArgs<'_, '_, '_> {
+    pub(super) fn params(&self) -> CausalAttentionParams {
+        CausalAttentionParams::new(self.row_count, self.seq_len, self.batch_size, self.embedding_dim, self.qkv_dim, self.head_count, self.head_dim)
+    }
 }
 
 impl<'a> CausalAttentionBackwardTcScratch<'a> {

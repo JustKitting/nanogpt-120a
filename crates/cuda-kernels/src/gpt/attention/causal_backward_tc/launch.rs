@@ -6,7 +6,7 @@ use super::launch_grads::run_grad_matmuls;
 use super::launch_scores::run_pair_scores;
 use super::matmul::AttentionTcMatmulContext;
 use super::types::CausalAttentionBackwardTcArgs;
-use crate::attention::{AttentionModule, CausalAttentionParams};
+use crate::attention::AttentionModule;
 use crate::launch::linear_config;
 
 impl AttentionModule {
@@ -14,6 +14,7 @@ impl AttentionModule {
         &self,
         args: CausalAttentionBackwardTcArgs<'_, '_, '_>,
     ) -> Result<(), DriverError> {
+        let params = args.params();
         let CausalAttentionBackwardTcArgs {
             stream,
             tc_module,
@@ -24,23 +25,14 @@ impl AttentionModule {
             softmax_d,
             d_qkv,
             scratch,
-            row_count,
+            row_count: _,
             seq_len,
             batch_size,
-            embedding_dim,
-            qkv_dim,
+            embedding_dim: _,
+            qkv_dim: _,
             head_count,
             head_dim,
         } = args;
-        let params = CausalAttentionParams::new(
-            row_count,
-            seq_len,
-            batch_size,
-            embedding_dim,
-            qkv_dim,
-            head_count,
-            head_dim,
-        );
         let batch_head = batch_size * head_count;
         let tc_ctx = AttentionTcMatmulContext {
             stream,

@@ -19,6 +19,12 @@ pub struct CausalAttentionArgs<'a, 'out> {
     pub head_dim: u32,
 }
 
+impl CausalAttentionArgs<'_, '_> {
+    fn params(&self) -> CausalAttentionParams {
+        CausalAttentionParams::new(self.row_count, self.seq_len, self.batch_size, self.embedding_dim, self.qkv_dim, self.head_count, self.head_dim)
+    }
+}
+
 impl AttentionModule {
     pub fn causal_attention(&self, args: CausalAttentionArgs<'_, '_>) -> Result<(), DriverError> {
         self.causal_attention.causal_attention_kernel(
@@ -30,15 +36,7 @@ impl AttentionModule {
             args.qkv,
             args.out,
             args.log_sum_exp,
-            CausalAttentionParams::new(
-                args.row_count,
-                args.seq_len,
-                args.batch_size,
-                args.embedding_dim,
-                args.qkv_dim,
-                args.head_count,
-                args.head_dim,
-            ),
+            args.params(),
         )
     }
 }
