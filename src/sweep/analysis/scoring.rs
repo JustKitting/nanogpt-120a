@@ -1,10 +1,12 @@
-use super::super::features::{FEATURE_COUNT, regression_features};
+use super::super::features::{regression_features, FEATURE_COUNT};
 use super::super::{candidate::Candidate, config::SweepConfig};
-use super::{
-    BinaryPrior, ResponseModel, SweepAnalysis,
-    regression::Prediction,
-    stats::{EPS, normal_cdf, normal_pdf},
-};
+use super::{regression::Prediction, ResponseModel, SweepAnalysis};
+
+mod acquisition;
+mod prior;
+
+use acquisition::improvement_acquisition;
+use prior::survival_prior;
 
 #[derive(Clone, Debug)]
 pub struct CandidateScore {
@@ -71,35 +73,4 @@ fn best_prediction<'a>(
             .find(|model| model.name == *name)
             .map(|model| (model, model.model.predict(features)))
     })
-}
-
-fn survival_prior(
-    base: Option<BinaryPrior>,
-    prediction: Option<(&ResponseModel, Prediction)>,
-) -> f64 {
-    let Some(base) = base else {
-        return 1.0;
-    };
-    let base_rate = base.posterior_mean.clamp(0.01, 1.0);
-    let Some((model, prediction)) = prediction else {
-        return base_rate;
-    };
-
-    let predicted = prediction.value.clamp(0.01, 1.0);
-    let sample_confidence = (model.model.n as f64 / (model.model.n as f64 + 8.0)).clamp(0.0, 1.0);
-    let uncertainty_confidence = 1.0 / (1.0 + prediction.uncertainty.max(0.0));
-    let confidence = (sample_confidence * uncertainty_confidence).clamp(0.0, 1.0);
-    (base_rate * (1.0 - confidence) + predicted * confidence).clamp(0.01, 1.0)
-}
-
-fn improvement_acquisition(prediction: Option<(&ResponseModel, Prediction)>) -> (f64, f64) {
-    let Some((model, prediction)) = prediction else {
-        return (0.0, 0.0);
-    };
-    let sigma = prediction.uncertainty.max(EPS);
-    let gap = prediction.standard_score - model.model.best_standard_score;
-    let z = gap / sigma;
-    let probability = normal_cdf(z);
-    let expected = (gap * probability + sigma * normal_pdf(z)).max(0.0);
-    (probability, expected)
 }
