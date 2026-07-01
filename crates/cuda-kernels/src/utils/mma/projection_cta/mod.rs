@@ -10,6 +10,11 @@ pub(crate) type ProjectionCtaBPacks = cuda_device::SharedArray<u32, { tile::NVFP
 pub(crate) type ProjectionCtaAScales = cuda_device::SharedArray<u32, { tile::NVFP4_PROJECTION_CTA_A_SCALES }>;
 pub(crate) type ProjectionCtaBScales = cuda_device::SharedArray<u32, { tile::NVFP4_PROJECTION_CTA_B_SCALES }>;
 
+#[derive(Clone, Copy)]
+pub(crate) struct ProjectionCtaSources<'a> { pub(crate) input_bytes: &'a [u8], pub(crate) input_scales: &'a [u8], pub(crate) weight_bytes: &'a [u8], pub(crate) weight_scales: &'a [u8] }
+pub(crate) struct ProjectionCtaTiles<'a> { pub(crate) a_packs: &'a mut ProjectionCtaAPacks, pub(crate) b_packs: &'a mut ProjectionCtaBPacks, pub(crate) a_scales: &'a mut ProjectionCtaAScales, pub(crate) b_scales: &'a mut ProjectionCtaBScales }
+pub(crate) struct ProjectionCtaRowPairTiles<'a> { pub(crate) a0_packs: &'a mut ProjectionCtaAPacks, pub(crate) a1_packs: &'a mut ProjectionCtaAPacks, pub(crate) b_packs: &'a mut ProjectionCtaBPacks, pub(crate) a0_scales: &'a mut ProjectionCtaAScales, pub(crate) a1_scales: &'a mut ProjectionCtaAScales, pub(crate) b_scales: &'a mut ProjectionCtaBScales }
+
 macro_rules! with_projection_cta_tiles {
     ($body:ident; $($arg:expr),+ $(,)?) => {{
         static mut A_PACKS: $crate::mma::ProjectionCtaAPacks = cuda_device::SharedArray::UNINIT;

@@ -28,17 +28,10 @@ macro_rules! nobias_body_at_fn {
             b_scales: &mut ProjectionCtaBScales,
             tile: Nvfp4ProjectionCtaTile,
         ) {
+            let sources = crate::mma::projection_cta::ProjectionCtaSources { input_bytes, input_scales, weight_bytes, weight_scales };
+            let mut tiles = crate::mma::projection_cta::ProjectionCtaTiles { a_packs, b_packs, a_scales, b_scales };
             let acc = $accumulator(
-                input_bytes,
-                input_scales,
-                weight_bytes,
-                weight_scales,
-                tile,
-                &params,
-                a_packs,
-                b_packs,
-                a_scales,
-                b_scales,
+                sources, tile, &params, &mut tiles,
             );
 
             $store(acc, input_global_scales, out, tile, &params);
@@ -109,20 +102,10 @@ pub fn nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair(
     tile0: Nvfp4ProjectionCtaTile,
     tile1: Nvfp4ProjectionCtaTile,
 ) {
+    let sources = crate::mma::projection_cta::ProjectionCtaSources { input_bytes, input_scales, weight_bytes, weight_scales };
+    let mut tiles = crate::mma::projection_cta::ProjectionCtaRowPairTiles { a0_packs: a_packs, a1_packs, b_packs, a0_scales: a_scales, a1_scales, b_scales };
     let (acc0, acc1) = projection_accumulator_aligned_row_pair(
-        input_bytes,
-        input_scales,
-        weight_bytes,
-        weight_scales,
-        tile0,
-        tile1,
-        &params,
-        a_packs,
-        a1_packs,
-        b_packs,
-        a_scales,
-        a1_scales,
-        b_scales,
+        sources, tile0, tile1, &params, &mut tiles,
     );
 
     store_accumulator_aligned(acc0, input_global_scales, out, tile0, &params);
