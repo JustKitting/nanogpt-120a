@@ -97,26 +97,22 @@ fn linear_backward_computes_dinput_and_dweight_from_quartet_operands() -> Result
 
     module.backward(LinearBackwardArgs {
         stream: &stream,
-        e_h: Nvfp4RowwiseDeviceTensor {
-            bytes: &e_h_bytes_dev,
-            scales: &e_h_scales_dev,
-            global_scales: &e_h_global_scales_dev,
-        },
-        weight_t_h: Nvfp4FourSixMmaWeightTensor {
-            bytes: &weight_t_h_bytes_dev,
-            scales: &weight_t_h_scales_dev,
-            global_scale: &weight_t_h_global_scale_dev,
-        },
-        e_t_h: Nvfp4RowwiseDeviceTensor {
-            bytes: &e_t_h_bytes_dev,
-            scales: &e_t_h_scales_dev,
-            global_scales: &e_t_h_global_scales_dev,
-        },
-        input_t_h: Nvfp4FourSixMmaWeightTensor {
-            bytes: &input_t_h_bytes_dev,
-            scales: &input_t_h_scales_dev,
-            global_scale: &input_t_h_global_scale_dev,
-        },
+        e_h: Nvfp4RowwiseDeviceTensor::new(&e_h_bytes_dev, &e_h_scales_dev, &e_h_global_scales_dev),
+        weight_t_h: Nvfp4FourSixMmaWeightTensor::new(
+            &weight_t_h_bytes_dev,
+            &weight_t_h_scales_dev,
+            &weight_t_h_global_scale_dev,
+        ),
+        e_t_h: Nvfp4RowwiseDeviceTensor::new(
+            &e_t_h_bytes_dev,
+            &e_t_h_scales_dev,
+            &e_t_h_global_scales_dev,
+        ),
+        input_t_h: Nvfp4FourSixMmaWeightTensor::new(
+            &input_t_h_bytes_dev,
+            &input_t_h_scales_dev,
+            &input_t_h_global_scale_dev,
+        ),
         dinput: &mut dinput_dev,
         dweight: &mut dweight_dev,
         dbias: None,

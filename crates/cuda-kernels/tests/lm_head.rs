@@ -46,16 +46,16 @@ fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error
 
     module.logits(LmHeadArgs {
         stream: &stream,
-        input: Nvfp4RowwiseDeviceTensor {
-            bytes: &input_bytes_dev,
-            scales: &input_scales_dev,
-            global_scales: &input_global_scales_dev,
-        },
-        weight: Nvfp4FourSixMmaWeightTensor {
-            bytes: &weight_bytes_dev,
-            scales: &weight_scales_dev,
-            global_scale: &weight_global_scale_dev,
-        },
+        input: Nvfp4RowwiseDeviceTensor::new(
+            &input_bytes_dev,
+            &input_scales_dev,
+            &input_global_scales_dev,
+        ),
+        weight: Nvfp4FourSixMmaWeightTensor::new(
+            &weight_bytes_dev,
+            &weight_scales_dev,
+            &weight_global_scale_dev,
+        ),
         logits: &mut logits_dev,
         token_count: TOKEN_COUNT as u32,
         input_dim: INPUT_DIM as u32,

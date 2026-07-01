@@ -43,11 +43,11 @@ fn layer_norm_backward_input_matches_reference() -> Result<(), Box<dyn Error>> {
         d_normalized: &grad_dev,
         mean: &mean_dev,
         inv_std: &inv_std_dev,
-        weight: Nvfp4DeviceTensor {
-            bytes: &weight_bytes_dev,
-            scales: &weight_scales_dev,
-            global_scale: &weight_global_scale_dev,
-        },
+        weight: Nvfp4DeviceTensor::new(
+            &weight_bytes_dev,
+            &weight_scales_dev,
+            &weight_global_scale_dev,
+        ),
         d_residual: &mut dx_dev,
         row_count: ROWS as u32,
         embedding_dim: COLS as u32,

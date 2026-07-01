@@ -58,11 +58,11 @@ impl ScratchBuffers {
     }
 
     pub fn a_tensor(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        tensor(&self.a_bytes, &self.a_scales, &self.a_globals)
+        Nvfp4RowwiseDeviceTensor::new(&self.a_bytes, &self.a_scales, &self.a_globals)
     }
 
     pub fn b_tensor(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        tensor(&self.b_bytes, &self.b_scales, &self.b_globals)
+        Nvfp4RowwiseDeviceTensor::new(&self.b_bytes, &self.b_scales, &self.b_globals)
     }
 }
 
@@ -78,18 +78,6 @@ fn operand<'a>(
         global_scales: globals,
         chunk_amax: amax,
         global_scale: 1.0,
-    }
-}
-
-fn tensor<'a>(
-    bytes: &'a DeviceBuffer<u8>,
-    scales: &'a DeviceBuffer<u8>,
-    globals: &'a DeviceBuffer<f32>,
-) -> Nvfp4RowwiseDeviceTensor<'a> {
-    Nvfp4RowwiseDeviceTensor {
-        bytes,
-        scales,
-        global_scales: globals,
     }
 }
 

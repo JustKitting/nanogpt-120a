@@ -46,21 +46,9 @@ fn nextlat_projection_gelu_and_residual_match_reference() -> Result<(), Box<dyn 
 
     module.projection(NextLatProjectionArgs {
         stream: &stream,
-        input: Nvfp4RowwiseDeviceTensor {
-            bytes: &input_bytes,
-            scales: &input_scales,
-            global_scales: &input_globals,
-        },
-        weight: Nvfp4FourSixMmaWeightTensor {
-            bytes: &weight_bytes,
-            scales: &weight_scales_dev,
-            global_scale: &global_dev,
-        },
-        bias: Nvfp4DeviceTensor {
-            bytes: &bias_bytes,
-            scales: &bias_scales_dev,
-            global_scale: &global_dev,
-        },
+        input: Nvfp4RowwiseDeviceTensor::new(&input_bytes, &input_scales, &input_globals),
+        weight: Nvfp4FourSixMmaWeightTensor::new(&weight_bytes, &weight_scales_dev, &global_dev),
+        bias: Nvfp4DeviceTensor::new(&bias_bytes, &bias_scales_dev, &global_dev),
         out: &mut projection,
         token_count: TOKEN_COUNT as u32,
         input_dim: INPUT_DIM as u32,

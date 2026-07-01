@@ -31,11 +31,7 @@ impl<'a> RowwiseNvfp4Scratch<'a> {
     }
 
     pub fn device(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        Nvfp4RowwiseDeviceTensor {
-            bytes: &*self.bytes,
-            scales: &*self.scales,
-            global_scales: &*self.global_scales,
-        }
+        Nvfp4RowwiseDeviceTensor::new(&*self.bytes, &*self.scales, &*self.global_scales)
     }
 
     pub fn reborrow(&mut self) -> RowwiseNvfp4Scratch<'_> {

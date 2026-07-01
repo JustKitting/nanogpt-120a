@@ -61,10 +61,6 @@ impl RowwiseTapeBuffers {
     }
 
     pub fn saved(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        Nvfp4RowwiseDeviceTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scales: &self.global_scales,
-        }
+        Nvfp4RowwiseDeviceTensor::new(&self.bytes, &self.scales, &self.global_scales)
     }
 }

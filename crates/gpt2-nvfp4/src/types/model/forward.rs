@@ -35,11 +35,11 @@ pub(super) fn forward<'a>(
         mut tape,
     } = args;
 
-    let lm_head_weight = Nvfp4FourSixMmaWeightTensor {
-        bytes: embeddings.token_embedding.bytes,
-        scales: embeddings.token_embedding.scales,
-        global_scale: embeddings.token_embedding.global_scale,
-    };
+    let lm_head_weight = Nvfp4FourSixMmaWeightTensor::new(
+        embeddings.token_embedding.bytes,
+        embeddings.token_embedding.scales,
+        embeddings.token_embedding.global_scale,
+    );
 
     let mut hidden = weights.embeddings.forward(embeddings)?;
 

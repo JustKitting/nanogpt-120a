@@ -15,11 +15,8 @@ pub fn saved_block<'a>(
     dummy: &'a DeviceBuffer<f32>,
     dummy_u16: &'a DeviceBuffer<u16>,
 ) -> BlockForwardSaved<'a> {
-    let rowwise = Nvfp4RowwiseDeviceTensor {
-        bytes: qkv_input_bytes,
-        scales: qkv_input_scales,
-        global_scales: qkv_input_globals,
-    };
+    let rowwise =
+        Nvfp4RowwiseDeviceTensor::new(qkv_input_bytes, qkv_input_scales, qkv_input_globals);
     let layer_norm = LayerNormSaved {
         row_count: GPT2_TOKEN_ROWS as u32,
         residual: dummy_u16,

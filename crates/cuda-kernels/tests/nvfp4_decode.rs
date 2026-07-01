@@ -28,11 +28,7 @@ fn nvfp4_decode_transpose_writes_fp32_transpose() -> Result<(), Box<dyn Error>> 
 
     module.decode_transpose_f32(Nvfp4DecodeTransposeArgs {
         stream: &stream,
-        input: Nvfp4DeviceTensor {
-            bytes: &bytes,
-            scales: &scales,
-            global_scale: &scalar_global_scale,
-        },
+        input: Nvfp4DeviceTensor::new(&bytes, &scales, &scalar_global_scale),
         output: &mut scalar_out,
         rows: ROWS as u32,
         cols: COLS as u32,
@@ -40,11 +36,7 @@ fn nvfp4_decode_transpose_writes_fp32_transpose() -> Result<(), Box<dyn Error>> 
 
     module.decode_rowwise_transpose_f32(Nvfp4RowwiseDecodeTransposeArgs {
         stream: &stream,
-        input: Nvfp4RowwiseDeviceTensor {
-            bytes: &bytes,
-            scales: &scales,
-            global_scales: &globals,
-        },
+        input: Nvfp4RowwiseDeviceTensor::new(&bytes, &scales, &globals),
         output: &mut rowwise_out,
         rows: ROWS as u32,
         cols: COLS as u32,

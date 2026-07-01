@@ -48,18 +48,14 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
         &dummy_u16,
     );
     let projections = AttentionProjectionTensors {
-        qkv_weight: Nvfp4FourSixMmaWeightTensor {
-            bytes: &qkv_weight_bytes,
-            scales: &qkv_weight_scales,
-            global_scale: &global_scale,
-        },
-        qkv_bias: nvfp4_device(&zero_bytes, &one_scales, &global_scale),
-        c_proj_weight: Nvfp4FourSixMmaWeightTensor {
-            bytes: &zero_bytes,
-            scales: &one_scales,
-            global_scale: &global_scale,
-        },
-        c_proj_bias: nvfp4_device(&zero_bytes, &one_scales, &global_scale),
+        qkv_weight: Nvfp4FourSixMmaWeightTensor::new(
+            &qkv_weight_bytes,
+            &qkv_weight_scales,
+            &global_scale,
+        ),
+        qkv_bias: Nvfp4DeviceTensor::new(&zero_bytes, &one_scales, &global_scale),
+        c_proj_weight: Nvfp4FourSixMmaWeightTensor::new(&zero_bytes, &one_scales, &global_scale),
+        c_proj_bias: Nvfp4DeviceTensor::new(&zero_bytes, &one_scales, &global_scale),
     };
     let mut scratch = scratch::QkvBackwardScratch::new(&stream)?;
     let mut d_ln_1_normalized = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
@@ -89,16 +85,4 @@ fn qkv_projection_backward_runs_linear_ms_eden_path() -> Result<(), Box<dyn Erro
     assert_nonzero_finite(&d_attn_qkv_weight.to_host_vec(&stream)?);
     assert_nonzero_finite(&d_attn_qkv_bias.to_host_vec(&stream)?);
     Ok(())
-}
-
-fn nvfp4_device<'a>(
-    bytes: &'a DeviceBuffer<u8>,
-    scales: &'a DeviceBuffer<u8>,
-    global_scale: &'a DeviceBuffer<f32>,
-) -> Nvfp4DeviceTensor<'a> {
-    Nvfp4DeviceTensor {
-        bytes,
-        scales,
-        global_scale,
-    }
 }

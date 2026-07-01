@@ -9,11 +9,39 @@ pub struct Nvfp4DeviceTensor<'a> {
     pub global_scale: &'a DeviceBuffer<f32>,
 }
 
+impl<'a> Nvfp4DeviceTensor<'a> {
+    pub fn new(
+        bytes: &'a DeviceBuffer<u8>,
+        scales: &'a DeviceBuffer<u8>,
+        global_scale: &'a DeviceBuffer<f32>,
+    ) -> Self {
+        Self {
+            bytes,
+            scales,
+            global_scale,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct Nvfp4RowwiseDeviceTensor<'a> {
     pub bytes: &'a DeviceBuffer<u8>,
     pub scales: &'a DeviceBuffer<u8>,
     pub global_scales: &'a DeviceBuffer<f32>,
+}
+
+impl<'a> Nvfp4RowwiseDeviceTensor<'a> {
+    pub fn new(
+        bytes: &'a DeviceBuffer<u8>,
+        scales: &'a DeviceBuffer<u8>,
+        global_scales: &'a DeviceBuffer<f32>,
+    ) -> Self {
+        Self {
+            bytes,
+            scales,
+            global_scales,
+        }
+    }
 }
 
 #[inline(always)]

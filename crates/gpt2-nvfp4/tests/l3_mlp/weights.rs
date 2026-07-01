@@ -42,31 +42,31 @@ impl WeightBuffers {
 
     pub fn up_tensors(&self) -> MlpUpTensors<'_> {
         MlpUpTensors {
-            weight: Nvfp4FourSixMmaWeightTensor {
-                bytes: &self.up_weight_bytes,
-                scales: &self.up_weight_scales,
-                global_scale: &self.global_scale,
-            },
-            bias: Nvfp4DeviceTensor {
-                bytes: &self.up_bias_bytes,
-                scales: &self.up_bias_scales,
-                global_scale: &self.global_scale,
-            },
+            weight: Nvfp4FourSixMmaWeightTensor::new(
+                &self.up_weight_bytes,
+                &self.up_weight_scales,
+                &self.global_scale,
+            ),
+            bias: Nvfp4DeviceTensor::new(
+                &self.up_bias_bytes,
+                &self.up_bias_scales,
+                &self.global_scale,
+            ),
         }
     }
 
     pub fn down_tensors(&self) -> MlpDownTensors<'_> {
         MlpDownTensors {
-            weight: Nvfp4FourSixMmaWeightTensor {
-                bytes: &self.down_weight_bytes,
-                scales: &self.down_weight_scales,
-                global_scale: &self.global_scale,
-            },
-            bias: Nvfp4DeviceTensor {
-                bytes: &self.down_bias_bytes,
-                scales: &self.down_bias_scales,
-                global_scale: &self.global_scale,
-            },
+            weight: Nvfp4FourSixMmaWeightTensor::new(
+                &self.down_weight_bytes,
+                &self.down_weight_scales,
+                &self.global_scale,
+            ),
+            bias: Nvfp4DeviceTensor::new(
+                &self.down_bias_bytes,
+                &self.down_bias_scales,
+                &self.global_scale,
+            ),
         }
     }
 }

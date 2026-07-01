@@ -11,11 +11,7 @@ pub(super) fn decode_master(
     let mut master = DeviceBuffer::zeroed(stream, tensor.len)?;
     decode.decode_transpose_f32(Nvfp4DecodeTransposeArgs {
         stream,
-        input: Nvfp4DeviceTensor {
-            bytes: &tensor.bytes,
-            scales: &tensor.scales,
-            global_scale: &tensor.global_scale,
-        },
+        input: Nvfp4DeviceTensor::new(&tensor.bytes, &tensor.scales, &tensor.global_scale),
         output: &mut master,
         rows: 1,
         cols: tensor.len as u32,

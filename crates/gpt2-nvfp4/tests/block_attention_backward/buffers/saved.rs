@@ -36,11 +36,11 @@ impl SavedBuffers {
     }
 
     pub fn block(&self) -> BlockForwardSaved<'_> {
-        let rowwise = Nvfp4RowwiseDeviceTensor {
-            bytes: &self.hidden_bytes,
-            scales: &self.hidden_scales,
-            global_scales: &self.hidden_globals,
-        };
+        let rowwise = Nvfp4RowwiseDeviceTensor::new(
+            &self.hidden_bytes,
+            &self.hidden_scales,
+            &self.hidden_globals,
+        );
         let ln = LayerNormSaved {
             row_count: GPT2_TOKEN_ROWS as u32,
             residual: &self.hidden_f16,

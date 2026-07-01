@@ -110,11 +110,7 @@ impl SourceScratch {
     }
 
     pub(super) fn tensor(&self) -> Nvfp4DeviceTensor<'_> {
-        Nvfp4DeviceTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scale: &self.global_scale,
-        }
+        Nvfp4DeviceTensor::new(&self.bytes, &self.scales, &self.global_scale)
     }
 }
 
@@ -142,11 +138,7 @@ impl RowwiseSourceScratch {
     }
 
     pub(super) fn tensor(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        Nvfp4RowwiseDeviceTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scales: &self.global_scales,
-        }
+        Nvfp4RowwiseDeviceTensor::new(&self.bytes, &self.scales, &self.global_scales)
     }
 }
 

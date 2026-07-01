@@ -29,11 +29,11 @@ pub(super) struct LinearBackwardCall<'a, 'scratch, 'out> {
 pub(super) fn nvfp4_weight_t(
     weight: Nvfp4FourSixMmaWeightTensor<'_>,
 ) -> LinearBackwardWeightTranspose<'_> {
-    LinearBackwardWeightTranspose::Nvfp4(Nvfp4DeviceTensor {
-        bytes: weight.bytes,
-        scales: weight.scales,
-        global_scale: weight.global_scale,
-    })
+    LinearBackwardWeightTranspose::Nvfp4(Nvfp4DeviceTensor::new(
+        weight.bytes,
+        weight.scales,
+        weight.global_scale,
+    ))
 }
 
 pub(super) fn run_linear_backward(call: LinearBackwardCall<'_, '_, '_>) -> Result<(), DriverError> {

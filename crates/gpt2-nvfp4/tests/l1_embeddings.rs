@@ -45,11 +45,11 @@ fn embedding_forward_decodes_token_embeddings_to_residual_only() -> Result<(), B
     module.token_embedding(EmbeddingArgs {
         stream: &stream,
         tokens: &tokens_dev,
-        token_embedding: Nvfp4DeviceTensor {
-            bytes: &token_embedding_bytes_dev,
-            scales: &token_embedding_scales_dev,
-            global_scale: &token_embedding_global_scale_dev,
-        },
+        token_embedding: Nvfp4DeviceTensor::new(
+            &token_embedding_bytes_dev,
+            &token_embedding_scales_dev,
+            &token_embedding_global_scale_dev,
+        ),
         residual: &mut residual_dev,
         hidden_len: HiddenState::LEN as u32,
         embedding_dim: GPT2_N_EMBD as u32,

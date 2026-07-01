@@ -66,11 +66,7 @@ impl<'a> Nvfp4TcMatmulOperand<'a> {
     }
 
     pub(super) fn rowwise(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        Nvfp4RowwiseDeviceTensor {
-            bytes: &*self.bytes,
-            scales: &*self.scales,
-            global_scales: &*self.global_scales,
-        }
+        Nvfp4RowwiseDeviceTensor::new(&*self.bytes, &*self.scales, &*self.global_scales)
     }
 }
 

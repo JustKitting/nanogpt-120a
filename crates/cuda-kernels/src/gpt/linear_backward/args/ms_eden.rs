@@ -14,19 +14,11 @@ pub struct MsEdenOperandScratch<'a> {
 
 impl<'a> MsEdenOperandScratch<'a> {
     pub(crate) fn rowwise(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        Nvfp4RowwiseDeviceTensor {
-            bytes: &*self.bytes,
-            scales: &*self.scales,
-            global_scales: &*self.global_scales,
-        }
+        Nvfp4RowwiseDeviceTensor::new(&*self.bytes, &*self.scales, &*self.global_scales)
     }
 
     pub(crate) fn device_scale_mma_weight(&self) -> Nvfp4DeviceScaleMmaWeightTensor<'_> {
-        Nvfp4DeviceScaleMmaWeightTensor {
-            bytes: &*self.bytes,
-            scales: &*self.scales,
-            global_scale: &*self.global_scale,
-        }
+        Nvfp4DeviceScaleMmaWeightTensor::new(&*self.bytes, &*self.scales, &*self.global_scale)
     }
 }
 

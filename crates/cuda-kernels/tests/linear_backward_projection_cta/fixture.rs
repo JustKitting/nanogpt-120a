@@ -46,10 +46,18 @@ impl ProjectionTensors {
     ) -> LinearBackwardDeviceScaleArgs<'a, 'out> {
         LinearBackwardDeviceScaleArgs {
             stream,
-            e_h: rowwise(&self.e_bytes, &self.e_scales, &self.e_globals),
-            weight_t_h: weight(&self.weight_bytes, &self.weight_scales, &self.weight_global),
-            e_t_h: rowwise(&self.e_t_bytes, &self.e_t_scales, &self.e_t_globals),
-            input_t_h: weight(
+            e_h: Nvfp4RowwiseDeviceTensor::new(&self.e_bytes, &self.e_scales, &self.e_globals),
+            weight_t_h: Nvfp4DeviceScaleMmaWeightTensor::new(
+                &self.weight_bytes,
+                &self.weight_scales,
+                &self.weight_global,
+            ),
+            e_t_h: Nvfp4RowwiseDeviceTensor::new(
+                &self.e_t_bytes,
+                &self.e_t_scales,
+                &self.e_t_globals,
+            ),
+            input_t_h: Nvfp4DeviceScaleMmaWeightTensor::new(
                 &self.input_t_bytes,
                 &self.input_t_scales,
                 &self.input_t_global,
@@ -60,29 +68,5 @@ impl ProjectionTensors {
             input_dim: super::INPUT_DIM as u32,
             output_dim: super::OUTPUT_DIM as u32,
         }
-    }
-}
-
-fn rowwise<'a>(
-    bytes: &'a DeviceBuffer<u8>,
-    scales: &'a DeviceBuffer<u8>,
-    globals: &'a DeviceBuffer<f32>,
-) -> Nvfp4RowwiseDeviceTensor<'a> {
-    Nvfp4RowwiseDeviceTensor {
-        bytes,
-        scales,
-        global_scales: globals,
-    }
-}
-
-fn weight<'a>(
-    bytes: &'a DeviceBuffer<u8>,
-    scales: &'a DeviceBuffer<u8>,
-    global: &'a DeviceBuffer<f32>,
-) -> Nvfp4DeviceScaleMmaWeightTensor<'a> {
-    Nvfp4DeviceScaleMmaWeightTensor {
-        bytes,
-        scales,
-        global_scale: global,
     }
 }

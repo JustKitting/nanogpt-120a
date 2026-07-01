@@ -59,19 +59,11 @@ impl UploadedNvfp4 {
     }
 
     pub fn device(&self) -> Nvfp4DeviceTensor<'_> {
-        Nvfp4DeviceTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scale: &self.global_scale,
-        }
+        Nvfp4DeviceTensor::new(&self.bytes, &self.scales, &self.global_scale)
     }
 
     pub fn mma(&self) -> Nvfp4FourSixMmaWeightTensor<'_> {
-        Nvfp4FourSixMmaWeightTensor {
-            bytes: &self.bytes,
-            scales: &self.scales,
-            global_scale: &self.global_scale,
-        }
+        Nvfp4FourSixMmaWeightTensor::new(&self.bytes, &self.scales, &self.global_scale)
     }
 }
 

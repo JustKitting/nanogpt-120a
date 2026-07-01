@@ -100,26 +100,22 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
             chunk_states: &mut tc_chunk_states_dev,
         },
         projections: AttentionProjectionTensors {
-            qkv_weight: Nvfp4FourSixMmaWeightTensor {
-                bytes: &weight_bytes_dev,
-                scales: &weight_scales_dev,
-                global_scale: &global_scale_dev,
-            },
-            qkv_bias: Nvfp4DeviceTensor {
-                bytes: &bias_bytes_dev,
-                scales: &bias_scales_dev,
-                global_scale: &global_scale_dev,
-            },
-            c_proj_weight: Nvfp4FourSixMmaWeightTensor {
-                bytes: &c_proj_weight_bytes_dev,
-                scales: &c_proj_weight_scales_dev,
-                global_scale: &global_scale_dev,
-            },
-            c_proj_bias: Nvfp4DeviceTensor {
-                bytes: &c_proj_bias_bytes_dev,
-                scales: &c_proj_bias_scales_dev,
-                global_scale: &global_scale_dev,
-            },
+            qkv_weight: Nvfp4FourSixMmaWeightTensor::new(
+                &weight_bytes_dev,
+                &weight_scales_dev,
+                &global_scale_dev,
+            ),
+            qkv_bias: Nvfp4DeviceTensor::new(&bias_bytes_dev, &bias_scales_dev, &global_scale_dev),
+            c_proj_weight: Nvfp4FourSixMmaWeightTensor::new(
+                &c_proj_weight_bytes_dev,
+                &c_proj_weight_scales_dev,
+                &global_scale_dev,
+            ),
+            c_proj_bias: Nvfp4DeviceTensor::new(
+                &c_proj_bias_bytes_dev,
+                &c_proj_bias_scales_dev,
+                &global_scale_dev,
+            ),
         },
         qkv: &mut qkv_dev,
         attention_log_sum_exp: &mut attention_log_sum_exp_dev,

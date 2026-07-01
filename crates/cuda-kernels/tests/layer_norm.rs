@@ -90,16 +90,12 @@ fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     module.gpt_layer_norm(GptLayerNormArgs {
         stream: &stream,
         residual: &x_dev,
-        weight: Nvfp4DeviceTensor {
-            bytes: &weight_bytes_dev,
-            scales: &weight_scales_dev,
-            global_scale: &weight_global_scale_dev,
-        },
-        bias: Nvfp4DeviceTensor {
-            bytes: &bias_bytes_dev,
-            scales: &bias_scales_dev,
-            global_scale: &bias_global_scale_dev,
-        },
+        weight: Nvfp4DeviceTensor::new(
+            &weight_bytes_dev,
+            &weight_scales_dev,
+            &weight_global_scale_dev,
+        ),
+        bias: Nvfp4DeviceTensor::new(&bias_bytes_dev, &bias_scales_dev, &bias_global_scale_dev),
         normalized: &mut out_dev,
         normalized_amax: &mut amax_dev,
         mean: &mut mean_dev,

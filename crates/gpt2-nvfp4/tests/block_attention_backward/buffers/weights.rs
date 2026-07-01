@@ -45,12 +45,12 @@ impl WeightBuffers {
 
     pub fn ln_1(&self) -> LayerNormTensors<'_> {
         LayerNormTensors {
-            weight: nvfp4_device(
+            weight: Nvfp4DeviceTensor::new(
                 &self.ln_weight_bytes,
                 &self.ln_weight_scales,
                 &self.global_scale,
             ),
-            bias: nvfp4_device(
+            bias: Nvfp4DeviceTensor::new(
                 &self.ln_bias_bytes,
                 &self.ln_bias_scales,
                 &self.global_scale,
@@ -60,22 +60,22 @@ impl WeightBuffers {
 
     pub fn projections(&self) -> AttentionProjectionTensors<'_> {
         AttentionProjectionTensors {
-            qkv_weight: mma_weight(
+            qkv_weight: Nvfp4FourSixMmaWeightTensor::new(
                 &self.qkv_weight_bytes,
                 &self.qkv_weight_scales,
                 &self.global_scale,
             ),
-            qkv_bias: nvfp4_device(
+            qkv_bias: Nvfp4DeviceTensor::new(
                 &self.qkv_bias_bytes,
                 &self.qkv_bias_scales,
                 &self.global_scale,
             ),
-            c_proj_weight: mma_weight(
+            c_proj_weight: Nvfp4FourSixMmaWeightTensor::new(
                 &self.c_proj_weight_bytes,
                 &self.c_proj_weight_scales,
                 &self.global_scale,
             ),
-            c_proj_bias: nvfp4_device(
+            c_proj_bias: Nvfp4DeviceTensor::new(
                 &self.c_proj_bias_bytes,
                 &self.c_proj_bias_scales,
                 &self.global_scale,
@@ -86,28 +86,4 @@ impl WeightBuffers {
 
 fn filled_u8(stream: &CudaStream, len: usize, value: u8) -> Result<DeviceBuffer<u8>, DriverError> {
     DeviceBuffer::from_host(stream, &vec![value; len])
-}
-
-fn mma_weight<'a>(
-    bytes: &'a DeviceBuffer<u8>,
-    scales: &'a DeviceBuffer<u8>,
-    global_scale: &'a DeviceBuffer<f32>,
-) -> Nvfp4FourSixMmaWeightTensor<'a> {
-    Nvfp4FourSixMmaWeightTensor {
-        bytes,
-        scales,
-        global_scale,
-    }
-}
-
-fn nvfp4_device<'a>(
-    bytes: &'a DeviceBuffer<u8>,
-    scales: &'a DeviceBuffer<u8>,
-    global_scale: &'a DeviceBuffer<f32>,
-) -> Nvfp4DeviceTensor<'a> {
-    Nvfp4DeviceTensor {
-        bytes,
-        scales,
-        global_scale,
-    }
 }

@@ -6,11 +6,7 @@ use super::types::RowwiseNvfp4Tape;
 
 impl<'a> RowwiseNvfp4Tape<'a> {
     pub(crate) fn saved(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
-        Nvfp4RowwiseDeviceTensor {
-            bytes: &*self.bytes,
-            scales: &*self.scales,
-            global_scales: &*self.global_scales,
-        }
+        Nvfp4RowwiseDeviceTensor::new(&*self.bytes, &*self.scales, &*self.global_scales)
     }
 
     pub(crate) fn reborrow(&mut self) -> RowwiseNvfp4Tape<'_> {
