@@ -32,8 +32,7 @@ pub use projection_cta::{
     nvfp4_projection_cta_nobias_kernel_body_at_aligned_row_pair,
     nvfp4_projection_cta_relu2_kernel_body,
     nvfp4_projection_cta_relu2_kernel_body_at_aligned_row_pair, projection_cta_grid_dim,
-    projection_cta_launch_grid_dim, projection_cta_row_pair_grid_dim,
-    projection_cta_row_pair_tile_count, projection_cta_shape_aligned,
+    projection_cta_launch_grid_dim, projection_cta_row_pair_tile_count, projection_cta_shape_aligned,
 };
 pub(crate) use projection_cta::{ProjectionCtaAPacks, ProjectionCtaAScales, ProjectionCtaBPacks, ProjectionCtaBScales, dispatch_projection_cta_tiles, with_projection_cta_tiles};
 pub use tensors::{Nvfp4DeviceScaleMmaWeightTensor, Nvfp4FourSixMmaWeightTensor};

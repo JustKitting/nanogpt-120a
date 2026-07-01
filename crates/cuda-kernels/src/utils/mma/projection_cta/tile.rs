@@ -84,26 +84,22 @@ pub fn projection_cta_grid_dim(token_count: u32, output_dim: u32) -> (u32, u32, 
     )
 }
 
-pub fn projection_cta_row_pair_grid_dim(token_count: u32, output_dim: u32) -> (u32, u32, u32) {
-    let grid = projection_cta_grid_dim(token_count, output_dim);
-    (grid.0, grid.1.div_ceil(2), 1)
-}
-
 pub fn projection_cta_launch_grid_dim(
     token_count: u32,
     input_dim: u32,
     output_dim: u32,
 ) -> (u32, u32, u32) {
+    let grid = projection_cta_grid_dim(token_count, output_dim);
     if projection_cta_shape_aligned(token_count, input_dim, output_dim) {
-        projection_cta_row_pair_grid_dim(token_count, output_dim)
+        (grid.0, grid.1.div_ceil(2), 1)
     } else {
-        projection_cta_grid_dim(token_count, output_dim)
+        grid
     }
 }
 
 pub fn projection_cta_row_pair_tile_count(token_count: u32, output_dim: u32) -> u32 {
-    let grid = projection_cta_row_pair_grid_dim(token_count, output_dim);
-    grid.0 * grid.1
+    let grid = projection_cta_grid_dim(token_count, output_dim);
+    grid.0 * grid.1.div_ceil(2)
 }
 
 pub fn projection_cta_shape_aligned(token_count: u32, input_dim: u32, output_dim: u32) -> bool {
