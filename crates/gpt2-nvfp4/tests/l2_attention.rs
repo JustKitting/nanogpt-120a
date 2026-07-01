@@ -35,8 +35,7 @@ const E4M3_ONE: u8 = 0x38;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
-fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result<(), Box<dyn Error>>
-{
+fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result<(), Box<dyn Error>> {
     let (_, stream, module) = cuda_test_context()?;
     let attention_module = AttentionModule::from_module(module.clone())?;
     let tc_module = F16TcMatmulModule::from_module(module.clone())?;
@@ -53,8 +52,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let mut input_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 16)?;
     let mut input_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_CONTEXT_LEN)?;
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
-    let mut attention_log_sum_exp_dev =
-        DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
+    let mut attention_log_sum_exp_dev = DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
     let mut tc_q_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut tc_k_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut tc_v_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
@@ -71,8 +69,7 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let bias_scales_dev = filled_u8(&stream, QkvVectorShape::SCALE_LEN, E4M3_ONE)?;
     let global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
 
-    let c_proj_weight_bytes_dev =
-        DeviceBuffer::from_host(&stream, &c_proj_identity_weight_bytes())?;
+    let c_proj_weight_bytes_dev = DeviceBuffer::from_host(&stream, &c_proj_identity_weight_bytes())?;
     let c_proj_weight_scales_dev = filled_u8(&stream, ResidualWeightShape::SCALE_LEN, E4M3_ONE)?;
 
     let c_proj_bias_bytes_dev = filled_u8(&stream, HiddenVectorShape::BYTE_LEN, 0)?;
@@ -98,22 +95,14 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
             chunk_states: &mut tc_chunk_states_dev,
         },
         projections: AttentionProjectionTensors {
-            qkv_weight: Nvfp4FourSixMmaWeightTensor::new(
-                &weight_bytes_dev,
-                &weight_scales_dev,
-                &global_scale_dev,
-            ),
+            qkv_weight: Nvfp4FourSixMmaWeightTensor::new(&weight_bytes_dev, &weight_scales_dev, &global_scale_dev),
             qkv_bias: Nvfp4DeviceTensor::new(&bias_bytes_dev, &bias_scales_dev, &global_scale_dev),
             c_proj_weight: Nvfp4FourSixMmaWeightTensor::new(
                 &c_proj_weight_bytes_dev,
                 &c_proj_weight_scales_dev,
                 &global_scale_dev,
             ),
-            c_proj_bias: Nvfp4DeviceTensor::new(
-                &c_proj_bias_bytes_dev,
-                &c_proj_bias_scales_dev,
-                &global_scale_dev,
-            ),
+            c_proj_bias: Nvfp4DeviceTensor::new(&c_proj_bias_bytes_dev, &c_proj_bias_scales_dev, &global_scale_dev),
         },
         qkv: &mut qkv_dev,
         attention_log_sum_exp: &mut attention_log_sum_exp_dev,

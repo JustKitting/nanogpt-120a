@@ -68,12 +68,8 @@ pub struct LinearBackwardMsEdenScratchBuffers {
 }
 
 impl LinearBackwardMsEdenScratchBuffers {
-    pub fn new(
-        stream: &CudaStream,
-        token_count: usize,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> Result<Self, DriverError> {
+    pub fn new(stream: &CudaStream, token_count: usize, input_dim: usize, output_dim: usize)
+        -> Result<Self, DriverError> {
         let output_k = nvfp4_tc_matmul_padded_k(output_dim as u32) as usize;
         let token_k = nvfp4_tc_matmul_padded_k(token_count as u32) as usize;
 

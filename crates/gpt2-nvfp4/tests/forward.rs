@@ -39,11 +39,7 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
         .expect("Gpt2::init must create model weights");
 
     let token_embedding = upload_nvfp4(&stream, &weights.embeddings.wte)?;
-    let blocks = weights
-        .h
-        .iter()
-        .map(|block| upload_block(&stream, block))
-        .collect::<TestResult<Vec<_>>>()?;
+    let blocks = weights.h.iter().map(|block| upload_block(&stream, block)).collect::<TestResult<Vec<_>>>()?;
     let ln_f = upload_layer_norm(&stream, &weights.ln_f)?;
 
     let tokens = token_ids();
@@ -59,13 +55,10 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
     let mut mlp_pre_activation_dev = DeviceBuffer::<f32>::zeroed(&stream, MlpActivation::LEN)?;
     let mut mlp_activation_dev = DeviceBuffer::<f32>::zeroed(&stream, MlpActivation::LEN)?;
     let mut mlp_activation_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, MlpActivation::LEN / 2)?;
-    let mut mlp_activation_scales_dev =
-        DeviceBuffer::<u8>::zeroed(&stream, MlpActivation::LEN / 16)?;
-    let mut mlp_activation_global_scales_dev =
-        DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
+    let mut mlp_activation_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, MlpActivation::LEN / 16)?;
+    let mut mlp_activation_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
     let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
-    let mut attention_log_sum_exp_dev =
-        DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
+    let mut attention_log_sum_exp_dev = DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
     let mut tc_q_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut tc_k_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut tc_v_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
