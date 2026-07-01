@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crate::AppResult;
+use crate::training::env::{env_bool, env_nonempty};
 
 const TRAIN_DATASET_ENV: &str = "TRAIN_DATASET";
 const TRAIN_REPEAT_BATCH_ENV: &str = "TRAIN_REPEAT_BATCH";
@@ -9,12 +10,11 @@ pub(super) const DATASET_SYNTH: &str = "synth";
 pub(super) const DATASET_SHAKESPEARE: &str = "shakespeare";
 
 pub(super) fn training_dataset() -> String {
-    std::env::var(TRAIN_DATASET_ENV).unwrap_or_else(|_| DATASET_SYNTH.to_string())
+    env_nonempty(TRAIN_DATASET_ENV).unwrap_or_else(|| DATASET_SYNTH.to_string())
 }
 
 pub(super) fn repeat_first_window() -> bool {
-    std::env::var(TRAIN_REPEAT_BATCH_ENV)
-        .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+    env_bool(TRAIN_REPEAT_BATCH_ENV).unwrap_or(false)
 }
 
 pub(super) fn token_count_paths(paths: &[PathBuf]) -> AppResult<usize> {

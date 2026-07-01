@@ -1,12 +1,12 @@
 use cuda_core::{CudaStream, DeviceBuffer};
 
 use crate::AppResult;
+use crate::training::env::env_bool;
 
 const TRAIN_TRACE_ENV: &str = "TRAIN_TRACE";
 
 pub fn enabled() -> bool {
-    std::env::var(TRAIN_TRACE_ENV)
-        .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+    env_bool(TRAIN_TRACE_ENV).unwrap_or(false)
 }
 
 pub(super) fn f32_buffer_stats(

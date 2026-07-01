@@ -19,6 +19,7 @@ use rust_kernels_cuda::residual::ResidualBackwardModule;
 use rust_kernels_cuda::transpose::TransposeModule;
 
 use crate::AppResult;
+use crate::training::env::env_usize;
 
 mod backward;
 
@@ -70,10 +71,7 @@ impl Runtime {
 }
 
 fn gpu_device_index() -> usize {
-    std::env::var("CUDA_DEVICE_INDEX")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
+    env_usize("CUDA_DEVICE_INDEX").unwrap_or(0)
 }
 
 fn ptx_path() -> String {
