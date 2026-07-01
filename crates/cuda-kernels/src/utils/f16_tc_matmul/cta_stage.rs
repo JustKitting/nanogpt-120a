@@ -9,8 +9,8 @@ macro_rules! stage_tiles_fn {
         pub(super) fn $name(
             a: &[u16],
             b_t: &[u16],
-            a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-            b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+            a_tile: &mut super::CtaATile,
+            b_tile: &mut super::CtaBTile,
             tile: CtaTile,
             m: u32,
             n: u32,
@@ -28,8 +28,8 @@ stage_tiles_fn!(stage_tiles_aligned, false);
 fn stage_tiles_impl<const CHECK_BOUNDS: bool>(
     a: &[u16],
     b_t: &[u16],
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-    b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+    a_tile: &mut super::CtaATile,
+    b_tile: &mut super::CtaBTile,
     tile: CtaTile,
     m: u32,
     n: u32,
@@ -70,7 +70,7 @@ pub(crate) fn stage_coords(offset: u32, row_base: u32, k_base: u32) -> (u32, u32
 }
 
 #[inline(always)]
-pub(crate) fn load_a_fragments(a_tile: &SharedArray<u16, CTA_A_ELEMS>, tile: CtaTile) -> [u32; 4] {
+pub(crate) fn load_a_fragments(a_tile: &super::CtaATile, tile: CtaTile) -> [u32; 4] {
     [
         load_a_fragment(a_tile, tile, 0),
         load_a_fragment(a_tile, tile, 1),
@@ -81,7 +81,7 @@ pub(crate) fn load_a_fragments(a_tile: &SharedArray<u16, CTA_A_ELEMS>, tile: Cta
 
 #[inline(always)]
 pub(crate) fn load_b_fragments(
-    b_tile: &SharedArray<u16, CTA_B_ELEMS>,
+    b_tile: &super::CtaBTile,
     tile: CtaTile,
     warp_n: u32,
 ) -> [u32; 2] {
@@ -92,7 +92,7 @@ pub(crate) fn load_b_fragments(
 }
 
 #[inline(always)]
-fn load_a_fragment(a_tile: &SharedArray<u16, CTA_A_ELEMS>, tile: CtaTile, register: u32) -> u32 {
+fn load_a_fragment(a_tile: &super::CtaATile, tile: CtaTile, register: u32) -> u32 {
     let row = tile.warp_m * 16 + tile.group + if register & 1 == 0 { 0 } else { 8 };
     let col = tile.thread_in_group * 2 + if register < 2 { 0 } else { 8 };
     load_packed2(a_tile, row * CTA_K + col)
@@ -100,7 +100,7 @@ fn load_a_fragment(a_tile: &SharedArray<u16, CTA_A_ELEMS>, tile: CtaTile, regist
 
 #[inline(always)]
 fn load_b_fragment(
-    b_tile: &SharedArray<u16, CTA_B_ELEMS>,
+    b_tile: &super::CtaBTile,
     tile: CtaTile,
     warp_n: u32,
     register: u32,

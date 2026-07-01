@@ -1,16 +1,16 @@
-use cuda_device::{SharedArray, thread};
+use cuda_device::thread;
 
 use super::convert::cvt_rn_f16_f32;
 use super::cta_stage::stage_coords;
-use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_THREADS, CtaTile};
+use super::cta_tile::{CTA_A_ELEMS, CTA_THREADS, CtaTile};
 
 macro_rules! stage_tiles_a_transposed_fn {
     ($name:ident, $rhs:ident: $rhs_ty:ty, $stage_rhs:path) => {
         pub(super) fn $name(
             a: &[f32],
             $rhs: &[$rhs_ty],
-            a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-            b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+            a_tile: &mut super::CtaATile,
+            b_tile: &mut super::CtaBTile,
             tile: CtaTile,
             m: u32,
             n: u32,
@@ -32,7 +32,7 @@ stage_tiles_a_transposed_fn!(
 
 fn stage_a_transposed(
     a: &[f32],
-    a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
+    a_tile: &mut super::CtaATile,
     tile: CtaTile,
     m: u32,
     k: u32,

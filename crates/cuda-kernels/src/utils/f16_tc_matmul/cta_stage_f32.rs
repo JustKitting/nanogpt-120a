@@ -9,8 +9,8 @@ macro_rules! stage_tiles_f32_fn {
         pub(super) fn $name(
             $lhs: &[$lhs_ty],
             $rhs: &[$rhs_ty],
-            a_tile: &mut SharedArray<u16, CTA_A_ELEMS>,
-            b_tile: &mut SharedArray<u16, CTA_B_ELEMS>,
+            a_tile: &mut super::CtaATile,
+            b_tile: &mut super::CtaBTile,
             tile: CtaTile,
             m: u32,
             n: u32,

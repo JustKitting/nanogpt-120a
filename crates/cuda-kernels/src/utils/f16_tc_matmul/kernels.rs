@@ -1,4 +1,4 @@
-use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel};
+use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::convert::fp32_to_f16_body;
 use super::cta::cta_matmul_body;
@@ -9,7 +9,6 @@ use super::cta_f32_a_transposed_half_rhs::cta_matmul_f32_a_transposed_half_rhs_b
 use super::cta_f32_a_transposed_rhs::cta_matmul_f32_a_transposed_rhs_body;
 use super::cta_f32_half_rhs::cta_matmul_f32_half_rhs_body;
 use super::cta_f32_rhs::cta_matmul_f32_rhs_body;
-use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
 use super::pad::pad_rows_body;
 
 pub const F16_THREADS_PER_BLOCK: u32 = 256;
@@ -21,8 +20,8 @@ pub(super) mod module {
 
     macro_rules! call_with_tiles {
         ($body:ident; $($pre:expr),* ; $($post:expr),* $(,)?) => {{
-            static mut A_TILE: SharedArray<u16, CTA_A_ELEMS> = SharedArray::UNINIT;
-            static mut B_TILE: SharedArray<u16, CTA_B_ELEMS> = SharedArray::UNINIT;
+            static mut A_TILE: crate::f16_tc_matmul::CtaATile = crate::f16_tc_matmul::CtaATile::UNINIT;
+            static mut B_TILE: crate::f16_tc_matmul::CtaBTile = crate::f16_tc_matmul::CtaBTile::UNINIT;
             $body($($pre,)* unsafe { &mut A_TILE }, unsafe { &mut B_TILE }, $($post),*);
         }};
     }
