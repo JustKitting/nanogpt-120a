@@ -80,21 +80,12 @@ impl LinearScratch {
             error_t,
             weight_t,
             input_t,
-            ms_eden(e, weight_t_h, e_t, input_t_h),
+            LinearBackwardMsEdenScratch {
+                e_h: e.as_arg(),
+                weight_t_h: weight_t_h.as_arg(),
+                e_t_h: e_t.as_arg(),
+                input_t_h: input_t_h.as_arg(),
+            },
         )
-    }
-}
-
-fn ms_eden<'a>(
-    e: &'a mut MsEdenOperandScratchBuffer,
-    weight_t_h: &'a mut MsEdenOperandScratchBuffer,
-    e_t: &'a mut MsEdenOperandScratchBuffer,
-    input_t_h: &'a mut MsEdenOperandScratchBuffer,
-) -> LinearBackwardMsEdenScratch<'a> {
-    LinearBackwardMsEdenScratch {
-        e_h: e.as_arg(),
-        weight_t_h: weight_t_h.as_arg(),
-        e_t_h: e_t.as_arg(),
-        input_t_h: input_t_h.as_arg(),
     }
 }
