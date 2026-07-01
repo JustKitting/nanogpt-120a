@@ -16,6 +16,8 @@ pub struct ApplyRopeParams {
 
 unsafe impl DeviceCopy for ApplyRopeParams {}
 
+#[path = "rope/body.rs"]
+mod body;
 #[path = "rope/kernels.rs"]
 pub mod kernels;
 #[path = "rope/launcher.rs"]
