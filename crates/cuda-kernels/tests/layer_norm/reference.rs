@@ -74,12 +74,12 @@ fn gpt_kernel_row_variance_sum(x: &[f32], base: usize, row_len: usize, mean: f32
 
 fn gpt_block_reduce_sum(local: impl Fn(usize) -> f32) -> f32 {
     let mut warp_totals = [0.0_f32; 32];
-    for warp in 0..8 {
+    for (warp, warp_total) in warp_totals.iter_mut().enumerate() {
         let mut lanes = [0.0_f32; 32];
-        for lane in 0..32 {
-            lanes[lane] = local(warp * 32 + lane);
+        for (lane, value) in lanes.iter_mut().enumerate() {
+            *value = local(warp * 32 + lane);
         }
-        warp_totals[warp] = warp_sum_lane0(lanes);
+        *warp_total = warp_sum_lane0(lanes);
     }
     warp_sum_lane0(warp_totals)
 }

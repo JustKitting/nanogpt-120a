@@ -32,7 +32,7 @@ fn lm_head_projects_rowwise_nvfp4_hidden_to_logits() -> Result<(), Box<dyn Error
 
     let input_bytes_dev = DeviceBuffer::from_host(&stream, &input_bytes)?;
     let input_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(TOKEN_COUNT * INPUT_DIM))?;
-    let input_global_scales_dev = DeviceBuffer::from_host(&stream, &vec![1.0_f32; TOKEN_COUNT])?;
+    let input_global_scales_dev = DeviceBuffer::from_host(&stream, &[1.0_f32; TOKEN_COUNT])?;
     let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
     let weight_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(VOCAB_SIZE * INPUT_DIM))?;
     let weight_global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;

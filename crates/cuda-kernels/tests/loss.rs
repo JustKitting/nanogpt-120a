@@ -56,14 +56,14 @@ fn cross_entropy_writes_losses_and_dlogits() -> Result<(), Box<dyn Error>> {
         common::assert_close(*actual, *expected, TOLERANCE);
     }
 
-    for row in 0..TOKEN_COUNT {
+    for (row, actual_amax) in row_amax.iter().enumerate() {
         let base = row * VOCAB_SIZE;
         let expected_amax = expected.1[base..base + VOCAB_SIZE]
             .iter()
             .copied()
             .map(f32::abs)
             .fold(0.0, f32::max);
-        common::assert_close(row_amax[row], expected_amax, TOLERANCE);
+        common::assert_close(*actual_amax, expected_amax, TOLERANCE);
     }
 
     Ok(())

@@ -28,7 +28,7 @@ fn nextlat_projection_gelu_and_residual_match_reference() -> Result<(), Box<dyn 
 
     let input_bytes = DeviceBuffer::from_host(&stream, &zeros)?;
     let input_scales = DeviceBuffer::from_host(&stream, &one_scales(TOKEN_COUNT * INPUT_DIM))?;
-    let input_globals = DeviceBuffer::from_host(&stream, &vec![1.0_f32; TOKEN_COUNT])?;
+    let input_globals = DeviceBuffer::from_host(&stream, &[1.0_f32; TOKEN_COUNT])?;
     let weight_bytes = DeviceBuffer::from_host(&stream, &weight_zeros)?;
     let weight_scales_dev = DeviceBuffer::from_host(&stream, &one_scales(INPUT_DIM * OUTPUT_DIM))?;
     let bias_bytes = DeviceBuffer::from_host(&stream, &one_pair_bytes(OUTPUT_DIM))?;

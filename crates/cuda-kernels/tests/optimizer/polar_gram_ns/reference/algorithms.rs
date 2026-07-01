@@ -39,12 +39,11 @@ pub fn stabilized_gram_ns(
         let r2 = matmul_f16(&r, &r, rows, rows, rows, false);
         let z = linear2(&r, b, &r2, c);
 
-        q = Some(if q.is_none() {
-            add_scaled_identity(&z, a, rows)
-        } else {
-            let q_ref = q.as_ref().expect("Q is set");
+        q = Some(if let Some(q_ref) = q.as_ref() {
             let qz = matmul_f16(q_ref, &z, rows, rows, rows, false);
             linear2(&qz, 1.0, q_ref, a)
+        } else {
+            add_scaled_identity(&z, a, rows)
         });
 
         if iter + 1 < iterations && !resets.contains(&(iter + 1)) {
