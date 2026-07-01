@@ -13,8 +13,11 @@ mod iterations;
 mod mode;
 #[path = "device/product.rs"]
 mod product;
+#[path = "device/stats.rs"]
+mod stats;
 
-pub use mode::{CorrectionStats, GramCorrectionMode};
+pub use mode::GramCorrectionMode;
+pub use stats::CorrectionStats;
 
 pub struct Nvfp4Polar<'a> {
     stream: &'a CudaStream,
