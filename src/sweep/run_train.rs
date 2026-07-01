@@ -19,14 +19,7 @@ pub fn run_screen_candidate(
     trial_dir: &Path,
     trial_index: usize,
 ) -> std::io::Result<RunResult> {
-    run_candidate_stage(
-        candidate,
-        config,
-        sweep_dir,
-        trial_dir,
-        trial_index,
-        Stage::Screen,
-    )
+    run_candidate_stage(candidate, config, sweep_dir, trial_dir, trial_index, Stage::Screen)
 }
 
 pub fn run_candidate(
@@ -36,14 +29,7 @@ pub fn run_candidate(
     trial_dir: &Path,
     trial_index: usize,
 ) -> std::io::Result<RunResult> {
-    run_candidate_stage(
-        candidate,
-        config,
-        sweep_dir,
-        trial_dir,
-        trial_index,
-        Stage::Full,
-    )
+    run_candidate_stage(candidate, config, sweep_dir, trial_dir, trial_index, Stage::Full)
 }
 
 fn run_candidate_stage(
