@@ -1,8 +1,6 @@
-#![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
-
 use cuda_device::{SharedArray, thread};
 
-use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
+use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaMatmulDims, CtaTile};
 
 macro_rules! stage_tiles_fn {
     ($name:ident, $check_bounds:expr) => {
@@ -12,12 +10,10 @@ macro_rules! stage_tiles_fn {
             a_tile: &mut super::CtaATile,
             b_tile: &mut super::CtaBTile,
             tile: CtaTile,
-            m: u32,
-            n: u32,
-            k: u32,
+            dims: CtaMatmulDims,
             k_base: u32,
         ) {
-            stage_tiles_impl::<$check_bounds>(a, b_t, a_tile, b_tile, tile, m, n, k, k_base);
+            stage_tiles_impl::<$check_bounds>(a, b_t, a_tile, b_tile, tile, dims, k_base);
         }
     };
 }
@@ -31,13 +27,11 @@ fn stage_tiles_impl<const CHECK_BOUNDS: bool>(
     a_tile: &mut super::CtaATile,
     b_tile: &mut super::CtaBTile,
     tile: CtaTile,
-    m: u32,
-    n: u32,
-    k: u32,
+    dims: CtaMatmulDims,
     k_base: u32,
 ) {
-    stage_matrix_tile::<CHECK_BOUNDS, CTA_A_ELEMS>(a, a_tile, tile, tile.row_base, m, k, k_base);
-    stage_matrix_tile::<CHECK_BOUNDS, CTA_B_ELEMS>(b_t, b_tile, tile, tile.col_base, n, k, k_base);
+    stage_matrix_tile::<CHECK_BOUNDS, CTA_A_ELEMS>(a, a_tile, tile, tile.row_base, dims.m, dims.k, k_base);
+    stage_matrix_tile::<CHECK_BOUNDS, CTA_B_ELEMS>(b_t, b_tile, tile, tile.col_base, dims.n, dims.k, k_base);
 }
 
 fn stage_matrix_tile<const CHECK_BOUNDS: bool, const TILE_ELEMS: usize>(

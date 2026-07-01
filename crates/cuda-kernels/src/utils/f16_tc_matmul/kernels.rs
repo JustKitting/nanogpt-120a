@@ -19,10 +19,11 @@ pub(super) mod module {
     use super::*;
 
     macro_rules! call_with_tiles {
-        ($body:ident; $($pre:expr),* ; $($post:expr),* $(,)?) => {{
+        ($body:ident; $($pre:expr),* ; $batch_count:expr, $m:expr, $n:expr, $k:expr $(, $extra:expr)* $(,)?) => {{
             static mut A_TILE: crate::f16_tc_matmul::CtaATile = crate::f16_tc_matmul::CtaATile::UNINIT;
             static mut B_TILE: crate::f16_tc_matmul::CtaBTile = crate::f16_tc_matmul::CtaBTile::UNINIT;
-            $body($($pre,)* unsafe { &mut A_TILE }, unsafe { &mut B_TILE }, $($post),*);
+            let dims = crate::f16_tc_matmul::cta_tile::CtaMatmulDims::new($batch_count, $m, $n, $k);
+            $body($($pre,)* unsafe { &mut A_TILE }, unsafe { &mut B_TILE }, dims $(, $extra)*);
         }};
     }
 

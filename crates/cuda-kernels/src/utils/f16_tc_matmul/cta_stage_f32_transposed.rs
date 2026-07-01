@@ -2,7 +2,7 @@ use cuda_device::thread;
 
 use super::convert::cvt_rn_f16_f32;
 use super::cta_stage::stage_coords;
-use super::cta_tile::{CTA_A_ELEMS, CTA_THREADS, CtaTile};
+use super::cta_tile::{CTA_A_ELEMS, CTA_THREADS, CtaMatmulDims, CtaTile};
 
 macro_rules! stage_tiles_a_transposed_fn {
     ($name:ident, $rhs:ident: $rhs_ty:ty, $stage_rhs:path) => {
@@ -12,13 +12,11 @@ macro_rules! stage_tiles_a_transposed_fn {
             a_tile: &mut super::CtaATile,
             b_tile: &mut super::CtaBTile,
             tile: CtaTile,
-            m: u32,
-            n: u32,
-            k: u32,
+            dims: CtaMatmulDims,
             k_base: u32,
         ) {
-            stage_a_transposed(a, a_tile, tile, m, k, k_base);
-            $stage_rhs($rhs, b_tile, tile, n, k, k_base);
+            stage_a_transposed(a, a_tile, tile, dims, k_base);
+            $stage_rhs($rhs, b_tile, tile, dims.n, dims.k, k_base);
         }
     };
 }
@@ -34,15 +32,14 @@ fn stage_a_transposed(
     a: &[f32],
     a_tile: &mut super::CtaATile,
     tile: CtaTile,
-    m: u32,
-    k: u32,
+    dims: CtaMatmulDims,
     k_base: u32,
 ) {
     let mut offset = thread::threadIdx_x();
     while offset < CTA_A_ELEMS as u32 {
         let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
-        a_tile[offset as usize] = if global_row < m && global_col < k {
-            let index = ((tile.batch * k + global_col) * m + global_row) as usize;
+        a_tile[offset as usize] = if global_row < dims.m && global_col < dims.k {
+            let index = ((tile.batch * dims.k + global_col) * dims.m + global_row) as usize;
             cvt_rn_f16_f32(a[index])
         } else {
             0

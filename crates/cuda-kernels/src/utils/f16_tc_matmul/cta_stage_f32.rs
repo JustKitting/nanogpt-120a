@@ -2,7 +2,7 @@ use cuda_device::{SharedArray, thread};
 
 use super::convert::cvt_rn_f16_f32;
 use super::cta_stage::stage_coords;
-use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_THREADS, CtaTile};
+use super::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_THREADS, CtaMatmulDims, CtaTile};
 
 macro_rules! stage_tiles_f32_fn {
     ($name:ident, $lhs:ident: $lhs_ty:ty, $rhs:ident: $rhs_ty:ty, $stage_lhs:path, $stage_rhs:path) => {
@@ -12,13 +12,11 @@ macro_rules! stage_tiles_f32_fn {
             a_tile: &mut super::CtaATile,
             b_tile: &mut super::CtaBTile,
             tile: CtaTile,
-            m: u32,
-            n: u32,
-            k: u32,
+            dims: CtaMatmulDims,
             k_base: u32,
         ) {
-            $stage_lhs($lhs, a_tile, tile, m, k, k_base);
-            $stage_rhs($rhs, b_tile, tile, n, k, k_base);
+            $stage_lhs($lhs, a_tile, tile, dims.m, dims.k, k_base);
+            $stage_rhs($rhs, b_tile, tile, dims.n, dims.k, k_base);
         }
     };
 }

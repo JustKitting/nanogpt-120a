@@ -37,18 +37,18 @@ macro_rules! cta_accumulate_k_loop4 {
 }
 
 macro_rules! cta_store4 {
-    ($store:path, $tile:expr, $out:expr, $m:expr, $n:expr, $acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident) => {{
+    ($store:path, $tile:expr, $out:expr, $dims:expr, $acc0:ident, $acc1:ident, $acc2:ident, $acc3:ident) => {{
         let tile = $tile;
-        $store($acc0, tile, tile.warp_n0, $out, $m, $n);
-        $store($acc1, tile, tile.warp_n0 + 1, $out, $m, $n);
-        $store($acc2, tile, tile.warp_n0 + 2, $out, $m, $n);
-        $store($acc3, tile, tile.warp_n0 + 3, $out, $m, $n);
+        $store($acc0, tile, tile.warp_n0, $out, $dims.m, $dims.n);
+        $store($acc1, tile, tile.warp_n0 + 1, $out, $dims.m, $dims.n);
+        $store($acc2, tile, tile.warp_n0 + 2, $out, $dims.m, $dims.n);
+        $store($acc3, tile, tile.warp_n0 + 3, $out, $dims.m, $dims.n);
     }};
 }
 
 macro_rules! cta_store_add4 {
     (
-        $store_add:path, $tile:expr, $base:expr, $out:expr, $m:expr, $n:expr, $base_scale:expr,
+        $store_add:path, $tile:expr, $base:expr, $out:expr, $dims:expr, $base_scale:expr,
         $matmul_scale:expr, $($acc:ident => $offset:expr),+ $(,)?
     ) => {{
         let tile = $tile;
@@ -59,8 +59,8 @@ macro_rules! cta_store_add4 {
                 tile.warp_n0 + $offset,
                 $base,
                 $out,
-                $m,
-                $n,
+                $dims.m,
+                $dims.n,
                 $base_scale,
                 $matmul_scale,
             );
