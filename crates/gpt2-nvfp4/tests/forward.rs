@@ -1,9 +1,8 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionLogSumExp, AttentionProjectionTensors, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
-    Gpt2, Gpt2ForwardArgs, HiddenState, HiddenStateNvfp4, Logits, MlpActivation,
-    MlpActivationNvfp4, MlpDownTensors, MlpProjectionTensors, MlpUpTensors, QkvActivation,
-    TokenEmbeddingArgs,
+    AttentionProjectionTensors, Gpt2, Gpt2ForwardArgs, HiddenStateNvfp4, MlpActivationNvfp4,
+    MlpDownTensors, MlpProjectionTensors, MlpUpTensors, TokenEmbeddingArgs, GPT2_BATCH_SIZE,
+    GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
 };
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionTcScratch};
 use rust_kernels_cuda::embedding::EmbeddingModule;
@@ -14,11 +13,14 @@ use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 
 mod common;
+#[path = "forward/scratch.rs"]
+mod scratch;
 #[path = "common/upload.rs"]
 mod upload_common;
 
 use common::cuda_test_context;
-use upload_common::{TestResult, upload_block, upload_layer_norm, upload_nvfp4};
+use scratch::ForwardScratch;
+use upload_common::{upload_block, upload_layer_norm, upload_nvfp4, TestResult};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -39,35 +41,16 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
         .expect("Gpt2::init must create model weights");
 
     let token_embedding = upload_nvfp4(&stream, &weights.embeddings.wte)?;
-    let blocks = weights.h.iter().map(|block| upload_block(&stream, block)).collect::<TestResult<Vec<_>>>()?;
+    let blocks = weights
+        .h
+        .iter()
+        .map(|block| upload_block(&stream, block))
+        .collect::<TestResult<Vec<_>>>()?;
     let ln_f = upload_layer_norm(&stream, &weights.ln_f)?;
 
     let tokens = token_ids();
     let tokens_dev = DeviceBuffer::from_host(&stream, &tokens)?;
-    let mut residual_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
-    let mut normalized_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
-    let mut normalized_amax_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
-    let mut mean_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
-    let mut inv_std_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
-    let mut hidden_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 2)?;
-    let mut hidden_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, HiddenState::LEN / 16)?;
-    let mut hidden_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
-    let mut mlp_pre_activation_dev = DeviceBuffer::<f32>::zeroed(&stream, MlpActivation::LEN)?;
-    let mut mlp_activation_dev = DeviceBuffer::<f32>::zeroed(&stream, MlpActivation::LEN)?;
-    let mut mlp_activation_bytes_dev = DeviceBuffer::<u8>::zeroed(&stream, MlpActivation::LEN / 2)?;
-    let mut mlp_activation_scales_dev = DeviceBuffer::<u8>::zeroed(&stream, MlpActivation::LEN / 16)?;
-    let mut mlp_activation_global_scales_dev = DeviceBuffer::<f32>::zeroed(&stream, GPT2_TOKEN_ROWS)?;
-    let mut qkv_dev = DeviceBuffer::<f32>::zeroed(&stream, QkvActivation::LEN)?;
-    let mut attention_log_sum_exp_dev = DeviceBuffer::<f32>::zeroed(&stream, AttentionLogSumExp::LEN)?;
-    let mut tc_q_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
-    let mut tc_k_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
-    let mut tc_v_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
-    let square = GPT2_BATCH_SIZE * gpt2_nvfp4::GPT2_N_HEAD * GPT2_SEQ_LEN * GPT2_SEQ_LEN;
-    let mut tc_scores_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
-    let mut tc_probs_dev = DeviceBuffer::<f32>::zeroed(&stream, square)?;
-    let mut tc_out_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
-    let mut tc_chunk_states_dev = DeviceBuffer::<u16>::zeroed(&stream, HiddenState::LEN)?;
-    let mut logits_dev = DeviceBuffer::<f32>::zeroed(&stream, Logits::LEN)?;
+    let mut scratch = ForwardScratch::new(&stream)?;
 
     model.forward(Gpt2ForwardArgs {
         embeddings: TokenEmbeddingArgs {
@@ -78,11 +61,11 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
             batch_size: GPT2_BATCH_SIZE as u32,
             seq_len: GPT2_SEQ_LEN as u32,
             row_count: GPT2_TOKEN_ROWS as u32,
-            residual: &mut residual_dev,
-            normalized: &mut normalized_dev,
-            normalized_amax: &mut normalized_amax_dev,
-            mean: &mut mean_dev,
-            inv_std: &mut inv_std_dev,
+            residual: &mut scratch.residual,
+            normalized: &mut scratch.normalized,
+            normalized_amax: &mut scratch.normalized_amax,
+            mean: &mut scratch.mean,
+            inv_std: &mut scratch.inv_std,
         },
         attention_module: &attention_module,
         attention_tc_module: &attention_tc_module,
@@ -91,23 +74,23 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
         mlp_module: &mlp_module,
         lm_head_module: &lm_head_module,
         hidden_nvfp4: HiddenStateNvfp4 {
-            bytes: &mut hidden_bytes_dev,
-            scales: &mut hidden_scales_dev,
-            global_scales: &mut hidden_global_scales_dev,
+            bytes: &mut scratch.hidden_bytes,
+            scales: &mut scratch.hidden_scales,
+            global_scales: &mut scratch.hidden_global_scales,
         },
         attention_tc_scratch: CausalAttentionTcScratch {
-            q: &mut tc_q_dev,
-            k: &mut tc_k_dev,
-            v: &mut tc_v_dev,
-            scores: &mut tc_scores_dev,
-            probs: &mut tc_probs_dev,
-            compact_out: &mut tc_out_dev,
-            chunk_states: &mut tc_chunk_states_dev,
+            q: &mut scratch.tc_q,
+            k: &mut scratch.tc_k,
+            v: &mut scratch.tc_v,
+            scores: &mut scratch.tc_scores,
+            probs: &mut scratch.tc_probs,
+            compact_out: &mut scratch.tc_out,
+            chunk_states: &mut scratch.tc_chunk_states,
         },
         mlp_activation_nvfp4: MlpActivationNvfp4 {
-            bytes: &mut mlp_activation_bytes_dev,
-            scales: &mut mlp_activation_scales_dev,
-            global_scales: &mut mlp_activation_global_scales_dev,
+            bytes: &mut scratch.mlp_activation_bytes,
+            scales: &mut scratch.mlp_activation_scales,
+            global_scales: &mut scratch.mlp_activation_global_scales,
         },
         attention: std::array::from_fn(|i| AttentionProjectionTensors {
             qkv_weight: blocks[i].attn_qkv.weight.mma(),
@@ -128,15 +111,15 @@ fn gpt2_forward_runs_through_tied_lm_head() -> TestResult {
             },
         }),
         ln_f: ln_f.tensors(),
-        attention_qkv: &mut qkv_dev,
-        attention_log_sum_exp: &mut attention_log_sum_exp_dev,
-        mlp_pre_activation: &mut mlp_pre_activation_dev,
-        mlp_activation: &mut mlp_activation_dev,
-        logits: &mut logits_dev,
+        attention_qkv: &mut scratch.qkv,
+        attention_log_sum_exp: &mut scratch.attention_log_sum_exp,
+        mlp_pre_activation: &mut scratch.mlp_pre_activation,
+        mlp_activation: &mut scratch.mlp_activation,
+        logits: &mut scratch.logits,
         tape: None,
     })?;
 
-    let logits = logits_dev.to_host_vec(&stream)?;
+    let logits = scratch.logits.to_host_vec(&stream)?;
     common::assert_nonzero_finite(&logits);
     Ok(())
 }
