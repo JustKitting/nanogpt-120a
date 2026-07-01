@@ -21,16 +21,10 @@ const GPT_EMBEDDING_DIM: usize = 768;
 fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let row_count = 2usize;
     let epsilon = 1.0e-5f32;
-    let mut x = [0.0f32; ROW_SIZE * 2];
-    let mut gamma = [0.0f32; ROW_SIZE];
-    let mut beta = [0.0f32; ROW_SIZE];
-
-    for col in 0..ROW_SIZE {
-        x[col] = sample_row_0(col);
-        x[ROW_SIZE + col] = sample_row_1(col);
-        gamma[col] = 0.75 + col as f32 * 0.01;
-        beta[col] = -0.125 + col as f32 * 0.005;
-    }
+    let x: [f32; ROW_SIZE * 2] =
+        std::array::from_fn(|i| if i < ROW_SIZE { sample_row_0(i) } else { sample_row_1(i - ROW_SIZE) });
+    let gamma: [f32; ROW_SIZE] = std::array::from_fn(|col| 0.75 + col as f32 * 0.01);
+    let beta: [f32; ROW_SIZE] = std::array::from_fn(|col| -0.125 + col as f32 * 0.005);
 
     let (_, stream, module) = common::cuda_test_module(LayerNormModule::from_module)?;
 
@@ -62,13 +56,9 @@ fn layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
 fn gpt_layer_norm_matches_reference() -> Result<(), Box<dyn Error>> {
     let row_count = 2usize;
     let epsilon = 1.0e-5f32;
-    let mut x = vec![0.0f32; row_count * GPT_EMBEDDING_DIM];
-
-    for row in 0..row_count {
-        for col in 0..GPT_EMBEDDING_DIM {
-            x[row * GPT_EMBEDDING_DIM + col] = (col as f32 - 383.5) * 0.001 + row as f32 * 0.25;
-        }
-    }
+    let x = (0..row_count * GPT_EMBEDDING_DIM)
+        .map(|i| ((i % GPT_EMBEDDING_DIM) as f32 - 383.5) * 0.001 + (i / GPT_EMBEDDING_DIM) as f32 * 0.25)
+        .collect::<Vec<_>>();
 
     let bias_bytes = vec![0_u8; GPT_EMBEDDING_DIM / 2];
 
