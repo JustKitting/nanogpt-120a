@@ -11,7 +11,7 @@ use rust_kernels_cuda::nvfp4_quant::{
 use rust_kernels_cuda::transpose::{TransposeF32Args, TransposeModule};
 
 mod common;
-#[path = "ms_eden_transpose/support.rs"]
+#[path = "ms_eden_transpose/support/mod.rs"]
 mod support;
 
 use support::*;
