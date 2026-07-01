@@ -27,6 +27,11 @@ pub fn assert_nonzero_finite(values: &[f32]) {
 }
 
 #[allow(dead_code)]
+pub fn float_bits(values: &[f32]) -> Vec<u32> {
+    values.iter().map(|value| value.to_bits()).collect()
+}
+
+#[allow(dead_code)]
 pub fn attention_log_sum_exp_values() -> Vec<f32> {
     let mut log_sum_exp = vec![0.0_f32; AttentionLogSumExp::LEN];
     for batch in 0..GPT2_BATCH_SIZE {

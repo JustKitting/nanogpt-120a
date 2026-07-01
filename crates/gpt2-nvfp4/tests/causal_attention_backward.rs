@@ -2,9 +2,9 @@ use std::error::Error;
 
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionCoreBackwardArgs, GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, GPT2_SEQ_LEN,
-    GPT2_TOKEN_ROWS, HiddenState, QkvActivation,
-    causal_attention_backward as gpt2_causal_attention_backward,
+    causal_attention_backward as gpt2_causal_attention_backward, AttentionCoreBackwardArgs,
+    HiddenState, QkvActivation, GPT2_BATCH_SIZE, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, GPT2_SEQ_LEN,
+    GPT2_TOKEN_ROWS,
 };
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionBackwardTcArgs};
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
@@ -18,8 +18,8 @@ mod data;
 #[path = "common/saved_block.rs"]
 mod saved_block;
 
-use common::{assert_nonzero_finite, attention_log_sum_exp_values, cuda_test_context};
-use saved_block::{SavedBlockParts, saved_block};
+use common::{assert_nonzero_finite, attention_log_sum_exp_values, cuda_test_context, float_bits};
+use saved_block::{saved_block, SavedBlockParts};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -86,16 +86,7 @@ fn causal_attention_backward_wrapper_matches_direct_kernel() -> Result<(), Box<d
     let wrapper = wrapper_d_qkv.to_host_vec(&stream)?;
     let direct = direct_d_qkv.to_host_vec(&stream)?;
     assert_nonzero_finite(&wrapper);
-    assert_eq!(
-        wrapper
-            .iter()
-            .map(|value| value.to_bits())
-            .collect::<Vec<_>>(),
-        direct
-            .iter()
-            .map(|value| value.to_bits())
-            .collect::<Vec<_>>()
-    );
+    assert_eq!(float_bits(&wrapper), float_bits(&direct));
 
     Ok(())
 }
