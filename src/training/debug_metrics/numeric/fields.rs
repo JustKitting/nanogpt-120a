@@ -2,14 +2,6 @@ use super::super::super::launch::CudaTrainOutput;
 
 mod value;
 
-#[derive(Clone, Copy)]
-pub(super) struct DebugMetricSpec {
-    name: &'static str,
-    unit: Option<&'static str>,
-    higher_is_better: bool,
-    field: DebugMetricField,
-}
-
 metric_fields! {
     DebugMetricField, DEBUG_METRIC_FIELDS, DebugMetricSpec, "Diagnostic " {
         UpdateCount => ("update count", None, true),

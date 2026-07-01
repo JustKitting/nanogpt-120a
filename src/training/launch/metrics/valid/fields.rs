@@ -1,13 +1,5 @@
 use super::super::output::CudaValidOutput;
 
-#[derive(Clone, Copy)]
-pub(super) struct ValidMetricSpec {
-    name: &'static str,
-    unit: Option<&'static str>,
-    higher_is_better: bool,
-    field: ValidMetricField,
-}
-
 metric_fields! {
     ValidMetricField, VALID_METRIC_FIELDS, ValidMetricSpec, "" {
         Loss => ("Validation loss", None, false),

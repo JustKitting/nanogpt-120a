@@ -1,13 +1,5 @@
 use super::super::output::CudaTrainOutput;
 
-#[derive(Clone, Copy)]
-pub(super) struct TrainMetricSpec {
-    name: &'static str,
-    unit: Option<&'static str>,
-    higher_is_better: bool,
-    field: TrainMetricField,
-}
-
 metric_fields! {
     TrainMetricField, TRAIN_METRIC_FIELDS, TrainMetricSpec, "" {
         Loss => ("Loss", None, false),

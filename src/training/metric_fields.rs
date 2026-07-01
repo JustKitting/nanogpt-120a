@@ -9,6 +9,14 @@ macro_rules! metric_fields {
         }
     ) => {
         #[derive(Clone, Copy)]
+        pub(super) struct $spec_ty {
+            name: &'static str,
+            unit: Option<&'static str>,
+            higher_is_better: bool,
+            field: $field_ty,
+        }
+
+        #[derive(Clone, Copy)]
         enum $field_ty {
             $($variant,)+
         }
