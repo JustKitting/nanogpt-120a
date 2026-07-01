@@ -27,18 +27,8 @@ const fn exact_prefix_nvfp4(name: &'static str, exact_steps: usize) -> (&'static
     (name, Mode::ExactPrefixThenNvfp4 { exact_steps })
 }
 
-const fn exact_prefix_nvfp4_average(
-    name: &'static str,
-    exact_steps: usize,
-    samples: usize,
-) -> (&'static str, Mode) {
-    (
-        name,
-        Mode::ExactPrefixThenNvfp4Average {
-            exact_steps,
-            samples,
-        },
-    )
+const fn exact_prefix_nvfp4_average(name: &'static str, exact_steps: usize, samples: usize) -> (&'static str, Mode) {
+    (name, Mode::ExactPrefixThenNvfp4Average { exact_steps, samples })
 }
 
 const fn stale(name: &'static str, period: usize) -> (&'static str, Mode) {
@@ -46,25 +36,9 @@ const fn stale(name: &'static str, period: usize) -> (&'static str, Mode) {
 }
 
 const fn exact_prefix_stale(name: &'static str, exact_steps: usize) -> (&'static str, Mode) {
-    (
-        name,
-        Mode::ExactPrefixThenStale {
-            exact_steps,
-            period: 2,
-        },
-    )
+    (name, Mode::ExactPrefixThenStale { exact_steps, period: 2 })
 }
 
-const fn adaptive(
-    name: &'static str,
-    period: usize,
-    max_relative_defect: f32,
-) -> (&'static str, Mode) {
-    (
-        name,
-        Mode::Adaptive {
-            period,
-            max_relative_defect,
-        },
-    )
+const fn adaptive(name: &'static str, period: usize, max_relative_defect: f32) -> (&'static str, Mode) {
+    (name, Mode::Adaptive { period, max_relative_defect })
 }
