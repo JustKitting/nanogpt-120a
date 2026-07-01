@@ -1,6 +1,6 @@
 use cuda_device::{cuda_module, kernel, thread, DisjointSlice, SharedArray};
 
-use crate::amax::{amax4_f32, max4_f32};
+use crate::amax::max4_f32;
 use crate::block_reduce::{block_max_leader_f32, block_max_store_f32};
 use crate::float_ptx::max_f32;
 use crate::quartet::quartet_backward_ms_eden_global_scale;
@@ -11,7 +11,7 @@ use super::input::{
 };
 use super::AMAX_WARPS_PER_BLOCK;
 use crate::nvfp4_quant::kernels::row_amax::{
-    TENSOR_AMAX_VALUES_PER_BLOCK, tensor_amax_chunk_indices,
+    tensor_amax_chunk_indices, tensor_chunk_amax4,
 };
 
 #[cuda_module]
@@ -20,16 +20,6 @@ pub(crate) mod module {
 
     static mut AMAX_REDUCE: SharedArray<f32, { AMAX_WARPS_PER_BLOCK as usize }> =
         SharedArray::UNINIT;
-
-    macro_rules! chunk_amax4 {
-        ($base:expr, $count:expr, [$i0:expr, $i1:expr, $i2:expr, $i3:expr], $value:ident($($value_arg:expr),+), $checked:ident($($checked_arg:expr),+)) => {{
-            if $base + TENSOR_AMAX_VALUES_PER_BLOCK <= $count {
-                amax4_f32($value($($value_arg),+, $i0), $value($($value_arg),+, $i1), $value($($value_arg),+, $i2), $value($($value_arg),+, $i3))
-            } else {
-                max4_f32($checked($($checked_arg),+, $i0, $count), $checked($($checked_arg),+, $i1, $count), $checked($($checked_arg),+, $i2, $count), $checked($($checked_arg),+, $i3, $count))
-            }
-        }};
-    }
 
     #[kernel]
     pub fn rowwise_nvfp4_chunk_amax_kernel(
@@ -43,7 +33,7 @@ pub(crate) mod module {
         let element_count = rows * cols;
         let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
-        let local_amax = chunk_amax4!(
+        let local_amax = tensor_chunk_amax4!(
             base, element_count, [i0, i1, i2, i3],
             rowwise_value_at(bytes, scales, global_scales, cols),
             checked_rowwise_abs_value(bytes, scales, global_scales, cols)
@@ -62,7 +52,7 @@ pub(crate) mod module {
     ) {
         let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
-        let local_amax = chunk_amax4!(
+        let local_amax = tensor_chunk_amax4!(
             base, element_count, [i0, i1, i2, i3],
             nvfp4_value_at(bytes, scales, global_scale),
             checked_nvfp4_abs_value(bytes, scales, global_scale)

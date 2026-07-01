@@ -1,6 +1,5 @@
 use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
-use crate::amax::{amax4_f32, max4_f32};
 use crate::block_reduce::block_max_store_f32;
 use crate::float_ptx::{abs_f32, max_f32};
 use crate::warp_reduce::thread_lane_warp;
@@ -8,6 +7,17 @@ use crate::warp_reduce::thread_lane_warp;
 use super::super::config::WARPS_PER_BLOCK;
 
 pub(crate) const TENSOR_AMAX_VALUES_PER_BLOCK: u32 = 1024;
+
+macro_rules! tensor_chunk_amax4 {
+    ($base:expr, $count:expr, [$i0:expr, $i1:expr, $i2:expr, $i3:expr], $value:ident($($value_arg:expr),+), $checked:ident($($checked_arg:expr),+)) => {{
+        if $base + $crate::nvfp4_quant::kernels::row_amax::TENSOR_AMAX_VALUES_PER_BLOCK <= $count {
+            $crate::amax::amax4_f32($value($($value_arg),+, $i0), $value($($value_arg),+, $i1), $value($($value_arg),+, $i2), $value($($value_arg),+, $i3))
+        } else {
+            $crate::amax::max4_f32($checked($($checked_arg),+, $i0, $count), $checked($($checked_arg),+, $i1, $count), $checked($($checked_arg),+, $i2, $count), $checked($($checked_arg),+, $i3, $count))
+        }
+    }};
+}
+pub(crate) use tensor_chunk_amax4;
 
 #[inline(always)]
 pub(crate) fn tensor_amax_chunk_indices() -> (u32, u32, u32, u32, u32, u32, u32, u32) {
@@ -54,28 +64,11 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    pub fn tensor_chunk_amax_f32_kernel(
-        x: &[f32],
-        mut out: DisjointSlice<f32>,
-        element_count: u32,
-    ) {
+    pub fn tensor_chunk_amax_f32_kernel(x: &[f32], mut out: DisjointSlice<f32>, element_count: u32) {
         let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
-        let local_amax = if base + TENSOR_AMAX_VALUES_PER_BLOCK <= element_count {
-            amax4_f32(
-                x[i0 as usize],
-                x[i1 as usize],
-                x[i2 as usize],
-                x[i3 as usize],
-            )
-        } else {
-            max4_f32(
-                checked_abs_f32(x, i0, element_count),
-                checked_abs_f32(x, i1, element_count),
-                checked_abs_f32(x, i2, element_count),
-                checked_abs_f32(x, i3, element_count),
-            )
-        };
+        let local_amax =
+            tensor_chunk_amax4!(base, element_count, [i0, i1, i2, i3], abs_f32_at(x), checked_abs_f32(x));
 
         block_max_store_f32!(TENSOR_AMAX, out[chunk], local_amax, lane, warp_in_block);
     }
@@ -96,6 +89,11 @@ pub(crate) mod module {
         }
 
         block_max_store_f32!(TENSOR_AMAX, out[0], local_amax, lane, warp_in_block);
+    }
+
+    #[inline(always)]
+    fn abs_f32_at(x: &[f32], index: u32) -> f32 {
+        abs_f32(x[index as usize])
     }
 
     #[inline(always)]
