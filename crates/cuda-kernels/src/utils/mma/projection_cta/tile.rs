@@ -44,12 +44,7 @@ impl Nvfp4ProjectionCtaTile {
     }
 
     pub fn row_pair(thread_id: u32) -> (Self, Self) {
-        let tile_col = thread::blockIdx_x();
-        let tile_row_pair = thread::blockIdx_y();
-        (
-            Self::from_grid_tile(tile_col, tile_row_pair * 2, thread_id),
-            Self::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id),
-        )
+        Self::from_grid_tile_pair(thread::blockIdx_x(), thread::blockIdx_y(), thread_id)
     }
 
     pub fn packed_row_pair(
@@ -60,6 +55,10 @@ impl Nvfp4ProjectionCtaTile {
     ) -> (Self, Self) {
         let tile_col = tile_index & grid_col_mask;
         let tile_row_pair = tile_index >> grid_col_shift;
+        Self::from_grid_tile_pair(tile_col, tile_row_pair, thread_id)
+    }
+
+    fn from_grid_tile_pair(tile_col: u32, tile_row_pair: u32, thread_id: u32) -> (Self, Self) {
         (
             Self::from_grid_tile(tile_col, tile_row_pair * 2, thread_id),
             Self::from_grid_tile(tile_col, tile_row_pair * 2 + 1, thread_id),
