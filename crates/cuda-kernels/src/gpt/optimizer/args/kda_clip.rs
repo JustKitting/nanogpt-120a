@@ -1,0 +1,23 @@
+use cuda_core::{CudaStream, DeviceBuffer};
+
+pub struct KdaAuroraClipArgs<'a> {
+    pub stream: &'a CudaStream,
+    pub qkv: &'a DeviceBuffer<u16>,
+    pub bytes: &'a mut DeviceBuffer<u8>,
+    pub scales: &'a mut DeviceBuffer<u8>,
+    pub global_scale: &'a mut DeviceBuffer<f32>,
+    pub z_master: &'a mut DeviceBuffer<f32>,
+    pub x_master: &'a mut DeviceBuffer<f32>,
+    pub momentum: &'a mut DeviceBuffer<f32>,
+    pub scores: &'a mut DeviceBuffer<f32>,
+    pub amax: &'a mut DeviceBuffer<f32>,
+    pub chunk_amax: &'a mut DeviceBuffer<f32>,
+    pub row_count: u32,
+    pub qkv_dim: u32,
+    pub input_dim: u32,
+    pub embedding_dim: u32,
+    pub head_count: u32,
+    pub head_dim: u32,
+    pub tau: f32,
+    pub silu_qk: u32,
+}
