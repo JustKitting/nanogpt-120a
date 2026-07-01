@@ -11,16 +11,14 @@ use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 #[path = "l2_attention/assertions.rs"]
 mod assertions;
 mod common;
-#[path = "common/upload.rs"]
-mod upload_common;
 #[path = "l2_attention/data.rs"]
 mod data;
 #[path = "common/f16.rs"]
 mod f16_common;
-#[path = "common/nvfp4.rs"]
-mod nvfp4_common;
 #[path = "support/forward_scratch.rs"]
 mod scratch_support;
+#[path = "common/upload.rs"]
+mod upload_common;
 
 use assertions::{
     assert_attention_log_sum_exp, assert_attention_matches, assert_c_proj_residual_add,
@@ -29,7 +27,7 @@ use assertions::{
 use common::cuda_test_context;
 use data::{c_proj_identity_weight_bytes, hidden_input, qkv_identity_weight_bytes, residual_input};
 use scratch_support::{CausalAttentionTcScratchBuffers, RowwiseNvfp4ScratchBuffers};
-use upload_common::{TestResult, upload_nvfp4_bytes, upload_zero_nvfp4};
+use upload_common::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]

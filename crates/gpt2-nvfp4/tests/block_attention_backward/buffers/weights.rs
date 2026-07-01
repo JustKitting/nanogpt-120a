@@ -4,8 +4,8 @@ use gpt2_nvfp4::{
     QkvWeightShape, ResidualWeightShape,
 };
 
-use crate::data::{E2M1_MIN_PAIR, E2M1_ONE_PAIR};
-use crate::upload_common::{TestResult, UploadedNvfp4, upload_nvfp4_bytes, upload_zero_nvfp4};
+use crate::common::nvfp4::{E2M1_MIN_PAIR, E2M1_ONE_PAIR};
+use crate::upload_common::{upload_nvfp4_bytes, upload_zero_nvfp4, TestResult, UploadedNvfp4};
 
 pub struct WeightBuffers {
     qkv_weight: UploadedNvfp4,

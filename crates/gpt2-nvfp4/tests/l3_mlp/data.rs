@@ -1,8 +1,8 @@
 use gpt2_nvfp4::{
-    GPT2_MLP, GPT2_N_EMBD, HiddenState, MlpDownWeightShape, MlpUpWeightShape, Nvfp4Shape,
+    HiddenState, MlpDownWeightShape, MlpUpWeightShape, Nvfp4Shape, GPT2_MLP, GPT2_N_EMBD,
 };
 
-use crate::nvfp4_common::repeating_identity_bytes;
+use crate::common::nvfp4::repeating_identity_bytes;
 
 pub fn normalized_input() -> Vec<f32> {
     hidden_values(|_, col| if col < GPT2_N_EMBD / 2 { 0.5 } else { -0.5 })

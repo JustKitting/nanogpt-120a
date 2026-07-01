@@ -20,8 +20,6 @@ mod common;
 mod data;
 #[path = "support/linear_backward_scratch.rs"]
 mod linear_scratch;
-#[path = "common/nvfp4.rs"]
-mod nvfp4_common;
 #[path = "common/saved_block.rs"]
 mod saved_block;
 #[path = "block_attention_backward/scratch.rs"]

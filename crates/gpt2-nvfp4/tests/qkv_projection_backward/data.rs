@@ -2,8 +2,7 @@ use gpt2_nvfp4::{
     AttentionBackwardSeeds, Gpt2Rng, HiddenState, Nvfp4Shape, QkvActivation, QkvWeightShape,
 };
 
-const E2M1_MIN_PAIR: u8 = 0x11;
-const E4M3_ONE: u8 = 0x38;
+use crate::common::nvfp4::{E2M1_MIN_PAIR, E4M3_ONE};
 
 pub fn qkv_input_bytes() -> Vec<u8> {
     vec![E2M1_MIN_PAIR; HiddenState::LEN / 2]

@@ -1,18 +1,15 @@
 use std::error::Error;
 
 use cuda_core::DeviceBuffer;
-use gpt2_nvfp4::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, HiddenState, Nvfp4Shape, TokenEmbeddingShape};
+use gpt2_nvfp4::{HiddenState, Nvfp4Shape, TokenEmbeddingShape, GPT2_CONTEXT_LEN, GPT2_N_EMBD};
 use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 mod common;
-#[path = "common/nvfp4.rs"]
-mod nvfp4_common;
 
 use common::cuda_test_context;
-use nvfp4_common::set_e2m1_one;
+use common::nvfp4::{set_e2m1_one, E4M3_ONE};
 
-const E4M3_ONE: u8 = 0x38;
 const TOLERANCE: f32 = 1.0e-7;
 
 #[ignore = "requires generated sm_120a PTX"]

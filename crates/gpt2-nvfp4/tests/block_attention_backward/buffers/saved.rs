@@ -2,8 +2,7 @@ use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{BlockForwardSaved, HiddenState, QkvActivation, GPT2_TOKEN_ROWS};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
-use crate::data::{E2M1_MIN_PAIR, E4M3_ONE};
-use crate::nvfp4_common::filled_u8;
+use crate::common::nvfp4::{filled_u8, E2M1_MIN_PAIR, E4M3_ONE};
 use crate::saved_block::{saved_block, SavedBlockParts};
 
 pub struct SavedBuffers {

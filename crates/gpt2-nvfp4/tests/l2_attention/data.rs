@@ -3,7 +3,7 @@ use gpt2_nvfp4::{
     GPT2_QKV,
 };
 
-use super::nvfp4_common::repeating_identity_bytes;
+use crate::common::nvfp4::repeating_identity_bytes;
 
 pub fn hidden_input() -> (Vec<f32>, Vec<f32>) {
     let mut hidden = vec![0.0_f32; HiddenState::LEN];

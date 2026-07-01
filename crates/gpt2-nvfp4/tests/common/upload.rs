@@ -5,8 +5,9 @@ use gpt2_nvfp4::{Gpt2BlockWeights, LayerNormTensors, LayerNormWeights, Nvfp4Shap
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
+use crate::common::nvfp4::E4M3_ONE;
+
 pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
-const E4M3_ONE: u8 = 0x38;
 
 pub struct UploadedNvfp4 {
     bytes: DeviceBuffer<u8>,
