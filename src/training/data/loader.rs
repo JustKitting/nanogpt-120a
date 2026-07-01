@@ -1,8 +1,9 @@
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
 
 use super::{
-    TokenDataLoader, TokenWindowBatch, tokens,
-    validation::{VALIDATION_WINDOWS, train_end, validation_windows},
+    tokens,
+    validation::{train_end, validation_windows, VALIDATION_WINDOWS},
+    TokenDataLoader, TokenWindowBatch,
 };
 use crate::AppResult;
 
@@ -17,24 +18,18 @@ impl TokenDataLoader {
             self.advance_train_shard()?;
         }
 
-        let mut offsets = Vec::with_capacity(GPT2_BATCH_SIZE);
-        if self.repeat_first_window {
-            offsets.resize(GPT2_BATCH_SIZE, 0);
-        } else {
-            for _ in 0..GPT2_BATCH_SIZE {
-                offsets.push(self.offset);
+        let batch_offset = self.offset;
+        let mut tokens = Vec::with_capacity(GPT2_BATCH_SIZE * len);
+        for _ in 0..GPT2_BATCH_SIZE {
+            tokens.extend_from_slice(&self.tokens[self.offset..self.offset + len]);
+            if !self.repeat_first_window {
                 self.offset += GPT2_SEQ_LEN;
             }
-        }
-
-        let mut tokens = Vec::with_capacity(GPT2_BATCH_SIZE * len);
-        for &offset in &offsets {
-            tokens.extend_from_slice(&self.tokens[offset..offset + len]);
         }
         Ok(TokenWindowBatch {
             tokens,
             source: self.path.clone(),
-            offset: offsets.first().copied().unwrap_or(0),
+            offset: batch_offset,
             batch_size: GPT2_BATCH_SIZE,
             seq_len: GPT2_SEQ_LEN,
         })
