@@ -1,11 +1,11 @@
 use std::error::Error;
 
-use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::f16_tc_matmul::{
-    F16TcMatmulArgs, F16TcMatmulModule, F16TcMatmulScratch, f16_tc_matmul_elements,
-};
+use cuda_core::DeviceBuffer;
+use rust_kernels_cuda::f16_tc_matmul::{F16TcMatmulArgs, F16TcMatmulModule};
 
 mod common;
+
+use common::f16_tc::F16TcScratchBuffers;
 
 const BATCH: usize = 2;
 const M: usize = 16;
@@ -20,7 +20,7 @@ fn batched_f16_tc_matmul_matches_power_of_two_reference() -> Result<(), Box<dyn 
     let a = DeviceBuffer::from_host(&stream, &vec![0.125_f32; BATCH * M * K])?;
     let b = DeviceBuffer::from_host(&stream, &vec![0.25_f32; BATCH * N * K])?;
     let mut out = DeviceBuffer::<f32>::zeroed(&stream, BATCH * M * N)?;
-    let mut scratch = ScratchBuffers::new(&stream)?;
+    let mut scratch = F16TcScratchBuffers::new(&stream, (BATCH * M, BATCH * N, K))?;
 
     module.batched_matmul(F16TcMatmulArgs {
         stream: &stream,
@@ -36,45 +36,4 @@ fn batched_f16_tc_matmul_matches_power_of_two_reference() -> Result<(), Box<dyn 
 
     common::assert_all_close(&out.to_host_vec(&stream)?, 0.5, TOLERANCE);
     Ok(())
-}
-
-struct ScratchBuffers {
-    a_padded: DeviceBuffer<f32>,
-    b_t_padded: DeviceBuffer<f32>,
-    a_halves: DeviceBuffer<u16>,
-    b_t_halves: DeviceBuffer<u16>,
-}
-
-impl ScratchBuffers {
-    fn new(stream: &CudaStream) -> Result<Self, DriverError> {
-        let a_rows = BATCH * M;
-        let b_rows = BATCH * N;
-        Ok(Self {
-            a_padded: DeviceBuffer::zeroed(
-                stream,
-                f16_tc_matmul_elements(a_rows as u32, K as u32),
-            )?,
-            b_t_padded: DeviceBuffer::zeroed(
-                stream,
-                f16_tc_matmul_elements(b_rows as u32, K as u32),
-            )?,
-            a_halves: DeviceBuffer::zeroed(
-                stream,
-                f16_tc_matmul_elements(a_rows as u32, K as u32),
-            )?,
-            b_t_halves: DeviceBuffer::zeroed(
-                stream,
-                f16_tc_matmul_elements(b_rows as u32, K as u32),
-            )?,
-        })
-    }
-
-    fn args(&mut self) -> F16TcMatmulScratch<'_> {
-        F16TcMatmulScratch {
-            a_padded: &mut self.a_padded,
-            b_t_padded: &mut self.b_t_padded,
-            a_halves: &mut self.a_halves,
-            b_t_halves: &mut self.b_t_halves,
-        }
-    }
 }
