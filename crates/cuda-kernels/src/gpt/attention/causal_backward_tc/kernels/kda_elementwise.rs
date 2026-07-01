@@ -1,9 +1,9 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::super::kda::{
-    add_kda_compact_body, chunk_cumsum_g_body, finish_kda_backward_body, gather_kda_dout_body,
-    make_kda_kneg_from_kg_body, make_kda_kpos_from_kg_body, make_kda_strict_neg_matrix_body,
-    prepare_kda_backward_inputs_body,
+    FinishKdaGrads, add_kda_compact_body, chunk_cumsum_g_body, finish_kda_backward_body,
+    gather_kda_dout_body, make_kda_kneg_from_kg_body, make_kda_kpos_from_kg_body,
+    make_kda_strict_neg_matrix_body, prepare_kda_backward_inputs_body,
 };
 use crate::attention::CausalAttentionParams;
 
@@ -91,7 +91,7 @@ pub(super) mod module {
         d_qkv: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        finish_kda_backward_body(qkv, d_q, d_k, d_v, d_g, d_beta, d_qkv, params);
+        finish_kda_backward_body(qkv, FinishKdaGrads { q: d_q, k: d_k, v: d_v, g: d_g, beta: d_beta }, d_qkv, params);
     }
 }
 
