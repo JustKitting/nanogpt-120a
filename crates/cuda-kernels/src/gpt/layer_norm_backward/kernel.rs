@@ -40,34 +40,12 @@ pub(super) mod kernels {
                 });
                 let dxhat = layer_norm_map3!(cols, |col| {
                     let grad = f32_column($d_normalized, row_base, col, $embedding_dim);
-                    let weight = nvfp4_column(
-                        $weight_bytes,
-                        $weight_scales,
-                        $weight_global_scale[0],
-                        0,
-                        col,
-                        $embedding_dim,
-                    );
+                    let weight = nvfp4_column($weight_bytes, $weight_scales, $weight_global_scale[0], 0, col, $embedding_dim);
                     grad * weight
                 });
-                let dxhat_sum = layer_norm_block_reduce!(
-                    WARP_SUMS,
-                    WARPS_PER_BLOCK,
-                    layer_norm_sum3!(dxhat),
-                    lane,
-                    warp_in_block,
-                    warp_sum_f32
-                );
-                let xhat_dxhat =
-                    layer_norm_map3_indexed!(xhat, |index, value| value * dxhat[index]);
-                let xhat_dxhat_sum = layer_norm_block_reduce!(
-                    WARP_SUMS,
-                    WARPS_PER_BLOCK,
-                    layer_norm_sum3!(xhat_dxhat),
-                    lane,
-                    warp_in_block,
-                    warp_sum_f32
-                );
+                let dxhat_sum = layer_norm_block_reduce!(WARP_SUMS, WARPS_PER_BLOCK, layer_norm_sum3!(dxhat), lane, warp_in_block, warp_sum_f32);
+                let xhat_dxhat = layer_norm_map3_indexed!(xhat, |index, value| value * dxhat[index]);
+                let xhat_dxhat_sum = layer_norm_block_reduce!(WARP_SUMS, WARPS_PER_BLOCK, layer_norm_sum3!(xhat_dxhat), lane, warp_in_block, warp_sum_f32);
                 let inv_dim = 1.0 / $embedding_dim as f32;
                 let dx = layer_norm_map3_indexed!(dxhat, |index, value| {
                     (value - dxhat_sum * inv_dim - xhat[index] * xhat_dxhat_sum * inv_dim)
