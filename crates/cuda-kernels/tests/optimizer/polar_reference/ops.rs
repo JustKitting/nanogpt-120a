@@ -11,6 +11,16 @@ pub fn polar_next(x: &[f32], ax: &[f32], aax: &[f32], iter: usize) -> Vec<f32> {
         .collect()
 }
 
+pub fn polar_iterations_f16(mut x: Vec<f32>, rows: usize, cols: usize, n: usize) -> Vec<f32> {
+    for iter in 0..n {
+        let gram = matmul_f16(&x, &x, rows, rows, cols, true);
+        let ax = matmul_f16(&gram, &x, rows, cols, rows, false);
+        let aax = matmul_f16(&gram, &ax, rows, cols, rows, false);
+        x = polar_next(&x, &ax, &aax, iter);
+    }
+    x
+}
+
 pub fn matmul_f16(
     a: &[f32],
     b: &[f32],

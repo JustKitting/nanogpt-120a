@@ -1,14 +1,8 @@
 use crate::polar_coefficients::coefficients;
-use crate::polar_reference::{matmul_f16, polar_next};
+use crate::polar_reference::{matmul_f16, polar_iterations_f16};
 
-pub fn standard_polar(mut x: Vec<f32>, rows: usize, cols: usize, iterations: usize) -> Vec<f32> {
-    for iter in 0..iterations {
-        let gram = matmul_f16(&x, &x, rows, rows, cols, true);
-        let ax = matmul_f16(&gram, &x, rows, cols, rows, false);
-        let aax = matmul_f16(&gram, &ax, rows, cols, rows, false);
-        x = polar_next(&x, &ax, &aax, iter);
-    }
-    x
+pub fn standard_polar(x: Vec<f32>, rows: usize, cols: usize, iterations: usize) -> Vec<f32> {
+    polar_iterations_f16(x, rows, cols, iterations)
 }
 
 pub fn stabilized_gram_ns(
