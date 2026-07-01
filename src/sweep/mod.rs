@@ -4,7 +4,6 @@ mod candidate;
 mod candidate_space;
 mod chain;
 mod config;
-mod env_file;
 mod features;
 mod fmt;
 mod history;

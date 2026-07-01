@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::env_file::parsed;
 use crate::sweep::candidate::Candidate;
-use crate::sweep::env_file::parsed;
 use crate::sweep::history::Trial;
 use crate::sweep::parse::RunResult;
 

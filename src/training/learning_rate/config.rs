@@ -1,5 +1,7 @@
 use std::{fs, path::PathBuf, str::FromStr, sync::OnceLock};
 
+use crate::env_file;
+
 const TRAIN_LR_SCALE_ENV: &str = "TRAIN_LR_SCALE";
 const TRAIN_ADAM_LR_SCALE_ENV: &str = "TRAIN_ADAM_LR_SCALE";
 const TRAIN_NEXTLAT_LR_SCALE_ENV: &str = "TRAIN_NEXTLAT_LR_SCALE";
@@ -48,7 +50,7 @@ fn config_value<T: FromStr>(name: &str, default: T) -> T {
     std::env::var(name)
         .ok()
         .and_then(|value| value.parse().ok())
-        .or_else(|| baseline().parse(name))
+        .or_else(|| env_file::parsed(&baseline().text, name))
         .unwrap_or(default)
 }
 
@@ -66,17 +68,6 @@ impl Baseline {
         Self {
             text: fs::read_to_string(baseline_path()).unwrap_or_default(),
         }
-    }
-
-    fn parse<T: FromStr>(&self, name: &str) -> Option<T> {
-        self.value(name).and_then(|value| value.parse().ok())
-    }
-
-    fn value(&self, name: &str) -> Option<&str> {
-        self.text.lines().find_map(|line| {
-            let (key, value) = line.split_once('=')?;
-            (key.trim() == name).then_some(value.trim())
-        })
     }
 }
 

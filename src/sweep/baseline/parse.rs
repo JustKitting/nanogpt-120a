@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
+use crate::env_file::{parsed, value};
 use crate::sweep::candidate::Candidate;
-use crate::sweep::env_file::{parsed, value};
 
 use super::record::Record;
 
