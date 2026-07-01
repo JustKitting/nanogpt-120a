@@ -23,50 +23,33 @@ struct FinishDimPoint { ctx: KdaWarpCtx, dim: u32, qk: KdaQkAct }
 #[derive(Clone, Copy)]
 struct FinishNormStats { q_norm: f32, k_norm: f32, q_dot: f32, k_dot: f32 }
 
-pub(crate) fn finish_kda_backward_body(
-    qkv: &[u16],
-    grads: FinishKdaGrads<'_>,
-    mut d_qkv: DisjointSlice<f32>,
-    params: CausalAttentionParams,
-) {
+#[derive(Clone, Copy)]
+struct FinishNormAcc { q_sum: f32, k_sum: f32, q_dot: f32, k_dot: f32 }
+
+impl FinishNormAcc {
+    #[inline(always)]
+    fn zero() -> Self { Self { q_sum: 0.0, k_sum: 0.0, q_dot: 0.0, k_dot: 0.0 } }
+
+    #[inline(always)]
+    fn stats(self) -> FinishNormStats {
+        let q_norm = sqrt_f32(warp_sum_f32(self.q_sum) + KDA_DENOM_EPS);
+        let k_norm = sqrt_f32(warp_sum_f32(self.k_sum) + KDA_DENOM_EPS);
+        FinishNormStats { q_norm, k_norm, q_dot: warp_sum_f32(self.q_dot), k_dot: warp_sum_f32(self.k_dot) }
+    }
+}
+
+pub(crate) fn finish_kda_backward_body(qkv: &[u16], grads: FinishKdaGrads<'_>, mut d_qkv: DisjointSlice<f32>, params: CausalAttentionParams) {
     let ctx = kda_warp_ctx(TC_BACKWARD_THREADS_PER_BLOCK, &params);
     if !ctx.valid {
         return;
     }
 
-    let mut q_sum = 0.0;
-    let mut k_sum = 0.0;
-    let mut q_dot = 0.0;
-    let mut k_dot = 0.0;
-
+    let mut acc = FinishNormAcc::zero();
     let dim0 = ctx.lane;
-    let mut qk0 = KdaQkAct::zero();
-    if dim0 < params.head_dim {
-        qk0 = read_qk_act(qkv, ctx.row, ctx.head, dim0, &params);
-        let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim0, &params);
-        q_sum = fma_f32(qk0.q_act, qk0.q_act, q_sum);
-        k_sum = fma_f32(qk0.k_act, qk0.k_act, k_sum);
-        q_dot = fma_f32(grads.q[compact], qk0.q_act, q_dot);
-        k_dot = fma_f32(grads.k[compact], qk0.k_act, k_dot);
-    }
-
+    let qk0 = read_finish_dim(qkv, grads, ctx, dim0, &params, &mut acc);
     let dim1 = ctx.lane + 32;
-    let mut qk1 = KdaQkAct::zero();
-    if dim1 < params.head_dim {
-        qk1 = read_qk_act(qkv, ctx.row, ctx.head, dim1, &params);
-        let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim1, &params);
-        q_sum = fma_f32(qk1.q_act, qk1.q_act, q_sum);
-        k_sum = fma_f32(qk1.k_act, qk1.k_act, k_sum);
-        q_dot = fma_f32(grads.q[compact], qk1.q_act, q_dot);
-        k_dot = fma_f32(grads.k[compact], qk1.k_act, k_dot);
-    }
-
-    let stats = FinishNormStats {
-        q_norm: sqrt_f32(warp_sum_f32(q_sum) + KDA_DENOM_EPS),
-        k_norm: sqrt_f32(warp_sum_f32(k_sum) + KDA_DENOM_EPS),
-        q_dot: warp_sum_f32(q_dot),
-        k_dot: warp_sum_f32(k_dot),
-    };
+    let qk1 = read_finish_dim(qkv, grads, ctx, dim1, &params, &mut acc);
+    let stats = acc.stats();
 
     if dim0 < params.head_dim {
         finish_dim(qkv, grads, &mut d_qkv, FinishDimPoint { ctx, dim: dim0, qk: qk0 }, stats, &params);
@@ -86,13 +69,27 @@ pub(crate) fn finish_kda_backward_body(
     }
 }
 
+#[inline(always)]
+fn read_finish_dim(
+    qkv: &[u16], grads: FinishKdaGrads<'_>, ctx: KdaWarpCtx, dim: u32,
+    params: &CausalAttentionParams, acc: &mut FinishNormAcc,
+) -> KdaQkAct {
+    if dim >= params.head_dim {
+        return KdaQkAct::zero();
+    }
+
+    let qk = read_qk_act(qkv, ctx.row, ctx.head, dim, params);
+    let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim, params);
+    acc.q_sum = fma_f32(qk.q_act, qk.q_act, acc.q_sum);
+    acc.k_sum = fma_f32(qk.k_act, qk.k_act, acc.k_sum);
+    acc.q_dot = fma_f32(grads.q[compact], qk.q_act, acc.q_dot);
+    acc.k_dot = fma_f32(grads.k[compact], qk.k_act, acc.k_dot);
+    qk
+}
+
 fn finish_dim(
-    qkv: &[u16],
-    grads: FinishKdaGrads<'_>,
-    d_qkv: &mut DisjointSlice<f32>,
-    point: FinishDimPoint,
-    stats: FinishNormStats,
-    params: &CausalAttentionParams,
+    qkv: &[u16], grads: FinishKdaGrads<'_>, d_qkv: &mut DisjointSlice<f32>,
+    point: FinishDimPoint, stats: FinishNormStats, params: &CausalAttentionParams,
 ) {
     let FinishDimPoint { ctx, dim, qk } = point;
     let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim, params);
