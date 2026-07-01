@@ -50,25 +50,15 @@ fn config_value<T: FromStr>(name: &str, default: T) -> T {
     std::env::var(name)
         .ok()
         .and_then(|value| value.parse().ok())
-        .or_else(|| env_file::parsed(&baseline().text, name))
+        .or_else(|| env_file::parsed(baseline_text(), name))
         .unwrap_or(default)
 }
 
-fn baseline() -> &'static Baseline {
-    static BASELINE: OnceLock<Baseline> = OnceLock::new();
-    BASELINE.get_or_init(Baseline::load)
-}
-
-struct Baseline {
-    text: String,
-}
-
-impl Baseline {
-    fn load() -> Self {
-        Self {
-            text: fs::read_to_string(baseline_path()).unwrap_or_default(),
-        }
-    }
+fn baseline_text() -> &'static str {
+    static BASELINE: OnceLock<String> = OnceLock::new();
+    BASELINE
+        .get_or_init(|| fs::read_to_string(baseline_path()).unwrap_or_default())
+        .as_str()
 }
 
 fn baseline_path() -> PathBuf {
