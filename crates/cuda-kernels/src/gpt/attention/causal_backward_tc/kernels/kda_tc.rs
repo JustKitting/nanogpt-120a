@@ -1,8 +1,9 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::super::kda::{
-    ChunkStateMatmulMode, KdaDmInputs, chunk_intra_kda_backward_body, chunk_intra_kda_dm_body,
-    chunk_kda_dkg_from_vnew_dh_body, chunk_state_matmul_body, chunkwise_kda_backward_body,
+    ChunkStateMatmulMode, KdaDmInputs, KdaIntraGrads, KdaIntraInputs,
+    chunk_intra_kda_backward_body, chunk_intra_kda_dm_body, chunk_kda_dkg_from_vnew_dh_body,
+    chunk_state_matmul_body, chunkwise_kda_backward_body,
 };
 use crate::attention::CausalAttentionParams;
 use crate::kda_tc::{with_kda_tiles, with_tc_ab_tiles};
@@ -10,12 +11,6 @@ use crate::kda_tc::{with_kda_tiles, with_tc_ab_tiles};
 #[cuda_module]
 pub(super) mod module {
     use super::*;
-
-    macro_rules! call_body {
-        ($func:ident; $($arg:expr),* $(,)?) => {
-            $func($($arg),*);
-        };
-    }
 
     #[kernel]
     pub fn chunk_kda_vnew_from_state_kernel(
@@ -108,7 +103,9 @@ pub(super) mod module {
         d_beta: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
-        call_body!(chunk_intra_kda_backward_body; qg, kg, vbeta, g, beta, d_qg_to_dv, d_kg, d_k_a_to_dg, d_kpos_m, d_vbeta_m, d_kneg_from_b, d_kpos_from_b_t, d_q, d_k, d_beta, params);
+        let inputs = KdaIntraInputs { qg, kg, vbeta, g, beta, d_kg, d_kpos_m, d_vbeta_m, d_kneg_from_b, d_kpos_from_b_t };
+        let grads = KdaIntraGrads { qg_to_dv: d_qg_to_dv, k_a_to_dg: d_k_a_to_dg, q: d_q, k: d_k, beta: d_beta };
+        chunk_intra_kda_backward_body(inputs, grads, params);
     }
 }
 
