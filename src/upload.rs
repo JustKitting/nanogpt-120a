@@ -8,8 +8,8 @@ use gpt2_nvfp4::{
 
 use crate::AppResult;
 
-use self::tensor::{upload_linear, upload_nvfp4};
-pub use self::tensor::{UploadedLayerNorm, UploadedLinear, UploadedNvfp4};
+use self::tensor::upload_nvfp4;
+pub use self::tensor::{UploadedLayerNorm, UploadedLinear, UploadedNvfp4, UploadedPair};
 
 pub struct UploadedModel {
     pub token_embedding: UploadedNvfp4,
@@ -27,7 +27,7 @@ impl UploadedModel {
                 .iter()
                 .map(|block| UploadedBlock::new(stream, block))
                 .collect::<AppResult<_>>()?,
-            ln_f: UploadedLayerNorm::new(stream, &weights.ln_f)?,
+            ln_f: UploadedLayerNorm::from_layer_norm(stream, &weights.ln_f)?,
             next_latent: UploadedNextLat::new(stream, &weights.next_latent)?,
         })
     }
@@ -54,13 +54,13 @@ pub struct UploadedNextLat {
 impl UploadedNextLat {
     fn new(stream: &CudaStream, weights: &NextLatWeights) -> AppResult<Self> {
         Ok(Self {
-            norm: UploadedLayerNorm {
-                weight: upload_nvfp4(stream, &weights.norm_weight)?,
-                bias: upload_nvfp4(stream, &weights.norm_bias)?,
-            },
-            input_projection: upload_linear(stream, &weights.input_projection)?,
-            transition: upload_linear(stream, &weights.transition)?,
-            output_projection: upload_linear(stream, &weights.output_projection)?,
+            norm: UploadedLayerNorm::from_parts(
+                upload_nvfp4(stream, &weights.norm_weight)?,
+                upload_nvfp4(stream, &weights.norm_bias)?,
+            ),
+            input_projection: UploadedLinear::from_linear(stream, &weights.input_projection)?,
+            transition: UploadedLinear::from_linear(stream, &weights.transition)?,
+            output_projection: UploadedLinear::from_linear(stream, &weights.output_projection)?,
         })
     }
 }
@@ -77,12 +77,12 @@ pub struct UploadedBlock {
 impl UploadedBlock {
     fn new(stream: &CudaStream, block: &Gpt2BlockWeights) -> AppResult<Self> {
         Ok(Self {
-            ln_1: UploadedLayerNorm::new(stream, &block.ln_1)?,
-            attn_qkv: upload_linear(stream, &block.attn.c_attn)?,
-            attn_c_proj: upload_linear(stream, &block.attn.c_proj)?,
-            ln_2: UploadedLayerNorm::new(stream, &block.ln_2)?,
-            mlp_up: upload_linear(stream, &block.mlp.c_fc)?,
-            mlp_down: upload_linear(stream, &block.mlp.c_proj)?,
+            ln_1: UploadedLayerNorm::from_layer_norm(stream, &block.ln_1)?,
+            attn_qkv: UploadedLinear::from_linear(stream, &block.attn.c_attn)?,
+            attn_c_proj: UploadedLinear::from_linear(stream, &block.attn.c_proj)?,
+            ln_2: UploadedLayerNorm::from_layer_norm(stream, &block.ln_2)?,
+            mlp_up: UploadedLinear::from_linear(stream, &block.mlp.c_fc)?,
+            mlp_down: UploadedLinear::from_linear(stream, &block.mlp.c_proj)?,
         })
     }
 

@@ -2,8 +2,8 @@ use cuda_core::CudaStream;
 
 use super::{super::format::CheckpointWriter, tensor};
 use crate::{
+    upload::{UploadedBlock, UploadedModel, UploadedNextLat, UploadedPair},
     AppResult,
-    upload::{UploadedBlock, UploadedLayerNorm, UploadedLinear, UploadedModel, UploadedNextLat, UploadedNvfp4},
 };
 
 pub(super) fn write_model(
@@ -15,7 +15,7 @@ pub(super) fn write_model(
     for (index, block) in model.blocks.iter().enumerate() {
         write_block(writer, stream, index, block)?;
     }
-    write_layer_norm(writer, stream, "ln_f", &model.ln_f)?;
+    write_uploaded_pair(writer, stream, "ln_f", &model.ln_f)?;
     write_next_latent(writer, stream, &model.next_latent)
 }
 
@@ -24,7 +24,7 @@ fn write_next_latent(
     stream: &CudaStream,
     next_latent: &UploadedNextLat,
 ) -> AppResult {
-    write_layer_norm(writer, stream, "next_latent.norm", &next_latent.norm)?;
+    write_uploaded_pair(writer, stream, "next_latent.norm", &next_latent.norm)?;
     write_linears(
         writer,
         stream,
@@ -44,7 +44,7 @@ fn write_block(
     block: &UploadedBlock,
 ) -> AppResult {
     let prefix = format!("blocks.{index}");
-    write_layer_norm(writer, stream, &format!("{prefix}.ln_1"), &block.ln_1)?;
+    write_uploaded_pair(writer, stream, &format!("{prefix}.ln_1"), &block.ln_1)?;
     write_linears(
         writer,
         stream,
@@ -54,7 +54,7 @@ fn write_block(
             ("attn_c_proj", &block.attn_c_proj),
         ],
     )?;
-    write_layer_norm(writer, stream, &format!("{prefix}.ln_2"), &block.ln_2)?;
+    write_uploaded_pair(writer, stream, &format!("{prefix}.ln_2"), &block.ln_2)?;
     write_linears(
         writer,
         stream,
@@ -63,37 +63,24 @@ fn write_block(
     )
 }
 
-fn write_layer_norm(
+fn write_uploaded_pair(
     writer: &mut CheckpointWriter<impl std::io::Write>,
     stream: &CudaStream,
     prefix: &str,
-    layer_norm: &UploadedLayerNorm,
+    pair: &UploadedPair,
 ) -> AppResult {
-    write_pair(writer, stream, prefix, &layer_norm.weight, &layer_norm.bias)
-}
-
-fn write_linear(
-    writer: &mut CheckpointWriter<impl std::io::Write>,
-    stream: &CudaStream,
-    prefix: &str,
-    linear: &UploadedLinear,
-) -> AppResult {
-    write_pair(writer, stream, prefix, &linear.weight, &linear.bias)
-}
-
-fn write_pair(writer: &mut CheckpointWriter<impl std::io::Write>, stream: &CudaStream, prefix: &str, weight: &UploadedNvfp4, bias: &UploadedNvfp4) -> AppResult {
-    tensor::write(writer, stream, &format!("{prefix}.weight"), weight)?;
-    tensor::write(writer, stream, &format!("{prefix}.bias"), bias)
+    tensor::write(writer, stream, &format!("{prefix}.weight"), &pair.weight)?;
+    tensor::write(writer, stream, &format!("{prefix}.bias"), &pair.bias)
 }
 
 fn write_linears<const N: usize>(
     writer: &mut CheckpointWriter<impl std::io::Write>,
     stream: &CudaStream,
     prefix: &str,
-    linears: [(&str, &UploadedLinear); N],
+    linears: [(&str, &UploadedPair); N],
 ) -> AppResult {
     for (suffix, linear) in linears {
-        write_linear(writer, stream, &format!("{prefix}.{suffix}"), linear)?;
+        write_uploaded_pair(writer, stream, &format!("{prefix}.{suffix}"), linear)?;
     }
     Ok(())
 }

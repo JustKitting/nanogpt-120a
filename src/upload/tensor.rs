@@ -5,21 +5,36 @@ use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 use crate::AppResult;
 
-pub struct UploadedLinear {
-    pub weight: UploadedNvfp4,
-    pub bias: UploadedNvfp4,
-}
-
-pub struct UploadedLayerNorm {
+pub struct UploadedPair {
     pub(crate) weight: UploadedNvfp4,
     pub(crate) bias: UploadedNvfp4,
 }
 
-impl UploadedLayerNorm {
-    pub(super) fn new(stream: &CudaStream, layer_norm: &LayerNormWeights) -> AppResult<Self> {
+pub type UploadedLayerNorm = UploadedPair;
+pub type UploadedLinear = UploadedPair;
+
+impl UploadedPair {
+    pub(crate) fn from_parts(weight: UploadedNvfp4, bias: UploadedNvfp4) -> Self {
+        Self { weight, bias }
+    }
+
+    pub(super) fn from_layer_norm(
+        stream: &CudaStream,
+        layer_norm: &LayerNormWeights,
+    ) -> AppResult<Self> {
         Ok(Self {
             weight: upload_nvfp4(stream, &layer_norm.weight)?,
             bias: upload_nvfp4(stream, &layer_norm.bias)?,
+        })
+    }
+
+    pub(super) fn from_linear<W: Nvfp4Shape, B: Nvfp4Shape>(
+        stream: &CudaStream,
+        linear: &LinearWeights<W, B>,
+    ) -> AppResult<Self> {
+        Ok(Self {
+            weight: upload_nvfp4(stream, &linear.weight)?,
+            bias: upload_nvfp4(stream, &linear.bias)?,
         })
     }
 
@@ -65,16 +80,6 @@ impl UploadedNvfp4 {
     pub fn mma(&self) -> Nvfp4FourSixMmaWeightTensor<'_> {
         Nvfp4FourSixMmaWeightTensor::new(&self.bytes, &self.scales, &self.global_scale)
     }
-}
-
-pub(super) fn upload_linear<W: Nvfp4Shape, B: Nvfp4Shape>(
-    stream: &CudaStream,
-    linear: &LinearWeights<W, B>,
-) -> AppResult<UploadedLinear> {
-    Ok(UploadedLinear {
-        weight: upload_nvfp4(stream, &linear.weight)?,
-        bias: upload_nvfp4(stream, &linear.bias)?,
-    })
 }
 
 pub(super) fn upload_nvfp4<S: Nvfp4Shape>(
