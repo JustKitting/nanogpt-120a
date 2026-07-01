@@ -34,17 +34,16 @@ impl UpdateSkipState {
             return UpdateSkipDecision::default();
         }
 
-        let loss_non_finite = loss.is_some_and(|value| !value.is_finite());
+        let finite_loss = loss.filter(|value| value.is_finite());
+        let loss_non_finite = loss.is_some() && finite_loss.is_none();
         let grad_non_finite = !grad_norm.is_finite();
         let loss_spike = self.config.use_loss
-            && loss
-                .filter(|value| value.is_finite())
-                .is_some_and(|value| self.is_spike(value, &self.losses));
+            && finite_loss.is_some_and(|value| self.is_spike(value, &self.losses));
         let grad_norm_spike = self.config.use_grad_norm
             && grad_norm.is_finite()
             && self.is_spike(grad_norm, &self.grad_norms);
 
-        if let Some(loss) = loss.filter(|value| value.is_finite()) {
+        if let Some(loss) = finite_loss {
             push_history(&mut self.losses, loss, self.config.rolling_interval);
         }
         if grad_norm.is_finite() {
