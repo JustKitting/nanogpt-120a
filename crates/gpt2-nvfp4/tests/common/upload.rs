@@ -1,9 +1,12 @@
+#![allow(dead_code)]
+
 use cuda_core::{CudaStream, DeviceBuffer};
 use gpt2_nvfp4::{Gpt2BlockWeights, LayerNormTensors, LayerNormWeights, Nvfp4Shape, Nvfp4Tensor};
 use rust_kernels_cuda::mma::Nvfp4FourSixMmaWeightTensor;
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+const E4M3_ONE: u8 = 0x38;
 
 pub struct UploadedNvfp4 {
     bytes: DeviceBuffer<u8>,
@@ -77,6 +80,22 @@ pub fn upload_nvfp4<S: Nvfp4Shape>(
         scales: DeviceBuffer::from_host(stream, tensor.scales.as_ref())?,
         global_scale: DeviceBuffer::from_host(stream, &[tensor.global_scale])?,
     })
+}
+
+pub fn upload_nvfp4_bytes<S: Nvfp4Shape>(
+    stream: &CudaStream,
+    bytes: Vec<u8>,
+) -> TestResult<UploadedNvfp4> {
+    assert_eq!(bytes.len(), S::BYTE_LEN);
+    Ok(UploadedNvfp4 {
+        bytes: DeviceBuffer::from_host(stream, &bytes)?,
+        scales: DeviceBuffer::from_host(stream, &vec![E4M3_ONE; S::SCALE_LEN])?,
+        global_scale: DeviceBuffer::from_host(stream, &[1.0_f32])?,
+    })
+}
+
+pub fn upload_zero_nvfp4<S: Nvfp4Shape>(stream: &CudaStream) -> TestResult<UploadedNvfp4> {
+    upload_nvfp4_bytes::<S>(stream, vec![0; S::BYTE_LEN])
 }
 
 fn upload_linear<W: Nvfp4Shape, B: Nvfp4Shape>(
