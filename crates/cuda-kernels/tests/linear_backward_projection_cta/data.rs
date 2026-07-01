@@ -2,8 +2,6 @@ use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 
 use crate::common::nvfp4::one_scales;
 
-const TOLERANCE: f32 = 1.0e-7;
-
 pub fn upload_bytes(
     stream: &CudaStream,
     rows: usize,
@@ -40,15 +38,5 @@ fn set_nibble(bytes: &mut [u8], element: usize, value: u8) {
         *byte = (*byte & 0xf0) | value;
     } else {
         *byte = (*byte & 0x0f) | (value << 4);
-    }
-}
-
-pub fn assert_vec_close(expected: &[f32], actual: &[f32]) {
-    for (index, (expected, actual)) in expected.iter().zip(actual).enumerate() {
-        let error = (expected - actual).abs();
-        assert!(
-            error <= TOLERANCE,
-            "index={index} expected={expected:.8e} actual={actual:.8e} error={error:.8e}"
-        );
     }
 }

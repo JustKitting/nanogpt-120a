@@ -1,7 +1,6 @@
 use std::error::Error;
 
 use cuda_core::DeviceBuffer;
-use data::assert_vec_close;
 use fixture::ProjectionTensors;
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
 
@@ -14,6 +13,7 @@ mod fixture;
 const TOKEN_COUNT: usize = 64;
 const INPUT_DIM: usize = 64;
 const OUTPUT_DIM: usize = 64;
+const TOLERANCE: f32 = 1.0e-7;
 
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
@@ -30,13 +30,15 @@ fn cta_projection_matches_warp_projection() -> Result<(), Box<dyn Error>> {
     module.backward_device_scale(tensors.args(&stream, &mut old_dinput, &mut old_dweight))?;
     module.backward_device_scale_cta(tensors.args(&stream, &mut cta_dinput, &mut cta_dweight))?;
 
-    assert_vec_close(
+    common::assert_slice_close(
         &old_dinput.to_host_vec(&stream)?,
         &cta_dinput.to_host_vec(&stream)?,
+        TOLERANCE,
     );
-    assert_vec_close(
+    common::assert_slice_close(
         &old_dweight.to_host_vec(&stream)?,
         &cta_dweight.to_host_vec(&stream)?,
+        TOLERANCE,
     );
     Ok(())
 }
