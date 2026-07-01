@@ -1,5 +1,5 @@
 use super::super::super::work_grid::WorkGrid;
-use super::body::AuroraMatrixShape;
+use super::types::AuroraMatrixShape;
 use crate::device_ptr::write_f32;
 
 pub(super) fn momentum_orient(
@@ -11,7 +11,7 @@ pub(super) fn momentum_orient(
     mu: f32,
     transposed: bool,
 ) {
-    let len = shape.rows * shape.cols;
+    let len = shape.len();
     let mut index = work.thread();
     while index < len {
         let row = index / shape.cols;

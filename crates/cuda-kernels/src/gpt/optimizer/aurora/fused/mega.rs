@@ -7,7 +7,7 @@ use crate::optimizer::AuroraSlotDescriptor;
 
 use super::super::super::AURORA_MATRIX_PHASES;
 use super::super::super::threads::WARPS_PER_BLOCK;
-use super::body::{AuroraMatrixScratch, AuroraMatrixTiles, AuroraUpdateScalars};
+use super::types::{AuroraMatrixScratch, AuroraMatrixTiles, AuroraUpdateScalars};
 
 mod slot;
 

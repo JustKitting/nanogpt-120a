@@ -1,10 +1,8 @@
 use crate::optimizer::AuroraSlotDescriptor;
 
 use super::super::super::super::work_grid::WorkGrid;
-use super::super::body::{
-    AuroraMatrixScratch, AuroraMatrixShape, AuroraMatrixState, AuroraMatrixTiles,
-    AuroraUpdateScalars, aurora_matrix_update_body,
-};
+use super::super::body::aurora_matrix_update_body;
+use super::super::types::{AuroraMatrixScratch, AuroraMatrixShape, AuroraMatrixState, AuroraMatrixTiles, AuroraUpdateScalars};
 
 #[derive(Clone, Copy)]
 pub(super) struct MegaScratchLayout { pub max_len: u32, pub max_ax_len: u32, pub max_dim: u32 }

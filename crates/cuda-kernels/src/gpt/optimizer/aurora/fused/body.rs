@@ -1,40 +1,11 @@
-use cuda_device::{SharedArray, grid};
+use cuda_device::grid;
 
-use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS};
-
-use super::super::super::threads::WARPS_PER_BLOCK;
 use super::super::super::work_grid::WorkGrid;
 use super::momentum::momentum_orient;
 use super::polar_step::run_polar_step;
 use super::quant::quantize_updated_master;
+use super::types::{AuroraMatrixScratch, AuroraMatrixShape, AuroraMatrixState, AuroraMatrixTiles, AuroraUpdateScalars};
 use super::update::update_master_chunks;
-
-#[derive(Clone, Copy)]
-pub(super) struct AuroraMatrixState {
-    pub grad: *const f32, pub momentum: *mut f32, pub z_master: *mut f32, pub x_master: *mut f32,
-    pub out_fp4: *mut u8, pub out_scales: *mut u8, pub out_global_scale: *mut f32,
-}
-
-#[derive(Clone, Copy)]
-pub(super) struct AuroraMatrixScratch {
-    pub oriented: *mut f32, pub polar_next: *mut f32, pub polar_x: *mut f32,
-    pub polar_gram: *mut f32, pub polar_ax: *mut f32, pub polar_chunks: *mut f32,
-}
-
-pub(super) struct AuroraMatrixTiles<'a> {
-    pub a_tile: &'a mut SharedArray<u16, CTA_A_ELEMS>,
-    pub b_tile: &'a mut SharedArray<u16, CTA_B_ELEMS>,
-    pub warp_sums: &'a mut SharedArray<f32, { WARPS_PER_BLOCK as usize }>,
-}
-
-#[derive(Clone, Copy)]
-pub(super) struct AuroraMatrixShape { pub rows: u32, pub cols: u32 }
-
-#[derive(Clone, Copy)]
-pub(super) struct AuroraUpdateScalars {
-    pub mu: f32, pub learning_rate: f32, pub weight_decay: f32,
-    pub average_coefficient: f32, pub iterations: u32,
-}
 
 pub(super) fn aurora_matrix_update_body(
     state: AuroraMatrixState,
@@ -44,8 +15,8 @@ pub(super) fn aurora_matrix_update_body(
     shape: AuroraMatrixShape,
     scalars: AuroraUpdateScalars,
 ) {
-    let len = shape.rows * shape.cols;
-    let transposed = shape.rows < shape.cols;
+    let len = shape.len();
+    let transposed = shape.polar_transposed();
 
     momentum_orient(
         state.grad,
@@ -84,7 +55,7 @@ pub(super) fn aurora_matrix_update_body(
         shape.rows,
         shape.cols,
         len,
-        shape.rows > shape.cols,
+        shape.master_transposed(),
         scalars.learning_rate,
         scalars.weight_decay,
         scalars.average_coefficient,
