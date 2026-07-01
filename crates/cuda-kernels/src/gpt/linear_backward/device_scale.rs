@@ -7,8 +7,9 @@ use crate::mma::{
     projection_grid_dim,
 };
 use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
+use crate::nvfp4_tma_matmul::kernels::{TILE_K, TILE_M, TILE_N};
 
-use super::{LinearBackwardDeviceScaleArgs, LinearBackwardModule};
+use super::{LinearBackwardDeviceScaleArgs, LinearBackwardModule, LinearBackwardTmaScratch};
 
 macro_rules! device_scale_projection {
     ($this:expr, $args:ident, $input:ident, $weight:ident, $out:ident, rows: $rows:expr, k: $k:expr) => {
@@ -34,6 +35,97 @@ macro_rules! device_scale_projection {
 }
 
 impl LinearBackwardModule {
+    pub fn backward_device_scale_tma(
+        &self,
+        args: LinearBackwardDeviceScaleArgs<'_, '_>,
+        tma: LinearBackwardTmaScratch<'_>,
+    ) -> Result<(), DriverError> {
+        let dinput_k = nvfp4_tc_matmul_padded_k(args.output_dim);
+        let dweight_k = nvfp4_tc_matmul_padded_k(args.token_count);
+
+        if tma_shape_aligned(args.token_count, dinput_k, args.input_dim) {
+            self.tma_scale_pack.pack(
+                args.stream,
+                args.e_h.scales,
+                tma.e_h_scales,
+                args.token_count,
+                dinput_k,
+            )?;
+            self.tma_scale_pack.pack(
+                args.stream,
+                args.weight_t_h.scales,
+                tma.weight_t_h_scales,
+                args.input_dim,
+                dinput_k,
+            )?;
+            self.tma.prepare_tma_nvfp4_device_scales_into(
+                args.stream,
+                args.e_h.bytes,
+                &*tma.e_h_scales,
+                args.weight_t_h.bytes,
+                &*tma.weight_t_h_scales,
+                args.token_count,
+                dinput_k,
+                args.input_dim,
+                tma.descriptors,
+            )?;
+            self.tma
+                .gemm_tma_nvfp4_rowwise_a_scale_and_global_scale_buffer(
+                    args.stream,
+                    &*tma.descriptors,
+                    args.dinput,
+                    args.token_count,
+                    dinput_k,
+                    args.input_dim,
+                    args.e_h.global_scales,
+                    args.weight_t_h.global_scale,
+                )?;
+        } else {
+            device_scale_projection!(self, args, e_h, weight_t_h, dinput, rows: args.token_count, k: dinput_k)?;
+        }
+
+        if tma_shape_aligned(args.output_dim, dweight_k, args.input_dim) {
+            self.tma_scale_pack.pack(
+                args.stream,
+                args.e_t_h.scales,
+                tma.e_t_h_scales,
+                args.output_dim,
+                dweight_k,
+            )?;
+            self.tma_scale_pack.pack(
+                args.stream,
+                args.input_t_h.scales,
+                tma.input_t_h_scales,
+                args.input_dim,
+                dweight_k,
+            )?;
+            self.tma.prepare_tma_nvfp4_device_scales_into(
+                args.stream,
+                args.e_t_h.bytes,
+                &*tma.e_t_h_scales,
+                args.input_t_h.bytes,
+                &*tma.input_t_h_scales,
+                args.output_dim,
+                dweight_k,
+                args.input_dim,
+                tma.descriptors,
+            )?;
+            self.tma
+                .gemm_tma_nvfp4_rowwise_a_scale_and_global_scale_buffer(
+                    args.stream,
+                    &*tma.descriptors,
+                    args.dweight,
+                    args.output_dim,
+                    dweight_k,
+                    args.input_dim,
+                    args.e_t_h.global_scales,
+                    args.input_t_h.global_scale,
+                )
+        } else {
+            device_scale_projection!(self, args, e_t_h, input_t_h, dweight, rows: args.output_dim, k: dweight_k)
+        }
+    }
+
     pub fn backward_device_scale(
         &self,
         args: LinearBackwardDeviceScaleArgs<'_, '_>,
@@ -93,4 +185,8 @@ impl LinearBackwardModule {
                     .with_global_scales(1.0, 0.0),
             )
     }
+}
+
+fn tma_shape_aligned(m: u32, k: u32, n: u32) -> bool {
+    m.is_multiple_of(TILE_M) && k.is_multiple_of(TILE_K) && n.is_multiple_of(TILE_N)
 }

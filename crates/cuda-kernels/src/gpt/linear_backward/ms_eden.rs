@@ -37,17 +37,20 @@ impl LinearBackwardModule {
         quantize.weight_transpose(args.weight_t, &mut scratch.weight_t_h)?;
         quantize.input_transpose(args.input_t, &mut scratch.input_t_h)?;
 
-        self.backward_device_scale_cta(LinearBackwardDeviceScaleArgs {
-            stream: args.stream,
-            e_h: scratch.e_h.rowwise(),
-            weight_t_h: scratch.weight_t_h.device_scale_mma_weight(),
-            e_t_h: scratch.e_t_h.rowwise(),
-            input_t_h: scratch.input_t_h.device_scale_mma_weight(),
-            dinput: args.dinput,
-            dweight: args.dweight,
-            token_count: args.token_count,
-            input_dim: args.input_dim,
-            output_dim: args.output_dim,
-        })
+        self.backward_device_scale_tma(
+            LinearBackwardDeviceScaleArgs {
+                stream: args.stream,
+                e_h: scratch.e_h.rowwise(),
+                weight_t_h: scratch.weight_t_h.device_scale_mma_weight(),
+                e_t_h: scratch.e_t_h.rowwise(),
+                input_t_h: scratch.input_t_h.device_scale_mma_weight(),
+                dinput: args.dinput,
+                dweight: args.dweight,
+                token_count: args.token_count,
+                input_dim: args.input_dim,
+                output_dim: args.output_dim,
+            },
+            scratch.tma,
+        )
     }
 }

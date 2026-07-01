@@ -3,6 +3,10 @@ use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use crate::mma::Nvfp4DeviceScaleMmaWeightTensor;
 use crate::nvfp4::Nvfp4RowwiseDeviceTensor;
 use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
+use crate::nvfp4_tma_matmul::{
+    scale_layout::{sm120_scale_packed_len, sm120_scale_padded_mn_extent},
+    tma::TmaNvfp4DeviceScaleDescriptors,
+};
 
 pub struct MsEdenOperandScratch<'a> {
     pub bytes: &'a mut DeviceBuffer<u8>,
@@ -27,6 +31,15 @@ pub struct LinearBackwardMsEdenScratch<'a> {
     pub weight_t_h: MsEdenOperandScratch<'a>,
     pub e_t_h: MsEdenOperandScratch<'a>,
     pub input_t_h: MsEdenOperandScratch<'a>,
+    pub tma: LinearBackwardTmaScratch<'a>,
+}
+
+pub struct LinearBackwardTmaScratch<'a> {
+    pub e_h_scales: &'a mut DeviceBuffer<u8>,
+    pub weight_t_h_scales: &'a mut DeviceBuffer<u8>,
+    pub e_t_h_scales: &'a mut DeviceBuffer<u8>,
+    pub input_t_h_scales: &'a mut DeviceBuffer<u8>,
+    pub descriptors: &'a mut TmaNvfp4DeviceScaleDescriptors,
 }
 
 pub struct MsEdenOperandScratchBuffer {
@@ -64,6 +77,15 @@ pub struct LinearBackwardMsEdenScratchBuffers {
     pub weight_t_h: MsEdenOperandScratchBuffer,
     pub e_t_h: MsEdenOperandScratchBuffer,
     pub input_t_h: MsEdenOperandScratchBuffer,
+    pub tma: LinearBackwardTmaScratchBuffers,
+}
+
+pub struct LinearBackwardTmaScratchBuffers {
+    pub e_h_scales: DeviceBuffer<u8>,
+    pub weight_t_h_scales: DeviceBuffer<u8>,
+    pub e_t_h_scales: DeviceBuffer<u8>,
+    pub input_t_h_scales: DeviceBuffer<u8>,
+    pub descriptors: TmaNvfp4DeviceScaleDescriptors,
 }
 
 impl LinearBackwardMsEdenScratchBuffers {
@@ -81,6 +103,14 @@ impl LinearBackwardMsEdenScratchBuffers {
             weight_t_h: MsEdenOperandScratchBuffer::new(stream, input_dim * output_k, input_dim)?,
             e_t_h: MsEdenOperandScratchBuffer::new(stream, output_dim * token_k, output_dim)?,
             input_t_h: MsEdenOperandScratchBuffer::new(stream, input_dim * token_k, input_dim)?,
+            tma: LinearBackwardTmaScratchBuffers::new(
+                stream,
+                token_count,
+                input_dim,
+                output_dim,
+                output_k,
+                token_k,
+            )?,
         })
     }
 
@@ -90,6 +120,45 @@ impl LinearBackwardMsEdenScratchBuffers {
             weight_t_h: self.weight_t_h.as_arg(),
             e_t_h: self.e_t_h.as_arg(),
             input_t_h: self.input_t_h.as_arg(),
+            tma: self.tma.as_arg(),
         }
     }
+}
+
+impl LinearBackwardTmaScratchBuffers {
+    fn new(
+        stream: &CudaStream,
+        token_count: usize,
+        input_dim: usize,
+        output_dim: usize,
+        output_k: usize,
+        token_k: usize,
+    ) -> Result<Self, DriverError> {
+        Ok(Self {
+            e_h_scales: DeviceBuffer::zeroed(stream, packed_scale_len(token_count, output_k))?,
+            weight_t_h_scales: DeviceBuffer::zeroed(stream, packed_scale_len(input_dim, output_k))?,
+            e_t_h_scales: DeviceBuffer::zeroed(stream, packed_scale_len(output_dim, token_k))?,
+            input_t_h_scales: DeviceBuffer::zeroed(stream, packed_scale_len(input_dim, token_k))?,
+            descriptors: TmaNvfp4DeviceScaleDescriptors {
+                a: DeviceBuffer::zeroed(stream, 1)?,
+                b: DeviceBuffer::zeroed(stream, 1)?,
+                a_scales: DeviceBuffer::zeroed(stream, 1)?,
+                b_scales: DeviceBuffer::zeroed(stream, 1)?,
+            },
+        })
+    }
+
+    fn as_arg(&mut self) -> LinearBackwardTmaScratch<'_> {
+        LinearBackwardTmaScratch {
+            e_h_scales: &mut self.e_h_scales,
+            weight_t_h_scales: &mut self.weight_t_h_scales,
+            e_t_h_scales: &mut self.e_t_h_scales,
+            input_t_h_scales: &mut self.input_t_h_scales,
+            descriptors: &mut self.descriptors,
+        }
+    }
+}
+
+fn packed_scale_len(rows: usize, k: usize) -> usize {
+    sm120_scale_packed_len(sm120_scale_padded_mn_extent(rows), k)
 }

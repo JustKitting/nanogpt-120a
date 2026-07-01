@@ -32,6 +32,62 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
 ```text
+date: 2026-07-01
+commit: accepted local jj commit after full gate
+experiment: Route aligned MS-EDEN linear backward projections through NVFP4 TMA GEMM.
+status: accepted_900s
+change:
+  Added packed SM120 scale scratch and TMA descriptors to the existing
+  LinearBackwardMsEden scratch. LinearBackwardModule now loads the existing
+  Nvfp4GemmModule and Sm120ScalePackModule from the same PTX module and, after
+  the existing MS-EDEN quantization, routes shape-aligned dinput and dweight
+  matmuls through the existing NVFP4 TMA GEMM. Unaligned branches, including
+  KDA QKV dweight rows that are not 128-tile aligned, stay on the existing
+  projection kernel fallback. Quantization math, seeds, scale override, model
+  shape, and optimizer hyperparameters were unchanged.
+  Also screened a temporary TRAIN_AURORA_BACKEND=mega selector for the existing
+  cooperative Aurora kernel; it completed only 15 steps in 30.086s with
+  val_loss=8.008109 and was reverted before this candidate.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo build --release -q: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test
+    linear_backward -- --ignored --nocapture --test-threads=1: pass.
+  Pre-change nsys profile used to select the target:
+    target/nsys/active_path_10s.nsys-rep
+    linear_backward_projection_pair_cta_device_scale_kernel was the largest
+    kernel family at 27.7% of CUDA GPU kernel time.
+  1s launch smoke:
+    target/runs/20260701_225436Z_synth_1s
+    val_loss=10.376312, train_elapsed_s=1.899, completed_steps=2.
+  30s candidate screen:
+    target/runs/20260701_225445Z_synth_30s
+    val_loss=6.799187, train_elapsed_s=30.489, completed_steps=32.
+  900s gate:
+    target/runs/20260701_225551Z_synth_900s
+    val_loss=3.942715, train_elapsed_s=900.300, completed_steps=919.
+measured_effect:
+  Against the active 30s baseline:
+    target/runs/20260701_215705Z_synth_30s
+    val_loss: 6.954216 -> 6.799187
+    completed_steps: 28 -> 32
+  Against the active 900s baseline:
+    target/runs/20260701_215803Z_synth_900s
+    val_loss: 4.019827 -> 3.942715
+    completed_steps: 794 -> 919
+  Logged 900s timing moved the expected way overall:
+    Loss_host_wait avg: 836.914ms -> 542.973ms
+    Backward_enqueue avg: 102.155ms -> 241.698ms
+    Optimizer avg: 181.743ms -> 185.121ms
+  The TMA path adds host enqueue work but reduces the synchronized GPU wait
+  enough to improve fixed-wall steps and validation loss.
+decision:
+  Accept as the new active kernel/runtime baseline. Keep the code and update
+  notes/sweep_baseline.env to this run.
+```
+
+```text
 date: 2026-06-26
 commit: uncommitted Kimi KDA candidate, not promoted
 experiment: Replace 3/4 attention layers with chunkwise KDA attention.

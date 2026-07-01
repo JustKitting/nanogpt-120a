@@ -7,6 +7,6 @@ pub use call::{
     LinearBackwardInputTranspose, LinearBackwardMsEdenArgs, LinearBackwardWeightTranspose,
 };
 pub use scratch::{
-    LinearBackwardMsEdenScratch, LinearBackwardMsEdenScratchBuffers, MsEdenOperandScratch,
-    MsEdenOperandScratchBuffer,
+    LinearBackwardMsEdenScratch, LinearBackwardMsEdenScratchBuffers, LinearBackwardTmaScratch,
+    MsEdenOperandScratch, MsEdenOperandScratchBuffer,
 };
