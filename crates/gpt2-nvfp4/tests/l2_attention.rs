@@ -21,7 +21,7 @@ mod nvfp4_common;
 
 use common::cuda_test_context;
 use f16_common::tc_f16;
-use nvfp4_common::repeating_identity_bytes;
+use nvfp4_common::{filled_u8, repeating_identity_bytes};
 
 const E4M3_ONE: u8 = 0x38;
 const HEAD_DIM: usize = GPT2_N_EMBD / GPT2_N_HEAD;
@@ -59,26 +59,19 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> Result
     let mut tc_out_dev = DeviceBuffer::<f32>::zeroed(&stream, HiddenState::LEN)?;
     let mut tc_chunk_states_dev = DeviceBuffer::<u16>::zeroed(&stream, HiddenState::LEN)?;
 
-    let weight_bytes = qkv_identity_weight_bytes();
-    let weight_scales = vec![E4M3_ONE; QkvWeightShape::SCALE_LEN];
-    let weight_bytes_dev = DeviceBuffer::from_host(&stream, &weight_bytes)?;
-    let weight_scales_dev = DeviceBuffer::from_host(&stream, &weight_scales)?;
+    let weight_bytes_dev = DeviceBuffer::from_host(&stream, &qkv_identity_weight_bytes())?;
+    let weight_scales_dev = filled_u8(&stream, QkvWeightShape::SCALE_LEN, E4M3_ONE)?;
 
-    let bias_bytes = vec![0_u8; QkvVectorShape::BYTE_LEN];
-    let bias_scales = vec![E4M3_ONE; QkvVectorShape::SCALE_LEN];
-    let bias_bytes_dev = DeviceBuffer::from_host(&stream, &bias_bytes)?;
-    let bias_scales_dev = DeviceBuffer::from_host(&stream, &bias_scales)?;
+    let bias_bytes_dev = filled_u8(&stream, QkvVectorShape::BYTE_LEN, 0)?;
+    let bias_scales_dev = filled_u8(&stream, QkvVectorShape::SCALE_LEN, E4M3_ONE)?;
     let global_scale_dev = DeviceBuffer::from_host(&stream, &[1.0_f32])?;
 
-    let c_proj_weight_bytes = c_proj_identity_weight_bytes();
-    let c_proj_weight_scales = vec![E4M3_ONE; ResidualWeightShape::SCALE_LEN];
-    let c_proj_weight_bytes_dev = DeviceBuffer::from_host(&stream, &c_proj_weight_bytes)?;
-    let c_proj_weight_scales_dev = DeviceBuffer::from_host(&stream, &c_proj_weight_scales)?;
+    let c_proj_weight_bytes_dev =
+        DeviceBuffer::from_host(&stream, &c_proj_identity_weight_bytes())?;
+    let c_proj_weight_scales_dev = filled_u8(&stream, ResidualWeightShape::SCALE_LEN, E4M3_ONE)?;
 
-    let c_proj_bias_bytes = vec![0_u8; HiddenVectorShape::BYTE_LEN];
-    let c_proj_bias_scales = vec![E4M3_ONE; HiddenVectorShape::SCALE_LEN];
-    let c_proj_bias_bytes_dev = DeviceBuffer::from_host(&stream, &c_proj_bias_bytes)?;
-    let c_proj_bias_scales_dev = DeviceBuffer::from_host(&stream, &c_proj_bias_scales)?;
+    let c_proj_bias_bytes_dev = filled_u8(&stream, HiddenVectorShape::BYTE_LEN, 0)?;
+    let c_proj_bias_scales_dev = filled_u8(&stream, HiddenVectorShape::SCALE_LEN, E4M3_ONE)?;
 
     AttentionWeights::forward(AttentionForwardArgs {
         use_full_attention: true,

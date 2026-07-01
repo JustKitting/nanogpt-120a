@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use cuda_core::{CudaStream, DeviceBuffer, DriverError};
+
 pub fn set_e2m1_one(bytes: &mut [u8], element: usize) {
     let byte = &mut bytes[element / 2];
     if element & 1 == 0 {
@@ -15,4 +17,12 @@ pub fn repeating_identity_bytes(byte_len: usize, cols: usize, row_len: usize) ->
         set_e2m1_one(&mut bytes, col * row_len + col % row_len);
     }
     bytes
+}
+
+pub fn filled_u8(
+    stream: &CudaStream,
+    len: usize,
+    value: u8,
+) -> Result<DeviceBuffer<u8>, DriverError> {
+    DeviceBuffer::from_host(stream, &vec![value; len])
 }
