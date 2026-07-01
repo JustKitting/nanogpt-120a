@@ -5,10 +5,10 @@ use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_f32_f16;
 use crate::float_ptx::fma_f32;
 use crate::kda_common::{
-    beta_compact_index, beta_index, compact_index, g_offset, k_offset, kda_warp_norm, q_offset,
-    qkv_index, safe_denom, sigmoid, silu_grad, v_offset,
+    beta_compact_index, beta_index, compact_index, g_offset, k_offset, q_offset, qkv_index,
+    safe_denom, sigmoid, silu_grad, v_offset,
 };
-use crate::kda_elementwise::{KdaQkAct, KdaWarpCtx, kda_warp_ctx, read_qk_act};
+use crate::kda_elementwise::{KdaQkAct, KdaQkNormAcc, KdaWarpCtx, kda_warp_ctx, read_qk_act};
 use crate::warp_reduce::warp_sum_f32;
 
 #[derive(Clone, Copy)]
@@ -24,16 +24,15 @@ struct FinishDimPoint { ctx: KdaWarpCtx, dim: u32, qk: KdaQkAct }
 struct FinishNormStats { q_norm: f32, k_norm: f32, q_dot: f32, k_dot: f32 }
 
 #[derive(Clone, Copy)]
-struct FinishNormAcc { q_sum: f32, k_sum: f32, q_dot: f32, k_dot: f32 }
+struct FinishNormAcc { qk_norm: KdaQkNormAcc, q_dot: f32, k_dot: f32 }
 
 impl FinishNormAcc {
     #[inline(always)]
-    fn zero() -> Self { Self { q_sum: 0.0, k_sum: 0.0, q_dot: 0.0, k_dot: 0.0 } }
+    fn zero() -> Self { Self { qk_norm: KdaQkNormAcc::zero(), q_dot: 0.0, k_dot: 0.0 } }
 
     #[inline(always)]
     fn stats(self) -> FinishNormStats {
-        let q_norm = kda_warp_norm(self.q_sum);
-        let k_norm = kda_warp_norm(self.k_sum);
+        let (q_norm, k_norm) = self.qk_norm.norms();
         FinishNormStats { q_norm, k_norm, q_dot: warp_sum_f32(self.q_dot), k_dot: warp_sum_f32(self.k_dot) }
     }
 }
@@ -80,8 +79,7 @@ fn read_finish_dim(
 
     let qk = read_qk_act(qkv, ctx.row, ctx.head, dim, params);
     let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim, params);
-    acc.q_sum = fma_f32(qk.q_act, qk.q_act, acc.q_sum);
-    acc.k_sum = fma_f32(qk.k_act, qk.k_act, acc.k_sum);
+    acc.qk_norm.add(qk);
     acc.q_dot = fma_f32(grads.q[compact], qk.q_act, acc.q_dot);
     acc.k_dot = fma_f32(grads.k[compact], qk.k_act, acc.k_dot);
     qk

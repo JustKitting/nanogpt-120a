@@ -1,33 +1,17 @@
 use cuda_device::{DisjointSlice, thread};
 
 use crate::attention::CausalAttentionParams;
-use crate::float_ptx::fma_f32;
 use crate::kda_common::{
-    batch_head, beta_compact_index, beta_index, compact_index, g_offset, kda_warp_norm, qkv_index,
-    safe_denom, sigmoid, silu, softplus, v_offset,
+    batch_head, beta_compact_index, beta_index, compact_index, g_offset, qkv_index, safe_denom,
+    sigmoid, silu, softplus, v_offset,
 };
 
-use super::context::{KdaQkAct, KdaQkvRead, KdaWarpCtx, kda_warp_ctx, read_qk_act};
+use super::context::{KdaQkAct, KdaQkNormAcc, KdaQkvRead, KdaWarpCtx, kda_warp_ctx, read_qk_act};
 
 pub(crate) struct KdaPrepareOutputs<'a> {
     pub(crate) q: DisjointSlice<'a, f32>, pub(crate) k: DisjointSlice<'a, f32>,
     pub(crate) v: DisjointSlice<'a, f32>, pub(crate) g: DisjointSlice<'a, f32>,
     pub(crate) beta: DisjointSlice<'a, f32>,
-}
-
-#[derive(Clone, Copy)]
-struct PrepareNormAcc { q_sum: f32, k_sum: f32 }
-
-impl PrepareNormAcc {
-    #[inline(always)]
-    fn zero() -> Self { Self { q_sum: 0.0, k_sum: 0.0 } }
-
-    #[inline(always)]
-    fn inv(self, scale: f32) -> (f32, f32) {
-        let q_norm = kda_warp_norm(self.q_sum);
-        let k_norm = kda_warp_norm(self.k_sum);
-        (scale / safe_denom(q_norm), 1.0 / safe_denom(k_norm))
-    }
 }
 
 pub(crate) fn chunk_cumsum_g_body(mut g: DisjointSlice<f32>, params: CausalAttentionParams) {
@@ -65,12 +49,13 @@ pub(crate) fn prepare_kda_inputs_body<T: KdaQkvRead>(
         return;
     }
 
-    let mut acc = PrepareNormAcc::zero();
+    let mut acc = KdaQkNormAcc::zero();
     let dim0 = ctx.lane;
     let qk0 = read_prepare_dim(qkv, ctx, dim0, &params, &mut acc);
     let dim1 = ctx.lane + 32;
     let qk1 = read_prepare_dim(qkv, ctx, dim1, &params, &mut acc);
-    let inv = acc.inv(params.scale);
+    let (q_norm, k_norm) = acc.norms();
+    let inv = (params.scale / safe_denom(q_norm), 1.0 / safe_denom(k_norm));
 
     if dim0 < params.head_dim {
         write_prepared(qkv, &mut out, ctx, dim0, qk0, inv, &params);
@@ -89,15 +74,14 @@ pub(crate) fn prepare_kda_inputs_body<T: KdaQkvRead>(
 
 #[inline(always)]
 fn read_prepare_dim<T: KdaQkvRead>(
-    qkv: &[T], ctx: KdaWarpCtx, dim: u32, params: &CausalAttentionParams, acc: &mut PrepareNormAcc,
+    qkv: &[T], ctx: KdaWarpCtx, dim: u32, params: &CausalAttentionParams, acc: &mut KdaQkNormAcc,
 ) -> KdaQkAct {
     if dim >= params.head_dim {
         return KdaQkAct::zero();
     }
 
     let qk = read_qk_act(qkv, ctx.row, ctx.head, dim, params);
-    acc.q_sum = fma_f32(qk.q_act, qk.q_act, acc.q_sum);
-    acc.k_sum = fma_f32(qk.k_act, qk.k_act, acc.k_sum);
+    acc.add(qk);
     qk
 }
 

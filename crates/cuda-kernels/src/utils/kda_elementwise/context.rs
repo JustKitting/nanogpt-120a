@@ -2,7 +2,8 @@ use cuda_device::{thread, warp};
 
 use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_f32_f16;
-use crate::kda_common::{KDA_MAX_HEAD_DIM, k_offset, q_offset, qkv_index, silu};
+use crate::float_ptx::fma_f32;
+use crate::kda_common::{KDA_MAX_HEAD_DIM, k_offset, kda_warp_norm, q_offset, qkv_index, silu};
 
 pub(crate) trait KdaQkvRead: Sized {
     fn read(values: &[Self], index: usize) -> f32;
@@ -65,6 +66,20 @@ impl KdaQkAct {
             k_act: 0.0,
         }
     }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct KdaQkNormAcc { q_sum: f32, k_sum: f32 }
+
+impl KdaQkNormAcc {
+    #[inline(always)]
+    pub(crate) fn zero() -> Self { Self { q_sum: 0.0, k_sum: 0.0 } }
+
+    #[inline(always)]
+    pub(crate) fn add(&mut self, qk: KdaQkAct) { self.q_sum = fma_f32(qk.q_act, qk.q_act, self.q_sum); self.k_sum = fma_f32(qk.k_act, qk.k_act, self.k_sum); }
+
+    #[inline(always)]
+    pub(crate) fn norms(self) -> (f32, f32) { (kda_warp_norm(self.q_sum), kda_warp_norm(self.k_sum)) }
 }
 
 pub(crate) fn read_qk_act<T: KdaQkvRead>(
