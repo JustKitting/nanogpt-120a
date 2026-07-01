@@ -21,15 +21,8 @@ pub(super) mod module {
         mut logits: DisjointSlice<f32>,
         params: LmHeadParams,
     ) {
-        let projection = Nvfp4ProjectionParams {
-            token_count: params.token_count,
-            input_dim: params.input_dim,
-            output_dim: params.vocab_size,
-            weight_global_scale: weight_global_scale[0],
-            bias_global_scale: 0.0,
-            residual_add: 0,
-            activation: 0,
-        };
+        let projection = Nvfp4ProjectionParams::new(params.token_count, params.input_dim, params.vocab_size)
+            .with_global_scales(weight_global_scale[0], 0.0);
 
         dispatch_projection_cta_tiles!(
             projection,

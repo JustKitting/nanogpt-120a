@@ -2,8 +2,8 @@ use cuda_core::DriverError;
 
 use crate::launch::{grid_x_config, launch_config};
 use crate::mma::{
-    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS,
-    NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams, projection_cta_grid_dim,
+    NVFP4_PROJECTION_CTA_THREADS, NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams,
+    projection_cta_grid_dim,
     projection_cta_row_pair_tile_count, projection_cta_shape_aligned, projection_grid_dim,
 };
 use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
@@ -18,7 +18,7 @@ macro_rules! device_scale_projection {
             $args.$input.bytes, $args.$input.scales, $args.$input.global_scales,
             $args.$weight.bytes, $args.$weight.scales, $args.$weight.global_scale,
             $args.$out,
-            linear_backward_projection_params($rows, $k, $args.input_dim),
+            Nvfp4ProjectionParams::new($rows, $k, $args.input_dim).with_global_scales(1.0, 0.0),
         )
     };
 }
@@ -77,24 +77,8 @@ impl LinearBackwardModule {
                 args.dweight,
                 dweight_grid.0 - 1,
                 dweight_grid.0.trailing_zeros(),
-                linear_backward_projection_params(args.token_count, dinput_k, args.input_dim),
-                linear_backward_projection_params(args.output_dim, dweight_k, args.input_dim),
+                Nvfp4ProjectionParams::new(args.token_count, dinput_k, args.input_dim).with_global_scales(1.0, 0.0),
+                Nvfp4ProjectionParams::new(args.output_dim, dweight_k, args.input_dim).with_global_scales(1.0, 0.0),
             )
-    }
-}
-
-fn linear_backward_projection_params(
-    token_count: u32,
-    input_dim: u32,
-    output_dim: u32,
-) -> Nvfp4ProjectionParams {
-    Nvfp4ProjectionParams {
-        token_count,
-        input_dim,
-        output_dim,
-        weight_global_scale: 1.0,
-        bias_global_scale: 0.0,
-        residual_add: 0,
-        activation: NVFP4_PROJECTION_ACTIVATION_NONE,
     }
 }

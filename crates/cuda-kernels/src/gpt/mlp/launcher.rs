@@ -6,8 +6,7 @@ use super::args::{MlpDownResidualArgs, MlpUpRelu2Args, Relu2BackwardArgs, Relu2B
 use super::kernels;
 use crate::launch::{launch_config, linear_config};
 use crate::mma::{
-    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams,
-    projection_cta_launch_grid_dim,
+    NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams, projection_cta_launch_grid_dim,
 };
 
 pub struct MlpModule {
@@ -23,7 +22,7 @@ macro_rules! projection_launcher {
                 args.input.bytes, args.input.scales, args.input.global_scales,
                 args.weight.bytes, args.weight.scales, args.bias.bytes, args.bias.scales,
                 args.weight.global_scale, args.bias.global_scale, $(args.$out,)*
-                projection_params(args.token_count, args.input_dim, args.output_dim, $residual_add),
+                Nvfp4ProjectionParams::new(args.token_count, args.input_dim, args.output_dim).with_residual_add($residual_add),
             )
         }
     };
@@ -58,21 +57,4 @@ fn projection_config(token_count: u32, input_dim: u32, output_dim: u32) -> cuda_
         projection_cta_launch_grid_dim(token_count, input_dim, output_dim),
         NVFP4_PROJECTION_CTA_THREADS,
     )
-}
-
-fn projection_params(
-    token_count: u32,
-    input_dim: u32,
-    output_dim: u32,
-    residual_add: u32,
-) -> Nvfp4ProjectionParams {
-    Nvfp4ProjectionParams {
-        token_count,
-        input_dim,
-        output_dim,
-        weight_global_scale: 1.0,
-        bias_global_scale: 1.0,
-        residual_add,
-        activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-    }
 }

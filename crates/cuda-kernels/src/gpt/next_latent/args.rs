@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy};
 
-use crate::mma::{Nvfp4FourSixMmaWeightTensor, Nvfp4ProjectionParams};
+use crate::mma::Nvfp4FourSixMmaWeightTensor;
 use crate::nvfp4::{Nvfp4DeviceTensor, Nvfp4RowwiseDeviceTensor};
 
 #[repr(C)]
@@ -88,16 +88,4 @@ pub struct NextLatResidualAddArgs<'a, 'out> {
     pub residual: &'a DeviceBuffer<f32>,
     pub out: &'out mut DeviceBuffer<f32>,
     pub len: u32,
-}
-
-pub fn projection_params(args: &NextLatProjectionArgs<'_, '_>) -> Nvfp4ProjectionParams {
-    Nvfp4ProjectionParams {
-        token_count: args.token_count,
-        input_dim: args.input_dim,
-        output_dim: args.output_dim,
-        weight_global_scale: 1.0,
-        bias_global_scale: 1.0,
-        residual_add: 0,
-        activation: 0,
-    }
 }

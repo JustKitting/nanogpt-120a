@@ -8,8 +8,7 @@ use super::pad::pad_rows;
 use super::quantize::quantize_operand;
 use crate::launch::launch_config;
 use crate::mma::{
-    NVFP4_PROJECTION_ACTIVATION_NONE, NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams,
-    projection_grid_dim,
+    NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams, projection_grid_dim,
 };
 
 pub struct Nvfp4TcMatmulModule {
@@ -84,15 +83,7 @@ impl Nvfp4TcMatmulModule {
             &*scratch.b_t.bytes,
             &*scratch.b_t.scales,
             args.out,
-            Nvfp4ProjectionParams {
-                token_count: args.m,
-                input_dim: padded_k,
-                output_dim: args.n,
-                weight_global_scale: scratch.b_t.global_scale,
-                bias_global_scale: 0.0,
-                residual_add: 0,
-                activation: NVFP4_PROJECTION_ACTIVATION_NONE,
-            },
+            Nvfp4ProjectionParams::new(args.m, padded_k, args.n).with_global_scales(scratch.b_t.global_scale, 0.0),
         )
     }
 }
