@@ -24,17 +24,13 @@ fn write_next_latent(
     stream: &CudaStream,
     next_latent: &UploadedNextLat,
 ) -> AppResult {
-    write_uploaded_pair(writer, stream, "next_latent.norm", &next_latent.norm)?;
-    write_linears(
-        writer,
-        stream,
-        "next_latent",
-        [
-            ("input_projection", &next_latent.input_projection),
-            ("transition", &next_latent.transition),
-            ("output_projection", &next_latent.output_projection),
-        ],
-    )
+    let pairs = [
+        ("norm", &next_latent.norm),
+        ("input_projection", &next_latent.input_projection),
+        ("transition", &next_latent.transition),
+        ("output_projection", &next_latent.output_projection),
+    ];
+    write_pairs(writer, stream, "next_latent", pairs)
 }
 
 fn write_block(
@@ -44,23 +40,15 @@ fn write_block(
     block: &UploadedBlock,
 ) -> AppResult {
     let prefix = format!("blocks.{index}");
-    write_uploaded_pair(writer, stream, &format!("{prefix}.ln_1"), &block.ln_1)?;
-    write_linears(
-        writer,
-        stream,
-        &prefix,
-        [
-            ("attn_qkv", &block.attn_qkv),
-            ("attn_c_proj", &block.attn_c_proj),
-        ],
-    )?;
-    write_uploaded_pair(writer, stream, &format!("{prefix}.ln_2"), &block.ln_2)?;
-    write_linears(
-        writer,
-        stream,
-        &prefix,
-        [("mlp_up", &block.mlp_up), ("mlp_down", &block.mlp_down)],
-    )
+    let pairs = [
+        ("ln_1", &block.ln_1),
+        ("attn_qkv", &block.attn_qkv),
+        ("attn_c_proj", &block.attn_c_proj),
+        ("ln_2", &block.ln_2),
+        ("mlp_up", &block.mlp_up),
+        ("mlp_down", &block.mlp_down),
+    ];
+    write_pairs(writer, stream, &prefix, pairs)
 }
 
 fn write_uploaded_pair(
@@ -73,14 +61,14 @@ fn write_uploaded_pair(
     tensor::write(writer, stream, &format!("{prefix}.bias"), &pair.bias)
 }
 
-fn write_linears<const N: usize>(
+fn write_pairs<const N: usize>(
     writer: &mut CheckpointWriter<impl std::io::Write>,
     stream: &CudaStream,
     prefix: &str,
-    linears: [(&str, &UploadedPair); N],
+    pairs: [(&str, &UploadedPair); N],
 ) -> AppResult {
-    for (suffix, linear) in linears {
-        write_uploaded_pair(writer, stream, &format!("{prefix}.{suffix}"), linear)?;
+    for (suffix, pair) in pairs {
+        write_uploaded_pair(writer, stream, &format!("{prefix}.{suffix}"), pair)?;
     }
     Ok(())
 }
