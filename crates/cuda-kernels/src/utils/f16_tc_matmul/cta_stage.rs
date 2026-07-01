@@ -30,8 +30,24 @@ fn stage_tiles_impl<const CHECK_BOUNDS: bool>(
     dims: CtaMatmulDims,
     k_base: u32,
 ) {
-    stage_matrix_tile::<CHECK_BOUNDS, CTA_A_ELEMS>(a, a_tile, tile, tile.row_base, dims.m, dims.k, k_base);
-    stage_matrix_tile::<CHECK_BOUNDS, CTA_B_ELEMS>(b_t, b_tile, tile, tile.col_base, dims.n, dims.k, k_base);
+    stage_matrix_tile::<CHECK_BOUNDS, CTA_A_ELEMS>(
+        a,
+        a_tile,
+        tile,
+        tile.row_base,
+        dims.m,
+        dims.k,
+        k_base,
+    );
+    stage_matrix_tile::<CHECK_BOUNDS, CTA_B_ELEMS>(
+        b_t,
+        b_tile,
+        tile,
+        tile.col_base,
+        dims.n,
+        dims.k,
+        k_base,
+    );
 }
 
 fn stage_matrix_tile<const CHECK_BOUNDS: bool, const TILE_ELEMS: usize>(
@@ -74,11 +90,7 @@ pub(crate) fn load_a_fragments(a_tile: &super::CtaATile, tile: CtaTile) -> [u32;
 }
 
 #[inline(always)]
-pub(crate) fn load_b_fragments(
-    b_tile: &super::CtaBTile,
-    tile: CtaTile,
-    warp_n: u32,
-) -> [u32; 2] {
+pub(crate) fn load_b_fragments(b_tile: &super::CtaBTile, tile: CtaTile, warp_n: u32) -> [u32; 2] {
     [
         load_b_fragment(b_tile, tile, warp_n, 0),
         load_b_fragment(b_tile, tile, warp_n, 1),
@@ -93,12 +105,7 @@ fn load_a_fragment(a_tile: &super::CtaATile, tile: CtaTile, register: u32) -> u3
 }
 
 #[inline(always)]
-fn load_b_fragment(
-    b_tile: &super::CtaBTile,
-    tile: CtaTile,
-    warp_n: u32,
-    register: u32,
-) -> u32 {
+fn load_b_fragment(b_tile: &super::CtaBTile, tile: CtaTile, warp_n: u32, register: u32) -> u32 {
     let row = warp_n * 8 + tile.group;
     let col = tile.thread_in_group * 2 + if register == 0 { 0 } else { 8 };
     load_packed2(b_tile, row * CTA_K + col)

@@ -2,12 +2,12 @@ use std::{fs, path::Path};
 
 use super::super::trial_record::{trial, trial_with_log};
 use crate::sweep::{
-    analysis,
+    SweepResult, analysis,
     candidate::Candidate,
     config::SweepConfig,
     history::{self, Trial},
     parse::RunResult,
-    run_build, run_train, screen_gate, status, SweepResult,
+    run_build, run_train, screen_gate, status,
 };
 
 pub(in crate::sweep::runner) fn run_trial(

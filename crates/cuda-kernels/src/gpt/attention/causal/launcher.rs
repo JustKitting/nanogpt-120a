@@ -21,7 +21,15 @@ pub struct CausalAttentionArgs<'a, 'out> {
 
 impl CausalAttentionArgs<'_, '_> {
     fn params(&self) -> CausalAttentionParams {
-        CausalAttentionParams::new(self.row_count, self.seq_len, self.batch_size, self.embedding_dim, self.qkv_dim, self.head_count, self.head_dim)
+        CausalAttentionParams::new(
+            self.row_count,
+            self.seq_len,
+            self.batch_size,
+            self.embedding_dim,
+            self.qkv_dim,
+            self.head_count,
+            self.head_dim,
+        )
     }
 }
 

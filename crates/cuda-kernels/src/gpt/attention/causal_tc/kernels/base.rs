@@ -1,4 +1,4 @@
-use cuda_device::{cuda_module, kernel, DisjointSlice, SharedArray};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel};
 
 use super::super::gather::gather_qkv_body;
 use super::super::scatter::{scatter_output_body, scatter_output_save_f16_body};
@@ -11,7 +11,10 @@ pub(super) mod module {
 
     #[kernel]
     pub fn gather_qkv_forward_kernel(
-        qkv: &[f32], q: DisjointSlice<f32>, k: DisjointSlice<f32>, v: DisjointSlice<f32>,
+        qkv: &[f32],
+        q: DisjointSlice<f32>,
+        k: DisjointSlice<f32>,
+        v: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         gather_qkv_body(qkv, q, k, v, params);
@@ -19,7 +22,9 @@ pub(super) mod module {
 
     #[kernel]
     pub fn attention_softmax_forward_kernel(
-        scores: &[f32], probs: DisjointSlice<f32>, log_sum_exp: DisjointSlice<f32>,
+        scores: &[f32],
+        probs: DisjointSlice<f32>,
+        log_sum_exp: DisjointSlice<f32>,
         params: CausalAttentionParams,
     ) {
         static mut REDUCE: SharedArray<f32, 8> = SharedArray::UNINIT;
@@ -27,17 +32,23 @@ pub(super) mod module {
     }
 
     #[kernel]
-    pub fn scatter_attention_forward_kernel(compact: &[f32], out: DisjointSlice<f32>, params: CausalAttentionParams) {
+    pub fn scatter_attention_forward_kernel(
+        compact: &[f32],
+        out: DisjointSlice<f32>,
+        params: CausalAttentionParams,
+    ) {
         scatter_output_body(compact, out, params);
     }
 
     #[kernel]
     pub fn scatter_attention_forward_save_f16_kernel(
-        compact: &[f32], out: DisjointSlice<f32>, attention_out_f16: DisjointSlice<u16>,
+        compact: &[f32],
+        out: DisjointSlice<f32>,
+        attention_out_f16: DisjointSlice<u16>,
         params: CausalAttentionParams,
     ) {
         scatter_output_save_f16_body(compact, out, attention_out_f16, params);
     }
 }
 
-pub(super) use module::{from_module, LoadedModule};
+pub(super) use module::{LoadedModule, from_module};

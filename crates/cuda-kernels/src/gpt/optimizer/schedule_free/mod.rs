@@ -35,7 +35,13 @@ pub(super) mod module {
         beta: f32,
     ) {
         schedule_free_four_six_body(
-            z_master, x_master, amax, &mut out_fp4, &mut out_scales, &mut out_global_scale, beta,
+            z_master,
+            x_master,
+            amax,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scale,
+            beta,
         );
     }
 }

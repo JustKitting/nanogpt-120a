@@ -1,7 +1,14 @@
-pub(super) fn sample_rows(row_count: usize, row_len: usize, period: usize, center: f32, scale: f32, row_offset_scale: f32) -> Vec<f32> {
-    (0..row_count * row_len).map(|i| {
-        ((i % period) as f32 - center) * scale + (i / row_len) as f32 * row_offset_scale
-    }).collect()
+pub(super) fn sample_rows(
+    row_count: usize,
+    row_len: usize,
+    period: usize,
+    center: f32,
+    scale: f32,
+    row_offset_scale: f32,
+) -> Vec<f32> {
+    (0..row_count * row_len)
+        .map(|i| ((i % period) as f32 - center) * scale + (i / row_len) as f32 * row_offset_scale)
+        .collect()
 }
 
 pub(super) fn reference_row_stats(

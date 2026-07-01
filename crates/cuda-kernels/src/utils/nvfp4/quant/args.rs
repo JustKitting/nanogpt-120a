@@ -5,7 +5,10 @@ mod ms_eden;
 #[path = "args/ms_eden_transpose.rs"]
 mod ms_eden_transpose;
 
-pub use basic::{Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs, RowAmaxArgs, TensorAmaxArgs};
+pub use basic::{
+    Nvfp4QuantArgs, Nvfp4QuantPaddedArgs, Nvfp4QuantRowwiseArgs, Nvfp4QuantTransposePaddedArgs,
+    RowAmaxArgs, TensorAmaxArgs,
+};
 pub use ms_eden::{
     MsEdenDeviceScaleQuantArgs, MsEdenPairDeviceScaleQuantArgs, MsEdenQuantArgs,
     MsEdenTransposeDeviceScaleQuantArgs, QuartetBackwardMsEdenDeviceScaleQuantArgs,

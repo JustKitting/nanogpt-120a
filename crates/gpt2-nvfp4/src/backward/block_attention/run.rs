@@ -3,9 +3,9 @@ use cuda_core::DriverError;
 use super::types::BlockAttentionBackwardArgs;
 use crate::backward::residual::residual_grad_add;
 use crate::backward::{
-    attention_c_proj_backward, causal_attention_backward, layer_norm_backward,
-    qkv_projection_backward, AttentionCProjBackwardArgs, AttentionCoreBackwardArgs,
-    AttentionQkvBackwardArgs, Gpt2LayerNormBackwardArgs,
+    AttentionCProjBackwardArgs, AttentionCoreBackwardArgs, AttentionQkvBackwardArgs,
+    Gpt2LayerNormBackwardArgs, attention_c_proj_backward, causal_attention_backward,
+    layer_norm_backward, qkv_projection_backward,
 };
 use crate::types::BlockBackwardGrads;
 

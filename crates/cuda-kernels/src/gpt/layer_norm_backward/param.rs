@@ -49,8 +49,16 @@ pub(super) mod kernels {
                 while row + PARAM_THREADS_PER_BLOCK * 3 < $row_count {
                     accumulate_param_grad!(weight_local, bias_local, row);
                     accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK);
-                    accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK * 2);
-                    accumulate_param_grad!(weight_local, bias_local, row + PARAM_THREADS_PER_BLOCK * 3);
+                    accumulate_param_grad!(
+                        weight_local,
+                        bias_local,
+                        row + PARAM_THREADS_PER_BLOCK * 2
+                    );
+                    accumulate_param_grad!(
+                        weight_local,
+                        bias_local,
+                        row + PARAM_THREADS_PER_BLOCK * 3
+                    );
                     row += UNROLLED_ROW_STRIDE;
                 }
 
@@ -59,8 +67,22 @@ pub(super) mod kernels {
                     row += PARAM_THREADS_PER_BLOCK;
                 }
 
-                let weight_sum = layer_norm_block_reduce!(WARP_SUMS, WARPS_PER_BLOCK, weight_local, lane, warp_in_block, warp_sum_f32);
-                let bias_sum = layer_norm_block_reduce!(WARP_SUMS, WARPS_PER_BLOCK, bias_local, lane, warp_in_block, warp_sum_f32);
+                let weight_sum = layer_norm_block_reduce!(
+                    WARP_SUMS,
+                    WARPS_PER_BLOCK,
+                    weight_local,
+                    lane,
+                    warp_in_block,
+                    warp_sum_f32
+                );
+                let bias_sum = layer_norm_block_reduce!(
+                    WARP_SUMS,
+                    WARPS_PER_BLOCK,
+                    bias_local,
+                    lane,
+                    warp_in_block,
+                    warp_sum_f32
+                );
 
                 layer_norm_store_row!(&mut $d_weight, col, lane, warp_in_block, weight_sum);
                 layer_norm_store_row!(&mut $d_bias, col, lane, warp_in_block, bias_sum);

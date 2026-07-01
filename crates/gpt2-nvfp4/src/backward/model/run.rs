@@ -1,9 +1,9 @@
 use cuda_core::DriverError;
 
-use super::blocks::{run_blocks, BlocksBackwardRun};
+use super::blocks::{BlocksBackwardRun, run_blocks};
 use super::final_head::run_final_head;
 use super::types::Gpt2BackwardArgs;
-use crate::backward::{layer_norm_backward, Gpt2LayerNormBackwardArgs};
+use crate::backward::{Gpt2LayerNormBackwardArgs, layer_norm_backward};
 use crate::types::Gpt2BackwardGrads;
 use crate::{GPT2_EMBEDDING_DIM, GPT2_N_LAYER};
 use rust_kernels_cuda::residual::ResidualGradAccumulateArgs;

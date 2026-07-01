@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::super::{
-    candidate::{valid_aurora_phases, Candidate},
+    candidate::{Candidate, valid_aurora_phases},
     candidate_space as space,
     rng::SweepRng,
 };

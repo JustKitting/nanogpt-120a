@@ -1,8 +1,16 @@
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use super::{
-    analysis, baseline::Baseline, chain, config::SweepConfig, fmt, history::{History, Trial}, optimizer, proposal_log,
-    SweepResult,
+    SweepResult, analysis,
+    baseline::Baseline,
+    chain,
+    config::SweepConfig,
+    fmt,
+    history::{History, Trial},
+    optimizer, proposal_log,
 };
 use crate::time_utils;
 
@@ -24,7 +32,14 @@ pub fn run(config: SweepConfig) -> SweepResult {
     let mut rng = chain::sweep_rng(config.seed, history.trials.len());
 
     for index in history.trials.len()..config.trials {
-        let (sweep_analysis, all_trials) = analyze_and_write(&sweep_dir, &shared_history, &history, &baseline, baseline_screen_trial.as_ref(), &config)?;
+        let (sweep_analysis, all_trials) = analyze_and_write(
+            &sweep_dir,
+            &shared_history,
+            &history,
+            &baseline,
+            baseline_screen_trial.as_ref(),
+            &config,
+        )?;
         analysis::print_summary(&sweep_analysis);
         let seen = chain::seen_keys(&all_trials);
         let proposal = optimizer::propose(
@@ -80,12 +95,26 @@ pub fn run(config: SweepConfig) -> SweepResult {
         if !config.dry_run {
             shared_history.append_unique(trial)?;
         }
-        analyze_and_write(&sweep_dir, &shared_history, &history, &baseline, baseline_screen_trial.as_ref(), &config)?;
+        analyze_and_write(
+            &sweep_dir,
+            &shared_history,
+            &history,
+            &baseline,
+            baseline_screen_trial.as_ref(),
+            &config,
+        )?;
     }
     Ok(())
 }
 
-fn analyze_and_write(sweep_dir: &Path, shared_history: &History, history: &History, baseline: &Baseline, baseline_screen_trial: Option<&Trial>, config: &SweepConfig) -> SweepResult<(analysis::SweepAnalysis, Vec<Trial>)> {
+fn analyze_and_write(
+    sweep_dir: &Path,
+    shared_history: &History,
+    history: &History,
+    baseline: &Baseline,
+    baseline_screen_trial: Option<&Trial>,
+    config: &SweepConfig,
+) -> SweepResult<(analysis::SweepAnalysis, Vec<Trial>)> {
     let baseline_trial = current_baseline_trial(baseline_screen_trial, baseline.measured_trial());
     let all_trials = chain::all_trials_with_baseline(
         baseline_trial.as_ref(),

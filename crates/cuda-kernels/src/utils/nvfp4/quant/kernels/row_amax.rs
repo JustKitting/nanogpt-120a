@@ -64,11 +64,20 @@ pub(crate) mod module {
     }
 
     #[kernel]
-    pub fn tensor_chunk_amax_f32_kernel(x: &[f32], mut out: DisjointSlice<f32>, element_count: u32) {
+    pub fn tensor_chunk_amax_f32_kernel(
+        x: &[f32],
+        mut out: DisjointSlice<f32>,
+        element_count: u32,
+    ) {
         let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
-        let local_amax =
-            tensor_chunk_amax4!(base, element_count, [i0, i1, i2, i3], abs_f32_at(x), checked_abs_f32(x));
+        let local_amax = tensor_chunk_amax4!(
+            base,
+            element_count,
+            [i0, i1, i2, i3],
+            abs_f32_at(x),
+            checked_abs_f32(x)
+        );
 
         block_max_store_f32!(TENSOR_AMAX, out[chunk], local_amax, lane, warp_in_block);
     }

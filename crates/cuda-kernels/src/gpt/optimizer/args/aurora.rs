@@ -36,3 +36,24 @@ pub struct AuroraMegaUpdateArgs<'a> {
     pub average_coefficient: f32,
     pub iterations: u32,
 }
+
+pub struct AuroraTmaPrepareArgs<'a> {
+    pub stream: &'a CudaStream,
+    pub slots: &'a DeviceBuffer<AuroraSlotDescriptor>,
+    pub oriented: &'a mut DeviceBuffer<f32>,
+    pub polar_x: &'a mut DeviceBuffer<f32>,
+    pub polar_chunks: &'a mut DeviceBuffer<f32>,
+    pub slot_index: u32,
+    pub mu: f32,
+}
+
+pub struct AuroraTmaFinishArgs<'a> {
+    pub stream: &'a CudaStream,
+    pub slots: &'a DeviceBuffer<AuroraSlotDescriptor>,
+    pub polar_update: &'a DeviceBuffer<f32>,
+    pub polar_chunks: &'a mut DeviceBuffer<f32>,
+    pub slot_index: u32,
+    pub learning_rate: f32,
+    pub weight_decay: f32,
+    pub average_coefficient: f32,
+}

@@ -1,4 +1,4 @@
-use cuda_device::{cuda_module, kernel, thread, DisjointSlice, SharedArray};
+use cuda_device::{DisjointSlice, SharedArray, cuda_module, kernel, thread};
 
 use crate::amax::max4_f32;
 use crate::block_reduce::{block_max_leader_f32, block_max_store_f32};
@@ -6,13 +6,11 @@ use crate::float_ptx::max_f32;
 use crate::quartet::quartet_backward_ms_eden_global_scale;
 use crate::warp_reduce::thread_lane_warp;
 
+use super::AMAX_WARPS_PER_BLOCK;
 use super::input::{
     checked_nvfp4_abs_value, checked_rowwise_abs_value, nvfp4_value_at, rowwise_value_at,
 };
-use super::AMAX_WARPS_PER_BLOCK;
-use crate::nvfp4_quant::kernels::row_amax::{
-    tensor_amax_chunk_indices, tensor_chunk_amax4,
-};
+use crate::nvfp4_quant::kernels::row_amax::{tensor_amax_chunk_indices, tensor_chunk_amax4};
 
 #[cuda_module]
 pub(crate) mod module {
@@ -34,7 +32,9 @@ pub(crate) mod module {
         let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
         let local_amax = tensor_chunk_amax4!(
-            base, element_count, [i0, i1, i2, i3],
+            base,
+            element_count,
+            [i0, i1, i2, i3],
             rowwise_value_at(bytes, scales, global_scales, cols),
             checked_rowwise_abs_value(bytes, scales, global_scales, cols)
         );
@@ -53,7 +53,9 @@ pub(crate) mod module {
         let (chunk, lane, warp_in_block, base, i0, i1, i2, i3) = tensor_amax_chunk_indices();
 
         let local_amax = tensor_chunk_amax4!(
-            base, element_count, [i0, i1, i2, i3],
+            base,
+            element_count,
+            [i0, i1, i2, i3],
             nvfp4_value_at(bytes, scales, global_scale),
             checked_nvfp4_abs_value(bytes, scales, global_scale)
         );
@@ -76,8 +78,10 @@ pub(crate) mod module {
             local_amax = max_f32(
                 local_amax,
                 max4_f32(
-                    chunk_amax_or_zero(chunk_amax, chunk, chunk_count), chunk_amax_or_zero(chunk_amax, chunk + stride, chunk_count),
-                    chunk_amax_or_zero(chunk_amax, chunk + stride * 2, chunk_count), chunk_amax_or_zero(chunk_amax, chunk + stride * 3, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk + stride, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk + stride * 2, chunk_count),
+                    chunk_amax_or_zero(chunk_amax, chunk + stride * 3, chunk_count),
                 ),
             );
             chunk += stride * 4;
@@ -87,7 +91,8 @@ pub(crate) mod module {
             unsafe { block_max_leader_f32(&mut AMAX_REDUCE, local_amax, lane, warp_in_block) }
         {
             unsafe {
-                *out_global_scale.get_unchecked_mut(0) = quartet_backward_ms_eden_global_scale(amax);
+                *out_global_scale.get_unchecked_mut(0) =
+                    quartet_backward_ms_eden_global_scale(amax);
             }
         }
     }
@@ -100,5 +105,4 @@ pub(crate) mod module {
             0.0
         }
     }
-
 }

@@ -1,4 +1,4 @@
-use super::super::{regression::Prediction, BinaryPrior, ResponseModel};
+use super::super::{BinaryPrior, ResponseModel, regression::Prediction};
 
 pub(super) fn survival_prior(
     base: Option<BinaryPrior>,

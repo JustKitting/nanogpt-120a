@@ -1,7 +1,7 @@
 use super::super::{
-    regression::Prediction,
-    stats::{normal_cdf, normal_pdf, EPS},
     ResponseModel,
+    regression::Prediction,
+    stats::{EPS, normal_cdf, normal_pdf},
 };
 
 pub(super) fn improvement_acquisition(

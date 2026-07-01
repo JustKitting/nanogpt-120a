@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{super::config::SweepConfig, regression::Effect, SweepAnalysis};
+use super::{super::config::SweepConfig, SweepAnalysis, regression::Effect};
 
 #[derive(Clone, Debug)]
 pub struct FactorBelief {
@@ -23,14 +23,23 @@ struct Accum {
 
 impl Accum {
     fn add(&mut self, effect: &Effect, weights: &ResponseWeights) {
-        let confidence = directional_confidence(effect.p_positive); self.direction += effect.coefficient * weights.direction * confidence;
+        let confidence = directional_confidence(effect.p_positive);
+        self.direction += effect.coefficient * weights.direction * confidence;
         self.confidence += confidence.abs() * weights.uncertainty.abs();
         self.variance += effect.stderr * effect.stderr * weights.uncertainty.abs();
-        self.positive_probability += effect.p_positive; self.evidence += 1;
+        self.positive_probability += effect.p_positive;
+        self.evidence += 1;
     }
 
     fn belief(self, factor: String) -> FactorBelief {
-        FactorBelief { factor, direction: self.direction, confidence: average(self.confidence, self.evidence), variance: average(self.variance, self.evidence), positive_probability: average(self.positive_probability, self.evidence), evidence: self.evidence }
+        FactorBelief {
+            factor,
+            direction: self.direction,
+            confidence: average(self.confidence, self.evidence),
+            variance: average(self.variance, self.evidence),
+            positive_probability: average(self.positive_probability, self.evidence),
+            evidence: self.evidence,
+        }
     }
 }
 
@@ -47,7 +56,10 @@ pub fn factor_beliefs(analysis: &SweepAnalysis, config: &SweepConfig) -> Vec<Fac
             .iter()
             .filter(|effect| !effect.name.contains('*'))
         {
-            factors.entry(effect.name.clone()).or_default().add(effect, &weights);
+            factors
+                .entry(effect.name.clone())
+                .or_default()
+                .add(effect, &weights);
         }
     }
     let mut beliefs = factors
@@ -87,14 +99,26 @@ fn average(value: f64, count: usize) -> f64 {
     }
 }
 
-struct ResponseWeights { direction: f64, uncertainty: f64 }
+struct ResponseWeights {
+    direction: f64,
+    uncertainty: f64,
+}
 
 fn response_weights(name: &str, config: &SweepConfig) -> ResponseWeights {
     if name.contains("quality") {
-        ResponseWeights { direction: config.sweep_quality_weight, uncertainty: config.sweep_quality_weight }
+        ResponseWeights {
+            direction: config.sweep_quality_weight,
+            uncertainty: config.sweep_quality_weight,
+        }
     } else if name == "stability" {
-        ResponseWeights { direction: 0.0, uncertainty: config.sweep_stability_weight }
+        ResponseWeights {
+            direction: 0.0,
+            uncertainty: config.sweep_stability_weight,
+        }
     } else {
-        ResponseWeights { direction: 0.0, uncertainty: 0.0 }
+        ResponseWeights {
+            direction: 0.0,
+            uncertainty: 0.0,
+        }
     }
 }

@@ -1,12 +1,12 @@
 use cuda_core::CudaStream;
 
-use crate::upload::UploadedModel;
 use crate::AppResult;
+use crate::upload::UploadedModel;
 
 use super::types::TrainingDiagnostics;
 use super::update::{
-    changed_bytes, collect_update_snapshots, finish_update_snapshots,
-    PendingTensorUpdateDiagnostics,
+    PendingTensorUpdateDiagnostics, changed_bytes, collect_update_snapshots,
+    finish_update_snapshots,
 };
 use super::util::{f32_buffer_stats, hash_bytes};
 use crate::training::grads::BackwardBuffers;

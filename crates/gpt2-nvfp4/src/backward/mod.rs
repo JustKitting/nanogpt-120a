@@ -13,9 +13,9 @@ mod scratch_reborrow;
 pub use attention::{
     AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
     AttentionCProjScratch, AttentionCoreBackwardArgs, AttentionCoreScratch,
-    AttentionCoreScratchBuffers,
-    AttentionQkvBackwardArgs, AttentionQkvScratch, c_proj_backward as attention_c_proj_backward,
-    causal_attention_backward, qkv_projection_backward,
+    AttentionCoreScratchBuffers, AttentionQkvBackwardArgs, AttentionQkvScratch,
+    c_proj_backward as attention_c_proj_backward, causal_attention_backward,
+    qkv_projection_backward,
 };
 pub use block::{BlockMlpBackwardArgs, BlockMlpBackwardModules, mlp_side_backward};
 pub use block_attention::{

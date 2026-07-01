@@ -12,8 +12,12 @@ use crate::kda_tc::{
 use super::{KdaChunkwiseGrads, KdaChunkwiseInputs};
 
 pub(super) fn add_kg_dh_to_du_tc(
-    kg: &[f32], d_u: &mut DisjointSlice<f32>, d_h_next: &KdaStateTile,
-    a_tile: &mut CtaATile, b_tile: &mut CtaBTile, ctx: CompactTileCtx<'_>,
+    kg: &[f32],
+    d_u: &mut DisjointSlice<f32>,
+    d_h_next: &KdaStateTile,
+    a_tile: &mut CtaATile,
+    b_tile: &mut CtaBTile,
+    ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
     tc_stage_loop!(ctx.tile, a_tile, b_tile, acc; k_base < ctx.params.head_dim; {

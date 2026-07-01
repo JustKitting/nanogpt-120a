@@ -11,15 +11,36 @@ macro_rules! add_launcher {
             assert!(args.base.len() >= elements(args.batch_count, args.m, args.n));
             assert!(args.out.len() >= elements(args.batch_count, args.m, args.n));
             self.module.$kernel(
-                args.stream, cta_config(args.m, args.n, args.batch_count), args.a, args.$rhs,
-                args.base, args.out, args.batch_count, args.m, args.n, args.k,
-                args.base_scale, args.matmul_scale,
+                args.stream,
+                cta_config(args.m, args.n, args.batch_count),
+                args.a,
+                args.$rhs,
+                args.base,
+                args.out,
+                args.batch_count,
+                args.m,
+                args.n,
+                args.k,
+                args.base_scale,
+                args.matmul_scale,
             )
         }
     };
 }
 
 impl F16TcMatmulModule {
-    add_launcher!(batched_matmul_add, F16TcMatmulAddArgs<'_, '_, '_>, b_t, f16_cta_tc_matmul_add_f32_kernel, rhs(n, k));
-    add_launcher!(batched_matmul_add_rhs_transposed_base, F16TcMatmulAddRhsTransposeBaseArgs<'_, '_>, rhs, f16_cta_tc_matmul_add_f32_rhs_transposed_base_kernel, rhs(k, n));
+    add_launcher!(
+        batched_matmul_add,
+        F16TcMatmulAddArgs<'_, '_, '_>,
+        b_t,
+        f16_cta_tc_matmul_add_f32_kernel,
+        rhs(n, k)
+    );
+    add_launcher!(
+        batched_matmul_add_rhs_transposed_base,
+        F16TcMatmulAddRhsTransposeBaseArgs<'_, '_>,
+        rhs,
+        f16_cta_tc_matmul_add_f32_rhs_transposed_base_kernel,
+        rhs(k, n)
+    );
 }

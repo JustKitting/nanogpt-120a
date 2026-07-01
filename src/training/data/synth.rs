@@ -77,14 +77,18 @@ fn clear_shards() -> AppResult<()> {
         return Ok(());
     }
 
-    for path in matching_entries(&dir, |file_name| is_bin_shard(file_name, SHARD_FILE_PREFIX) || file_name == SYNTH_EOS_MARKER)? {
+    for path in matching_entries(&dir, |file_name| {
+        is_bin_shard(file_name, SHARD_FILE_PREFIX) || file_name == SYNTH_EOS_MARKER
+    })? {
         fs::remove_file(path)?;
     }
 
     Ok(())
 }
 
-fn is_bin_shard(file_name: &str, prefix: &str) -> bool { file_name.starts_with(prefix) && file_name.ends_with(".bin") }
+fn is_bin_shard(file_name: &str, prefix: &str) -> bool {
+    file_name.starts_with(prefix) && file_name.ends_with(".bin")
+}
 
 fn matching_entries(dir: &Path, keep: impl Fn(&str) -> bool) -> AppResult<Vec<PathBuf>> {
     let mut paths = fs::read_dir(dir)?

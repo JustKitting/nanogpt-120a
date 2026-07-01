@@ -60,7 +60,14 @@ impl<'a, 'cuda> ScheduleEval<'a, 'cuda> {
         cols: usize,
         iterations: usize,
     ) -> Self {
-        Self { polar, source, expected, rows, cols, iterations }
+        Self {
+            polar,
+            source,
+            expected,
+            rows,
+            cols,
+            iterations,
+        }
     }
 }
 

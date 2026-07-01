@@ -13,31 +13,63 @@ use crate::warp_reduce::warp_sum_f32;
 
 #[derive(Clone, Copy)]
 pub(crate) struct FinishKdaGrads<'a> {
-    pub(crate) q: &'a [f32], pub(crate) k: &'a [f32], pub(crate) v: &'a [f32],
-    pub(crate) g: &'a [f32], pub(crate) beta: &'a [f32],
+    pub(crate) q: &'a [f32],
+    pub(crate) k: &'a [f32],
+    pub(crate) v: &'a [f32],
+    pub(crate) g: &'a [f32],
+    pub(crate) beta: &'a [f32],
 }
 
 #[derive(Clone, Copy)]
-struct FinishDimPoint { ctx: KdaWarpCtx, dim: u32, qk: KdaQkAct }
+struct FinishDimPoint {
+    ctx: KdaWarpCtx,
+    dim: u32,
+    qk: KdaQkAct,
+}
 
 #[derive(Clone, Copy)]
-struct FinishNormStats { q_norm: f32, k_norm: f32, q_dot: f32, k_dot: f32 }
+struct FinishNormStats {
+    q_norm: f32,
+    k_norm: f32,
+    q_dot: f32,
+    k_dot: f32,
+}
 
 #[derive(Clone, Copy)]
-struct FinishNormAcc { qk_norm: KdaQkNormAcc, q_dot: f32, k_dot: f32 }
+struct FinishNormAcc {
+    qk_norm: KdaQkNormAcc,
+    q_dot: f32,
+    k_dot: f32,
+}
 
 impl FinishNormAcc {
     #[inline(always)]
-    fn zero() -> Self { Self { qk_norm: KdaQkNormAcc::zero(), q_dot: 0.0, k_dot: 0.0 } }
+    fn zero() -> Self {
+        Self {
+            qk_norm: KdaQkNormAcc::zero(),
+            q_dot: 0.0,
+            k_dot: 0.0,
+        }
+    }
 
     #[inline(always)]
     fn stats(self) -> FinishNormStats {
         let (q_norm, k_norm) = self.qk_norm.norms();
-        FinishNormStats { q_norm, k_norm, q_dot: warp_sum_f32(self.q_dot), k_dot: warp_sum_f32(self.k_dot) }
+        FinishNormStats {
+            q_norm,
+            k_norm,
+            q_dot: warp_sum_f32(self.q_dot),
+            k_dot: warp_sum_f32(self.k_dot),
+        }
     }
 }
 
-pub(crate) fn finish_kda_backward_body(qkv: &[u16], grads: FinishKdaGrads<'_>, mut d_qkv: DisjointSlice<f32>, params: CausalAttentionParams) {
+pub(crate) fn finish_kda_backward_body(
+    qkv: &[u16],
+    grads: FinishKdaGrads<'_>,
+    mut d_qkv: DisjointSlice<f32>,
+    params: CausalAttentionParams,
+) {
     let ctx = kda_warp_ctx(TC_BACKWARD_THREADS_PER_BLOCK, &params);
     if !ctx.valid {
         return;
@@ -51,10 +83,32 @@ pub(crate) fn finish_kda_backward_body(qkv: &[u16], grads: FinishKdaGrads<'_>, m
     let stats = acc.stats();
 
     if dim0 < params.head_dim {
-        finish_dim(qkv, grads, &mut d_qkv, FinishDimPoint { ctx, dim: dim0, qk: qk0 }, stats, &params);
+        finish_dim(
+            qkv,
+            grads,
+            &mut d_qkv,
+            FinishDimPoint {
+                ctx,
+                dim: dim0,
+                qk: qk0,
+            },
+            stats,
+            &params,
+        );
     }
     if dim1 < params.head_dim {
-        finish_dim(qkv, grads, &mut d_qkv, FinishDimPoint { ctx, dim: dim1, qk: qk1 }, stats, &params);
+        finish_dim(
+            qkv,
+            grads,
+            &mut d_qkv,
+            FinishDimPoint {
+                ctx,
+                dim: dim1,
+                qk: qk1,
+            },
+            stats,
+            &params,
+        );
     }
     if ctx.lane == 0 {
         let raw_beta = cvt_f32_f16(qkv[beta_index(ctx.row, ctx.head, &params)]);
@@ -70,8 +124,12 @@ pub(crate) fn finish_kda_backward_body(qkv: &[u16], grads: FinishKdaGrads<'_>, m
 
 #[inline(always)]
 fn read_finish_dim(
-    qkv: &[u16], grads: FinishKdaGrads<'_>, ctx: KdaWarpCtx, dim: u32,
-    params: &CausalAttentionParams, acc: &mut FinishNormAcc,
+    qkv: &[u16],
+    grads: FinishKdaGrads<'_>,
+    ctx: KdaWarpCtx,
+    dim: u32,
+    params: &CausalAttentionParams,
+    acc: &mut FinishNormAcc,
 ) -> KdaQkAct {
     if dim >= params.head_dim {
         return KdaQkAct::zero();
@@ -86,8 +144,12 @@ fn read_finish_dim(
 }
 
 fn finish_dim(
-    qkv: &[u16], grads: FinishKdaGrads<'_>, d_qkv: &mut DisjointSlice<f32>,
-    point: FinishDimPoint, stats: FinishNormStats, params: &CausalAttentionParams,
+    qkv: &[u16],
+    grads: FinishKdaGrads<'_>,
+    d_qkv: &mut DisjointSlice<f32>,
+    point: FinishDimPoint,
+    stats: FinishNormStats,
+    params: &CausalAttentionParams,
 ) {
     let FinishDimPoint { ctx, dim, qk } = point;
     let compact = compact_index(ctx.batch, ctx.token, ctx.head, dim, params);
@@ -95,7 +157,8 @@ fn finish_dim(
     let k_denom = safe_denom(stats.k_norm);
     let q_cubic_denom = safe_denom(stats.q_norm * stats.q_norm * stats.q_norm);
     let k_cubic_denom = safe_denom(stats.k_norm * stats.k_norm * stats.k_norm);
-    let dq_norm = params.scale * (grads.q[compact] / q_denom - qk.q_act * stats.q_dot / q_cubic_denom);
+    let dq_norm =
+        params.scale * (grads.q[compact] / q_denom - qk.q_act * stats.q_dot / q_cubic_denom);
     let dk_norm = grads.k[compact] / k_denom - qk.k_act * stats.k_dot / k_cubic_denom;
     let raw_v = cvt_f32_f16(qkv[qkv_index(ctx.row, ctx.head, dim, v_offset(params), params)]);
     let raw_g = cvt_f32_f16(qkv[qkv_index(ctx.row, ctx.head, dim, g_offset(params), params)]);

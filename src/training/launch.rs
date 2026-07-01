@@ -9,6 +9,6 @@ mod strategy;
 
 pub(super) use burn_shim::CudaLearningComponents;
 use burn_shim::{BurnBackend, BurnInnerBackend, CudaTrainInput, CudaValidInput};
-pub(super) use config::{env_bool, env_nonempty, TrainConfig};
+pub(super) use config::{TrainConfig, env_bool, env_nonempty};
 pub(crate) use launcher::launch_from_env;
 pub(super) use metrics::CudaTrainOutput;

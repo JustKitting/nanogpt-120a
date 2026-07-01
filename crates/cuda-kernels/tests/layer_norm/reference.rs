@@ -56,7 +56,12 @@ fn gpt_kernel_row_variance_sum(x: &[f32], base: usize, row_len: usize, mean: f32
     })
 }
 
-fn gpt_kernel_row_reduce(x: &[f32], base: usize, row_len: usize, value: impl Fn(f32) -> f32) -> f32 {
+fn gpt_kernel_row_reduce(
+    x: &[f32],
+    base: usize,
+    row_len: usize,
+    value: impl Fn(f32) -> f32,
+) -> f32 {
     gpt_block_reduce_sum(|thread| {
         let mut sum = 0.0;
         for offset in [0, 256, 512] {

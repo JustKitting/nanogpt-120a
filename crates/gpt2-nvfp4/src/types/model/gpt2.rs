@@ -2,8 +2,8 @@ use cuda_core::DriverError;
 
 use super::args::Gpt2ForwardArgs;
 use super::weights::Gpt2Weights;
-use crate::types::{HiddenStateDevice, TokenEmbeddingArgs};
 use crate::Gpt2Rng;
+use crate::types::{HiddenStateDevice, TokenEmbeddingArgs};
 
 #[derive(Clone, Debug, Default)]
 pub struct Gpt2 {

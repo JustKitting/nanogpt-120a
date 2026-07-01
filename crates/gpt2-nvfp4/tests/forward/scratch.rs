@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    AttentionLogSumExp, HiddenState, Logits, MlpActivation, QkvActivation, RowwiseNvfp4Buffers,
-    GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    AttentionLogSumExp, GPT2_BATCH_SIZE, GPT2_N_HEAD, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, HiddenState,
+    Logits, MlpActivation, QkvActivation, RowwiseNvfp4Buffers,
 };
 
 use crate::common::forward_scratch::CausalAttentionTcScratchBuffers;

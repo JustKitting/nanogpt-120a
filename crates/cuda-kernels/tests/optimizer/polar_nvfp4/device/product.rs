@@ -4,7 +4,7 @@ use cuda_core::DeviceBuffer;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulF32Args;
 use rust_kernels_cuda::nvfp4_tc_matmul::Nvfp4TcMatmulArgs;
 
-use super::super::scratch::{global_scale, Scratch};
+use super::super::scratch::{Scratch, global_scale};
 use super::Nvfp4Polar;
 
 impl<'a> Nvfp4Polar<'a> {

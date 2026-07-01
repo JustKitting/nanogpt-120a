@@ -23,8 +23,12 @@ mod threads;
 mod work_grid;
 
 pub use args::{
-    AdamWUpdateArgs, AuroraMegaUpdateArgs, AuroraSlotDescriptor, EmbeddingLookupGradArgs,
-    GradientClipArgs, KdaAuroraClipArgs, ScheduleFreeMaterializeArgs,
+    AdamWUpdateArgs, AuroraMegaUpdateArgs, AuroraSlotDescriptor, AuroraTmaFinishArgs,
+    AuroraTmaPrepareArgs, EmbeddingLookupGradArgs, GradientClipArgs, KdaAuroraClipArgs,
+    ScheduleFreeMaterializeArgs,
+};
+pub use aurora::polar::fused::{
+    Coefficients as AuroraPolarCoefficients, coefficients as aurora_polar_coefficients,
 };
 pub use grad_clip::GRAD_CLIP_VALUES_PER_CHUNK;
 pub use launcher::OptimizerModule;

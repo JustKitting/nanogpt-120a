@@ -1,8 +1,8 @@
 use cuda_core::DriverError;
 
 use super::types::AttentionQkvBackwardArgs;
-use crate::backward::linear::{run_rowwise_linear_backward, RowwiseLinearBackwardPass};
 use crate::AttentionDims;
+use crate::backward::linear::{RowwiseLinearBackwardPass, run_rowwise_linear_backward};
 
 pub fn qkv_projection_backward(
     args: AttentionQkvBackwardArgs<'_, '_, '_>,

@@ -1,6 +1,6 @@
 use gpt2_nvfp4::{
-    HiddenState, Nvfp4Shape, QkvWeightShape, ResidualWeightShape, GPT2_CONTEXT_LEN, GPT2_N_EMBD,
-    GPT2_QKV,
+    GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_QKV, HiddenState, Nvfp4Shape, QkvWeightShape,
+    ResidualWeightShape,
 };
 
 use crate::common::nvfp4::repeating_identity_bytes;

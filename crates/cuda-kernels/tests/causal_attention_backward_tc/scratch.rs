@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::CausalAttentionBackwardTcScratch;
 
-use super::shape::{HEADS, HEAD_DIM, TOKEN_COUNT};
+use super::shape::{HEAD_DIM, HEADS, TOKEN_COUNT};
 
 pub struct TcScratchBuffers {
     q_f32: DeviceBuffer<f32>,

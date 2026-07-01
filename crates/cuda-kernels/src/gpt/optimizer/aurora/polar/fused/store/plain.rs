@@ -21,34 +21,101 @@ macro_rules! store_tile_acc4 {
 }
 
 #[inline(always)]
-pub(crate) fn store_plain(acc: [f32; 4], tile: CtaTile, warp_n: u32, out: *mut f32, rows: u32, cols: u32) {
+pub(crate) fn store_plain(
+    acc: [f32; 4],
+    tile: CtaTile,
+    warp_n: u32,
+    out: *mut f32,
+    rows: u32,
+    cols: u32,
+) {
     store_acc4!(store_plain_one, acc, tile, warp_n, out, rows, cols);
 }
 
 #[inline(always)]
-pub(crate) fn store_plain_tile(acc: [[f32; 4]; 4], tile: CtaTile, out: *mut f32, rows: u32, cols: u32) { store_tile_acc4!(store_plain, acc, tile, out, rows, cols); }
+pub(crate) fn store_plain_tile(
+    acc: [[f32; 4]; 4],
+    tile: CtaTile,
+    out: *mut f32,
+    rows: u32,
+    cols: u32,
+) {
+    store_tile_acc4!(store_plain, acc, tile, out, rows, cols);
+}
 
 #[inline(always)]
-pub(crate) fn store_plain_transposed(acc: [f32; 4], tile: CtaTile, warp_n: u32, out: *mut f32, dim: u32) {
+pub(crate) fn store_plain_transposed(
+    acc: [f32; 4],
+    tile: CtaTile,
+    warp_n: u32,
+    out: *mut f32,
+    dim: u32,
+) {
     store_acc4!(store_plain_transposed_one, acc, tile, warp_n, out, dim);
 }
 
 #[inline(always)]
-pub(crate) fn store_plain_transposed_tile(acc: [[f32; 4]; 4], tile: CtaTile, out: *mut f32, dim: u32) { store_tile_acc4!(store_plain_transposed, acc, tile, out, dim); }
-
-#[inline(always)]
-pub(crate) fn store_symmetric_polynomial(
-    acc: [f32; 4], tile: CtaTile, warp_n: u32, base: *const f32, out: *mut f32,
-    dim: u32, coefficients: Coefficients,
+pub(crate) fn store_plain_transposed_tile(
+    acc: [[f32; 4]; 4],
+    tile: CtaTile,
+    out: *mut f32,
+    dim: u32,
 ) {
-    store_acc4!(store_symmetric_polynomial_one, acc, tile, warp_n, base, out, dim, coefficients);
+    store_tile_acc4!(store_plain_transposed, acc, tile, out, dim);
 }
 
 #[inline(always)]
-pub(crate) fn store_symmetric_polynomial_tile(acc: [[f32; 4]; 4], tile: CtaTile, base: *const f32, out: *mut f32, dim: u32, coefficients: Coefficients) { store_tile_acc4!(store_symmetric_polynomial, acc, tile, base, out, dim, coefficients); }
+pub(crate) fn store_symmetric_polynomial(
+    acc: [f32; 4],
+    tile: CtaTile,
+    warp_n: u32,
+    base: *const f32,
+    out: *mut f32,
+    dim: u32,
+    coefficients: Coefficients,
+) {
+    store_acc4!(
+        store_symmetric_polynomial_one,
+        acc,
+        tile,
+        warp_n,
+        base,
+        out,
+        dim,
+        coefficients
+    );
+}
 
 #[inline(always)]
-fn store_plain_one(acc: f32, tile: CtaTile, warp_n: u32, acc_index: usize, out: *mut f32, rows: u32, cols: u32) {
+pub(crate) fn store_symmetric_polynomial_tile(
+    acc: [[f32; 4]; 4],
+    tile: CtaTile,
+    base: *const f32,
+    out: *mut f32,
+    dim: u32,
+    coefficients: Coefficients,
+) {
+    store_tile_acc4!(
+        store_symmetric_polynomial,
+        acc,
+        tile,
+        base,
+        out,
+        dim,
+        coefficients
+    );
+}
+
+#[inline(always)]
+fn store_plain_one(
+    acc: f32,
+    tile: CtaTile,
+    warp_n: u32,
+    acc_index: usize,
+    out: *mut f32,
+    rows: u32,
+    cols: u32,
+) {
     let row = row(tile, acc_index);
     let col = col(tile, warp_n, acc_index);
     if row < rows && col < cols {
@@ -57,7 +124,14 @@ fn store_plain_one(acc: f32, tile: CtaTile, warp_n: u32, acc_index: usize, out: 
 }
 
 #[inline(always)]
-fn store_plain_transposed_one(acc: f32, tile: CtaTile, warp_n: u32, acc_index: usize, out: *mut f32, dim: u32) {
+fn store_plain_transposed_one(
+    acc: f32,
+    tile: CtaTile,
+    warp_n: u32,
+    acc_index: usize,
+    out: *mut f32,
+    dim: u32,
+) {
     let row = row(tile, acc_index);
     let col = col(tile, warp_n, acc_index);
     if row < dim && col < dim {
@@ -68,8 +142,14 @@ fn store_plain_transposed_one(acc: f32, tile: CtaTile, warp_n: u32, acc_index: u
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 #[inline(always)]
 fn store_symmetric_polynomial_one(
-    acc: f32, tile: CtaTile, warp_n: u32, acc_index: usize, base: *const f32,
-    out: *mut f32, dim: u32, coefficients: Coefficients,
+    acc: f32,
+    tile: CtaTile,
+    warp_n: u32,
+    acc_index: usize,
+    base: *const f32,
+    out: *mut f32,
+    dim: u32,
+    coefficients: Coefficients,
 ) {
     let row = row(tile, acc_index);
     let col = col(tile, warp_n, acc_index);

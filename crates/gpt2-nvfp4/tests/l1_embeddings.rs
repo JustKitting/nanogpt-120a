@@ -1,14 +1,14 @@
 use std::error::Error;
 
 use cuda_core::DeviceBuffer;
-use gpt2_nvfp4::{HiddenState, Nvfp4Shape, TokenEmbeddingShape, GPT2_CONTEXT_LEN, GPT2_N_EMBD};
+use gpt2_nvfp4::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, HiddenState, Nvfp4Shape, TokenEmbeddingShape};
 use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
 use rust_kernels_cuda::nvfp4::Nvfp4DeviceTensor;
 
 mod common;
 
 use common::cuda_test_context;
-use common::nvfp4::{set_e2m1_one, E4M3_ONE};
+use common::nvfp4::{E4M3_ONE, set_e2m1_one};
 
 const TOLERANCE: f32 = 1.0e-7;
 

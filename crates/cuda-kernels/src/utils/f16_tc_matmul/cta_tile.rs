@@ -8,14 +8,28 @@ pub(crate) const CTA_A_ELEMS: usize = CTA_M as usize * CTA_K as usize;
 pub(crate) const CTA_B_ELEMS: usize = CTA_N as usize * CTA_K as usize;
 
 #[derive(Clone, Copy)]
-pub(crate) struct CtaMatmulDims { pub(crate) batch_count: u32, pub(crate) m: u32, pub(crate) n: u32, pub(crate) k: u32 }
+pub(crate) struct CtaMatmulDims {
+    pub(crate) batch_count: u32,
+    pub(crate) m: u32,
+    pub(crate) n: u32,
+    pub(crate) k: u32,
+}
 
 impl CtaMatmulDims {
     #[inline(always)]
-    pub(crate) fn new(batch_count: u32, m: u32, n: u32, k: u32) -> Self { Self { batch_count, m, n, k } }
+    pub(crate) fn new(batch_count: u32, m: u32, n: u32, k: u32) -> Self {
+        Self {
+            batch_count,
+            m,
+            n,
+            k,
+        }
+    }
 
     #[inline(always)]
-    pub(crate) fn aligned(self) -> bool { self.m.is_multiple_of(CTA_M) && self.n.is_multiple_of(CTA_N) && self.k.is_multiple_of(CTA_K) }
+    pub(crate) fn aligned(self) -> bool {
+        self.m.is_multiple_of(CTA_M) && self.n.is_multiple_of(CTA_N) && self.k.is_multiple_of(CTA_K)
+    }
 }
 
 #[inline(always)]

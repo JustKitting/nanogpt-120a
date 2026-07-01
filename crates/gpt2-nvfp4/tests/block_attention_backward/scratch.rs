@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DriverError};
 use gpt2_nvfp4::{
-    AttentionCoreScratchBuffers, BlockAttentionBackwardScratch, LinearScratch, GPT2_N_EMBD,
-    GPT2_QKV,
+    AttentionCoreScratchBuffers, BlockAttentionBackwardScratch, GPT2_N_EMBD, GPT2_QKV,
+    LinearScratch,
 };
 
 pub struct BlockAttentionScratch {

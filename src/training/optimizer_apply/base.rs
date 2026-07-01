@@ -1,16 +1,16 @@
 use cuda_core::{CudaStream, DriverError};
 use rust_kernels_cuda::optimizer::OptimizerModule;
 
+use crate::training::OptimizerTrace;
 use crate::training::grads::BackwardBuffers;
 use crate::training::next_latent::NextLatGradBuffers;
 use crate::training::optimizer::OptimizerScratch;
 use crate::training::optimizer_state::OptimizerStateBuffers;
-use crate::training::OptimizerTrace;
 use crate::upload::UploadedModel;
 
 use super::adam::AdamUpdate;
 use super::layer_norm::update_layer_norm_timed;
-use super::next_latent::{update_next_latent, NextLatUpdateArgs};
+use super::next_latent::{NextLatUpdateArgs, update_next_latent};
 use super::timed_ms;
 
 pub(super) struct BaseAdamUpdateArgs<'a> {

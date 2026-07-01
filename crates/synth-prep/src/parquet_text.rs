@@ -35,7 +35,11 @@ fn tokenize_synth_batch(
     tokenizer: &Llama2Tokenizer,
     writer: &mut ShardWriter,
 ) -> AppResult<()> {
-    let sections = [("Query", string_column(batch, "query")?), ("Reasoning", string_column(batch, "synthetic_reasoning")?), ("Answer", string_column(batch, "synthetic_answer")?)];
+    let sections = [
+        ("Query", string_column(batch, "query")?),
+        ("Reasoning", string_column(batch, "synthetic_reasoning")?),
+        ("Answer", string_column(batch, "synthetic_answer")?),
+    ];
 
     for row in 0..batch.num_rows() {
         let mut text = String::new();

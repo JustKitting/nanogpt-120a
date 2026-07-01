@@ -1,6 +1,6 @@
 use gpt2_nvfp4::{
-    attention_side_backward, AttentionBackwardModules, BlockAttentionBackwardArgs,
-    BlockAttentionBackwardModules, BlockAttentionBackwardSeeds, Gpt2Rng,
+    AttentionBackwardModules, BlockAttentionBackwardArgs, BlockAttentionBackwardModules,
+    BlockAttentionBackwardSeeds, Gpt2Rng, attention_side_backward,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;

@@ -45,58 +45,110 @@ pub(super) mod module {
 
     #[kernel]
     pub fn f16_cta_tc_matmul_kernel(
-        a: &[u16], b_t: &[u16], out: DisjointSlice<f32>, batch_count: u32, m: u32, n: u32, k: u32,
+        a: &[u16],
+        b_t: &[u16],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
     ) {
         call_with_tiles!(cta_matmul_body; a, b_t, out; batch_count, m, n, k);
     }
 
     #[kernel]
     pub fn f16_cta_tc_matmul_f32_kernel(
-        a: &[f32], b_t: &[f32], out: DisjointSlice<f32>, batch_count: u32, m: u32, n: u32, k: u32,
+        a: &[f32],
+        b_t: &[f32],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
     ) {
         call_with_tiles!(cta_matmul_f32_body; a, b_t, out; batch_count, m, n, k);
     }
 
     #[kernel]
     pub fn f16_cta_tc_matmul_f32_rhs_kernel(
-        a: &[f32], rhs: &[f32], out: DisjointSlice<f32>, batch_count: u32, m: u32, n: u32, k: u32,
+        a: &[f32],
+        rhs: &[f32],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
     ) {
         call_with_tiles!(cta_matmul_f32_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
     #[kernel]
     pub fn f16_cta_tc_matmul_f32_half_rhs_kernel(
-        a: &[f32], rhs: &[u16], out: DisjointSlice<f32>, batch_count: u32, m: u32, n: u32, k: u32,
+        a: &[f32],
+        rhs: &[u16],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
     ) {
         call_with_tiles!(cta_matmul_f32_half_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
     #[kernel]
     pub fn f16_cta_tc_matmul_f32_a_transposed_rhs_kernel(
-        a: &[f32], rhs: &[f32], out: DisjointSlice<f32>, batch_count: u32, m: u32, n: u32, k: u32,
+        a: &[f32],
+        rhs: &[f32],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
     ) {
         call_with_tiles!(cta_matmul_f32_a_transposed_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
     #[kernel]
     pub fn f16_cta_tc_matmul_f32_a_transposed_half_rhs_kernel(
-        a: &[f32], rhs: &[u16], out: DisjointSlice<f32>, batch_count: u32, m: u32, n: u32, k: u32,
+        a: &[f32],
+        rhs: &[u16],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
     ) {
         call_with_tiles!(cta_matmul_f32_a_transposed_half_rhs_body; a, rhs, out; batch_count, m, n, k);
     }
 
     #[kernel]
     pub fn f16_cta_tc_matmul_add_f32_kernel(
-        a: &[f32], b_t: &[f32], base: &[f32], out: DisjointSlice<f32>,
-        batch_count: u32, m: u32, n: u32, k: u32, base_scale: f32, matmul_scale: f32,
+        a: &[f32],
+        b_t: &[f32],
+        base: &[f32],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
+        base_scale: f32,
+        matmul_scale: f32,
     ) {
         call_with_tiles!(cta_matmul_add_f32_body; a, b_t, base, out; batch_count, m, n, k, base_scale, matmul_scale);
     }
 
     #[kernel]
     pub fn f16_cta_tc_matmul_add_f32_rhs_transposed_base_kernel(
-        a: &[f32], rhs: &[f32], base: &[f32], out: DisjointSlice<f32>,
-        batch_count: u32, m: u32, n: u32, k: u32, base_scale: f32, matmul_scale: f32,
+        a: &[f32],
+        rhs: &[f32],
+        base: &[f32],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
+        base_scale: f32,
+        matmul_scale: f32,
     ) {
         call_with_tiles!(
             cta_matmul_add_f32_rhs_transposed_base_body; a, rhs, base, out;

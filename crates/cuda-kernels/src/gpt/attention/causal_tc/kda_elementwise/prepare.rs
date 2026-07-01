@@ -14,7 +14,12 @@ pub(in super::super) fn prepare_kda_body(
     beta: DisjointSlice<f32>,
     params: CausalAttentionParams,
 ) {
-    prepare_kda_inputs_body(qkv, KdaPrepareOutputs { q, k, v, g, beta }, params, TC_FORWARD_THREADS_PER_BLOCK);
+    prepare_kda_inputs_body(
+        qkv,
+        KdaPrepareOutputs { q, k, v, g, beta },
+        params,
+        TC_FORWARD_THREADS_PER_BLOCK,
+    );
 }
 
 pub(in super::super) fn zero_f32_body(mut values: DisjointSlice<f32>, element_count: u32) {

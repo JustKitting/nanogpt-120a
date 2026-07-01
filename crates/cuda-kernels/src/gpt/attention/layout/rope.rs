@@ -1,5 +1,5 @@
-use super::qkv::qkv_index_from_shape;
 use super::super::rope::ApplyRopeParams;
+use super::qkv::qkv_index_from_shape;
 
 #[inline(always)]
 pub(crate) fn rope_qkv_index(
@@ -11,5 +11,12 @@ pub(crate) fn rope_qkv_index(
     params: &ApplyRopeParams,
 ) -> usize {
     let row = batch * params.seq_len + token;
-    qkv_index_from_shape(row, head, dim, section_offset, params.qkv_dim, params.head_dim)
+    qkv_index_from_shape(
+        row,
+        head,
+        dim,
+        section_offset,
+        params.qkv_dim,
+        params.head_dim,
+    )
 }

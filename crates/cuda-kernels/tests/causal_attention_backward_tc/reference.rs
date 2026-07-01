@@ -37,7 +37,11 @@ pub fn backward(
 
 fn scores(qkv: &[f32], query: usize, head: usize) -> Vec<f32> {
     (0..=query)
-        .map(|key| head_sum(|dim| qkv_value(qkv, query, head, dim, 0) * qkv_value(qkv, key, head, dim, EMBEDDING)))
+        .map(|key| {
+            head_sum(|dim| {
+                qkv_value(qkv, query, head, dim, 0) * qkv_value(qkv, key, head, dim, EMBEDDING)
+            })
+        })
         .collect()
 }
 
@@ -46,7 +50,9 @@ fn softmax_d(out: &[f32], d_out: &[f32], query: usize, head: usize) -> f32 {
 }
 
 fn d_out_dot_v(qkv: &[f32], d_out: &[f32], query: usize, key: usize, head: usize) -> f32 {
-    head_sum(|dim| d_out[hidden_index(query, head, dim)] * qkv[qkv_index(key, head, dim, 2 * EMBEDDING)])
+    head_sum(|dim| {
+        d_out[hidden_index(query, head, dim)] * qkv[qkv_index(key, head, dim, 2 * EMBEDDING)]
+    })
 }
 
 fn head_sum(value: impl Fn(usize) -> f32) -> f32 {
@@ -60,7 +66,8 @@ fn apply_rope_backward(grad: &mut [f32], dq_rot: &[f32], dk_rot: &[f32]) {
                 let h = hidden_index(token, head, dim);
                 let pair = hidden_index(token, head, dim ^ 1);
                 for (offset, rot) in [(0, dq_rot), (EMBEDDING, dk_rot)] {
-                    grad[qkv_index(token, head, dim, offset)] = rope_raw_grad(token, dim, rot[h], rot[pair]);
+                    grad[qkv_index(token, head, dim, offset)] =
+                        rope_raw_grad(token, dim, rot[h], rot[pair]);
                 }
             }
         }

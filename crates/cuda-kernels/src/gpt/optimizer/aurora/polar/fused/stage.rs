@@ -1,8 +1,8 @@
-use cuda_device::{thread, SharedArray};
+use cuda_device::{SharedArray, thread};
 
 use crate::device_ptr::read_f32;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
-use crate::f16_tc_matmul::cta_tile::{CtaTile, CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS};
+use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS, CtaTile};
 
 macro_rules! stage_four_offsets {
     ($stage:ident($($arg:expr),+), $offset:expr) => {{

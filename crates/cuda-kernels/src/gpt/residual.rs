@@ -44,8 +44,19 @@ impl ResidualBackwardModule {
         })
     }
 
-    residual_launcher!(grad_add, ResidualGradAddArgs<'_, '_>, residual_grad_add_kernel, direct, branch);
-    residual_launcher!(grad_accumulate, ResidualGradAccumulateArgs<'_, '_>, residual_grad_accumulate_kernel, branch);
+    residual_launcher!(
+        grad_add,
+        ResidualGradAddArgs<'_, '_>,
+        residual_grad_add_kernel,
+        direct,
+        branch
+    );
+    residual_launcher!(
+        grad_accumulate,
+        ResidualGradAccumulateArgs<'_, '_>,
+        residual_grad_accumulate_kernel,
+        branch
+    );
 }
 
 #[cuda_module]
@@ -53,7 +64,12 @@ mod kernels {
     use super::*;
 
     #[kernel]
-    pub fn residual_grad_add_kernel(direct: &[f32], branch: &[f32], mut out: DisjointSlice<f32>, len: u32) {
+    pub fn residual_grad_add_kernel(
+        direct: &[f32],
+        branch: &[f32],
+        mut out: DisjointSlice<f32>,
+        len: u32,
+    ) {
         if let Some(index) = residual_index(len) {
             unsafe {
                 *out.get_unchecked_mut(index) = direct[index] + branch[index];

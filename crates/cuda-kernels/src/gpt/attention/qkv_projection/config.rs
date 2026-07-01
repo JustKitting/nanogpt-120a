@@ -2,9 +2,7 @@ use cuda_core::LaunchConfig;
 
 use super::args::QkvProjectionArgs;
 use crate::launch::launch_config;
-use crate::mma::{
-    NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams, projection_cta_grid_dim,
-};
+use crate::mma::{NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams, projection_cta_grid_dim};
 
 pub(super) fn cta_config(token_count: u32, output_dim: u32) -> LaunchConfig {
     launch_config(

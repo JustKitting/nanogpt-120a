@@ -2,10 +2,10 @@ use cuda_core::{CudaStream, DriverError};
 use rust_kernels_cuda::layer_norm_backward::LayerNormBackwardModule;
 use rust_kernels_cuda::residual::ResidualBackwardModule;
 
-use super::layer_norm::{layer_norm_backward, Gpt2LayerNormBackwardArgs};
+use super::layer_norm::{Gpt2LayerNormBackwardArgs, layer_norm_backward};
 use super::mlp::{
-    backward as mlp_backward, MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules,
-    MlpBackwardScratch, MlpBackwardSeeds,
+    MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds,
+    backward as mlp_backward,
 };
 use super::residual::residual_grad_add;
 use crate::types::{BlockBackwardGrads, BlockForwardSaved};

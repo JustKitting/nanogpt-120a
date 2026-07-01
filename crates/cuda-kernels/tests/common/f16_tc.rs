@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use rust_kernels_cuda::f16_tc_matmul::{f16_tc_matmul_elements, F16TcMatmulScratch};
+use rust_kernels_cuda::f16_tc_matmul::{F16TcMatmulScratch, f16_tc_matmul_elements};
 
 pub struct F16TcScratchBuffers {
     a_padded: DeviceBuffer<f32>,

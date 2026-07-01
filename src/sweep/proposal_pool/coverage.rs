@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::super::features::{unit_features, FEATURE_COUNT};
+use super::super::features::{FEATURE_COUNT, unit_features};
 use super::super::{candidate::Candidate, config::SweepConfig, rng::SweepRng};
 
 #[cfg(test)]

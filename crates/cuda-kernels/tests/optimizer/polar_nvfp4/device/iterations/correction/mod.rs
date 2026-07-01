@@ -15,7 +15,12 @@ impl<'a> Nvfp4Polar<'a> {
         stale_defect: &mut [f32],
         stats: &mut CorrectionStats,
     ) -> Result<CorrectionGram, Box<dyn Error>> {
-        let GramRequest { source, rows, cols, iter } = request;
+        let GramRequest {
+            source,
+            rows,
+            cols,
+            iter,
+        } = request;
         let rejects_stale_steps = mode.rejects_stale_steps();
         let gram = match mode {
             GramCorrectionMode::HighPrecision | GramCorrectionMode::HighPrecisionSafety { .. } => {
@@ -37,7 +42,10 @@ impl<'a> Nvfp4Polar<'a> {
                     CorrectionGram::approximate(self.nvfp4_gram(source, rows, cols, iter, stats)?)
                 }
             }
-            GramCorrectionMode::ExactPrefixThenNvfp4Average { exact_steps, samples } => {
+            GramCorrectionMode::ExactPrefixThenNvfp4Average {
+                exact_steps,
+                samples,
+            } => {
                 if iter < exact_steps {
                     CorrectionGram::refreshed(self.high_precision_gram(source, rows, cols, stats)?)
                 } else {
@@ -64,11 +72,29 @@ impl<'a> Nvfp4Polar<'a> {
                 stale_defect,
                 stats,
             )?,
-            GramCorrectionMode::ExactPrefixThenStale { exact_steps, period }
-            | GramCorrectionMode::ExactPrefixThenStaleReject { exact_steps, period }
-            | GramCorrectionMode::ExactPrefixThenStaleRejectSafety { exact_steps, period, .. }
-            | GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety { exact_steps, period, .. }
-            | GramCorrectionMode::ExactPrefixThenStaleRejectSchedule { exact_steps, period, .. } => {
+            GramCorrectionMode::ExactPrefixThenStale {
+                exact_steps,
+                period,
+            }
+            | GramCorrectionMode::ExactPrefixThenStaleReject {
+                exact_steps,
+                period,
+            }
+            | GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
+                exact_steps,
+                period,
+                ..
+            }
+            | GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety {
+                exact_steps,
+                period,
+                ..
+            }
+            | GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+                exact_steps,
+                period,
+                ..
+            } => {
                 if iter < exact_steps {
                     CorrectionGram::refreshed(self.high_precision_gram(source, rows, cols, stats)?)
                 } else {
@@ -82,7 +108,10 @@ impl<'a> Nvfp4Polar<'a> {
                     )?
                 }
             }
-            GramCorrectionMode::Adaptive { period, max_relative_defect } => self.stale_correction_gram(
+            GramCorrectionMode::Adaptive {
+                period,
+                max_relative_defect,
+            } => self.stale_correction_gram(
                 request,
                 period <= 1
                     || iter % period == 0

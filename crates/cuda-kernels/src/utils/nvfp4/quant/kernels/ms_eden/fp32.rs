@@ -26,8 +26,18 @@ pub(crate) mod module {
         guarded_pack_chunk!(chunk, chunk_count);
 
         fp32_to_nvfp4_ms_eden_body(
-            x, &mut out_fp4, &mut out_scales, &mut out_global_scales, &mut out_chunk_amax,
-            chunk, src_row_len, dst_row_len, global_scale, scale_override, sign_seed, scale_seed,
+            x,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            &mut out_chunk_amax,
+            chunk,
+            src_row_len,
+            dst_row_len,
+            global_scale,
+            scale_override,
+            sign_seed,
+            scale_seed,
         );
     }
 
@@ -49,8 +59,18 @@ pub(crate) mod module {
         guarded_pack_chunk!(chunk, chunk_count);
 
         fp32_to_nvfp4_ms_eden_body(
-            x, &mut out_fp4, &mut out_scales, &mut out_global_scales, &mut out_chunk_amax,
-            chunk, src_row_len, dst_row_len, global_scale[0], scale_override, sign_seed, scale_seed,
+            x,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            &mut out_chunk_amax,
+            chunk,
+            src_row_len,
+            dst_row_len,
+            global_scale[0],
+            scale_override,
+            sign_seed,
+            scale_seed,
         );
     }
 
@@ -71,8 +91,17 @@ pub(crate) mod module {
         guarded_pack_chunk!(chunk, chunk_count);
 
         fp32_to_nvfp4_ms_eden_body_no_chunk_amax(
-            x, &mut out_fp4, &mut out_scales, &mut out_global_scales,
-            chunk, src_row_len, dst_row_len, global_scale[0], scale_override, sign_seed, scale_seed,
+            x,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            chunk,
+            src_row_len,
+            dst_row_len,
+            global_scale[0],
+            scale_override,
+            sign_seed,
+            scale_seed,
         );
     }
 
@@ -90,8 +119,17 @@ pub(crate) mod module {
         scale_seed: u32,
     ) {
         fp32_to_nvfp4_ms_eden_body_no_chunk_amax(
-            x, &mut out_fp4, &mut out_scales, &mut out_global_scales,
-            pack_chunk(), src_row_len, dst_row_len, global_scale[0], scale_override, sign_seed, scale_seed,
+            x,
+            &mut out_fp4,
+            &mut out_scales,
+            &mut out_global_scales,
+            pack_chunk(),
+            src_row_len,
+            dst_row_len,
+            global_scale[0],
+            scale_override,
+            sign_seed,
+            scale_seed,
         );
     }
 }

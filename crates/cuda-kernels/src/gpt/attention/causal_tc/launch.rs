@@ -38,17 +38,19 @@ impl AttentionModule {
                 n: args.seq_len,
                 k: args.head_dim,
             })?;
-        self.causal_attention_tc.base.attention_softmax_forward_kernel(
-            args.stream,
-            launch_config(
-                (args.seq_len, args.head_count, args.batch_size),
-                TC_FORWARD_THREADS_PER_BLOCK,
-            ),
-            &*scratch.scores,
-            &mut *scratch.probs,
-            args.log_sum_exp,
-            params,
-        )?;
+        self.causal_attention_tc
+            .base
+            .attention_softmax_forward_kernel(
+                args.stream,
+                launch_config(
+                    (args.seq_len, args.head_count, args.batch_size),
+                    TC_FORWARD_THREADS_PER_BLOCK,
+                ),
+                &*scratch.scores,
+                &mut *scratch.probs,
+                args.log_sum_exp,
+                params,
+            )?;
         args.tc_module
             .batched_matmul_f32_rhs(F16TcMatmulF32RhsArgs {
                 stream: args.stream,
@@ -65,22 +67,27 @@ impl AttentionModule {
             TC_FORWARD_THREADS_PER_BLOCK,
         );
         if let Some(attention_out_f16) = args.attention_out_f16 {
-            return self.causal_attention_tc.base.scatter_attention_forward_save_f16_kernel(
+            return self
+                .causal_attention_tc
+                .base
+                .scatter_attention_forward_save_f16_kernel(
+                    args.stream,
+                    config,
+                    &*scratch.compact_out,
+                    args.out,
+                    attention_out_f16,
+                    params,
+                );
+        }
+
+        self.causal_attention_tc
+            .base
+            .scatter_attention_forward_kernel(
                 args.stream,
                 config,
                 &*scratch.compact_out,
                 args.out,
-                attention_out_f16,
                 params,
-            );
-        }
-
-        self.causal_attention_tc.base.scatter_attention_forward_kernel(
-            args.stream,
-            config,
-            &*scratch.compact_out,
-            args.out,
-            params,
-        )
+            )
     }
 }

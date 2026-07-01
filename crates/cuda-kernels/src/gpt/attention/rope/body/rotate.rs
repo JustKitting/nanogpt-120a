@@ -1,7 +1,7 @@
 use cuda_device::DisjointSlice;
 
-use super::pair::{QkvPair, read_pair};
 use super::super::ApplyRopeParams;
+use super::pair::{QkvPair, read_pair};
 use crate::float_ptx::{exp_f32, fma_f32, sincos_f32};
 
 #[inline(always)]

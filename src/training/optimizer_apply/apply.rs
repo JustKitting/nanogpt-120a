@@ -33,14 +33,25 @@ pub fn apply_weight_updates(args: WeightUpdateArgs<'_>) -> AppResult<WeightUpdat
     let candidate_step = state.next_step();
     trace.adam_lr = adam_learning_rate(candidate_step);
     trace.aurora_lr = aurora_learning_rate(candidate_step);
-    trace.embedding_lookup_ms = timed_ms(|| add_embedding_lookup_grad(stream, optimizer, batch, grads, next_latent_grads))?;
+    trace.embedding_lookup_ms =
+        timed_ms(|| add_embedding_lookup_grad(stream, optimizer, batch, grads, next_latent_grads))?;
 
     let grad_norm = grad_clip.clip(stream, optimizer)?;
     trace.grad_norm = grad_norm;
 
     let skip_decision = state.should_skip_update(observed_loss, grad_norm);
-    if record_skip_decision(stream, grads, next_latent_grads, candidate_step, &mut trace, skip_decision)? {
-        return Ok(WeightUpdateResult { trace, diagnostics: None });
+    if record_skip_decision(
+        stream,
+        grads,
+        next_latent_grads,
+        candidate_step,
+        &mut trace,
+        skip_decision,
+    )? {
+        return Ok(WeightUpdateResult {
+            trace,
+            diagnostics: None,
+        });
     }
 
     let step = state.advance();
@@ -48,7 +59,16 @@ pub fn apply_weight_updates(args: WeightUpdateArgs<'_>) -> AppResult<WeightUpdat
     let average_coefficient = state.schedule_free_average_coefficient(step);
 
     let diagnostics = super::super::diagnostics::enabled()
-        .then(|| PendingTrainingDiagnostics::collect(stream, uploaded, grads, state, step, average_coefficient))
+        .then(|| {
+            PendingTrainingDiagnostics::collect(
+                stream,
+                uploaded,
+                grads,
+                state,
+                step,
+                average_coefficient,
+            )
+        })
         .transpose()?;
 
     update_base_adam(BaseAdamUpdateArgs {
@@ -76,10 +96,20 @@ pub fn apply_weight_updates(args: WeightUpdateArgs<'_>) -> AppResult<WeightUpdat
         trace: &mut trace,
     })?;
 
-    update_aurora_groups(stream, runtime, aurora_tables, aurora, step, average_coefficient, &mut trace)?;
+    update_aurora_groups(
+        stream,
+        runtime,
+        aurora_tables,
+        aurora,
+        step,
+        average_coefficient,
+        &mut trace,
+    )?;
     apply_kda_aurora_clip(stream, runtime, uploaded, tape, scratch, state, &mut trace)?;
 
-    let diagnostics = diagnostics.map(|pending| pending.finish(stream, uploaded)).transpose()?;
+    let diagnostics = diagnostics
+        .map(|pending| pending.finish(stream, uploaded))
+        .transpose()?;
 
     Ok(WeightUpdateResult { trace, diagnostics })
 }

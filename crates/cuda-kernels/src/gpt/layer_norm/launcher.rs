@@ -68,11 +68,28 @@ impl LayerNormModule {
     pub fn layer_norm_warp_f32(&self, args: LayerNormArgs<'_, '_>) -> Result<(), DriverError> {
         self.module.layer_norm_warp_f32_kernel(
             args.stream,
-            launch_config((args.row_count.div_ceil(WARPS_PER_BLOCK), 1, 1), THREADS_PER_BLOCK),
-            args.x, args.gamma, args.beta, args.out, args.row_count, args.epsilon,
+            launch_config(
+                (args.row_count.div_ceil(WARPS_PER_BLOCK), 1, 1),
+                THREADS_PER_BLOCK,
+            ),
+            args.x,
+            args.gamma,
+            args.beta,
+            args.out,
+            args.row_count,
+            args.epsilon,
         )
     }
 
-    gpt_layer_norm_launcher!(gpt_layer_norm, GptLayerNormArgs<'_, '_>, gpt_layer_norm_kernel);
-    gpt_layer_norm_launcher!(gpt_layer_norm_save_residual_f16, GptLayerNormSaveResidualF16Args<'_, '_>, gpt_layer_norm_save_residual_f16_kernel, residual_f16);
+    gpt_layer_norm_launcher!(
+        gpt_layer_norm,
+        GptLayerNormArgs<'_, '_>,
+        gpt_layer_norm_kernel
+    );
+    gpt_layer_norm_launcher!(
+        gpt_layer_norm_save_residual_f16,
+        GptLayerNormSaveResidualF16Args<'_, '_>,
+        gpt_layer_norm_save_residual_f16_kernel,
+        residual_f16
+    );
 }

@@ -45,9 +45,19 @@ fn values(len: usize, start: f32) -> Vec<f32> {
 }
 
 fn reference(d_concat: &[f32], d_predicted: &[f32]) -> (Vec<f32>, Vec<f32>) {
-    let d_next = d_concat.chunks(EMBED * 2).flat_map(|row| row[..EMBED].iter().copied()).collect();
-    let d_current = d_concat.chunks(EMBED * 2).zip(d_predicted.chunks(EMBED))
-        .flat_map(|(row, predicted)| row[EMBED..].iter().zip(predicted).map(|(concat, predicted)| concat + predicted))
+    let d_next = d_concat
+        .chunks(EMBED * 2)
+        .flat_map(|row| row[..EMBED].iter().copied())
+        .collect();
+    let d_current = d_concat
+        .chunks(EMBED * 2)
+        .zip(d_predicted.chunks(EMBED))
+        .flat_map(|(row, predicted)| {
+            row[EMBED..]
+                .iter()
+                .zip(predicted)
+                .map(|(concat, predicted)| concat + predicted)
+        })
         .collect();
     (d_next, d_current)
 }

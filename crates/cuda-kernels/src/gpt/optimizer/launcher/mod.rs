@@ -11,18 +11,39 @@ use cuda_core::{CudaModule, CudaStream, DeviceBuffer, DriverError};
 
 use super::modules;
 use crate::nvfp4_quant::{Nvfp4QuantArgs, Nvfp4QuantModule, TensorAmaxArgs};
+use crate::nvfp4_tma_matmul::{
+    launcher::Nvfp4GemmModule, pad::TmaMatrixPadModule, scale_pack::Sm120ScalePackModule,
+};
 
 pub struct OptimizerModule {
     pub(super) apply: modules::LoadedModule,
     quant: Nvfp4QuantModule,
+    pub(super) tma: Nvfp4GemmModule,
+    pub(super) tma_scale_pack: Sm120ScalePackModule,
+    pub(super) tma_pad: TmaMatrixPadModule,
 }
 
 impl OptimizerModule {
     pub fn from_module(module: Arc<CudaModule>) -> Result<Self, DriverError> {
         Ok(Self {
             apply: modules::from_module(module.clone())?,
-            quant: Nvfp4QuantModule::from_module(module)?,
+            quant: Nvfp4QuantModule::from_module(module.clone())?,
+            tma: Nvfp4GemmModule::from_module(module.clone())?,
+            tma_scale_pack: Sm120ScalePackModule::from_module(module.clone())?,
+            tma_pad: TmaMatrixPadModule::from_module(module)?,
         })
+    }
+
+    pub fn tma_gemm(&self) -> &Nvfp4GemmModule {
+        &self.tma
+    }
+
+    pub fn tma_scale_pack(&self) -> &Sm120ScalePackModule {
+        &self.tma_scale_pack
+    }
+
+    pub fn tma_pad(&self) -> &TmaMatrixPadModule {
+        &self.tma_pad
     }
 
     #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]

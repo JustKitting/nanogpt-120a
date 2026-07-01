@@ -51,36 +51,61 @@ use crate::warp_reduce::{warp_max_f32, warp_sum_f32};
 
 #[inline(always)]
 pub(crate) fn block_sum_shared_f32<const WARPS: usize>(
-    storage: &mut SharedArray<f32, WARPS>, local: f32, lane: u32, warp: u32,
+    storage: &mut SharedArray<f32, WARPS>,
+    local: f32,
+    lane: u32,
+    warp: u32,
 ) -> f32 {
     block_sum_shared_f32_for_warps(storage, WARPS as u32, local, lane, warp)
 }
 
 #[inline(always)]
 pub(crate) fn block_sum_shared_f32_for_warps<const WARPS: usize>(
-    storage: &mut SharedArray<f32, WARPS>, active_warps: u32, local: f32, lane: u32, warp: u32,
+    storage: &mut SharedArray<f32, WARPS>,
+    active_warps: u32,
+    local: f32,
+    lane: u32,
+    warp: u32,
 ) -> f32 {
     block_reduce_f32!(storage, active_warps, local, lane, warp, warp_sum_f32, 0.0)
 }
 
 #[inline(always)]
 pub(crate) fn block_max_shared_f32<const WARPS: usize>(
-    storage: &mut SharedArray<f32, WARPS>, local: f32, lane: u32, warp: u32,
+    storage: &mut SharedArray<f32, WARPS>,
+    local: f32,
+    lane: u32,
+    warp: u32,
 ) -> f32 {
     block_max_shared_f32_for_warps(storage, WARPS as u32, local, lane, warp, 0.0)
 }
 
 #[inline(always)]
 pub(crate) fn block_max_shared_f32_for_warps<const WARPS: usize>(
-    storage: &mut SharedArray<f32, WARPS>, active_warps: u32, local: f32, lane: u32,
-    warp: u32, identity: f32,
+    storage: &mut SharedArray<f32, WARPS>,
+    active_warps: u32,
+    local: f32,
+    lane: u32,
+    warp: u32,
+    identity: f32,
 ) -> f32 {
-    block_reduce_f32!(storage, active_warps, local, lane, warp, warp_max_f32, identity)
+    block_reduce_f32!(
+        storage,
+        active_warps,
+        local,
+        lane,
+        warp,
+        warp_max_f32,
+        identity
+    )
 }
 
 #[inline(always)]
 pub(crate) fn block_max_leader_f32<const WARPS: usize>(
-    storage: &mut SharedArray<f32, WARPS>, local: f32, lane: u32, warp: u32,
+    storage: &mut SharedArray<f32, WARPS>,
+    local: f32,
+    lane: u32,
+    warp: u32,
 ) -> Option<f32> {
     let warp_value = warp_max_f32(local);
     if lane == 0 {
@@ -95,7 +120,11 @@ pub(crate) fn block_max_leader_f32<const WARPS: usize>(
         return None;
     }
 
-    let partial = if lane < WARPS as u32 { unsafe { storage[lane as usize] } } else { 0.0 };
+    let partial = if lane < WARPS as u32 {
+        unsafe { storage[lane as usize] }
+    } else {
+        0.0
+    };
     let block_value = warp_max_f32(partial);
     if lane == 0 { Some(block_value) } else { None }
 }

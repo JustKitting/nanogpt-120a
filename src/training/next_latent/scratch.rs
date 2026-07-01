@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DriverError};
-use gpt2_nvfp4::{LinearScratch, GPT2_N_EMBD, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
+use gpt2_nvfp4::{GPT2_N_EMBD, LinearScratch, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
 
 pub struct NextLatScratchBuffers {
     pub output_projection: LinearScratch,

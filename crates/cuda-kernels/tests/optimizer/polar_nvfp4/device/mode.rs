@@ -1,24 +1,72 @@
 #[derive(Clone, Copy)]
 pub enum GramCorrectionMode {
     HighPrecision,
-    HighPrecisionSafety { coefficient_safety: f32 },
+    HighPrecisionSafety {
+        coefficient_safety: f32,
+    },
     Nvfp4GramOnly,
-    Nvfp4GramOnlySafety { coefficient_safety: f32 },
-    Nvfp4GramOnlySchedule { coefficient_safety: [f32; 8] },
-    Nvfp4GramOnlyLateSafety { start_iter: usize, coefficient_safety: f32 },
-    Nvfp4GramAverage { samples: usize },
-    ExactPrefixThenNvfp4 { exact_steps: usize },
-    ExactPrefixThenNvfp4Average { exact_steps: usize, samples: usize },
-    Stale { period: usize },
-    StaleReject { period: usize },
-    StaleRejectSafety { period: usize, coefficient_safety: f32 },
-    StaleScaled { period: usize, scale: f32 },
-    ExactPrefixThenStale { exact_steps: usize, period: usize },
-    ExactPrefixThenStaleReject { exact_steps: usize, period: usize },
-    ExactPrefixThenStaleRejectSafety { exact_steps: usize, period: usize, coefficient_safety: f32 },
-    ExactPrefixThenStaleRejectLateSafety { exact_steps: usize, period: usize, start_iter: usize, coefficient_safety: f32 },
-    ExactPrefixThenStaleRejectSchedule { exact_steps: usize, period: usize, coefficient_safety: [f32; 8] },
-    Adaptive { period: usize, max_relative_defect: f32 },
+    Nvfp4GramOnlySafety {
+        coefficient_safety: f32,
+    },
+    Nvfp4GramOnlySchedule {
+        coefficient_safety: [f32; 8],
+    },
+    Nvfp4GramOnlyLateSafety {
+        start_iter: usize,
+        coefficient_safety: f32,
+    },
+    Nvfp4GramAverage {
+        samples: usize,
+    },
+    ExactPrefixThenNvfp4 {
+        exact_steps: usize,
+    },
+    ExactPrefixThenNvfp4Average {
+        exact_steps: usize,
+        samples: usize,
+    },
+    Stale {
+        period: usize,
+    },
+    StaleReject {
+        period: usize,
+    },
+    StaleRejectSafety {
+        period: usize,
+        coefficient_safety: f32,
+    },
+    StaleScaled {
+        period: usize,
+        scale: f32,
+    },
+    ExactPrefixThenStale {
+        exact_steps: usize,
+        period: usize,
+    },
+    ExactPrefixThenStaleReject {
+        exact_steps: usize,
+        period: usize,
+    },
+    ExactPrefixThenStaleRejectSafety {
+        exact_steps: usize,
+        period: usize,
+        coefficient_safety: f32,
+    },
+    ExactPrefixThenStaleRejectLateSafety {
+        exact_steps: usize,
+        period: usize,
+        start_iter: usize,
+        coefficient_safety: f32,
+    },
+    ExactPrefixThenStaleRejectSchedule {
+        exact_steps: usize,
+        period: usize,
+        coefficient_safety: [f32; 8],
+    },
+    Adaptive {
+        period: usize,
+        max_relative_defect: f32,
+    },
 }
 
 impl GramCorrectionMode {
@@ -26,12 +74,25 @@ impl GramCorrectionMode {
         match self {
             GramCorrectionMode::HighPrecisionSafety { coefficient_safety }
             | GramCorrectionMode::Nvfp4GramOnlySafety { coefficient_safety }
-            | GramCorrectionMode::StaleRejectSafety { coefficient_safety, .. }
-            | GramCorrectionMode::ExactPrefixThenStaleRejectSafety { coefficient_safety, .. } => coefficient_safety,
-            GramCorrectionMode::Nvfp4GramOnlyLateSafety { start_iter, coefficient_safety }
-            | GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety { start_iter, coefficient_safety, .. } if iter >= start_iter => coefficient_safety,
+            | GramCorrectionMode::StaleRejectSafety {
+                coefficient_safety, ..
+            }
+            | GramCorrectionMode::ExactPrefixThenStaleRejectSafety {
+                coefficient_safety, ..
+            } => coefficient_safety,
+            GramCorrectionMode::Nvfp4GramOnlyLateSafety {
+                start_iter,
+                coefficient_safety,
+            }
+            | GramCorrectionMode::ExactPrefixThenStaleRejectLateSafety {
+                start_iter,
+                coefficient_safety,
+                ..
+            } if iter >= start_iter => coefficient_safety,
             GramCorrectionMode::Nvfp4GramOnlySchedule { coefficient_safety }
-            | GramCorrectionMode::ExactPrefixThenStaleRejectSchedule { coefficient_safety, .. } => coefficient_safety[iter.min(coefficient_safety.len() - 1)],
+            | GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+                coefficient_safety, ..
+            } => coefficient_safety[iter.min(coefficient_safety.len() - 1)],
             _ => 1.0,
         }
     }

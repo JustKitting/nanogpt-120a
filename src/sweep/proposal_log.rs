@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use super::{optimizer::Proposal, SweepResult};
+use super::{SweepResult, optimizer::Proposal};
 
 mod format;
 
@@ -12,7 +12,10 @@ pub fn write(sweep_dir: &Path, index: usize, proposal: &Proposal) -> SweepResult
         ("ranked.tsv", ranked_tsv(proposal)),
         ("sources.tsv", sources_tsv(proposal)),
     ] {
-        fs::write(sweep_dir.join(format!("candidate_{index:04}_{suffix}")), text)?;
+        fs::write(
+            sweep_dir.join(format!("candidate_{index:04}_{suffix}")),
+            text,
+        )?;
     }
     Ok(())
 }

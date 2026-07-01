@@ -31,25 +31,24 @@ impl<'a> QuantizeContext<'a> {
                     precomputed_chunk_count: None,
                 },
             ),
-            LinearBackwardWeightTranspose::Nvfp4(weight) => {
-                self.module
-                    .nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
-                        Nvfp4TransposeMsEdenDeviceScaleQuantArgs {
-                            stream: self.stream,
-                            input: weight,
-                            out_fp4: &mut *operand.bytes,
-                            out_scales: &mut *operand.scales,
-                            out_global_scales: &mut *operand.global_scales,
-                            out_chunk_amax: &mut *operand.chunk_amax,
-                            out_global_scale: &mut *operand.global_scale,
-                            source_rows: self.output_dim,
-                            source_cols: self.input_dim,
-                            dst_row_len: self.output_k,
-                            sign_seed: self.sign_seed,
-                            scale_seed: self.scale_seed ^ 0x9e37_79b9,
-                        },
-                    )
-            }
+            LinearBackwardWeightTranspose::Nvfp4(weight) => self
+                .module
+                .nvfp4_transpose_to_quartet_backward_ms_eden_derived_device_scale_no_chunk_amax(
+                    Nvfp4TransposeMsEdenDeviceScaleQuantArgs {
+                        stream: self.stream,
+                        input: weight,
+                        out_fp4: &mut *operand.bytes,
+                        out_scales: &mut *operand.scales,
+                        out_global_scales: &mut *operand.global_scales,
+                        out_chunk_amax: &mut *operand.chunk_amax,
+                        out_global_scale: &mut *operand.global_scale,
+                        source_rows: self.output_dim,
+                        source_cols: self.input_dim,
+                        dst_row_len: self.output_k,
+                        sign_seed: self.sign_seed,
+                        scale_seed: self.scale_seed ^ 0x9e37_79b9,
+                    },
+                ),
         }
     }
 

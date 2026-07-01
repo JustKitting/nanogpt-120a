@@ -33,7 +33,17 @@ pub(super) fn push_local(
     center: Option<&Candidate>,
     count: usize,
 ) {
-    push_candidates(pool, used, local::candidates(used, rng, center, remaining_slots(pool, count, pool.capacity())), "local");
+    push_candidates(
+        pool,
+        used,
+        local::candidates(
+            used,
+            rng,
+            center,
+            remaining_slots(pool, count, pool.capacity()),
+        ),
+        "local",
+    );
 }
 
 pub(super) fn push_variance(
@@ -44,7 +54,18 @@ pub(super) fn push_variance(
     analysis: &SweepAnalysis,
     count: usize,
 ) {
-    push_candidates(pool, used, variance::candidates(used, rng, config, analysis, remaining_slots(pool, count, config.candidate_samples)), "variance");
+    push_candidates(
+        pool,
+        used,
+        variance::candidates(
+            used,
+            rng,
+            config,
+            analysis,
+            remaining_slots(pool, count, config.candidate_samples),
+        ),
+        "variance",
+    );
 }
 
 pub(super) fn push_coverage(
@@ -55,7 +76,18 @@ pub(super) fn push_coverage(
     observed: &[Candidate],
     count: usize,
 ) {
-    push_candidates(pool, used, coverage::candidates(used, rng, config, observed, remaining_slots(pool, count, config.candidate_samples)), "coverage");
+    push_candidates(
+        pool,
+        used,
+        coverage::candidates(
+            used,
+            rng,
+            config,
+            observed,
+            remaining_slots(pool, count, config.candidate_samples),
+        ),
+        "coverage",
+    );
 }
 
 pub(super) fn push_factorial(
@@ -67,7 +99,19 @@ pub(super) fn push_factorial(
     center: Option<&Candidate>,
     count: usize,
 ) {
-    push_candidates(pool, used, factorial::candidates(used, rng, config, analysis, center, remaining_slots(pool, count, config.candidate_samples)), "factorial");
+    push_candidates(
+        pool,
+        used,
+        factorial::candidates(
+            used,
+            rng,
+            config,
+            analysis,
+            center,
+            remaining_slots(pool, count, config.candidate_samples),
+        ),
+        "factorial",
+    );
 }
 
 pub(super) fn push_random(
@@ -92,10 +136,17 @@ fn push_unique(
     }
 }
 
-fn push_candidates(pool: &mut Vec<PooledCandidate>, used: &mut HashSet<String>, candidates: impl IntoIterator<Item = Candidate>, source: &'static str) {
+fn push_candidates(
+    pool: &mut Vec<PooledCandidate>,
+    used: &mut HashSet<String>,
+    candidates: impl IntoIterator<Item = Candidate>,
+    source: &'static str,
+) {
     for candidate in candidates {
         push_unique(pool, used, candidate, source);
     }
 }
 
-fn remaining_slots(pool: &[PooledCandidate], count: usize, limit: usize) -> usize { (pool.len() + count).min(limit.max(1)) - pool.len() }
+fn remaining_slots(pool: &[PooledCandidate], count: usize, limit: usize) -> usize {
+    (pool.len() + count).min(limit.max(1)) - pool.len()
+}

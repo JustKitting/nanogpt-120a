@@ -12,5 +12,5 @@ mod types;
 mod utils;
 
 pub(crate) use adam::adam_debug_config;
-pub use {apply::apply_weight_updates, types::WeightUpdateArgs};
 use utils::timed_ms;
+pub use {apply::apply_weight_updates, types::WeightUpdateArgs};

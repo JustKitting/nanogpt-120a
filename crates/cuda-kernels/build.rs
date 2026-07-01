@@ -1,5 +1,7 @@
 use std::{env, fs, path::PathBuf};
 
+#[path = "build_nvfp4_config.rs"]
+mod build_nvfp4_config;
 #[path = "../build_support.rs"]
 mod build_support;
 
@@ -23,6 +25,7 @@ fn main() {
     emit_rerun_metadata(&["AURORA_COOPERATIVE_BLOCKS", "AURORA_MATRIX_PHASES"]);
 
     let out = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR must be set"));
+    build_nvfp4_config::emit_nvfp4_config(&out);
     fs::write(
         out.join("optimizer_config.rs"),
         format!(

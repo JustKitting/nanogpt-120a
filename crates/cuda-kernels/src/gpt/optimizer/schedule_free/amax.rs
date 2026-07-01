@@ -10,7 +10,11 @@ use super::super::threads::WARPS_PER_BLOCK;
 use super::value::{checked_abs_schedule_value, schedule_value};
 
 pub(super) fn schedule_free_chunk_amax_body(
-    z_master: &[f32], x_master: &[f32], out: &mut DisjointSlice<f32>, beta: f32, len: u32,
+    z_master: &[f32],
+    x_master: &[f32],
+    out: &mut DisjointSlice<f32>,
+    beta: f32,
+    len: u32,
 ) {
     static mut TENSOR_AMAX: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
 

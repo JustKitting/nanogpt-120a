@@ -1,8 +1,8 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    AttentionForwardArgs, AttentionLogSumExp, AttentionWeights, HiddenState, HiddenStateDevice,
-    HiddenVectorShape, QkvActivation, QkvVectorShape, QkvWeightShape, ResidualWeightShape,
-    RowwiseNvfp4Buffers, GPT2_CONTEXT_LEN, GPT2_N_HEAD,
+    AttentionForwardArgs, AttentionLogSumExp, AttentionWeights, GPT2_CONTEXT_LEN, GPT2_N_HEAD,
+    HiddenState, HiddenStateDevice, HiddenVectorShape, QkvActivation, QkvVectorShape,
+    QkvWeightShape, ResidualWeightShape, RowwiseNvfp4Buffers,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
@@ -20,7 +20,9 @@ use assertions::{
 };
 use common::cuda_test_context;
 use common::forward_scratch::CausalAttentionTcScratchBuffers;
-use common::upload::{attention_projection_tensors, upload_nvfp4_bytes, upload_zero_nvfp4, TestResult};
+use common::upload::{
+    TestResult, attention_projection_tensors, upload_nvfp4_bytes, upload_zero_nvfp4,
+};
 use data::{c_proj_identity_weight_bytes, hidden_input, qkv_identity_weight_bytes, residual_input};
 
 #[ignore = "requires generated sm_120a PTX"]
@@ -63,7 +65,12 @@ fn attention_forward_quantizes_projects_and_applies_causal_attention() -> TestRe
         quant_module: &quant_module,
         input_nvfp4: input_nvfp4.scratch(),
         tc_scratch: tc_scratch.args(),
-        projections: attention_projection_tensors(&qkv_weight, &qkv_bias, &c_proj_weight, &c_proj_bias),
+        projections: attention_projection_tensors(
+            &qkv_weight,
+            &qkv_bias,
+            &c_proj_weight,
+            &c_proj_bias,
+        ),
         qkv: &mut qkv_dev,
         attention_log_sum_exp: &mut attention_log_sum_exp_dev,
         hidden: HiddenStateDevice {

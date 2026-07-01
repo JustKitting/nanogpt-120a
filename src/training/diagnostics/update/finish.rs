@@ -1,7 +1,7 @@
 use cuda_core::CudaStream;
 
-use crate::upload::{UploadedModel, UploadedNvfp4, UploadedPair};
 use crate::AppResult;
+use crate::upload::{UploadedModel, UploadedNvfp4, UploadedPair};
 
 use super::snapshot::PendingTensorUpdateDiagnostics;
 use super::stats::tensor_update_stats;

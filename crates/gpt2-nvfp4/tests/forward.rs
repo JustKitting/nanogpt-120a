@@ -1,6 +1,6 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    Gpt2, Gpt2ForwardArgs, TokenEmbeddingArgs, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, Gpt2, Gpt2ForwardArgs, TokenEmbeddingArgs,
 };
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::embedding::EmbeddingModule;
@@ -15,7 +15,7 @@ mod common;
 mod scratch;
 
 use common::cuda_test_context;
-use common::upload::{block::upload_block, upload_layer_norm, upload_nvfp4, TestResult};
+use common::upload::{TestResult, block::upload_block, upload_layer_norm, upload_nvfp4};
 use scratch::ForwardScratch;
 
 #[ignore = "requires generated sm_120a PTX"]

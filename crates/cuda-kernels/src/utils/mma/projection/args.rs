@@ -23,17 +23,32 @@ unsafe impl DeviceCopy for Nvfp4ProjectionParams {}
 impl Nvfp4ProjectionParams {
     #[inline(always)]
     pub fn new(token_count: u32, input_dim: u32, output_dim: u32) -> Self {
-        Self { token_count, input_dim, output_dim, weight_global_scale: 1.0, bias_global_scale: 1.0, residual_add: 0, activation: NVFP4_PROJECTION_ACTIVATION_NONE }
+        Self {
+            token_count,
+            input_dim,
+            output_dim,
+            weight_global_scale: 1.0,
+            bias_global_scale: 1.0,
+            residual_add: 0,
+            activation: NVFP4_PROJECTION_ACTIVATION_NONE,
+        }
     }
 
     #[inline(always)]
     pub fn with_residual_add(self, residual_add: u32) -> Self {
-        Self { residual_add, ..self }
+        Self {
+            residual_add,
+            ..self
+        }
     }
 
     #[inline(always)]
     pub fn with_global_scales(self, weight: f32, bias: f32) -> Self {
-        Self { weight_global_scale: weight, bias_global_scale: bias, ..self }
+        Self {
+            weight_global_scale: weight,
+            bias_global_scale: bias,
+            ..self
+        }
     }
 }
 

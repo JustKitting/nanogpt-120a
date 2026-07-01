@@ -22,7 +22,8 @@ impl RunResult {
             if let Some(step) = debug_usize(line, "iteration: Some(") {
                 self.last_step = Some(step);
             }
-            if let Some(steps) = debug_usize(line, "global_progress: Progress { items_processed: ") {
+            if let Some(steps) = debug_usize(line, "global_progress: Progress { items_processed: ")
+            {
                 self.completed_steps = Some(steps);
             }
         }
@@ -50,7 +51,10 @@ fn debug_field<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
 }
 
 pub(super) fn f64_field(line: &str, prefix: &str) -> Option<f64> {
-    field(line, prefix)?.parse::<f64>().ok().filter(|value| value.is_finite())
+    field(line, prefix)?
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())
 }
 
 pub(super) fn usize_field(line: &str, prefix: &str) -> Option<usize> {

@@ -9,7 +9,13 @@ pub(super) struct ClipParams {
     pub(super) head_dim: u32,
 }
 
-pub(super) fn qk_norms(qkv: &[u16], row: u32, head: u32, params: ClipParams, silu_qk: u32) -> (f32, f32) {
+pub(super) fn qk_norms(
+    qkv: &[u16],
+    row: u32,
+    head: u32,
+    params: ClipParams,
+    silu_qk: u32,
+) -> (f32, f32) {
     let mut q_sum = 0.0;
     let mut k_sum = 0.0;
     let mut dim = 0;

@@ -2,7 +2,7 @@ use std::time::Instant;
 
 mod pass;
 
-use super::optimizer_apply::{apply_weight_updates, WeightUpdateArgs};
+use super::optimizer_apply::{WeightUpdateArgs, apply_weight_updates};
 use super::{TokenBatch, TrainStats, Trainer};
 use crate::AppResult;
 

@@ -1,7 +1,9 @@
 use std::error::Error;
 
 use cuda_core::{CudaStream, DeviceBuffer, DeviceCopy};
-use rust_kernels_cuda::optimizer::{AURORA_COOPERATIVE_BLOCKS, AURORA_MATRIX_PHASES, AuroraSlotDescriptor};
+use rust_kernels_cuda::optimizer::{
+    AURORA_COOPERATIVE_BLOCKS, AURORA_MATRIX_PHASES, AuroraSlotDescriptor,
+};
 
 pub const SLOT_COUNT: usize = AURORA_MATRIX_PHASES;
 
@@ -38,7 +40,11 @@ impl Slots {
         })
     }
 
-    pub fn with_repeated_grad(stream: &CudaStream, grad: f32, len: usize) -> Result<Self, Box<dyn Error>> {
+    pub fn with_repeated_grad(
+        stream: &CudaStream,
+        grad: f32,
+        len: usize,
+    ) -> Result<Self, Box<dyn Error>> {
         Self::new(stream, &vec![grad; len])
     }
 }
@@ -86,13 +92,20 @@ pub fn assert_quantized_slot_matches(
     Ok(())
 }
 
-fn slot_buffers(stream: &CudaStream, values: &[f32]) -> Result<Vec<DeviceBuffer<f32>>, Box<dyn Error>> {
+fn slot_buffers(
+    stream: &CudaStream,
+    values: &[f32],
+) -> Result<Vec<DeviceBuffer<f32>>, Box<dyn Error>> {
     (0..SLOT_COUNT)
         .map(|_| DeviceBuffer::from_host(stream, values).map_err(Into::into))
         .collect()
 }
 
-fn fill_slot_buffers(stream: &CudaStream, value: f32, len: usize) -> Result<Vec<DeviceBuffer<f32>>, Box<dyn Error>> {
+fn fill_slot_buffers(
+    stream: &CudaStream,
+    value: f32,
+    len: usize,
+) -> Result<Vec<DeviceBuffer<f32>>, Box<dyn Error>> {
     slot_buffers(stream, &vec![value; len])
 }
 

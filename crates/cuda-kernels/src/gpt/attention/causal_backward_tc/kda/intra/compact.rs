@@ -62,7 +62,11 @@ fn update_compact_grad(
     while kg_source < ctx.chunk_tokens {
         let source_token = ctx.start + kg_source;
         let source_compact = ctx.compact(source_token, dim);
-        dg_last_value = fma_f32(inputs.d_kg[source_compact], inputs.kg[source_compact], dg_last_value);
+        dg_last_value = fma_f32(
+            inputs.d_kg[source_compact],
+            inputs.kg[source_compact],
+            dg_last_value,
+        );
         kg_source += 1;
     }
     if token == ctx.end - 1 {

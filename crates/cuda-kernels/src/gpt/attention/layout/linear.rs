@@ -7,7 +7,11 @@ pub(crate) fn row_index(batch: u32, token: u32, params: &CausalAttentionParams) 
 
 #[inline(always)]
 pub(crate) fn compact_index(
-    batch: u32, token: u32, head: u32, dim: u32, params: &CausalAttentionParams,
+    batch: u32,
+    token: u32,
+    head: u32,
+    dim: u32,
+    params: &CausalAttentionParams,
 ) -> usize {
     (((batch * params.head_count + head) * params.seq_len + token) * params.head_dim + dim) as usize
 }
@@ -27,7 +31,11 @@ pub(crate) fn compact_linear_parts(
 
 #[inline(always)]
 pub(crate) fn hidden_index(
-    batch: u32, token: u32, head: u32, dim: u32, params: &CausalAttentionParams,
+    batch: u32,
+    token: u32,
+    head: u32,
+    dim: u32,
+    params: &CausalAttentionParams,
 ) -> usize {
     row_index(batch, token, params) as usize * params.embedding_dim as usize
         + head as usize * params.head_dim as usize

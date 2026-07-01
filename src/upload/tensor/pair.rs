@@ -1,7 +1,7 @@
 use cuda_core::CudaStream;
 use gpt2_nvfp4::{LayerNormTensors, LayerNormWeights, LinearWeights, Nvfp4Shape};
 
-use super::{upload_nvfp4, UploadedNvfp4};
+use super::{UploadedNvfp4, upload_nvfp4};
 use crate::AppResult;
 
 pub struct UploadedPair {

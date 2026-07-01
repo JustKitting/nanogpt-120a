@@ -1,6 +1,6 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    BlockBackwardGrads, HiddenState, MlpActivation, QkvActivation, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV,
+    BlockBackwardGrads, GPT2_MLP, GPT2_N_EMBD, GPT2_QKV, HiddenState, MlpActivation, QkvActivation,
 };
 
 use super::LayerNormGradBuffers;

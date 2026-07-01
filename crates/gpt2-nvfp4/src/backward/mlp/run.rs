@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 use rust_kernels_cuda::mlp::Relu2BackwardF16Args;
 
 use super::args::{MlpBackwardArgs, MlpBackwardGrads, MlpBackwardScratch};
-use crate::backward::linear::{run_rowwise_linear_backward, RowwiseLinearBackwardPass};
+use crate::backward::linear::{RowwiseLinearBackwardPass, run_rowwise_linear_backward};
 use crate::{GPT2_EMBEDDING_DIM, GPT2_MLP_DIM};
 
 pub fn backward(args: MlpBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {

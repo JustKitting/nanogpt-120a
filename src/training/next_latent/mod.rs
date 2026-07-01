@@ -9,8 +9,8 @@ mod projection;
 mod quantize;
 mod scratch;
 
-pub use backward::{backward, NextLatBackwardArgs, NextLatBackwardSeeds};
+pub use backward::{NextLatBackwardArgs, NextLatBackwardSeeds, backward};
 pub use buffers::NextLatBuffers;
-pub use forward::{forward, NextLatForwardArgs};
+pub use forward::{NextLatForwardArgs, forward};
 pub use grads::NextLatGradBuffers;
 pub use scratch::NextLatScratchBuffers;

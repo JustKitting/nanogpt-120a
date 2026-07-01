@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use cuda_core::{CudaModule, DriverError};
 
-use super::args::{F32AddScaledIdentityArgs, F32Linear2Args};
+use super::args::{
+    F32AddScaledIdentityArgs, F32Linear2Args, F32Linear3Args, F32ScaleInPlaceByAmaxArgs,
+};
 use super::kernels;
 use crate::launch::linear_config;
 
@@ -36,6 +38,24 @@ impl F32MatrixOpsModule {
         )
     }
 
+    pub fn linear3(&self, args: F32Linear3Args<'_, '_>) -> Result<(), DriverError> {
+        assert!(args.a.len() >= args.len as usize);
+        assert!(args.b.len() >= args.len as usize);
+        assert!(args.c_out.len() >= args.len as usize);
+
+        self.module.f32_linear3_in_place_kernel(
+            args.stream,
+            linear_config(args.len, F32_OPS_THREADS_PER_BLOCK),
+            args.a,
+            args.b,
+            args.c_out,
+            args.len,
+            args.a_scale,
+            args.b_scale,
+            args.c_scale,
+        )
+    }
+
     pub fn add_scaled_identity(
         &self,
         args: F32AddScaledIdentityArgs<'_, '_>,
@@ -51,6 +71,38 @@ impl F32MatrixOpsModule {
             args.out,
             args.dim,
             args.scale,
+        )
+    }
+
+    pub fn scale_in_place_by_sqrt_amax_bound(
+        &self,
+        args: F32ScaleInPlaceByAmaxArgs<'_>,
+    ) -> Result<(), DriverError> {
+        assert!(args.x.len() >= args.len as usize);
+        assert!(!args.amax.is_empty());
+
+        self.module.f32_scale_in_place_by_sqrt_amax_bound_kernel(
+            args.stream,
+            linear_config(args.len, F32_OPS_THREADS_PER_BLOCK),
+            args.x,
+            args.amax,
+            args.len,
+        )
+    }
+
+    pub fn scale_in_place_by_amax_bound(
+        &self,
+        args: F32ScaleInPlaceByAmaxArgs<'_>,
+    ) -> Result<(), DriverError> {
+        assert!(args.x.len() >= args.len as usize);
+        assert!(!args.amax.is_empty());
+
+        self.module.f32_scale_in_place_by_amax_bound_kernel(
+            args.stream,
+            linear_config(args.len, F32_OPS_THREADS_PER_BLOCK),
+            args.x,
+            args.amax,
+            args.len,
         )
     }
 }

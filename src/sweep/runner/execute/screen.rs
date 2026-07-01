@@ -1,8 +1,8 @@
 use std::{fs, path::Path};
 
+use crate::sweep::SweepResult;
 use crate::sweep::fmt;
 use crate::sweep::{baseline::Baseline, config::SweepConfig, history::Trial, run_build, run_train};
-use crate::sweep::SweepResult;
 
 pub(in crate::sweep::runner) fn screen_baseline(
     baseline: &Baseline,

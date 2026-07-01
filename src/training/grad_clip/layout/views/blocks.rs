@@ -25,9 +25,17 @@ fn push_attention_views<'a>(
         rows,
         prefix,
         &[
-            ("attn_qkv.weight", &block.d_attn_qkv_weight, GPT2_N_EMBD * GPT2_QKV),
+            (
+                "attn_qkv.weight",
+                &block.d_attn_qkv_weight,
+                GPT2_N_EMBD * GPT2_QKV,
+            ),
             ("attn_qkv.bias", &block.d_attn_qkv_bias, GPT2_QKV),
-            ("attn_c_proj.weight", &block.d_attn_c_proj_weight, GPT2_N_EMBD * GPT2_N_EMBD),
+            (
+                "attn_c_proj.weight",
+                &block.d_attn_c_proj_weight,
+                GPT2_N_EMBD * GPT2_N_EMBD,
+            ),
             ("attn_c_proj.bias", &block.d_attn_c_proj_bias, GPT2_N_EMBD),
         ],
     );
@@ -38,9 +46,17 @@ fn push_mlp_views<'a>(rows: &mut Vec<HostGradView<'a>>, prefix: &str, block: &'a
         rows,
         prefix,
         &[
-            ("mlp_up.weight", &block.d_mlp_c_fc_weight, GPT2_N_EMBD * GPT2_MLP),
+            (
+                "mlp_up.weight",
+                &block.d_mlp_c_fc_weight,
+                GPT2_N_EMBD * GPT2_MLP,
+            ),
             ("mlp_up.bias", &block.d_mlp_c_fc_bias, GPT2_MLP),
-            ("mlp_down.weight", &block.d_mlp_c_proj_weight, GPT2_MLP * GPT2_N_EMBD),
+            (
+                "mlp_down.weight",
+                &block.d_mlp_c_proj_weight,
+                GPT2_MLP * GPT2_N_EMBD,
+            ),
             ("mlp_down.bias", &block.d_mlp_c_proj_bias, GPT2_N_EMBD),
         ],
     );

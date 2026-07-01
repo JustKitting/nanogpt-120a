@@ -12,7 +12,7 @@ mod decode;
 mod scratch;
 
 use decode::decoded_dot;
-use scratch::{ScratchBuffers, K, M, N};
+use scratch::{K, M, N, ScratchBuffers};
 
 const TOLERANCE: f32 = 1.0e-5;
 

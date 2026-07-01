@@ -5,12 +5,12 @@ use burn::train::{
     EventProcessorTraining, LearnerEvent, SupervisedTrainingEventProcessor, TrainingItem,
 };
 
-use super::{epoch_progress, CudaLearningComponents};
+use super::{CudaLearningComponents, epoch_progress};
+use crate::AppResult;
+use crate::training::TrainStats;
 use crate::training::data::TokenWindowBatch;
 use crate::training::debug_metrics::DebugTraceLogger;
 use crate::training::launch::metrics::{CudaTrainOutput, CudaValidOutput};
-use crate::training::TrainStats;
-use crate::AppResult;
 
 pub(super) fn process_train_step(
     logger: &mut DebugTraceLogger,

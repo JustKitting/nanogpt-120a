@@ -1,5 +1,5 @@
 use gpt2_nvfp4::{
-    HiddenState, MlpDownWeightShape, MlpUpWeightShape, Nvfp4Shape, GPT2_MLP, GPT2_N_EMBD,
+    GPT2_MLP, GPT2_N_EMBD, HiddenState, MlpDownWeightShape, MlpUpWeightShape, Nvfp4Shape,
 };
 
 use crate::common::nvfp4::repeating_identity_bytes;
@@ -13,7 +13,9 @@ pub fn residual_input() -> Vec<f32> {
 }
 
 fn hidden_values(value: impl Fn(usize, usize) -> f32) -> Vec<f32> {
-    (0..HiddenState::LEN).map(|i| value(i / GPT2_N_EMBD, i % GPT2_N_EMBD)).collect()
+    (0..HiddenState::LEN)
+        .map(|i| value(i / GPT2_N_EMBD, i % GPT2_N_EMBD))
+        .collect()
 }
 
 pub fn mlp_up_repeat_weight_bytes() -> Vec<u8> {

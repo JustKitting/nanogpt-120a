@@ -8,7 +8,11 @@ pub fn values(offset: f32) -> Vec<f32> {
 
 pub fn concat(next_token_embeddings: &[f32], current_states: &[f32]) -> Vec<f32> {
     let mut out = vec![0.0; ROW_COUNT * EMBED * 2];
-    for ((out, next), current) in out.chunks_mut(EMBED * 2).zip(next_token_embeddings.chunks(EMBED)).zip(current_states.chunks(EMBED)) {
+    for ((out, next), current) in out
+        .chunks_mut(EMBED * 2)
+        .zip(next_token_embeddings.chunks(EMBED))
+        .zip(current_states.chunks(EMBED))
+    {
         out[..EMBED].copy_from_slice(next);
         out[EMBED..].copy_from_slice(current);
     }

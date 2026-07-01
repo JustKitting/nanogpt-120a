@@ -16,7 +16,10 @@ pub(super) struct UpdateStatAccumulator {
 
 impl UpdateStatAccumulator {
     pub(super) fn new() -> Self {
-        Self { grad_finite: true, ..Self::default() }
+        Self {
+            grad_finite: true,
+            ..Self::default()
+        }
     }
 
     pub(super) fn record(

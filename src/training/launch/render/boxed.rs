@@ -13,7 +13,10 @@ pub(in crate::training::launch) struct BoxedMetricsRenderer {
 
 impl BoxedMetricsRenderer {
     pub(in crate::training::launch) fn new(inner: Box<dyn MetricsRenderer>) -> Self {
-        Self { inner, hidden_metric_ids: HashSet::new() }
+        Self {
+            inner,
+            hidden_metric_ids: HashSet::new(),
+        }
     }
 
     fn is_hidden(&self, state: &MetricState) -> bool {
@@ -87,4 +90,6 @@ impl MetricsRenderer for BoxedMetricsRenderer {
     }
 }
 
-fn hidden_renderer_metric(name: &str) -> bool { name.starts_with("Diagnostic ") }
+fn hidden_renderer_metric(name: &str) -> bool {
+    name.starts_with("Diagnostic ")
+}

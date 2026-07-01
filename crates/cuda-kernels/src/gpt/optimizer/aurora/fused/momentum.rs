@@ -22,7 +22,11 @@ pub(super) fn momentum_orient(
             let next_momentum = mu * *momentum_ptr + (1.0 - mu) * g;
             let nesterov = mu * next_momentum + (1.0 - mu) * g;
             *momentum_ptr = next_momentum;
-            let dst = if transposed { col * shape.rows + row } else { index };
+            let dst = if transposed {
+                col * shape.rows + row
+            } else {
+                index
+            };
             write_f32(oriented, dst, nesterov);
         }
         index += work.stride();

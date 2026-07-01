@@ -7,9 +7,7 @@ use super::kernels;
 use super::pad::pad_rows;
 use super::quantize::quantize_operand;
 use crate::launch::launch_config;
-use crate::mma::{
-    NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams, projection_grid_dim,
-};
+use crate::mma::{NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams, projection_grid_dim};
 
 pub struct Nvfp4TcMatmulModule {
     module: kernels::module::LoadedModule,
@@ -83,7 +81,8 @@ impl Nvfp4TcMatmulModule {
             &*scratch.b_t.bytes,
             &*scratch.b_t.scales,
             args.out,
-            Nvfp4ProjectionParams::new(args.m, padded_k, args.n).with_global_scales(scratch.b_t.global_scale, 0.0),
+            Nvfp4ProjectionParams::new(args.m, padded_k, args.n)
+                .with_global_scales(scratch.b_t.global_scale, 0.0),
         )
     }
 }

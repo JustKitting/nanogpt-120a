@@ -5,5 +5,7 @@ mod kernels;
 #[path = "f32_matrix_ops/launcher.rs"]
 mod launcher;
 
-pub use args::{F32AddScaledIdentityArgs, F32Linear2Args};
+pub use args::{
+    F32AddScaledIdentityArgs, F32Linear2Args, F32Linear3Args, F32ScaleInPlaceByAmaxArgs,
+};
 pub use launcher::F32MatrixOpsModule;

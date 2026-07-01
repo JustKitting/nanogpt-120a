@@ -16,7 +16,10 @@ pub fn stddev(values: &[f64], mean: f64) -> f64 {
         .sqrt()
 }
 
-pub fn mean_stddev(values: &[f64]) -> (f64, f64) { let mean = mean(values); (mean, stddev(values, mean)) }
+pub fn mean_stddev(values: &[f64]) -> (f64, f64) {
+    let mean = mean(values);
+    (mean, stddev(values, mean))
+}
 
 pub fn dot(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b).map(|(a, b)| a * b).sum()

@@ -2,9 +2,9 @@ use std::error::Error;
 
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    causal_attention_backward as gpt2_causal_attention_backward, AttentionCoreBackwardArgs,
-    AttentionCoreScratchBuffers, HiddenState, QkvActivation, GPT2_BATCH_SIZE, GPT2_N_EMBD,
-    GPT2_N_HEAD, GPT2_QKV, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    AttentionCoreBackwardArgs, AttentionCoreScratchBuffers, GPT2_BATCH_SIZE, GPT2_N_EMBD,
+    GPT2_N_HEAD, GPT2_QKV, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, HiddenState, QkvActivation,
+    causal_attention_backward as gpt2_causal_attention_backward,
 };
 use rust_kernels_cuda::attention::{AttentionModule, CausalAttentionBackwardTcArgs};
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
@@ -14,7 +14,7 @@ mod common;
 #[path = "attention_core_backward/data.rs"]
 mod data;
 
-use common::saved_block::{saved_block, SavedBlockParts};
+use common::saved_block::{SavedBlockParts, saved_block};
 use common::{assert_nonzero_finite, attention_log_sum_exp_values, cuda_test_context, float_bits};
 
 #[ignore = "requires generated sm_120a PTX"]

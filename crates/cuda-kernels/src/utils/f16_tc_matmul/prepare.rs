@@ -29,8 +29,24 @@ pub(super) fn prepare_halves<'scratch>(
 
     assert!(scratch.a_padded.len() >= a_rows as usize * padded_k as usize);
     assert!(scratch.b_t_padded.len() >= b_rows as usize * padded_k as usize);
-    pad_rows(module, stream, a, scratch.a_padded, a_rows, dims.k, padded_k)?;
-    pad_rows(module, stream, b_t, scratch.b_t_padded, b_rows, dims.k, padded_k)?;
+    pad_rows(
+        module,
+        stream,
+        a,
+        scratch.a_padded,
+        a_rows,
+        dims.k,
+        padded_k,
+    )?;
+    pad_rows(
+        module,
+        stream,
+        b_t,
+        scratch.b_t_padded,
+        b_rows,
+        dims.k,
+        padded_k,
+    )?;
     convert(
         module,
         stream,

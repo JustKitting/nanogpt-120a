@@ -1,6 +1,8 @@
 use cuda_core::DriverError;
 
-use super::args::{Nvfp4QuantArgs, Nvfp4QuantRowwiseArgs};
+use super::args::{
+    Nvfp4QuantArgs, Nvfp4QuantPaddedArgs, Nvfp4QuantRowwiseArgs, Nvfp4QuantTransposePaddedArgs,
+};
 use super::launcher::Nvfp4QuantModule;
 use super::shape::{four_six_grid_config, four_six_rowwise_pow2};
 
@@ -29,6 +31,49 @@ impl Nvfp4QuantModule {
         }
 
         self.launch_fp32_to_nvfp4_four_six(args)
+    }
+
+    pub fn fp32_to_nvfp4_four_six_padded(
+        &self,
+        args: Nvfp4QuantPaddedArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let padded_elements = args.padded_rows * args.padded_cols;
+        assert!(padded_elements.is_multiple_of(16));
+        self.four_six.fp32_to_nvfp4_four_six_padded_kernel(
+            args.stream,
+            four_six_grid_config(padded_elements / 16),
+            args.x,
+            args.amax,
+            args.out_fp4,
+            args.out_scales,
+            args.out_global_scale,
+            args.rows,
+            args.cols,
+            args.padded_cols,
+            SCALE_OVERRIDE,
+        )
+    }
+
+    pub fn fp32_transpose_to_nvfp4_four_six_padded(
+        &self,
+        args: Nvfp4QuantTransposePaddedArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        let padded_elements = args.padded_rows * args.padded_cols;
+        assert!(padded_elements.is_multiple_of(16));
+        self.four_six
+            .fp32_transpose_to_nvfp4_four_six_padded_kernel(
+                args.stream,
+                four_six_grid_config(padded_elements / 16),
+                args.x,
+                args.amax,
+                args.out_fp4,
+                args.out_scales,
+                args.out_global_scale,
+                args.source_rows,
+                args.source_cols,
+                args.padded_cols,
+                SCALE_OVERRIDE,
+            )
     }
 
     fn launch_fp32_to_nvfp4_four_six(

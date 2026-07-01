@@ -4,7 +4,7 @@ use gpt2_nvfp4::{Gpt2BackwardWeights, Gpt2Weights};
 use crate::AppResult;
 
 use super::{
-    tensor::upload_nvfp4, UploadedBlock, UploadedLayerNorm, UploadedNextLat, UploadedNvfp4,
+    UploadedBlock, UploadedLayerNorm, UploadedNextLat, UploadedNvfp4, tensor::upload_nvfp4,
 };
 
 pub struct UploadedModel {

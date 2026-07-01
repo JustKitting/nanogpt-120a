@@ -2,8 +2,8 @@ use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 
 use super::scratch::RowwiseNvfp4Scratch;
-use crate::types::tape::RowwiseNvfp4Tape;
 use crate::GPT2_TOKEN_ROWS;
+use crate::types::tape::RowwiseNvfp4Tape;
 
 pub struct RowwiseNvfp4Buffers {
     bytes: DeviceBuffer<u8>,

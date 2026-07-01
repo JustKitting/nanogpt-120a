@@ -4,18 +4,18 @@ use burn::train::{
 };
 
 use super::{
+    CudaTrainingStrategy, TRAIN_EPOCH,
     artifacts::finish_training_artifacts,
     budget::WallClockBudget,
     events::process_train_step,
     validation::{process_validation, validation_input},
-    CudaTrainingStrategy, TRAIN_EPOCH,
 };
-use crate::training::launch::{
-    config::{load_model_path, should_eval_step, should_log_step},
-    CudaLearningComponents,
-};
-use crate::training::{debug_metrics, Trainer};
 use crate::AppResult;
+use crate::training::launch::{
+    CudaLearningComponents,
+    config::{load_model_path, should_eval_step, should_log_step},
+};
+use crate::training::{Trainer, debug_metrics};
 
 impl CudaTrainingStrategy {
     pub(super) fn run_training(
@@ -95,5 +95,11 @@ impl CudaTrainingStrategy {
 }
 
 fn stop_reason(interrupter: &Interrupter, wall_clock: &WallClockBudget) -> Option<&'static str> {
-    if interrupter.should_stop() { Some("burn_interrupter") } else if wall_clock.expired() { Some("wall_clock") } else { None }
+    if interrupter.should_stop() {
+        Some("burn_interrupter")
+    } else if wall_clock.expired() {
+        Some("wall_clock")
+    } else {
+        None
+    }
 }

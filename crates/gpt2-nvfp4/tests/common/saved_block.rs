@@ -2,7 +2,7 @@
 
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{
-    BlockForwardSaved, LayerNormSaved, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
+    BlockForwardSaved, GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS, LayerNormSaved,
 };
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 

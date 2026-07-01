@@ -1,6 +1,6 @@
 use std::fmt;
 
-use gpt2_nvfp4::{HiddenState, GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV};
+use gpt2_nvfp4::{GPT2_CONTEXT_LEN, GPT2_N_EMBD, GPT2_N_HEAD, GPT2_QKV, HiddenState};
 
 use crate::common::f16::tc_f16;
 
@@ -9,7 +9,11 @@ const ATTENTION_TOLERANCE: f32 = 1.0e-6;
 const RESIDUAL_TOLERANCE: f32 = 1.0e-7;
 
 pub fn assert_qkv_nonzero(qkv: &[f32]) {
-    let nonzero = |start| qkv[start..start + GPT2_N_EMBD].iter().any(|value| value.abs() > 1.0e-7);
+    let nonzero = |start| {
+        qkv[start..start + GPT2_N_EMBD]
+            .iter()
+            .any(|value| value.abs() > 1.0e-7)
+    };
     assert!(nonzero(0) && nonzero(GPT2_N_EMBD) && nonzero(2 * GPT2_N_EMBD));
 }
 
@@ -37,7 +41,12 @@ pub fn assert_attention_matches(qkv: &[f32], out: &[f32]) {
                 }
 
                 let col = head * HEAD_DIM + dim;
-                assert_scaled_close(format_args!("row={row} head={head} dim={dim}"), out[row * GPT2_N_EMBD + col], expected, ATTENTION_TOLERANCE);
+                assert_scaled_close(
+                    format_args!("row={row} head={head} dim={dim}"),
+                    out[row * GPT2_N_EMBD + col],
+                    expected,
+                    ATTENTION_TOLERANCE,
+                );
             }
         }
     }
@@ -79,11 +88,21 @@ pub fn assert_c_proj_residual_add(
 ) {
     for index in 0..HiddenState::LEN {
         let expected = residual_before[index] + attention_out[index];
-        assert_scaled_close(format_args!("index={index}"), residual_after[index], expected, RESIDUAL_TOLERANCE);
+        assert_scaled_close(
+            format_args!("index={index}"),
+            residual_after[index],
+            expected,
+            RESIDUAL_TOLERANCE,
+        );
     }
 }
 
-fn assert_scaled_close(context: fmt::Arguments<'_>, actual: f32, expected: f32, relative_tolerance: f32) {
+fn assert_scaled_close(
+    context: fmt::Arguments<'_>,
+    actual: f32,
+    expected: f32,
+    relative_tolerance: f32,
+) {
     let error = (actual - expected).abs();
     let tolerance = expected.abs().max(1.0) * relative_tolerance;
     assert!(

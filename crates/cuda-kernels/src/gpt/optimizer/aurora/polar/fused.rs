@@ -12,8 +12,8 @@ mod stage;
 mod store;
 mod tiles;
 
-use coefficients::coefficients;
-use normalize::normalize_source_to_x;
+pub use coefficients::{Coefficients, coefficients};
+pub(crate) use normalize::normalize_source_to_x;
 use ptr::{source_ptr, target_ptr};
 use tiles::{run_plain_tiles, run_symmetric_polynomial_tiles, run_symmetric_tiles};
 

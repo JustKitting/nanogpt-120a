@@ -52,7 +52,10 @@ pub fn assert_all_close(actual: &[f32], expected: f32, tolerance: f32) {
     }
 }
 
-pub fn assert_nvfp4_buffers_nonzero(bytes: &[u8], scales: &[u8]) { assert!(bytes.iter().any(|byte| *byte != 0)); assert!(scales.iter().any(|scale| *scale != 0)); }
+pub fn assert_nvfp4_buffers_nonzero(bytes: &[u8], scales: &[u8]) {
+    assert!(bytes.iter().any(|byte| *byte != 0));
+    assert!(scales.iter().any(|scale| *scale != 0));
+}
 
 pub fn assert_slice_close(actual: &[f32], expected: &[f32], tolerance: f32) {
     assert_eq!(actual.len(), expected.len());

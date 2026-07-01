@@ -41,7 +41,11 @@ impl Llama2Tokenizer {
         self.encode_with_special_tokens(text, false)
     }
 
-    fn encode_with_special_tokens(&self, text: &str, add_special_tokens: bool) -> AppResult<Vec<u32>> {
+    fn encode_with_special_tokens(
+        &self,
+        text: &str,
+        add_special_tokens: bool,
+    ) -> AppResult<Vec<u32>> {
         Ok(self
             .tokenizer
             .encode(text, add_special_tokens)

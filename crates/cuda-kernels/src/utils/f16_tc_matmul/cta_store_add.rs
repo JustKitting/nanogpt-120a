@@ -13,17 +13,27 @@ pub(crate) struct StoreAddArgs<'a> {
 
 impl<'a> StoreAddArgs<'a> {
     #[inline(always)]
-    pub(crate) fn new(tile: CtaTile, warp_n: u32, base: &'a [f32], dims: CtaMatmulDims, base_scale: f32, matmul_scale: f32) -> Self {
-        Self { tile, warp_n, base, dims, base_scale, matmul_scale }
+    pub(crate) fn new(
+        tile: CtaTile,
+        warp_n: u32,
+        base: &'a [f32],
+        dims: CtaMatmulDims,
+        base_scale: f32,
+        matmul_scale: f32,
+    ) -> Self {
+        Self {
+            tile,
+            warp_n,
+            base,
+            dims,
+            base_scale,
+            matmul_scale,
+        }
     }
 }
 
 #[inline(always)]
-pub(super) fn store_add(
-    acc: [f32; 4],
-    out: &mut DisjointSlice<f32>,
-    args: StoreAddArgs<'_>,
-) {
+pub(super) fn store_add(acc: [f32; 4], out: &mut DisjointSlice<f32>, args: StoreAddArgs<'_>) {
     store_add_one(acc[0], 0, out, &args);
     store_add_one(acc[1], 1, out, &args);
     store_add_one(acc[2], 2, out, &args);

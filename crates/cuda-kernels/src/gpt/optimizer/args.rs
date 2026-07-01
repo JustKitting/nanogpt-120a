@@ -6,7 +6,9 @@ mod kda_clip;
 mod schedule_free;
 
 pub use adam::AdamWUpdateArgs;
-pub use aurora::{AuroraMegaUpdateArgs, AuroraSlotDescriptor};
+pub use aurora::{
+    AuroraMegaUpdateArgs, AuroraSlotDescriptor, AuroraTmaFinishArgs, AuroraTmaPrepareArgs,
+};
 pub use embedding::EmbeddingLookupGradArgs;
 pub use grad_clip::GradientClipArgs;
 pub use kda_clip::KdaAuroraClipArgs;

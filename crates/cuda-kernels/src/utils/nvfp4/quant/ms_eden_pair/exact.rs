@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 
 use super::super::args::MsEdenPairDeviceScaleQuantArgs;
 use super::super::launcher::Nvfp4QuantModule;
-use super::super::shape::{grid_config, Fp32PairNoPad, MsEdenPackGrid};
+use super::super::shape::{Fp32PairNoPad, MsEdenPackGrid, grid_config};
 
 impl Nvfp4QuantModule {
     pub(super) fn launch_pair_exact_no_chunk_amax(

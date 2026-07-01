@@ -53,7 +53,14 @@ pub(crate) fn nextlat_smooth_l1_body(
         col += THREADS_PER_BLOCK;
     }
 
-    let sum = layer_norm_block_reduce!(SUMS, WARPS_PER_BLOCK, local, lane, warp_in_block, warp_sum_f32);
+    let sum = layer_norm_block_reduce!(
+        SUMS,
+        WARPS_PER_BLOCK,
+        local,
+        lane,
+        warp_in_block,
+        warp_sum_f32
+    );
     let row_loss = if valid {
         shape.lambda * sum / shape.embedding_dim as f32
     } else {

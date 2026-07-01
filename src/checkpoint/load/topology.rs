@@ -5,8 +5,8 @@ use gpt2_nvfp4::GPT2_N_LAYER;
 
 use super::{super::format::CheckpointTensor, tensor::take_uploaded};
 use crate::{
-    upload::{UploadedBlock, UploadedModel, UploadedNextLat, UploadedPair},
     AppResult,
+    upload::{UploadedBlock, UploadedModel, UploadedNextLat, UploadedPair},
 };
 
 pub(super) fn load_model(

@@ -4,7 +4,9 @@ use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::{cvt_f32_f16, cvt_rn_f16_f32};
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_K, CTA_THREADS};
 use crate::kda_common::{chunk_state_index, compact_index, hidden_index, kda_decay_exp};
-use crate::kda_tc::{CompactTileCtx, CtaATile, CtaBTile, KdaStateTile, compact_fragment_coords, for_acc_fragments};
+use crate::kda_tc::{
+    CompactTileCtx, CtaATile, CtaBTile, KdaStateTile, compact_fragment_coords, for_acc_fragments,
+};
 
 macro_rules! stage_compact_t_a_fn {
     ($name:ident, $src:ident: $src_ty:ty, $index:ident, $read:expr) => {

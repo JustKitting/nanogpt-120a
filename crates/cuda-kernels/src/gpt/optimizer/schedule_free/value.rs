@@ -10,7 +10,11 @@ pub(super) fn schedule_value(z_master: &[f32], x_master: &[f32], beta: f32, inde
 
 #[inline(always)]
 pub(super) fn checked_abs_schedule_value(
-    z_master: &[f32], x_master: &[f32], beta: f32, index: u32, len: u32,
+    z_master: &[f32],
+    x_master: &[f32],
+    beta: f32,
+    index: u32,
+    len: u32,
 ) -> f32 {
     if index < len {
         abs_f32(schedule_value(z_master, x_master, beta, index))

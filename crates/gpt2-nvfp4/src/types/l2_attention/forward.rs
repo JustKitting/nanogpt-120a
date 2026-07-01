@@ -4,8 +4,8 @@ use rust_kernels_cuda::attention::{
 };
 
 use super::tensors::AttentionForwardArgs;
-use crate::types::HiddenStateDevice;
 use crate::AttentionDims;
+use crate::types::HiddenStateDevice;
 
 pub(super) fn forward<'a, 'scratch>(
     args: AttentionForwardArgs<'a, 'scratch>,
@@ -15,7 +15,8 @@ pub(super) fn forward<'a, 'scratch>(
     let dims = AttentionDims::new(args.use_full_attention);
     let hidden = args.hidden;
 
-    let input = input_nvfp4.quantize_hidden_precomputed(args.quant_module, &hidden, dims.embedding_dim)?;
+    let input =
+        input_nvfp4.quantize_hidden_precomputed(args.quant_module, &hidden, dims.embedding_dim)?;
     if let Some(tape) = tape.as_mut() {
         tape.save_qkv_input(hidden.stream, input)?;
     }

@@ -21,12 +21,21 @@ pub(crate) mod module {
     #[kernel]
     pub fn fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_kernel(
         x: &[f32],
-        mut out_fp4: DisjointSlice<u8>, mut out_scales: DisjointSlice<u8>, mut out_global_scales: DisjointSlice<f32>,
-        mut transpose_out_fp4: DisjointSlice<u8>, mut transpose_out_scales: DisjointSlice<u8>,
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        mut transpose_out_fp4: DisjointSlice<u8>,
+        mut transpose_out_scales: DisjointSlice<u8>,
         mut transpose_out_global_scales: DisjointSlice<f32>,
         global_scale: &[f32],
-        row_grid_dim: u32, source_rows: u32, source_cols: u32, dst_row_len: u32,
-        transpose_dst_row_len: u32, scale_override: f32, sign_seed: u32, scale_seed: u32,
+        row_grid_dim: u32,
+        source_rows: u32,
+        source_cols: u32,
+        dst_row_len: u32,
+        transpose_dst_row_len: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
         transpose_scale_seed: u32,
     ) {
         dispatch_fp32_pair!(
@@ -47,12 +56,20 @@ pub(crate) mod module {
     #[kernel]
     pub fn fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_pow2_kernel(
         x: &[f32],
-        mut out_fp4: DisjointSlice<u8>, mut out_scales: DisjointSlice<u8>, mut out_global_scales: DisjointSlice<f32>,
-        mut transpose_out_fp4: DisjointSlice<u8>, mut transpose_out_scales: DisjointSlice<u8>,
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        mut transpose_out_fp4: DisjointSlice<u8>,
+        mut transpose_out_scales: DisjointSlice<u8>,
         mut transpose_out_global_scales: DisjointSlice<f32>,
         global_scale: &[f32],
-        row_grid_dim: u32, source_cols: u32, row_chunks_per_row_shift: u32,
-        transpose_chunks_per_row_shift: u32, scale_override: f32, sign_seed: u32, scale_seed: u32,
+        row_grid_dim: u32,
+        source_cols: u32,
+        row_chunks_per_row_shift: u32,
+        transpose_chunks_per_row_shift: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
         transpose_scale_seed: u32,
     ) {
         dispatch_fp32_pair!(
@@ -75,12 +92,21 @@ pub(crate) mod module {
     #[kernel]
     pub fn fp32_pair_to_nvfp4_ms_eden_device_scale_no_chunk_amax_exact_no_pad_kernel(
         x: &[f32],
-        mut out_fp4: DisjointSlice<u8>, mut out_scales: DisjointSlice<u8>, mut out_global_scales: DisjointSlice<f32>,
-        mut transpose_out_fp4: DisjointSlice<u8>, mut transpose_out_scales: DisjointSlice<u8>,
+        mut out_fp4: DisjointSlice<u8>,
+        mut out_scales: DisjointSlice<u8>,
+        mut out_global_scales: DisjointSlice<f32>,
+        mut transpose_out_fp4: DisjointSlice<u8>,
+        mut transpose_out_scales: DisjointSlice<u8>,
         mut transpose_out_global_scales: DisjointSlice<f32>,
         global_scale: &[f32],
-        row_grid_dim: u32, source_cols: u32, row_chunks_per_row: u32, transpose_chunks_per_row: u32,
-        scale_override: f32, sign_seed: u32, scale_seed: u32, transpose_scale_seed: u32,
+        row_grid_dim: u32,
+        source_cols: u32,
+        row_chunks_per_row: u32,
+        transpose_chunks_per_row: u32,
+        scale_override: f32,
+        sign_seed: u32,
+        scale_seed: u32,
+        transpose_scale_seed: u32,
     ) {
         dispatch_fp32_pair!(
             row_grid_dim: row_grid_dim,

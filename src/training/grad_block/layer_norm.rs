@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{HiddenState, LayerNormGrads, GPT2_N_EMBD};
+use gpt2_nvfp4::{GPT2_N_EMBD, HiddenState, LayerNormGrads};
 
 use crate::training::device_buffer::zero;
 

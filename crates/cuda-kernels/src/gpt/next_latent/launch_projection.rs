@@ -1,7 +1,9 @@
 use super::args::NextLatProjectionArgs;
 use super::launcher::NextLatModule;
 use crate::launch::launch_config;
-use crate::mma::{NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams, projection_cta_launch_grid_dim};
+use crate::mma::{
+    NVFP4_PROJECTION_CTA_THREADS, Nvfp4ProjectionParams, projection_cta_launch_grid_dim,
+};
 use cuda_core::DriverError;
 
 impl NextLatModule {

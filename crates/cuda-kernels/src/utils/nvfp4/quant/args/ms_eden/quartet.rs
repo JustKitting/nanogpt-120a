@@ -32,7 +32,10 @@ pub struct QuartetBackwardMsEdenDeviceScaleQuantArgs<'a, 'out> {
 }
 
 impl QuartetBackwardMsEdenDeviceScaleQuantArgs<'_, '_> {
-    pub(crate) fn device_scale_args(&mut self, scale_override: f32) -> MsEdenDeviceScaleQuantArgs<'_, '_> {
+    pub(crate) fn device_scale_args(
+        &mut self,
+        scale_override: f32,
+    ) -> MsEdenDeviceScaleQuantArgs<'_, '_> {
         MsEdenDeviceScaleQuantArgs {
             stream: self.stream,
             x: self.x,

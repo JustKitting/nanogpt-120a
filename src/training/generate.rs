@@ -1,7 +1,7 @@
 use cuda_core::DeviceBuffer;
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_VOCAB_DIM};
 use llama2_tokenizer::Llama2Tokenizer;
-use rust_kernels_cuda::logits::{LogitsTopKArgs, LOGITS_TOP_K};
+use rust_kernels_cuda::logits::{LOGITS_TOP_K, LogitsTopKArgs};
 
 use super::{TokenBatch, Trainer};
 use crate::AppResult;

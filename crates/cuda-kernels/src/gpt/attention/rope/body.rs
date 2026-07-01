@@ -17,7 +17,15 @@ pub(super) fn apply_rope_body(mut qkv: DisjointSlice<f32>, params: ApplyRopePara
         return;
     };
     rotate_section(&mut qkv, batch, token, head, dim, 0, &params);
-    rotate_section(&mut qkv, batch, token, head, dim, params.embedding_dim, &params);
+    rotate_section(
+        &mut qkv,
+        batch,
+        token,
+        head,
+        dim,
+        params.embedding_dim,
+        &params,
+    );
 }
 
 pub(super) fn apply_rope_save_f16_body(
@@ -29,8 +37,24 @@ pub(super) fn apply_rope_save_f16_body(
         return;
     };
     let q = rotate_section(&mut qkv, batch, token, head, dim, 0, &params);
-    let k = rotate_section(&mut qkv, batch, token, head, dim, params.embedding_dim, &params);
-    let v = read_pair(&mut qkv, batch, token, head, dim, params.embedding_dim * 2, &params);
+    let k = rotate_section(
+        &mut qkv,
+        batch,
+        token,
+        head,
+        dim,
+        params.embedding_dim,
+        &params,
+    );
+    let v = read_pair(
+        &mut qkv,
+        batch,
+        token,
+        head,
+        dim,
+        params.embedding_dim * 2,
+        &params,
+    );
 
     store_pair_f16(&mut qkv_f16, q);
     store_pair_f16(&mut qkv_f16, k);

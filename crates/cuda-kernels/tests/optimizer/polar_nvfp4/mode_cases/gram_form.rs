@@ -39,7 +39,10 @@ pub(in super::super) fn gram_form_correction_modes() -> [(&'static str, Mode); 3
     ]
 }
 
-const fn high_precision_safety(name: &'static str, coefficient_safety: f32) -> (&'static str, Mode) {
+const fn high_precision_safety(
+    name: &'static str,
+    coefficient_safety: f32,
+) -> (&'static str, Mode) {
     (name, Mode::HighPrecisionSafety { coefficient_safety })
 }
 
@@ -47,8 +50,18 @@ const fn nvfp4_only_safety(name: &'static str, coefficient_safety: f32) -> (&'st
     (name, Mode::Nvfp4GramOnlySafety { coefficient_safety })
 }
 
-const fn late_safety(name: &'static str, start_iter: usize, coefficient_safety: f32) -> (&'static str, Mode) {
-    (name, Mode::Nvfp4GramOnlyLateSafety { start_iter, coefficient_safety })
+const fn late_safety(
+    name: &'static str,
+    start_iter: usize,
+    coefficient_safety: f32,
+) -> (&'static str, Mode) {
+    (
+        name,
+        Mode::Nvfp4GramOnlyLateSafety {
+            start_iter,
+            coefficient_safety,
+        },
+    )
 }
 
 const fn stale_scaled(name: &'static str, scale: f32) -> (&'static str, Mode) {
@@ -56,17 +69,50 @@ const fn stale_scaled(name: &'static str, scale: f32) -> (&'static str, Mode) {
 }
 
 const fn stale_reject_safety(name: &'static str, coefficient_safety: f32) -> (&'static str, Mode) {
-    (name, Mode::StaleRejectSafety { period: 2, coefficient_safety })
+    (
+        name,
+        Mode::StaleRejectSafety {
+            period: 2,
+            coefficient_safety,
+        },
+    )
 }
 
 const fn exact_prefix_stale_reject(name: &'static str, exact_steps: usize) -> (&'static str, Mode) {
-    (name, Mode::ExactPrefixThenStaleReject { exact_steps, period: 2 })
+    (
+        name,
+        Mode::ExactPrefixThenStaleReject {
+            exact_steps,
+            period: 2,
+        },
+    )
 }
 
-const fn exact_prefix_stale_reject_safety(name: &'static str, coefficient_safety: f32) -> (&'static str, Mode) {
-    (name, Mode::ExactPrefixThenStaleRejectSafety { exact_steps: 3, period: 2, coefficient_safety })
+const fn exact_prefix_stale_reject_safety(
+    name: &'static str,
+    coefficient_safety: f32,
+) -> (&'static str, Mode) {
+    (
+        name,
+        Mode::ExactPrefixThenStaleRejectSafety {
+            exact_steps: 3,
+            period: 2,
+            coefficient_safety,
+        },
+    )
 }
 
-const fn exact_prefix_stale_reject_late_safety(name: &'static str, start_iter: usize) -> (&'static str, Mode) {
-    (name, Mode::ExactPrefixThenStaleRejectLateSafety { exact_steps: 3, period: 2, start_iter, coefficient_safety: 1.03 })
+const fn exact_prefix_stale_reject_late_safety(
+    name: &'static str,
+    start_iter: usize,
+) -> (&'static str, Mode) {
+    (
+        name,
+        Mode::ExactPrefixThenStaleRejectLateSafety {
+            exact_steps: 3,
+            period: 2,
+            start_iter,
+            coefficient_safety: 1.03,
+        },
+    )
 }

@@ -25,7 +25,13 @@ pub(super) struct BlockUpdateArgs<'a> {
 }
 
 pub(super) fn update_blocks(args: BlockUpdateArgs<'_>) -> Result<(), DriverError> {
-    let mut adam = AdamUpdate::new(args.stream, args.optimizer, args.scratch, args.step, args.average_coefficient);
+    let mut adam = AdamUpdate::new(
+        args.stream,
+        args.optimizer,
+        args.scratch,
+        args.step,
+        args.average_coefficient,
+    );
     let blocks_ms = timed_ms(|| {
         for ((block, grad), state) in args
             .uploaded
@@ -50,10 +56,26 @@ pub(super) fn update_block(
     trace: &mut OptimizerTrace,
 ) -> Result<(), DriverError> {
     trace.adam_ms += update_layer_norm_timed(adam, &mut block.ln_1, &grad.ln_1, &mut state.ln_1)?;
-    trace.adam_ms += adam.update_timed(&mut block.attn_qkv.bias, &grad.d_attn_qkv_bias, &mut state.attn_qkv.bias)?;
-    trace.adam_ms += adam.update_timed(&mut block.attn_c_proj.bias, &grad.d_attn_c_proj_bias, &mut state.attn_c_proj.bias)?;
+    trace.adam_ms += adam.update_timed(
+        &mut block.attn_qkv.bias,
+        &grad.d_attn_qkv_bias,
+        &mut state.attn_qkv.bias,
+    )?;
+    trace.adam_ms += adam.update_timed(
+        &mut block.attn_c_proj.bias,
+        &grad.d_attn_c_proj_bias,
+        &mut state.attn_c_proj.bias,
+    )?;
     trace.adam_ms += update_layer_norm_timed(adam, &mut block.ln_2, &grad.ln_2, &mut state.ln_2)?;
-    trace.adam_ms += adam.update_timed(&mut block.mlp_up.bias, &grad.d_mlp_c_fc_bias, &mut state.mlp_up.bias)?;
-    trace.adam_ms += adam.update_timed(&mut block.mlp_down.bias, &grad.d_mlp_c_proj_bias, &mut state.mlp_down.bias)?;
+    trace.adam_ms += adam.update_timed(
+        &mut block.mlp_up.bias,
+        &grad.d_mlp_c_fc_bias,
+        &mut state.mlp_up.bias,
+    )?;
+    trace.adam_ms += adam.update_timed(
+        &mut block.mlp_down.bias,
+        &grad.d_mlp_c_proj_bias,
+        &mut state.mlp_down.bias,
+    )?;
     Ok(())
 }

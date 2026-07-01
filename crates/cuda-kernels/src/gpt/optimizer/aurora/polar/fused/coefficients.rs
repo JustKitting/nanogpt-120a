@@ -1,12 +1,12 @@
 #[derive(Clone, Copy)]
-pub(super) struct Coefficients {
-    pub(super) a: f32,
-    pub(super) b: f32,
-    pub(super) c: f32,
+pub struct Coefficients {
+    pub a: f32,
+    pub b: f32,
+    pub c: f32,
 }
 
 #[inline(always)]
-pub(super) fn coefficients(iter: u32) -> Coefficients {
+pub fn coefficients(iter: u32) -> Coefficients {
     match iter {
         0 => Coefficients {
             a: 8.287_212 / 1.01,

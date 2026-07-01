@@ -1,11 +1,9 @@
 use cuda_core::CudaStream;
-use gpt2_nvfp4::{
-    AttentionProjectionTensors, Gpt2BlockWeights, MlpProjectionTensors, Nvfp4Shape,
-};
+use gpt2_nvfp4::{AttentionProjectionTensors, Gpt2BlockWeights, MlpProjectionTensors, Nvfp4Shape};
 
 use super::{
-    attention_projection_tensors, mlp_projection_tensors, upload_layer_norm, upload_nvfp4,
-    TestResult, UploadedLayerNorm, UploadedLinear, UploadedPair,
+    TestResult, UploadedLayerNorm, UploadedLinear, UploadedPair, attention_projection_tensors,
+    mlp_projection_tensors, upload_layer_norm, upload_nvfp4,
 };
 
 pub struct UploadedBlock {
@@ -19,11 +17,21 @@ pub struct UploadedBlock {
 
 impl UploadedBlock {
     pub fn attention_tensors(&self) -> AttentionProjectionTensors<'_> {
-        attention_projection_tensors(&self.attn_qkv.weight, &self.attn_qkv.bias, &self.attn_c_proj.weight, &self.attn_c_proj.bias)
+        attention_projection_tensors(
+            &self.attn_qkv.weight,
+            &self.attn_qkv.bias,
+            &self.attn_c_proj.weight,
+            &self.attn_c_proj.bias,
+        )
     }
 
     pub fn mlp_tensors(&self) -> MlpProjectionTensors<'_> {
-        mlp_projection_tensors(&self.mlp_up.weight, &self.mlp_up.bias, &self.mlp_down.weight, &self.mlp_down.bias)
+        mlp_projection_tensors(
+            &self.mlp_up.weight,
+            &self.mlp_up.bias,
+            &self.mlp_down.weight,
+            &self.mlp_down.bias,
+        )
     }
 }
 
@@ -38,6 +46,12 @@ pub fn upload_block(stream: &CudaStream, block: &Gpt2BlockWeights) -> TestResult
     })
 }
 
-fn upload_linear<W: Nvfp4Shape, B: Nvfp4Shape>(stream: &CudaStream, linear: &gpt2_nvfp4::LinearWeights<W, B>) -> TestResult<UploadedLinear> {
-    Ok(UploadedPair { weight: upload_nvfp4(stream, &linear.weight)?, bias: upload_nvfp4(stream, &linear.bias)? })
+fn upload_linear<W: Nvfp4Shape, B: Nvfp4Shape>(
+    stream: &CudaStream,
+    linear: &gpt2_nvfp4::LinearWeights<W, B>,
+) -> TestResult<UploadedLinear> {
+    Ok(UploadedPair {
+        weight: upload_nvfp4(stream, &linear.weight)?,
+        bias: upload_nvfp4(stream, &linear.bias)?,
+    })
 }

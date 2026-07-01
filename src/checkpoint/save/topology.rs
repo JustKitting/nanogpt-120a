@@ -2,8 +2,8 @@ use cuda_core::CudaStream;
 
 use super::{super::format::CheckpointWriter, tensor};
 use crate::{
-    upload::{UploadedBlock, UploadedModel, UploadedNextLat, UploadedPair},
     AppResult,
+    upload::{UploadedBlock, UploadedModel, UploadedNextLat, UploadedPair},
 };
 
 pub(super) fn write_model(

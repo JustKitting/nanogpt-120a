@@ -23,6 +23,7 @@ pub(in crate::training) struct AuroraPointerTables {
 
 pub(in crate::training) struct AuroraGroupTable {
     pub(super) slots: DeviceBuffer<AuroraSlotDescriptor>,
+    pub(super) host_slots: Vec<AuroraSlotDescriptor>,
 }
 
 impl AuroraPointerTables {

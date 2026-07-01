@@ -1,4 +1,4 @@
-use gpt2_nvfp4::{HiddenStateDevice, MlpForwardArgs, MlpScratch, MlpWeights, GPT2_CONTEXT_LEN};
+use gpt2_nvfp4::{GPT2_CONTEXT_LEN, HiddenStateDevice, MlpForwardArgs, MlpScratch, MlpWeights};
 use rust_kernels_cuda::mlp::MlpModule;
 use rust_kernels_cuda::nvfp4_quant::Nvfp4QuantModule;
 

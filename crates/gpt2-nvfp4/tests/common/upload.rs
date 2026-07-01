@@ -30,21 +30,47 @@ impl UploadedNvfp4 {
     }
 }
 
-pub fn attention_projection_tensors<'a>(qkv_weight: &'a UploadedNvfp4, qkv_bias: &'a UploadedNvfp4, c_proj_weight: &'a UploadedNvfp4, c_proj_bias: &'a UploadedNvfp4) -> AttentionProjectionTensors<'a> {
+pub fn attention_projection_tensors<'a>(
+    qkv_weight: &'a UploadedNvfp4,
+    qkv_bias: &'a UploadedNvfp4,
+    c_proj_weight: &'a UploadedNvfp4,
+    c_proj_bias: &'a UploadedNvfp4,
+) -> AttentionProjectionTensors<'a> {
     AttentionProjectionTensors {
-        qkv_weight: qkv_weight.mma(), qkv_bias: qkv_bias.device(),
-        c_proj_weight: c_proj_weight.mma(), c_proj_bias: c_proj_bias.device(),
+        qkv_weight: qkv_weight.mma(),
+        qkv_bias: qkv_bias.device(),
+        c_proj_weight: c_proj_weight.mma(),
+        c_proj_bias: c_proj_bias.device(),
     }
 }
 
-pub fn mlp_projection_tensors<'a>(up_weight: &'a UploadedNvfp4, up_bias: &'a UploadedNvfp4, down_weight: &'a UploadedNvfp4, down_bias: &'a UploadedNvfp4) -> MlpProjectionTensors<'a> {
+pub fn mlp_projection_tensors<'a>(
+    up_weight: &'a UploadedNvfp4,
+    up_bias: &'a UploadedNvfp4,
+    down_weight: &'a UploadedNvfp4,
+    down_bias: &'a UploadedNvfp4,
+) -> MlpProjectionTensors<'a> {
     MlpProjectionTensors {
-        up: MlpUpTensors { weight: up_weight.mma(), bias: up_bias.device() },
-        down: MlpDownTensors { weight: down_weight.mma(), bias: down_bias.device() },
+        up: MlpUpTensors {
+            weight: up_weight.mma(),
+            bias: up_bias.device(),
+        },
+        down: MlpDownTensors {
+            weight: down_weight.mma(),
+            bias: down_bias.device(),
+        },
     }
 }
 
-pub fn layer_norm_tensors<'a>(weight: &'a UploadedNvfp4, bias: &'a UploadedNvfp4) -> LayerNormTensors<'a> { LayerNormTensors { weight: weight.device(), bias: bias.device() } }
+pub fn layer_norm_tensors<'a>(
+    weight: &'a UploadedNvfp4,
+    bias: &'a UploadedNvfp4,
+) -> LayerNormTensors<'a> {
+    LayerNormTensors {
+        weight: weight.device(),
+        bias: bias.device(),
+    }
+}
 
 pub struct UploadedPair {
     pub weight: UploadedNvfp4,
@@ -60,20 +86,42 @@ impl UploadedPair {
     }
 }
 
-pub fn upload_layer_norm(stream: &CudaStream, layer_norm: &LayerNormWeights) -> TestResult<UploadedLayerNorm> {
-    Ok(UploadedPair { weight: upload_nvfp4(stream, &layer_norm.weight)?, bias: upload_nvfp4(stream, &layer_norm.bias)? })
+pub fn upload_layer_norm(
+    stream: &CudaStream,
+    layer_norm: &LayerNormWeights,
+) -> TestResult<UploadedLayerNorm> {
+    Ok(UploadedPair {
+        weight: upload_nvfp4(stream, &layer_norm.weight)?,
+        bias: upload_nvfp4(stream, &layer_norm.bias)?,
+    })
 }
 
-pub fn upload_nvfp4<S: Nvfp4Shape>(stream: &CudaStream, tensor: &Nvfp4Tensor<S>) -> TestResult<UploadedNvfp4> {
-    upload_nvfp4_parts(stream, tensor.bytes.as_ref(), tensor.scales.as_ref(), tensor.global_scale)
+pub fn upload_nvfp4<S: Nvfp4Shape>(
+    stream: &CudaStream,
+    tensor: &Nvfp4Tensor<S>,
+) -> TestResult<UploadedNvfp4> {
+    upload_nvfp4_parts(
+        stream,
+        tensor.bytes.as_ref(),
+        tensor.scales.as_ref(),
+        tensor.global_scale,
+    )
 }
 
-pub fn upload_nvfp4_bytes<S: Nvfp4Shape>(stream: &CudaStream, bytes: Vec<u8>) -> TestResult<UploadedNvfp4> {
+pub fn upload_nvfp4_bytes<S: Nvfp4Shape>(
+    stream: &CudaStream,
+    bytes: Vec<u8>,
+) -> TestResult<UploadedNvfp4> {
     assert_eq!(bytes.len(), S::BYTE_LEN);
     upload_nvfp4_parts(stream, &bytes, &vec![E4M3_ONE; S::SCALE_LEN], 1.0)
 }
 
-fn upload_nvfp4_parts(stream: &CudaStream, bytes: &[u8], scales: &[u8], global_scale: f32) -> TestResult<UploadedNvfp4> {
+fn upload_nvfp4_parts(
+    stream: &CudaStream,
+    bytes: &[u8],
+    scales: &[u8],
+    global_scale: f32,
+) -> TestResult<UploadedNvfp4> {
     Ok(UploadedNvfp4 {
         bytes: DeviceBuffer::from_host(stream, bytes)?,
         scales: DeviceBuffer::from_host(stream, scales)?,

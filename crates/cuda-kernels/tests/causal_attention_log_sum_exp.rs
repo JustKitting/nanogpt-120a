@@ -39,7 +39,10 @@ fn causal_attention_batch_isolation() -> Result<(), Box<dyn Error>> {
     let first = run_attention(&stream, &module, sample_qkv(0.25), 2)?;
     let second = run_attention(&stream, &module, sample_qkv(8.0), 2)?;
 
-    assert_eq!(bits(&first.out[..TOKEN_COUNT * EMBEDDING_DIM]), bits(&second.out[..TOKEN_COUNT * EMBEDDING_DIM]));
+    assert_eq!(
+        bits(&first.out[..TOKEN_COUNT * EMBEDDING_DIM]),
+        bits(&second.out[..TOKEN_COUNT * EMBEDDING_DIM])
+    );
     assert_eq!(
         bits(&first.log_sum_exp[..HEAD_COUNT * TOKEN_COUNT]),
         bits(&second.log_sum_exp[..HEAD_COUNT * TOKEN_COUNT])

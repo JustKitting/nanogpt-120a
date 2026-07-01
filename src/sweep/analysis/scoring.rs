@@ -1,6 +1,6 @@
-use super::super::features::{regression_features, FEATURE_COUNT};
+use super::super::features::{FEATURE_COUNT, regression_features};
 use super::super::{candidate::Candidate, config::SweepConfig};
-use super::{regression::Prediction, ResponseModel, SweepAnalysis};
+use super::{ResponseModel, SweepAnalysis, regression::Prediction};
 
 mod acquisition;
 mod prior;

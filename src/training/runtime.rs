@@ -4,6 +4,7 @@ use cuda_core::{CudaContext, CudaStream};
 use rust_kernels_cuda::attention::AttentionModule;
 use rust_kernels_cuda::embedding::EmbeddingModule;
 use rust_kernels_cuda::f16_tc_matmul::F16TcMatmulModule;
+use rust_kernels_cuda::f32_matrix_ops::F32MatrixOpsModule;
 use rust_kernels_cuda::layer_norm::LayerNormModule;
 use rust_kernels_cuda::layer_norm_backward::LayerNormBackwardModule;
 use rust_kernels_cuda::linear_backward::LinearBackwardModule;
@@ -28,6 +29,7 @@ pub struct Runtime {
     pub embedding: EmbeddingModule,
     pub attention: AttentionModule,
     pub f16_tc_matmul: F16TcMatmulModule,
+    pub f32_ops: F32MatrixOpsModule,
     pub quant: Nvfp4QuantModule,
     pub layer_norm: LayerNormModule,
     pub mlp: MlpModule,
@@ -53,6 +55,7 @@ impl Runtime {
             embedding: EmbeddingModule::from_module(ptx.clone())?,
             attention: AttentionModule::from_module(ptx.clone())?,
             f16_tc_matmul: F16TcMatmulModule::from_module(ptx.clone())?,
+            f32_ops: F32MatrixOpsModule::from_module(ptx.clone())?,
             quant: Nvfp4QuantModule::from_module(ptx.clone())?,
             layer_norm: LayerNormModule::from_module(ptx.clone())?,
             mlp: MlpModule::from_module(ptx.clone())?,

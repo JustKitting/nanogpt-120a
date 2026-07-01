@@ -4,7 +4,10 @@ use super::super::super::work_grid::WorkGrid;
 use super::momentum::momentum_orient;
 use super::polar_step::run_polar_step;
 use super::quant::quantize_updated_master;
-use super::types::{AuroraMatrixScratch, AuroraMatrixShape, AuroraMatrixState, AuroraMatrixTiles, AuroraUpdateScalars};
+use super::types::{
+    AuroraMatrixScratch, AuroraMatrixShape, AuroraMatrixState, AuroraMatrixTiles,
+    AuroraUpdateScalars,
+};
 use super::update::update_master_chunks;
 
 pub(super) fn aurora_matrix_update_body(
@@ -29,6 +32,8 @@ pub(super) fn aurora_matrix_update_body(
     );
     grid::sync();
 
+    let polar_rows = if transposed { shape.cols } else { shape.rows };
+    let polar_cols = if transposed { shape.rows } else { shape.cols };
     let polar_update = run_polar_step(
         scratch.oriented,
         scratch.polar_next,
@@ -40,9 +45,9 @@ pub(super) fn aurora_matrix_update_body(
         tiles.b_tile,
         tiles.warp_sums,
         work,
-        shape.rows,
-        shape.cols,
-        transposed,
+        polar_rows,
+        polar_cols,
+        false,
         scalars.iterations,
     );
 

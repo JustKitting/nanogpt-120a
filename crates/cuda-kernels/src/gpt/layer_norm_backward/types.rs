@@ -24,9 +24,16 @@ macro_rules! backward_input_launcher {
             self.module.$kernel(
                 args.stream,
                 grid_x_config(args.row_count, THREADS_PER_BLOCK),
-                args.residual, args.d_normalized, args.mean, args.inv_std,
-                args.weight.bytes, args.weight.scales, args.weight.global_scale,
-                args.d_residual, args.row_count, args.embedding_dim,
+                args.residual,
+                args.d_normalized,
+                args.mean,
+                args.inv_std,
+                args.weight.bytes,
+                args.weight.scales,
+                args.weight.global_scale,
+                args.d_residual,
+                args.row_count,
+                args.embedding_dim,
             )
         }
     };
@@ -38,8 +45,14 @@ macro_rules! backward_params_launcher {
             self.param_module.$kernel(
                 args.stream,
                 grid_x_config(args.embedding_dim, PARAM_THREADS_PER_BLOCK),
-                args.residual, args.d_normalized, args.mean, args.inv_std,
-                args.d_weight, args.d_bias, args.row_count, args.embedding_dim,
+                args.residual,
+                args.d_normalized,
+                args.mean,
+                args.inv_std,
+                args.d_weight,
+                args.d_bias,
+                args.row_count,
+                args.embedding_dim,
             )
         }
     };
@@ -53,8 +66,24 @@ impl LayerNormBackwardModule {
         })
     }
 
-    backward_input_launcher!(backward_input, LayerNormBackwardInputArgs<'_, '_>, layer_norm_backward_input_kernel);
-    backward_input_launcher!(backward_input_f32, LayerNormBackwardInputF32Args<'_, '_>, layer_norm_backward_input_f32_kernel);
-    backward_params_launcher!(backward_params, LayerNormBackwardParamArgs<'_, '_>, layer_norm_backward_params_kernel);
-    backward_params_launcher!(backward_params_f32, LayerNormBackwardParamF32Args<'_, '_>, layer_norm_backward_params_f32_kernel);
+    backward_input_launcher!(
+        backward_input,
+        LayerNormBackwardInputArgs<'_, '_>,
+        layer_norm_backward_input_kernel
+    );
+    backward_input_launcher!(
+        backward_input_f32,
+        LayerNormBackwardInputF32Args<'_, '_>,
+        layer_norm_backward_input_f32_kernel
+    );
+    backward_params_launcher!(
+        backward_params,
+        LayerNormBackwardParamArgs<'_, '_>,
+        layer_norm_backward_params_kernel
+    );
+    backward_params_launcher!(
+        backward_params_f32,
+        LayerNormBackwardParamF32Args<'_, '_>,
+        layer_norm_backward_params_f32_kernel
+    );
 }

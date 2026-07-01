@@ -12,13 +12,20 @@ use crate::kda_tc::{CompactTileCtx, CtaTiles, KdaStateTile};
 use phase::{compute_kg_vnew_add_state, compute_ws_to_vnew, decay_state};
 
 #[derive(Clone, Copy)]
-pub(in super::super) struct KdaStateSaveInputs<'a> { pub(in super::super) kg: &'a [f32], pub(in super::super) w: &'a [f32], pub(in super::super) u: &'a [f32], pub(in super::super) chunk_g_last: &'a [f32] }
+pub(in super::super) struct KdaStateSaveInputs<'a> {
+    pub(in super::super) kg: &'a [f32],
+    pub(in super::super) w: &'a [f32],
+    pub(in super::super) u: &'a [f32],
+    pub(in super::super) chunk_g_last: &'a [f32],
+}
 
 pub(in super::super) fn chunk_kda_state_save_body(
-    inputs: KdaStateSaveInputs<'_>, mut v_new: DisjointSlice<f32>,
+    inputs: KdaStateSaveInputs<'_>,
+    mut v_new: DisjointSlice<f32>,
     mut chunk_states: DisjointSlice<u16>,
     params: CausalAttentionParams,
-    state: &mut KdaStateTile, tiles: CtaTiles<'_>,
+    state: &mut KdaStateTile,
+    tiles: CtaTiles<'_>,
 ) {
     let (a_tile, b_tile) = tiles;
     let bh = thread::blockIdx_x();

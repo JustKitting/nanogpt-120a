@@ -5,8 +5,8 @@ use rust_kernels_cuda::optimizer::{AdamWUpdateArgs, OptimizerModule};
 
 use crate::upload::UploadedNvfp4;
 
-use config::{ADAM_BETA1, ADAM_BETA2, ADAM_EPS, ADAM_WEIGHT_DECAY};
 pub(crate) use config::adam_debug_config;
+use config::{ADAM_BETA1, ADAM_BETA2, ADAM_EPS, ADAM_WEIGHT_DECAY};
 pub(super) use config::{adam_learning_rate, next_latent_adam_learning_rate};
 
 use super::super::optimizer::OptimizerScratch;

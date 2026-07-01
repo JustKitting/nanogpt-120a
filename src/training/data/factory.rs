@@ -3,14 +3,13 @@ use std::path::PathBuf;
 use crate::AppResult;
 
 use super::{
-    shakespeare,
+    TokenDataLoader, shakespeare,
     source::{
-        repeat_first_window, token_count_paths, training_dataset, DATASET_SHAKESPEARE,
-        DATASET_SYNTH,
+        DATASET_SHAKESPEARE, DATASET_SYNTH, repeat_first_window, token_count_paths,
+        training_dataset,
     },
     synth, tokens,
     validation::train_end,
-    TokenDataLoader,
 };
 
 impl TokenDataLoader {

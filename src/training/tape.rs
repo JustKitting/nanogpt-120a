@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{Gpt2ForwardSaved, Gpt2ForwardTape, HiddenState, GPT2_N_LAYER};
+use gpt2_nvfp4::{GPT2_N_LAYER, Gpt2ForwardSaved, Gpt2ForwardTape, HiddenState};
 
 use super::device_buffer::block_array;
 use super::tape_block::BlockTapeBuffers;

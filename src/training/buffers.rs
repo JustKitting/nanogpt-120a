@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use gpt2_nvfp4::{
-    AttentionLogSumExp, HiddenState, Logits, MlpActivation, QkvActivation, RowwiseNvfp4Buffers,
-    GPT2_TOKEN_ROWS,
+    AttentionLogSumExp, GPT2_TOKEN_ROWS, HiddenState, Logits, MlpActivation, QkvActivation,
+    RowwiseNvfp4Buffers,
 };
 
 use super::device_buffer::zero;

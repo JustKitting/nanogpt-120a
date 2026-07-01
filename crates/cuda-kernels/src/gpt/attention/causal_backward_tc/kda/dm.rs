@@ -4,10 +4,20 @@ use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 use crate::f16_tc_matmul::cta_tile::{CTA_B_ELEMS, CTA_K, CTA_THREADS};
 use crate::kda_common::{beta_compact_index, compact_index, kda_decay_exp};
-use crate::kda_tc::{CompactTileCtx, CtaBTile, CtaTiles, KdaChunkTileCtx, stage_compact_a as stage_dm_compact_a, stage_compact_token_dim_b_t as stage_dm_compact_b_t, store_chunk_matrix_quads, tc_stage_loop};
+use crate::kda_tc::{
+    CompactTileCtx, CtaBTile, CtaTiles, KdaChunkTileCtx, stage_compact_a as stage_dm_compact_a,
+    stage_compact_token_dim_b_t as stage_dm_compact_b_t, store_chunk_matrix_quads, tc_stage_loop,
+};
 
 #[derive(Clone, Copy)]
-pub(crate) struct KdaDmInputs<'a> { pub(crate) kg: &'a [f32], pub(crate) vbeta: &'a [f32], pub(crate) g: &'a [f32], pub(crate) beta: &'a [f32], pub(crate) d_u: &'a [f32], pub(crate) d_w: &'a [f32] }
+pub(crate) struct KdaDmInputs<'a> {
+    pub(crate) kg: &'a [f32],
+    pub(crate) vbeta: &'a [f32],
+    pub(crate) g: &'a [f32],
+    pub(crate) beta: &'a [f32],
+    pub(crate) d_u: &'a [f32],
+    pub(crate) d_w: &'a [f32],
+}
 
 pub(crate) fn chunk_intra_kda_dm_body(
     inputs: KdaDmInputs<'_>,
@@ -54,7 +64,8 @@ fn stage_dm_kpos_b_t(
             let compact = compact_index(ctx.batch, token, ctx.head, dim, ctx.params);
             let g_value = inputs.g[compact];
             let g_last = inputs.g[compact_index(ctx.batch, ctx.end - 1, ctx.head, dim, ctx.params)];
-            let beta_value = inputs.beta[beta_compact_index(ctx.batch, token, ctx.head, ctx.params)];
+            let beta_value =
+                inputs.beta[beta_compact_index(ctx.batch, token, ctx.head, ctx.params)];
             cvt_rn_f16_f32(beta_value * inputs.kg[compact] * kda_decay_exp(2.0 * g_value - g_last))
         } else {
             0

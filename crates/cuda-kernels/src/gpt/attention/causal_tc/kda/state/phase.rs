@@ -3,9 +3,7 @@ use cuda_device::{DisjointSlice, thread};
 use super::super::super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_K, CTA_THREADS};
-use crate::kda_common::{
-    chunk_g_last_index, compact_index, kda_decay_exp, state_elems,
-};
+use crate::kda_common::{chunk_g_last_index, compact_index, kda_decay_exp, state_elems};
 use crate::kda_tc::{
     CompactTileCtx, CtaATile, CtaBTile, KdaStateTile, add_shared_state_quads, stage_compact_a,
     stage_compact_b_t_disjoint as stage_vnew_b_t_disjoint, stage_shared_state_b_t,
@@ -13,8 +11,13 @@ use crate::kda_tc::{
 };
 
 pub(super) fn compute_ws_to_vnew(
-    w: &[f32], u: &[f32], v_new: &mut DisjointSlice<f32>, state: &KdaStateTile,
-    a_tile: &mut CtaATile, b_tile: &mut CtaBTile, ctx: CompactTileCtx<'_>,
+    w: &[f32],
+    u: &[f32],
+    v_new: &mut DisjointSlice<f32>,
+    state: &KdaStateTile,
+    a_tile: &mut CtaATile,
+    b_tile: &mut CtaBTile,
+    ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
     tc_stage_loop!(ctx.tile, a_tile, b_tile, acc; k_base < ctx.params.head_dim; {
@@ -26,8 +29,12 @@ pub(super) fn compute_ws_to_vnew(
 }
 
 pub(super) fn compute_kg_vnew_add_state(
-    k: &[f32], v_new: &mut DisjointSlice<f32>, state: &mut KdaStateTile,
-    a_tile: &mut CtaATile, b_tile: &mut CtaBTile, ctx: CompactTileCtx<'_>,
+    k: &[f32],
+    v_new: &mut DisjointSlice<f32>,
+    state: &mut KdaStateTile,
+    a_tile: &mut CtaATile,
+    b_tile: &mut CtaBTile,
+    ctx: CompactTileCtx<'_>,
 ) {
     let mut acc = [[0.0_f32; 4]; 4];
     tc_stage_loop!(ctx.tile, a_tile, b_tile, acc; k_base < ctx.params.chunk_size; {
@@ -39,7 +46,11 @@ pub(super) fn compute_kg_vnew_add_state(
 }
 
 pub(super) fn decay_state(
-    state: &mut KdaStateTile, chunk_g_last: &[f32], bh: u32, chunk: u32, tid: u32,
+    state: &mut KdaStateTile,
+    chunk_g_last: &[f32],
+    bh: u32,
+    chunk: u32,
+    tid: u32,
     ctx: CompactTileCtx<'_>,
 ) {
     let state_elems = state_elems(ctx.params);

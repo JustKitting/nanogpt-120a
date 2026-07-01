@@ -13,14 +13,14 @@ pub use activations::{
 pub use backward::{
     AttentionBackwardModules, AttentionBackwardSeeds, AttentionCProjBackwardArgs,
     AttentionCProjScratch, AttentionCoreBackwardArgs, AttentionCoreScratch,
-    AttentionCoreScratchBuffers,
-    AttentionQkvBackwardArgs, AttentionQkvScratch, BlockAttentionBackwardArgs,
-    BlockAttentionBackwardModules, BlockAttentionBackwardScratch, BlockAttentionBackwardSeeds,
-    BlockMlpBackwardArgs, BlockMlpBackwardModules, FinalHeadBackwardArgs, FinalHeadBackwardModules,
-    FinalHeadBackwardScratch, FinalHeadBackwardSeeds, Gpt2BackwardArgs, Gpt2BackwardModules,
-    Gpt2BackwardScratch, Gpt2BackwardSeeds, Gpt2BackwardWeights, Gpt2LayerNormBackwardArgs,
-    Gpt2LayerNormBackwardInputArgs, Gpt2LayerNormBackwardParamArgs, LinearScratch,
-    MlpBackwardArgs, MlpBackwardGrads, MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds,
+    AttentionCoreScratchBuffers, AttentionQkvBackwardArgs, AttentionQkvScratch,
+    BlockAttentionBackwardArgs, BlockAttentionBackwardModules, BlockAttentionBackwardScratch,
+    BlockAttentionBackwardSeeds, BlockMlpBackwardArgs, BlockMlpBackwardModules,
+    FinalHeadBackwardArgs, FinalHeadBackwardModules, FinalHeadBackwardScratch,
+    FinalHeadBackwardSeeds, Gpt2BackwardArgs, Gpt2BackwardModules, Gpt2BackwardScratch,
+    Gpt2BackwardSeeds, Gpt2BackwardWeights, Gpt2LayerNormBackwardArgs,
+    Gpt2LayerNormBackwardInputArgs, Gpt2LayerNormBackwardParamArgs, LinearScratch, MlpBackwardArgs,
+    MlpBackwardGrads, MlpBackwardModules, MlpBackwardScratch, MlpBackwardSeeds,
     attention_c_proj_backward, attention_side_backward, causal_attention_backward,
     final_head_backward, gpt2_backward, layer_norm_backward, layer_norm_backward_input,
     layer_norm_backward_params, mlp_backward, mlp_side_backward, qkv_projection_backward,
@@ -28,15 +28,15 @@ pub use backward::{
 
 pub use config::AttentionDims;
 pub use config::{
-    GPT2_EMBEDDING_DIM, GPT2_MLP_DIM, GPT2_TOKEN_ROWS_U32, GPT2_VOCAB_DIM, NEXTLAT_HIDDEN_DIM,
-    NEXTLAT_INPUT_DIM,
-};
-pub use config::{
     GPT2_BATCH_SIZE, GPT2_CONTEXT_LEN, GPT2_FULL_ATTENTION_QKV, GPT2_K_OFFSET,
     GPT2_KDA_BETA_OFFSET, GPT2_KDA_G_OFFSET, GPT2_LAYER_NORM_EPSILON, GPT2_MLP, GPT2_N_EMBD,
     GPT2_N_HEAD, GPT2_N_LAYER, GPT2_Q_OFFSET, GPT2_QKV, GPT2_SEQ_LEN, GPT2_TOKEN_ROWS,
     GPT2_V_OFFSET, GPT2_VOCAB_SIZE, Gpt2Config, KDA_CHUNK_SIZE, KDA_DECAY_SCALE,
     KIMI_FULL_ATTENTION_PERIOD, NEXTLAT_HIDDEN, NEXTLAT_INPUT, uses_full_attention,
+};
+pub use config::{
+    GPT2_EMBEDDING_DIM, GPT2_MLP_DIM, GPT2_TOKEN_ROWS_U32, GPT2_VOCAB_DIM, NEXTLAT_HIDDEN_DIM,
+    NEXTLAT_INPUT_DIM,
 };
 
 pub use tensor::{FixedBytes, Nvfp4Shape, Nvfp4Tensor};

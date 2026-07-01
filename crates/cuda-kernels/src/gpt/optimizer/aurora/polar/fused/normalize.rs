@@ -10,8 +10,13 @@ const POLAR_EXPRESS_EPS: f32 = 1.0e-7;
 
 #[derive(Clone, Copy)]
 struct NormalizeSourceToX {
-    source: *const f32, x: *mut f32, chunks: *mut f32,
-    source_rows: u32, source_cols: u32, polar_rows: u32, polar_cols: u32,
+    source: *const f32,
+    x: *mut f32,
+    chunks: *mut f32,
+    source_rows: u32,
+    source_cols: u32,
+    polar_rows: u32,
+    polar_cols: u32,
     transpose_source: bool,
 }
 
@@ -28,7 +33,7 @@ impl NormalizeSourceToX {
 }
 
 #[expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
-pub(super) fn normalize_source_to_x(
+pub(crate) fn normalize_source_to_x(
     source: *const f32,
     x: *mut f32,
     chunks: *mut f32,
@@ -41,7 +46,14 @@ pub(super) fn normalize_source_to_x(
     transpose_source: bool,
 ) {
     let job = NormalizeSourceToX {
-        source, x, chunks, source_rows, source_cols, polar_rows, polar_cols, transpose_source,
+        source,
+        x,
+        chunks,
+        source_rows,
+        source_cols,
+        polar_rows,
+        polar_cols,
+        transpose_source,
     };
     let len = job.source_rows * job.source_cols;
     let tid = thread::threadIdx_x();

@@ -6,8 +6,12 @@ use super::layout::slot_for_chunk;
 use super::{APPLY_UNROLL, THREADS_PER_BLOCK, VALUES_PER_CHUNK};
 
 pub(super) fn grad_clip_apply_body(
-    ptrs: &[u64], lens: &[u32], chunk_offsets: &[u32], scale: &[f32],
-    slot_count: u32, chunk_count: u32,
+    ptrs: &[u64],
+    lens: &[u32],
+    chunk_offsets: &[u32],
+    scale: &[f32],
+    slot_count: u32,
+    chunk_count: u32,
 ) {
     let chunk = thread::blockIdx_x();
     if chunk >= chunk_count {

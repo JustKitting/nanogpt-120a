@@ -43,7 +43,12 @@ impl NextLatModule {
             args.target_states,
             args.losses,
             args.d_predicted_next_states,
-            NextLatShape::smooth_l1(args.batch_size, args.seq_len, args.embedding_dim, args.lambda),
+            NextLatShape::smooth_l1(
+                args.batch_size,
+                args.seq_len,
+                args.embedding_dim,
+                args.lambda,
+            ),
         )
     }
 }

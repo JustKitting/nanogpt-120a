@@ -55,8 +55,16 @@ fn nextlat_concat_and_shifted_smooth_l1_match_reference() -> Result<(), Box<dyn 
     let expected_concat = reference::concat(&next_token_embeddings, &current_states);
     let (expected_losses, expected_grad) = reference::smooth_l1(&predicted, &current_states);
 
-    common::assert_slice_close(&concat_dev.to_host_vec(&stream)?, &expected_concat, TOLERANCE);
-    common::assert_slice_close(&losses_dev.to_host_vec(&stream)?, &expected_losses, TOLERANCE);
+    common::assert_slice_close(
+        &concat_dev.to_host_vec(&stream)?,
+        &expected_concat,
+        TOLERANCE,
+    );
+    common::assert_slice_close(
+        &losses_dev.to_host_vec(&stream)?,
+        &expected_losses,
+        TOLERANCE,
+    );
     common::assert_slice_close(&d_pred_dev.to_host_vec(&stream)?, &expected_grad, TOLERANCE);
     Ok(())
 }

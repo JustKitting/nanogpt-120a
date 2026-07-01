@@ -5,7 +5,7 @@ use rust_kernels_cuda::linear_backward::{
 use rust_kernels_cuda::loss::CrossEntropyArgs;
 
 use super::args::FinalHeadBackwardArgs;
-use crate::backward::linear::{run_linear_backward, LinearBackwardCall};
+use crate::backward::linear::{LinearBackwardCall, run_linear_backward};
 use crate::{GPT2_EMBEDDING_DIM, GPT2_VOCAB_DIM};
 
 pub fn backward(args: FinalHeadBackwardArgs<'_, '_, '_>) -> Result<(), DriverError> {

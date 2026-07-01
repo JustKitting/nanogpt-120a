@@ -69,17 +69,30 @@ impl KdaQkAct {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct KdaQkNormAcc { q_sum: f32, k_sum: f32 }
+pub(crate) struct KdaQkNormAcc {
+    q_sum: f32,
+    k_sum: f32,
+}
 
 impl KdaQkNormAcc {
     #[inline(always)]
-    pub(crate) fn zero() -> Self { Self { q_sum: 0.0, k_sum: 0.0 } }
+    pub(crate) fn zero() -> Self {
+        Self {
+            q_sum: 0.0,
+            k_sum: 0.0,
+        }
+    }
 
     #[inline(always)]
-    pub(crate) fn add(&mut self, qk: KdaQkAct) { self.q_sum = fma_f32(qk.q_act, qk.q_act, self.q_sum); self.k_sum = fma_f32(qk.k_act, qk.k_act, self.k_sum); }
+    pub(crate) fn add(&mut self, qk: KdaQkAct) {
+        self.q_sum = fma_f32(qk.q_act, qk.q_act, self.q_sum);
+        self.k_sum = fma_f32(qk.k_act, qk.k_act, self.k_sum);
+    }
 
     #[inline(always)]
-    pub(crate) fn norms(self) -> (f32, f32) { (kda_warp_norm(self.q_sum), kda_warp_norm(self.k_sum)) }
+    pub(crate) fn norms(self) -> (f32, f32) {
+        (kda_warp_norm(self.q_sum), kda_warp_norm(self.k_sum))
+    }
 }
 
 pub(crate) fn read_qk_act<T: KdaQkvRead>(

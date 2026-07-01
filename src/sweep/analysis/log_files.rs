@@ -17,7 +17,10 @@ pub fn full_path(trial: &Trial) -> Option<PathBuf> {
 }
 
 fn has_log_file(trial: &Trial, file_name: &str) -> bool {
-    trial.log_path.file_name().is_some_and(|name| name == file_name)
+    trial
+        .log_path
+        .file_name()
+        .is_some_and(|name| name == file_name)
 }
 
 pub fn read_log(path: impl Into<Option<PathBuf>>) -> Option<LogMetrics> {

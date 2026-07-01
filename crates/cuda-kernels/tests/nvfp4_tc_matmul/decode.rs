@@ -3,7 +3,7 @@ use rust_kernels_cuda::nvfp4::{
     Nvfp4DecodeModule, Nvfp4RowwiseDecodeTransposeArgs, Nvfp4RowwiseDeviceTensor,
 };
 
-use super::scratch::{padded_k, ScratchBuffers, M, N};
+use super::scratch::{M, N, ScratchBuffers, padded_k};
 
 pub fn decoded_dot(
     decode: &Nvfp4DecodeModule,

@@ -3,8 +3,8 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::nvfp4::Nvfp4RowwiseDeviceTensor;
 use rust_kernels_cuda::nvfp4_tc_matmul::{
-    nvfp4_tc_matmul_bytes, nvfp4_tc_matmul_chunks, nvfp4_tc_matmul_elements,
-    nvfp4_tc_matmul_scales, Nvfp4TcMatmulOperand, Nvfp4TcMatmulScratch,
+    Nvfp4TcMatmulOperand, Nvfp4TcMatmulScratch, nvfp4_tc_matmul_bytes, nvfp4_tc_matmul_chunks,
+    nvfp4_tc_matmul_elements, nvfp4_tc_matmul_scales,
 };
 
 pub struct Nvfp4TcScratchBuffers {

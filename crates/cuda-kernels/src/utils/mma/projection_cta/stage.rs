@@ -27,13 +27,15 @@ macro_rules! stage_tiles_fn {
             let thread_id = thread::threadIdx_x();
             let mut offset = thread_id;
             while offset < NVFP4_PROJECTION_CTA_A_PACKS as u32 {
-                tiles.a_packs[offset as usize] = $load_a_pack(sources.input_bytes, tile, offset, k_base, params);
+                tiles.a_packs[offset as usize] =
+                    $load_a_pack(sources.input_bytes, tile, offset, k_base, params);
                 offset += NVFP4_PROJECTION_CTA_THREADS;
             }
 
             let mut offset = thread_id;
             while offset < NVFP4_PROJECTION_CTA_B_PACKS as u32 {
-                tiles.b_packs[offset as usize] = $load_b_pack(sources.weight_bytes, tile, offset, k_base, params);
+                tiles.b_packs[offset as usize] =
+                    $load_b_pack(sources.weight_bytes, tile, offset, k_base, params);
                 offset += NVFP4_PROJECTION_CTA_THREADS;
             }
 
@@ -85,8 +87,11 @@ pub fn stage_row_pair_tiles_aligned(
         if offset < NVFP4_PROJECTION_CTA_A_PACKS as u32 {
             tiles.a0_packs[offset as usize] =
                 load_a_pack_aligned(sources.input_bytes, tile0, offset, k_base, params);
-            tiles.a1_packs[offset as usize] =
-                load_a_pack_aligned(sources.input_bytes, tile1, offset, k_base, params);
+            tiles.a1_packs[offset as usize] = if tile1.row_base < params.token_count {
+                load_a_pack_aligned(sources.input_bytes, tile1, offset, k_base, params)
+            } else {
+                0
+            };
         }
         offset += NVFP4_PROJECTION_CTA_THREADS;
     }
@@ -98,8 +103,11 @@ pub fn stage_row_pair_tiles_aligned(
         if offset < NVFP4_PROJECTION_CTA_A_SCALES as u32 {
             tiles.a0_scales[offset as usize] =
                 load_a_scale_aligned(sources.input_scales, tile0, offset, k_base, params);
-            tiles.a1_scales[offset as usize] =
-                load_a_scale_aligned(sources.input_scales, tile1, offset, k_base, params);
+            tiles.a1_scales[offset as usize] = if tile1.row_base < params.token_count {
+                load_a_scale_aligned(sources.input_scales, tile1, offset, k_base, params)
+            } else {
+                crate::mma::projection::load_bytes::E4M3_ONE_PACKED4
+            };
         }
         offset += NVFP4_PROJECTION_CTA_THREADS;
     }

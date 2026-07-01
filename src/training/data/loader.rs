@@ -1,9 +1,8 @@
 use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN};
 
 use super::{
-    tokens,
-    validation::{train_end, validation_windows, VALIDATION_WINDOWS},
-    TokenDataLoader, TokenWindowBatch,
+    TokenDataLoader, TokenWindowBatch, tokens,
+    validation::{VALIDATION_WINDOWS, train_end, validation_windows},
 };
 use crate::AppResult;
 

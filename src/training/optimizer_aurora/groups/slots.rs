@@ -1,13 +1,13 @@
 use std::cmp::Reverse;
 
 use gpt2_nvfp4::{
-    uses_full_attention, AttentionDims, GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, NEXTLAT_HIDDEN,
-    NEXTLAT_INPUT,
+    AttentionDims, GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, NEXTLAT_HIDDEN, NEXTLAT_INPUT,
+    uses_full_attention,
 };
 use rust_kernels_cuda::optimizer::AURORA_MATRIX_PHASES;
 
 use super::super::AURORA_MATRIX_SLOTS;
-use super::{padding::AuroraPaddingBuffers, ptrs, HostPtrs};
+use super::{HostPtrs, padding::AuroraPaddingBuffers, ptrs};
 use crate::{
     training::{
         grads::BackwardBuffers, learning_rate, next_latent::NextLatGradBuffers,

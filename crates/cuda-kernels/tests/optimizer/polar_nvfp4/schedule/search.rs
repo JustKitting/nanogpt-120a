@@ -78,7 +78,9 @@ fn evaluate_schedule(
     name: &str,
     schedule: [f32; MAX_ITERATIONS],
 ) -> Result<ScheduleResult, Box<dyn Error>> {
-    let mode = GramCorrectionMode::Nvfp4GramOnlySchedule { coefficient_safety: schedule };
+    let mode = GramCorrectionMode::Nvfp4GramOnlySchedule {
+        coefficient_safety: schedule,
+    };
     evaluate_mode(eval, name, schedule, mode)
 }
 
@@ -88,7 +90,11 @@ fn evaluate_stale_reject_schedule(
     period: usize,
     schedule: [f32; MAX_ITERATIONS],
 ) -> Result<ScheduleResult, Box<dyn Error>> {
-    let mode = GramCorrectionMode::ExactPrefixThenStaleRejectSchedule { exact_steps, period, coefficient_safety: schedule };
+    let mode = GramCorrectionMode::ExactPrefixThenStaleRejectSchedule {
+        exact_steps,
+        period,
+        coefficient_safety: schedule,
+    };
     evaluate_mode(
         eval,
         &format!(

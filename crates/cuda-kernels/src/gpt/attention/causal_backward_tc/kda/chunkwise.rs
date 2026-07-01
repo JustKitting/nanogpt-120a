@@ -12,8 +12,18 @@ use crate::kda_tc::{CompactTileCtx, CtaATile, CtaBTile, KdaStateTile};
 use phase::{add_kg_dh_to_du_tc, compute_prev_dh_tc};
 
 #[derive(Clone, Copy)]
-pub(crate) struct KdaChunkwiseInputs<'a> { pub(crate) qg: &'a [f32], pub(crate) kg: &'a [f32], pub(crate) g: &'a [f32], pub(crate) chunk_states: &'a [u16], pub(crate) d_out: &'a [f32] }
-pub(crate) struct KdaChunkwiseGrads<'a> { pub(crate) u_to_du: DisjointSlice<'a, f32>, pub(crate) w_to_dw: DisjointSlice<'a, f32>, pub(crate) d_h_states: DisjointSlice<'a, f32> }
+pub(crate) struct KdaChunkwiseInputs<'a> {
+    pub(crate) qg: &'a [f32],
+    pub(crate) kg: &'a [f32],
+    pub(crate) g: &'a [f32],
+    pub(crate) chunk_states: &'a [u16],
+    pub(crate) d_out: &'a [f32],
+}
+pub(crate) struct KdaChunkwiseGrads<'a> {
+    pub(crate) u_to_du: DisjointSlice<'a, f32>,
+    pub(crate) w_to_dw: DisjointSlice<'a, f32>,
+    pub(crate) d_h_states: DisjointSlice<'a, f32>,
+}
 pub(crate) fn chunkwise_kda_backward_body(
     inputs: KdaChunkwiseInputs<'_>,
     mut grads: KdaChunkwiseGrads<'_>,
@@ -46,13 +56,22 @@ pub(crate) fn chunkwise_kda_backward_body(
         let chunk = chunk_remaining - 1;
         let start = chunk * params.chunk_size;
         let end = params.seq_len.min(start + params.chunk_size);
-        load_chunk_state(inputs.chunk_states, state, bh, chunk, state_elems, &params, TC_BACKWARD_THREADS_PER_BLOCK);
+        load_chunk_state(
+            inputs.chunk_states,
+            state,
+            bh,
+            chunk,
+            state_elems,
+            &params,
+            TC_BACKWARD_THREADS_PER_BLOCK,
+        );
 
         idx = tid;
         let d_h_base = ((bh * chunks + chunk) * state_elems) as usize;
         while idx < state_elems {
             unsafe {
-                *grads.d_h_states.get_unchecked_mut(d_h_base + idx as usize) = d_h_next[idx as usize];
+                *grads.d_h_states.get_unchecked_mut(d_h_base + idx as usize) =
+                    d_h_next[idx as usize];
             }
             idx += TC_BACKWARD_THREADS_PER_BLOCK;
         }
@@ -62,7 +81,13 @@ pub(crate) fn chunkwise_kda_backward_body(
         add_kg_dh_to_du_tc(inputs.kg, &mut grads.u_to_du, d_h_next, a_tile, b_tile, ctx);
         thread::sync_threads();
 
-        compute_prev_dh_tc(inputs, &mut grads, (&*d_h_next, &mut *d_h), (&mut *a_tile, &mut *b_tile), ctx);
+        compute_prev_dh_tc(
+            inputs,
+            &mut grads,
+            (&*d_h_next, &mut *d_h),
+            (&mut *a_tile, &mut *b_tile),
+            ctx,
+        );
         thread::sync_threads();
 
         idx = tid;

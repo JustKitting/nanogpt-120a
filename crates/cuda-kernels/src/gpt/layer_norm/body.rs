@@ -41,7 +41,12 @@ macro_rules! gpt_layer_norm_body {
         if row < $row_count {
             let row_base = row as usize * $embedding_dim as usize;
             let cols = layer_norm_columns3!(thread, GPT_LAYER_NORM_THREADS_PER_BLOCK);
-            let values = layer_norm_map3!(cols, |col| f32_column($residual, row_base, col, $embedding_dim));
+            let values = layer_norm_map3!(cols, |col| f32_column(
+                $residual,
+                row_base,
+                col,
+                $embedding_dim
+            ));
 
             maybe_store_residual_f16!($residual_f16, row_base, cols, $embedding_dim, values);
 
@@ -54,7 +59,12 @@ macro_rules! gpt_layer_norm_body {
                 warp_sum_f32
             ) / $embedding_dim as f32;
             layer_norm_store_row!(&mut $mean_out, row, lane, warp_in_block, mean);
-            let centered = layer_norm_map3_indexed!(cols, |index, col| centered_column(col, $embedding_dim, values[index], mean));
+            let centered = layer_norm_map3_indexed!(cols, |index, col| centered_column(
+                col,
+                $embedding_dim,
+                values[index],
+                mean
+            ));
             let variance_sum = layer_norm_block_reduce!(
                 WARP_SUMS,
                 GPT_LAYER_NORM_WARPS_PER_BLOCK,
@@ -79,9 +89,19 @@ macro_rules! gpt_layer_norm_body {
                     $bias_global_scale[0],
                 ));
 
-            layer_norm_store3!(&mut $normalized, row_base, cols, $embedding_dim, normalized_values);
+            layer_norm_store3!(
+                &mut $normalized,
+                row_base,
+                cols,
+                $embedding_dim,
+                normalized_values
+            );
 
-            let local_amax = max_abs3(normalized_values[0], normalized_values[1], normalized_values[2]);
+            let local_amax = max_abs3(
+                normalized_values[0],
+                normalized_values[1],
+                normalized_values[2],
+            );
             let block_amax = layer_norm_block_reduce!(
                 WARP_SUMS,
                 GPT_LAYER_NORM_WARPS_PER_BLOCK,

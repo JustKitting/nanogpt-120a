@@ -2,7 +2,7 @@ use cuda_core::DriverError;
 use gpt2_nvfp4::{GPT2_EMBEDDING_DIM, NEXTLAT_HIDDEN_DIM, NEXTLAT_INPUT_DIM};
 
 use super::backward::NextLatBackwardArgs;
-use super::backward_linear_call::{run_linear, LinearCall};
+use super::backward_linear_call::{LinearCall, run_linear};
 
 pub(super) fn output_projection_backward(
     args: &mut NextLatBackwardArgs<'_, '_, '_>,

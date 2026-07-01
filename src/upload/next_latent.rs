@@ -3,7 +3,7 @@ use gpt2_nvfp4::NextLatWeights;
 
 use crate::AppResult;
 
-use super::{tensor::upload_nvfp4, UploadedLayerNorm, UploadedLinear};
+use super::{UploadedLayerNorm, UploadedLinear, tensor::upload_nvfp4};
 
 pub struct UploadedNextLat {
     pub norm: UploadedLayerNorm,

@@ -9,8 +9,12 @@ use super::SCALE_OVERRIDE;
 use super::value::schedule_value;
 
 pub(super) fn schedule_free_four_six_body(
-    z_master: &[f32], x_master: &[f32], amax: &[f32], out_fp4: &mut DisjointSlice<u8>,
-    out_scales: &mut DisjointSlice<u8>, out_global_scale: &mut DisjointSlice<f32>,
+    z_master: &[f32],
+    x_master: &[f32],
+    amax: &[f32],
+    out_fp4: &mut DisjointSlice<u8>,
+    out_scales: &mut DisjointSlice<u8>,
+    out_global_scale: &mut DisjointSlice<f32>,
     beta: f32,
 ) {
     let (lane_in_group, group_mask, group_leader) = four_six_lane();

@@ -1,14 +1,14 @@
 use cuda_core::{CudaStream, DriverError};
-use gpt2_nvfp4::{uses_full_attention, AttentionDims, GPT2_TOKEN_ROWS_U32};
+use gpt2_nvfp4::{AttentionDims, GPT2_TOKEN_ROWS_U32, uses_full_attention};
 use rust_kernels_cuda::optimizer::KdaAuroraClipArgs;
 
 use crate::training::runtime::Runtime;
 use crate::upload::UploadedModel;
 
+use super::super::OptimizerTrace;
 use super::super::optimizer::OptimizerScratch;
 use super::super::optimizer_state::OptimizerStateBuffers;
 use super::super::tape::ForwardTapeBuffers;
-use super::super::OptimizerTrace;
 use super::timed_ms;
 
 const KDA_QK_CLIP_TAU: f32 = 100.0;

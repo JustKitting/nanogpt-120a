@@ -40,11 +40,25 @@ pub(crate) mod module {
         static mut WARP_SUMS: SharedArray<f32, { WARPS_PER_BLOCK as usize }> = SharedArray::UNINIT;
 
         let scratch = AuroraMatrixScratch {
-            oriented: oriented.as_mut_ptr(), polar_next: polar_next.as_mut_ptr(), polar_x: polar_x.as_mut_ptr(),
-            polar_gram: polar_gram.as_mut_ptr(), polar_ax: polar_ax.as_mut_ptr(), polar_chunks: polar_chunks.as_mut_ptr(),
+            oriented: oriented.as_mut_ptr(),
+            polar_next: polar_next.as_mut_ptr(),
+            polar_x: polar_x.as_mut_ptr(),
+            polar_gram: polar_gram.as_mut_ptr(),
+            polar_ax: polar_ax.as_mut_ptr(),
+            polar_chunks: polar_chunks.as_mut_ptr(),
         };
-        let layout = slot::MegaScratchLayout { max_len, max_ax_len, max_dim };
-        let scalars = AuroraUpdateScalars { mu, learning_rate, weight_decay, average_coefficient, iterations };
+        let layout = slot::MegaScratchLayout {
+            max_len,
+            max_ax_len,
+            max_dim,
+        };
+        let scalars = AuroraUpdateScalars {
+            mu,
+            learning_rate,
+            weight_decay,
+            average_coefficient,
+            iterations,
+        };
         let matrix = thread::blockIdx_y();
         let matrix_count = thread::gridDim_y();
         let mut phase = 0;
@@ -58,7 +72,11 @@ pub(crate) mod module {
                         slots,
                         scratch,
                         layout,
-                        AuroraMatrixTiles { a_tile: &mut A_TILE, b_tile: &mut B_TILE, warp_sums: &mut WARP_SUMS },
+                        AuroraMatrixTiles {
+                            a_tile: &mut A_TILE,
+                            b_tile: &mut B_TILE,
+                            warp_sums: &mut WARP_SUMS,
+                        },
                         scalars,
                     );
                 }

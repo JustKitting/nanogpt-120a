@@ -44,7 +44,11 @@ fn layer_norm_backward_params_match_reference() -> Result<(), Box<dyn Error>> {
     })?;
 
     let (expected_weight, expected_bias) = reference_param_grads(&x, &dy, &mean, &inv_std);
-    common::assert_slice_close(&d_weight_dev.to_host_vec(&stream)?, &expected_weight, 1.0e-7);
+    common::assert_slice_close(
+        &d_weight_dev.to_host_vec(&stream)?,
+        &expected_weight,
+        1.0e-7,
+    );
     common::assert_slice_close(&d_bias_dev.to_host_vec(&stream)?, &expected_bias, 1.0e-7);
     Ok(())
 }

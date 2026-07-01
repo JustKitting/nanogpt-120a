@@ -37,14 +37,21 @@ pub(super) fn ranked_tsv(proposal: &Proposal) -> String {
     );
     let selected_key = proposal.candidate.key();
     for (rank, scored) in proposal.ranked.iter().enumerate() {
-        push_ranked_row(&mut text, rank, scored, scored.candidate.key() == selected_key);
+        push_ranked_row(
+            &mut text,
+            rank,
+            scored,
+            scored.candidate.key() == selected_key,
+        );
     }
     text
 }
 
 fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, selected: bool) {
-    let [quality_value, quality_z, quality_uncertainty] = prediction_columns(scored.score.predicted_quality);
-    let [stability_value, stability_z, stability_uncertainty] = prediction_columns(scored.score.predicted_stability);
+    let [quality_value, quality_z, quality_uncertainty] =
+        prediction_columns(scored.score.predicted_quality);
+    let [stability_value, stability_z, stability_uncertainty] =
+        prediction_columns(scored.score.predicted_stability);
     let score_columns = score_columns(&scored.score);
     text.push_str(&format!(
         "{}\t{}\t{}\t{}\t{}\t{:.8}\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -66,8 +73,12 @@ fn push_ranked_row(text: &mut String, rank: usize, scored: &ScoredCandidate, sel
 fn score_columns(score: &CandidateScore) -> String {
     format!(
         "{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}",
-        score.score, score.expected_quality, score.survival_prior,
-        score.probability_improvement, score.expected_improvement, score.uncertainty
+        score.score,
+        score.expected_quality,
+        score.survival_prior,
+        score.probability_improvement,
+        score.expected_improvement,
+        score.uncertainty
     )
 }
 
@@ -84,10 +95,12 @@ fn fmt_prediction(value: Option<Prediction>) -> String {
 
 fn prediction_columns(prediction: Option<Prediction>) -> [String; 3] {
     prediction
-        .map(|prediction| [
-            format!("{:.8}", prediction.value),
-            format!("{:.8}", prediction.standard_score),
-            format!("{:.8}", prediction.uncertainty),
-        ])
+        .map(|prediction| {
+            [
+                format!("{:.8}", prediction.value),
+                format!("{:.8}", prediction.standard_score),
+                format!("{:.8}", prediction.uncertainty),
+            ]
+        })
         .unwrap_or_default()
 }

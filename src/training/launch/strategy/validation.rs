@@ -4,7 +4,7 @@ use burn::train::{SupervisedTrainingEventProcessor, ValidLoader};
 
 use super::super::super::Trainer;
 use super::super::{
-    data_loader::CudaValidationInput, metrics::CudaValidOutput, CudaLearningComponents,
+    CudaLearningComponents, data_loader::CudaValidationInput, metrics::CudaValidOutput,
 };
 use super::events::process_valid_step;
 use crate::AppResult;

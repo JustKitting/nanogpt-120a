@@ -18,8 +18,12 @@ pub(super) fn tensor_update_stats(
 
     for i in 0..pending.len {
         let grad = pending.grad[i];
-        let decoded_before =
-            nvfp4_host_value(&pending.before_bytes, &pending.before_scales, pending.before_global, i);
+        let decoded_before = nvfp4_host_value(
+            &pending.before_bytes,
+            &pending.before_scales,
+            pending.before_global,
+            i,
+        );
         let before = pending
             .adam
             .as_ref()
@@ -29,7 +33,13 @@ pub(super) fn tensor_update_stats(
         let delta = after - before;
         let (predicted_delta, quant_error) = match pending.adam.as_ref() {
             Some(adam) => {
-                let predicted_z = adam_predicted_next(adam.z_master[i], grad, adam.first[i], adam.second[i], adam);
+                let predicted_z = adam_predicted_next(
+                    adam.z_master[i],
+                    grad,
+                    adam.first[i],
+                    adam.second[i],
+                    adam,
+                );
                 let predicted_x = before + adam.average_coefficient * (predicted_z - before);
                 (predicted_x - before, after - predicted_x)
             }
@@ -48,8 +58,11 @@ pub(super) fn tensor_update_stats(
     let quant_error_rms = rms(totals.quant_error_sum_sq, len);
     let update_to_weight_rms = ratio_or_zero(delta_rms, weight_rms_before);
     let quant_error_to_predicted_delta_rms = ratio_or_zero(quant_error_rms, predicted_delta_rms);
-    let delta_grad_cos =
-        cosine_or_zero(totals.grad_dot_delta, totals.grad_sum_sq, totals.delta_sum_sq);
+    let delta_grad_cos = cosine_or_zero(
+        totals.grad_dot_delta,
+        totals.grad_sum_sq,
+        totals.delta_sum_sq,
+    );
     let predicted_delta_grad_cos = cosine_or_zero(
         totals.grad_dot_predicted_delta,
         totals.grad_sum_sq,

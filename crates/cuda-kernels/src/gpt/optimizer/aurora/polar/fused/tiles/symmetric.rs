@@ -1,13 +1,15 @@
 #![expect(clippy::too_many_arguments, reason = "CUDA ABI uses explicit buffers")]
 
-use cuda_device::{thread, SharedArray};
+use cuda_device::{SharedArray, thread};
 
-use crate::f16_tc_matmul::cta_tile::{CtaTile, CTA_A_ELEMS, CTA_B_ELEMS, CTA_M};
+use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_B_ELEMS, CTA_M, CtaTile};
 use crate::float_ptx::sqrt_f32;
 
 use super::super::super::super::super::work_grid::WorkGrid;
 use super::super::coefficients::Coefficients;
-use super::super::store::{store_plain_tile, store_plain_transposed_tile, store_symmetric_polynomial_tile};
+use super::super::store::{
+    store_plain_tile, store_plain_transposed_tile, store_symmetric_polynomial_tile,
+};
 use super::compute_tile;
 
 macro_rules! for_upper_triangle_tiles {

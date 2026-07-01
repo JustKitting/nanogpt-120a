@@ -3,8 +3,8 @@ use cuda_core::DriverError;
 use crate::launch::{grid_x_config, launch_config};
 use crate::mma::{
     NVFP4_PROJECTION_CTA_THREADS, NVFP4_PROJECTION_THREADS_PER_BLOCK, Nvfp4ProjectionParams,
-    projection_cta_grid_dim,
-    projection_cta_row_pair_tile_count, projection_cta_shape_aligned, projection_grid_dim,
+    projection_cta_grid_dim, projection_cta_row_pair_tile_count, projection_cta_shape_aligned,
+    projection_grid_dim,
 };
 use crate::nvfp4_tc_matmul::nvfp4_tc_matmul_padded_k;
 
@@ -12,14 +12,24 @@ use super::{LinearBackwardDeviceScaleArgs, LinearBackwardModule};
 
 macro_rules! device_scale_projection {
     ($this:expr, $args:ident, $input:ident, $weight:ident, $out:ident, rows: $rows:expr, k: $k:expr) => {
-        $this.module.projection.linear_backward_projection_device_scale_kernel(
-            $args.stream,
-            launch_config(projection_grid_dim($rows, $args.input_dim), NVFP4_PROJECTION_THREADS_PER_BLOCK),
-            $args.$input.bytes, $args.$input.scales, $args.$input.global_scales,
-            $args.$weight.bytes, $args.$weight.scales, $args.$weight.global_scale,
-            $args.$out,
-            Nvfp4ProjectionParams::new($rows, $k, $args.input_dim).with_global_scales(1.0, 0.0),
-        )
+        $this
+            .module
+            .projection
+            .linear_backward_projection_device_scale_kernel(
+                $args.stream,
+                launch_config(
+                    projection_grid_dim($rows, $args.input_dim),
+                    NVFP4_PROJECTION_THREADS_PER_BLOCK,
+                ),
+                $args.$input.bytes,
+                $args.$input.scales,
+                $args.$input.global_scales,
+                $args.$weight.bytes,
+                $args.$weight.scales,
+                $args.$weight.global_scale,
+                $args.$out,
+                Nvfp4ProjectionParams::new($rows, $k, $args.input_dim).with_global_scales(1.0, 0.0),
+            )
     };
 }
 
@@ -77,8 +87,10 @@ impl LinearBackwardModule {
                 args.dweight,
                 dweight_grid.0 - 1,
                 dweight_grid.0.trailing_zeros(),
-                Nvfp4ProjectionParams::new(args.token_count, dinput_k, args.input_dim).with_global_scales(1.0, 0.0),
-                Nvfp4ProjectionParams::new(args.output_dim, dweight_k, args.input_dim).with_global_scales(1.0, 0.0),
+                Nvfp4ProjectionParams::new(args.token_count, dinput_k, args.input_dim)
+                    .with_global_scales(1.0, 0.0),
+                Nvfp4ProjectionParams::new(args.output_dim, dweight_k, args.input_dim)
+                    .with_global_scales(1.0, 0.0),
             )
     }
 }

@@ -8,8 +8,11 @@ use crate::warp_reduce::thread_lane_warp;
 use super::{THREADS_PER_BLOCK, WARP_SUM_SLOTS};
 
 pub(super) fn grad_clip_scale_body(
-    chunk_sums: &[f32], scale: &mut DisjointSlice<f32>, norm_out: &mut DisjointSlice<f32>,
-    chunk_count: u32, max_norm: f32,
+    chunk_sums: &[f32],
+    scale: &mut DisjointSlice<f32>,
+    norm_out: &mut DisjointSlice<f32>,
+    chunk_count: u32,
+    max_norm: f32,
 ) {
     static mut WARP_SUMS: SharedArray<f32, WARP_SUM_SLOTS> = SharedArray::UNINIT;
 

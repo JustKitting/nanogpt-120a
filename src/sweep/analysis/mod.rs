@@ -15,7 +15,7 @@ use super::{config::SweepConfig, history::Trial};
 pub use beliefs::factor_beliefs;
 pub use regression::Prediction;
 pub use report::write;
-pub use scoring::{score_candidate, CandidateScore};
+pub use scoring::{CandidateScore, score_candidate};
 
 #[derive(Clone, Debug)]
 pub struct SweepAnalysis {

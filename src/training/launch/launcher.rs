@@ -4,19 +4,19 @@ use burn::data::dataloader::DataLoader;
 use burn::train::logger::FileMetricLogger;
 use burn::train::{Interrupter, Learner, SupervisedTraining, TrainingStrategy};
 
+use super::CudaLearningComponents;
 use super::burn_shim::{
     BurnBackend, BurnInnerBackend, CudaBurnModel, CudaNoopOptimizer, CudaTrainInput, CudaValidInput,
 };
 use super::config::TrainConfig;
 use super::data_loader::{CudaTrainDataLoader, CudaValidDataLoader};
 use super::metrics::register_cuda_metrics;
-use super::output::{build_run_info, RunOutput};
-use super::render::{default_renderer, BoxedMetricsRenderer};
+use super::output::{RunOutput, build_run_info};
+use super::render::{BoxedMetricsRenderer, default_renderer};
 use super::strategy::CudaTrainingStrategy;
-use super::CudaLearningComponents;
-use crate::training::data::VALIDATION_WINDOWS;
-use crate::training::{debug_metrics, TokenDataLoader};
 use crate::AppResult;
+use crate::training::data::VALIDATION_WINDOWS;
+use crate::training::{TokenDataLoader, debug_metrics};
 
 pub(crate) fn launch_from_env() -> AppResult {
     let (dataset, data) = TokenDataLoader::from_training_dataset()?;

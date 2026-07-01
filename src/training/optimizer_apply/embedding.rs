@@ -2,9 +2,9 @@ use cuda_core::{CudaStream, DriverError};
 use gpt2_nvfp4::GPT2_EMBEDDING_DIM;
 use rust_kernels_cuda::optimizer::{EmbeddingLookupGradArgs, OptimizerModule};
 
+use super::super::TokenBatch;
 use super::super::grads::BackwardBuffers;
 use super::super::next_latent::NextLatGradBuffers;
-use super::super::TokenBatch;
 
 pub(super) fn add_embedding_lookup_grad(
     stream: &CudaStream,

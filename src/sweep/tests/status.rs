@@ -31,7 +31,9 @@ fn records_sweep_owned_trial_status_and_events() {
 }
 
 fn status_timestamp(text: &str) -> &str {
-    text.lines().find_map(|line| line.strip_prefix("UPDATED_AT_UTC=")).unwrap()
+    text.lines()
+        .find_map(|line| line.strip_prefix("UPDATED_AT_UTC="))
+        .unwrap()
 }
 
 fn event_timestamp(text: &str) -> &str {

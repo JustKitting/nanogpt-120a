@@ -3,5 +3,10 @@ mod call;
 #[path = "ms_eden/scratch.rs"]
 mod scratch;
 
-pub use call::{LinearBackwardInputTranspose, LinearBackwardMsEdenArgs, LinearBackwardWeightTranspose};
-pub use scratch::{LinearBackwardMsEdenScratch, LinearBackwardMsEdenScratchBuffers, MsEdenOperandScratch, MsEdenOperandScratchBuffer};
+pub use call::{
+    LinearBackwardInputTranspose, LinearBackwardMsEdenArgs, LinearBackwardWeightTranspose,
+};
+pub use scratch::{
+    LinearBackwardMsEdenScratch, LinearBackwardMsEdenScratchBuffers, MsEdenOperandScratch,
+    MsEdenOperandScratchBuffer,
+};

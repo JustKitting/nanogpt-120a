@@ -4,7 +4,11 @@ use crate::attention::CausalAttentionParams;
 use crate::f16_tc_matmul::convert::cvt_rn_f16_f32;
 use crate::f16_tc_matmul::cta_tile::{CTA_A_ELEMS, CTA_K, CTA_THREADS};
 use crate::kda_common::chunk_matrix_index;
-use crate::kda_tc::{CtaATile, CtaTiles, KdaChunkTileCtx, MatrixTileCtx, StateTileLayout, StateTileSource, stage_compact_a, stage_compact_b_t as stage_vnew_b_t_slice, stage_state_b_t, store_hidden_output_quads, tc_stage_loop};
+use crate::kda_tc::{
+    CtaATile, CtaTiles, KdaChunkTileCtx, MatrixTileCtx, StateTileLayout, StateTileSource,
+    stage_compact_a, stage_compact_b_t as stage_vnew_b_t_slice, stage_state_b_t,
+    store_hidden_output_quads, tc_stage_loop,
+};
 
 pub(in super::super) fn chunk_kda_output_from_state_body(
     q: &[f32],

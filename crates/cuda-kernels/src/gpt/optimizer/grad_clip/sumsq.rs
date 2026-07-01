@@ -8,8 +8,12 @@ use super::layout::slot_for_chunk;
 use super::{THREADS_PER_BLOCK, VALUES_PER_CHUNK, WARP_SUM_SLOTS};
 
 pub(super) fn grad_clip_sumsq_chunks_body(
-    ptrs: &[u64], lens: &[u32], chunk_offsets: &[u32], chunk_sums: &mut DisjointSlice<f32>,
-    slot_count: u32, chunk_count: u32,
+    ptrs: &[u64],
+    lens: &[u32],
+    chunk_offsets: &[u32],
+    chunk_sums: &mut DisjointSlice<f32>,
+    slot_count: u32,
+    chunk_count: u32,
 ) {
     static mut WARP_SUMS: SharedArray<f32, WARP_SUM_SLOTS> = SharedArray::UNINIT;
 

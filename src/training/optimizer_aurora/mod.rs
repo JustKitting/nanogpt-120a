@@ -1,12 +1,12 @@
 //! Host-side Aurora update flow.
 
-mod apply;
 mod groups;
+mod tma;
 
 use gpt2_nvfp4::{GPT2_MLP, GPT2_N_EMBD, GPT2_N_LAYER, GPT2_QKV, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
 
-pub(super) use apply::{AuroraMegaArgs, apply_aurora_mega};
 pub(super) use groups::{AuroraGroupTable, AuroraPointerTables};
+pub(super) use tma::{AuroraTmaArgs, apply_aurora_tma};
 
 const MU: f32 = 0.95;
 const POLAR_ITERATIONS: u32 = 5;
@@ -26,12 +26,12 @@ pub(in crate::training) const fn max_matrix_len() -> usize {
     )
 }
 
-pub(in crate::training) const fn max_polar_ax_len() -> usize {
-    max2(GPT2_N_EMBD * GPT2_N_EMBD, NEXTLAT_HIDDEN * NEXTLAT_HIDDEN)
-}
-
 pub(in crate::training) const fn max_matrix_dim() -> usize {
     max2(GPT2_N_EMBD, NEXTLAT_HIDDEN)
+}
+
+pub(in crate::training) const fn max_polar_cols() -> usize {
+    max3(max2(GPT2_QKV, GPT2_MLP), NEXTLAT_INPUT, NEXTLAT_HIDDEN)
 }
 
 const fn max2(a: usize, b: usize) -> usize {
