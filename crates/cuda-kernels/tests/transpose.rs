@@ -42,10 +42,8 @@ fn input_matrix() -> Vec<f32> {
 
 fn expected_transpose(input: &[f32]) -> Vec<f32> {
     let mut output = vec![0.0_f32; ROWS * COLS];
-    for row in 0..ROWS {
-        for col in 0..COLS {
-            output[col * ROWS + row] = input[row * COLS + col];
-        }
+    for index in 0..ROWS * COLS {
+        output[(index % COLS) * ROWS + index / COLS] = input[index];
     }
     output
 }

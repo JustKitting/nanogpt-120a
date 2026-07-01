@@ -47,10 +47,5 @@ fn nvfp4_decode_transpose_writes_fp32_transpose() -> Result<(), Box<dyn Error>> 
 }
 
 fn expected_rowwise() -> Vec<f32> {
-    let mut output = vec![0.0_f32; ROWS * COLS];
-    for col in 0..COLS {
-        output[col * ROWS] = 1.0;
-        output[col * ROWS + 1] = 2.0;
-    }
-    output
+    (0..COLS).flat_map(|_| [1.0, 2.0]).collect()
 }
