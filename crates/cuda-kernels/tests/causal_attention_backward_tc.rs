@@ -18,8 +18,6 @@ mod shape;
 
 use scratch::TcScratchBuffers;
 
-const TC_TOLERANCE: f32 = 1.0e-6;
-
 #[ignore = "requires generated sm_120a PTX"]
 #[test]
 fn materialized_tc_backward_matches_reference() -> Result<(), Box<dyn Error>> {
@@ -62,24 +60,6 @@ fn materialized_tc_backward_matches_reference() -> Result<(), Box<dyn Error>> {
         head_dim: shape::HEAD_DIM as u32,
     })?;
 
-    assert_tc_close(&tc_grad.to_host_vec(&stream)?, &expected);
+    common::assert_slice_close(&tc_grad.to_host_vec(&stream)?, &expected, 1.0e-6);
     Ok(())
-}
-
-fn assert_tc_close(actual: &[f32], expected: &[f32]) {
-    let mut max_error = 0.0_f32;
-    let mut max_index = 0_usize;
-    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
-        let error = (actual - expected).abs();
-        if error > max_error {
-            max_error = error;
-            max_index = index;
-        }
-    }
-    assert!(
-        max_error <= TC_TOLERANCE,
-        "max_error={max_error:.8e} index={max_index} actual={:.8e} expected={:.8e}",
-        actual[max_index],
-        expected[max_index],
-    );
 }

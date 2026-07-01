@@ -61,7 +61,11 @@ pub fn assert_all_close(actual: &[f32], expected: f32, tolerance: f32) {
 
 pub fn assert_slice_close(actual: &[f32], expected: &[f32], tolerance: f32) {
     assert_eq!(actual.len(), expected.len());
-    for (actual, expected) in actual.iter().zip(expected) {
-        assert_close(*actual, *expected, tolerance);
+    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+        let error = (actual - expected).abs();
+        assert!(
+            error <= tolerance,
+            "index={index} actual={actual:.8e} expected={expected:.8e} error={error:.8e} tolerance={tolerance:.8e}"
+        );
     }
 }
