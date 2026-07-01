@@ -15,7 +15,7 @@ mod common;
 mod scratch;
 
 use common::cuda_test_context;
-use common::upload::{upload_block, upload_layer_norm, upload_nvfp4, TestResult};
+use common::upload::{block::upload_block, upload_layer_norm, upload_nvfp4, TestResult};
 use scratch::ForwardScratch;
 
 #[ignore = "requires generated sm_120a PTX"]
