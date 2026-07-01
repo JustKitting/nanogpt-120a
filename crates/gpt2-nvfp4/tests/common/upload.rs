@@ -102,7 +102,7 @@ pub fn upload_layer_norm(
     stream: &CudaStream,
     layer_norm: &LayerNormWeights,
 ) -> TestResult<UploadedLayerNorm> {
-    Ok(uploaded_pair(upload_nvfp4(stream, &layer_norm.weight)?, upload_nvfp4(stream, &layer_norm.bias)?))
+    Ok(UploadedPair { weight: upload_nvfp4(stream, &layer_norm.weight)?, bias: upload_nvfp4(stream, &layer_norm.bias)? })
 }
 
 pub fn upload_nvfp4<S: Nvfp4Shape>(
@@ -136,9 +136,5 @@ fn upload_linear<W: Nvfp4Shape, B: Nvfp4Shape>(
     stream: &CudaStream,
     linear: &gpt2_nvfp4::LinearWeights<W, B>,
 ) -> TestResult<UploadedLinear> {
-    Ok(uploaded_pair(upload_nvfp4(stream, &linear.weight)?, upload_nvfp4(stream, &linear.bias)?))
-}
-
-fn uploaded_pair(weight: UploadedNvfp4, bias: UploadedNvfp4) -> UploadedPair {
-    UploadedPair { weight, bias }
+    Ok(UploadedPair { weight: upload_nvfp4(stream, &linear.weight)?, bias: upload_nvfp4(stream, &linear.bias)? })
 }
