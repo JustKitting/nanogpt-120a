@@ -2,6 +2,7 @@ mod burn_shim;
 mod config;
 mod data_loader;
 mod launcher;
+mod loss_plot;
 mod metrics;
 mod output;
 mod render;

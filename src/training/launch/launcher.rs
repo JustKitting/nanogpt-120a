@@ -10,6 +10,7 @@ use super::burn_shim::{
 };
 use super::config::TrainConfig;
 use super::data_loader::{CudaTrainDataLoader, CudaValidDataLoader};
+use super::loss_plot::write_loss_plot;
 use super::metrics::register_cuda_metrics;
 use super::output::{RunOutput, build_run_info};
 use super::render::{BoxedMetricsRenderer, default_renderer};
@@ -64,6 +65,9 @@ pub(crate) fn launch_from_env() -> AppResult {
     let burn_device = Default::default();
     let learner = Learner::new(CudaBurnModel::new(&burn_device), CudaNoopOptimizer, 0.0);
     let _learning_result = training.launch(learner);
+    if let Some(path) = write_loss_plot(&run_output)? {
+        println!("loss_plot={}", path.display());
+    }
 
     match strategy_result.lock().unwrap().take() {
         Some(Ok(())) => Ok(()),
