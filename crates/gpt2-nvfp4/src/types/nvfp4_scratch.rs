@@ -9,7 +9,7 @@ pub struct RowwiseNvfp4Scratch<'a> {
 }
 
 impl<'a> RowwiseNvfp4Scratch<'a> {
-    pub(crate) fn quantize_precomputed_amax(
+    pub fn quantize_precomputed_amax(
         &mut self,
         quant_module: &Nvfp4QuantModule,
         stream: &CudaStream,
@@ -30,7 +30,7 @@ impl<'a> RowwiseNvfp4Scratch<'a> {
         })
     }
 
-    pub(crate) fn quantize_row_amax(
+    pub fn quantize_row_amax(
         &mut self,
         quant_module: &Nvfp4QuantModule,
         stream: &CudaStream,

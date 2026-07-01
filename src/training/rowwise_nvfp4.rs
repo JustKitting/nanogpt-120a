@@ -10,12 +10,6 @@ pub(crate) struct RowwiseNvfp4Buffers {
     global_scales: DeviceBuffer<f32>,
 }
 
-pub(crate) struct RowwiseNvfp4Out<'a> {
-    pub bytes: &'a mut DeviceBuffer<u8>,
-    pub scales: &'a mut DeviceBuffer<u8>,
-    pub global_scales: &'a mut DeviceBuffer<f32>,
-}
-
 impl RowwiseNvfp4Buffers {
     pub(crate) fn new(
         stream: &CudaStream,
@@ -51,13 +45,5 @@ impl RowwiseNvfp4Buffers {
 
     pub(crate) fn saved(&self) -> Nvfp4RowwiseDeviceTensor<'_> {
         self.rowwise()
-    }
-
-    pub(crate) fn out(&mut self) -> RowwiseNvfp4Out<'_> {
-        RowwiseNvfp4Out {
-            bytes: &mut self.bytes,
-            scales: &mut self.scales,
-            global_scales: &mut self.global_scales,
-        }
     }
 }
