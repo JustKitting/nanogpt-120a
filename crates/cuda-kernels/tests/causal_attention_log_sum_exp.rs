@@ -39,12 +39,10 @@ fn causal_attention_batch_isolation() -> Result<(), Box<dyn Error>> {
     let first = run_attention(&stream, &module, sample_qkv(0.25), 2)?;
     let second = run_attention(&stream, &module, sample_qkv(8.0), 2)?;
 
-    let sample0_out_len = TOKEN_COUNT * EMBEDDING_DIM;
-    let sample0_log_sum_exp_len = HEAD_COUNT * TOKEN_COUNT;
-    assert_eq!(bits(&first.out[..sample0_out_len]), bits(&second.out[..sample0_out_len]));
+    assert_eq!(bits(&first.out[..TOKEN_COUNT * EMBEDDING_DIM]), bits(&second.out[..TOKEN_COUNT * EMBEDDING_DIM]));
     assert_eq!(
-        bits(&first.log_sum_exp[..sample0_log_sum_exp_len]),
-        bits(&second.log_sum_exp[..sample0_log_sum_exp_len])
+        bits(&first.log_sum_exp[..HEAD_COUNT * TOKEN_COUNT]),
+        bits(&second.log_sum_exp[..HEAD_COUNT * TOKEN_COUNT])
     );
 
     Ok(())
@@ -87,8 +85,7 @@ fn run_attention(
 }
 
 fn sample_qkv(sample1_scale: f32) -> Vec<f32> {
-    const BATCH_SIZE: usize = 2;
-    let mut qkv = vec![0.0_f32; BATCH_SIZE * TOKEN_COUNT * QKV_DIM];
+    let mut qkv = vec![0.0_f32; 2 * TOKEN_COUNT * QKV_DIM];
     fill_sample(&mut qkv, 0, 1.0);
     fill_sample(&mut qkv, 1, sample1_scale);
     qkv
