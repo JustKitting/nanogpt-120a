@@ -59,8 +59,7 @@ impl Nvfp4TcMatmulModule {
             &mut scratch.a,
             args.m,
             padded_k,
-            args.sign_seed,
-            args.scale_seed,
+            (args.sign_seed, args.scale_seed),
         )?;
         quantize_operand(
             args.quant_module,
@@ -69,8 +68,7 @@ impl Nvfp4TcMatmulModule {
             &mut scratch.b_t,
             args.n,
             padded_k,
-            args.sign_seed,
-            args.scale_seed ^ 0x9e37_79b9,
+            (args.sign_seed, args.scale_seed ^ 0x9e37_79b9),
         )?;
 
         let a = scratch.a.rowwise();

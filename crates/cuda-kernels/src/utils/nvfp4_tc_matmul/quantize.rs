@@ -10,8 +10,7 @@ pub(super) fn quantize_operand(
     scratch: &mut Nvfp4TcMatmulOperand<'_>,
     row_count: u32,
     row_len: u32,
-    sign_seed: u32,
-    scale_seed: u32,
+    (sign_seed, scale_seed): (u32, u32),
 ) -> Result<(), DriverError> {
     module.fp32_to_nvfp4_quartet_backward_ms_eden_with_global_scale(
         QuartetBackwardMsEdenQuantArgs {
