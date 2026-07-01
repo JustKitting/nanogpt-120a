@@ -1,7 +1,7 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
 use rust_kernels_cuda::attention::CausalAttentionBackwardTcScratch;
 
-use super::shape::{HEAD_DIM, HEADS, TOKEN_COUNT};
+use super::shape::{HEADS, HEAD_DIM, TOKEN_COUNT};
 
 pub struct TcScratchBuffers {
     q_f32: DeviceBuffer<f32>,
@@ -31,26 +31,26 @@ impl TcScratchBuffers {
         let compact = HEADS * TOKEN_COUNT * HEAD_DIM;
         let square = HEADS * TOKEN_COUNT * TOKEN_COUNT;
         Ok(Self {
-            q_f32: zero(stream, compact)?,
-            k_f32: zero(stream, compact)?,
-            v_f32: zero(stream, compact)?,
-            g_f32: zero(stream, compact)?,
-            q: zero(stream, compact)?,
-            k: zero(stream, compact)?,
-            v: zero(stream, compact)?,
-            d_out: zero(stream, compact)?,
-            scores: zero(stream, square)?,
-            dot: zero(stream, square)?,
-            p: zero(stream, square)?,
-            ds: zero(stream, square)?,
-            d_q: zero(stream, compact)?,
-            d_k: zero(stream, compact)?,
-            d_v: zero(stream, compact)?,
-            kda_d_q: zero(stream, compact)?,
-            kda_d_k: zero(stream, compact)?,
-            kda_d_v: zero(stream, compact)?,
-            kda_d_g: zero(stream, compact)?,
-            kda_d_beta: zero(stream, TOKEN_COUNT * HEADS)?,
+            q_f32: DeviceBuffer::zeroed(stream, compact)?,
+            k_f32: DeviceBuffer::zeroed(stream, compact)?,
+            v_f32: DeviceBuffer::zeroed(stream, compact)?,
+            g_f32: DeviceBuffer::zeroed(stream, compact)?,
+            q: DeviceBuffer::zeroed(stream, compact)?,
+            k: DeviceBuffer::zeroed(stream, compact)?,
+            v: DeviceBuffer::zeroed(stream, compact)?,
+            d_out: DeviceBuffer::zeroed(stream, compact)?,
+            scores: DeviceBuffer::zeroed(stream, square)?,
+            dot: DeviceBuffer::zeroed(stream, square)?,
+            p: DeviceBuffer::zeroed(stream, square)?,
+            ds: DeviceBuffer::zeroed(stream, square)?,
+            d_q: DeviceBuffer::zeroed(stream, compact)?,
+            d_k: DeviceBuffer::zeroed(stream, compact)?,
+            d_v: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_q: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_k: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_v: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_g: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_beta: DeviceBuffer::zeroed(stream, TOKEN_COUNT * HEADS)?,
         })
     }
 
@@ -78,11 +78,4 @@ impl TcScratchBuffers {
             kda_d_beta: &mut self.kda_d_beta,
         }
     }
-}
-
-fn zero<T: cuda_core::DeviceCopy>(
-    stream: &CudaStream,
-    len: usize,
-) -> Result<DeviceBuffer<T>, DriverError> {
-    DeviceBuffer::zeroed(stream, len)
 }

@@ -15,9 +15,9 @@ impl RowwiseNvfp4ScratchBuffers {
         row_count: usize,
     ) -> Result<Self, DriverError> {
         Ok(Self {
-            bytes: zero(stream, element_count / 2)?,
-            scales: zero(stream, element_count / 16)?,
-            global_scales: zero(stream, row_count)?,
+            bytes: DeviceBuffer::zeroed(stream, element_count / 2)?,
+            scales: DeviceBuffer::zeroed(stream, element_count / 16)?,
+            global_scales: DeviceBuffer::zeroed(stream, row_count)?,
         })
     }
 
@@ -52,13 +52,13 @@ impl CausalAttentionTcScratchBuffers {
     ) -> Result<Self, DriverError> {
         let square = batch_size * head_count * seq_len * seq_len;
         Ok(Self {
-            q: zero(stream, compact_len)?,
-            k: zero(stream, compact_len)?,
-            v: zero(stream, compact_len)?,
-            scores: zero(stream, square)?,
-            probs: zero(stream, square)?,
-            compact_out: zero(stream, compact_len)?,
-            chunk_states: zero(stream, compact_len)?,
+            q: DeviceBuffer::zeroed(stream, compact_len)?,
+            k: DeviceBuffer::zeroed(stream, compact_len)?,
+            v: DeviceBuffer::zeroed(stream, compact_len)?,
+            scores: DeviceBuffer::zeroed(stream, square)?,
+            probs: DeviceBuffer::zeroed(stream, square)?,
+            compact_out: DeviceBuffer::zeroed(stream, compact_len)?,
+            chunk_states: DeviceBuffer::zeroed(stream, compact_len)?,
         })
     }
 
@@ -73,11 +73,4 @@ impl CausalAttentionTcScratchBuffers {
             chunk_states: &mut self.chunk_states,
         }
     }
-}
-
-fn zero<T: cuda_core::DeviceCopy>(
-    stream: &CudaStream,
-    len: usize,
-) -> Result<DeviceBuffer<T>, DriverError> {
-    DeviceBuffer::zeroed(stream, len)
 }

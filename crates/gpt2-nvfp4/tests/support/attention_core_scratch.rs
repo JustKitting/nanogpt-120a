@@ -31,27 +31,27 @@ impl AttentionCoreScratchBuffers {
         let compact = GPT2_BATCH_SIZE * GPT2_SEQ_LEN * GPT2_N_EMBD;
         let square = GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN * GPT2_SEQ_LEN;
         Ok(Self {
-            softmax_d: zero(stream, GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN)?,
-            q_f32: zero(stream, compact)?,
-            k_f32: zero(stream, compact)?,
-            v_f32: zero(stream, compact)?,
-            g_f32: zero(stream, compact)?,
-            q: zero(stream, compact)?,
-            k: zero(stream, compact)?,
-            v: zero(stream, compact)?,
-            d_out: zero(stream, compact)?,
-            scores: zero(stream, square)?,
-            dot: zero(stream, square)?,
-            p: zero(stream, square)?,
-            ds: zero(stream, square)?,
-            d_q: zero(stream, compact)?,
-            d_k: zero(stream, compact)?,
-            d_v: zero(stream, compact)?,
-            kda_d_q: zero(stream, compact)?,
-            kda_d_k: zero(stream, compact)?,
-            kda_d_v: zero(stream, compact)?,
-            kda_d_g: zero(stream, compact)?,
-            kda_d_beta: zero(stream, GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN)?,
+            softmax_d: DeviceBuffer::zeroed(stream, GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN)?,
+            q_f32: DeviceBuffer::zeroed(stream, compact)?,
+            k_f32: DeviceBuffer::zeroed(stream, compact)?,
+            v_f32: DeviceBuffer::zeroed(stream, compact)?,
+            g_f32: DeviceBuffer::zeroed(stream, compact)?,
+            q: DeviceBuffer::zeroed(stream, compact)?,
+            k: DeviceBuffer::zeroed(stream, compact)?,
+            v: DeviceBuffer::zeroed(stream, compact)?,
+            d_out: DeviceBuffer::zeroed(stream, compact)?,
+            scores: DeviceBuffer::zeroed(stream, square)?,
+            dot: DeviceBuffer::zeroed(stream, square)?,
+            p: DeviceBuffer::zeroed(stream, square)?,
+            ds: DeviceBuffer::zeroed(stream, square)?,
+            d_q: DeviceBuffer::zeroed(stream, compact)?,
+            d_k: DeviceBuffer::zeroed(stream, compact)?,
+            d_v: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_q: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_k: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_v: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_g: DeviceBuffer::zeroed(stream, compact)?,
+            kda_d_beta: DeviceBuffer::zeroed(stream, GPT2_BATCH_SIZE * GPT2_N_HEAD * GPT2_SEQ_LEN)?,
         })
     }
 
@@ -82,11 +82,4 @@ impl AttentionCoreScratchBuffers {
             },
         }
     }
-}
-
-fn zero<T: cuda_core::DeviceCopy>(
-    stream: &CudaStream,
-    len: usize,
-) -> Result<DeviceBuffer<T>, DriverError> {
-    DeviceBuffer::zeroed(stream, len)
 }
