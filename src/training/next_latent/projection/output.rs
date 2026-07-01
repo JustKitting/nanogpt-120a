@@ -1,5 +1,5 @@
 use cuda_core::DriverError;
-use gpt2_nvfp4::{GPT2_N_EMBD, NEXTLAT_HIDDEN};
+use gpt2_nvfp4::{GPT2_EMBEDDING_DIM, NEXTLAT_HIDDEN_DIM};
 use rust_kernels_cuda::next_latent::{
     NextLatProjectionArgs, NextLatResidualAddArgs, NextLatSmoothL1Args,
 };
@@ -16,15 +16,15 @@ pub(in crate::training::next_latent) fn output_and_loss(
         bias: args.weights.output_projection.bias.device(),
         out: &mut args.buffers.delta,
         token_count: args.row_count,
-        input_dim: NEXTLAT_HIDDEN as u32,
-        output_dim: GPT2_N_EMBD as u32,
+        input_dim: NEXTLAT_HIDDEN_DIM,
+        output_dim: GPT2_EMBEDDING_DIM,
     })?;
     args.next_latent.residual_add(NextLatResidualAddArgs {
         stream: args.stream,
         delta: &args.buffers.delta,
         residual: args.current_states,
         out: &mut args.buffers.predicted,
-        len: args.row_count * GPT2_N_EMBD as u32,
+        len: args.row_count * GPT2_EMBEDDING_DIM,
     })?;
     args.next_latent.smooth_l1(NextLatSmoothL1Args {
         stream: args.stream,
@@ -34,7 +34,7 @@ pub(in crate::training::next_latent) fn output_and_loss(
         d_predicted_next_states: &mut args.buffers.d_predicted,
         batch_size: args.batch_size,
         seq_len: args.seq_len,
-        embedding_dim: GPT2_N_EMBD as u32,
+        embedding_dim: GPT2_EMBEDDING_DIM,
         lambda: args.lambda,
     })
 }

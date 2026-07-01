@@ -1,5 +1,5 @@
 use cuda_core::DriverError;
-use gpt2_nvfp4::{NEXTLAT_HIDDEN, NEXTLAT_INPUT};
+use gpt2_nvfp4::{NEXTLAT_HIDDEN_DIM, NEXTLAT_INPUT_DIM};
 use rust_kernels_cuda::next_latent::{NextLatGeluArgs, NextLatProjectionArgs};
 
 use super::super::forward::NextLatForwardArgs;
@@ -15,14 +15,14 @@ pub(in crate::training::next_latent) fn projection_gelu1(
         bias: args.weights.input_projection.bias.device(),
         out: &mut args.buffers.pre1,
         token_count: args.row_count,
-        input_dim: NEXTLAT_INPUT as u32,
-        output_dim: NEXTLAT_HIDDEN as u32,
+        input_dim: NEXTLAT_INPUT_DIM,
+        output_dim: NEXTLAT_HIDDEN_DIM,
     })?;
     args.next_latent.gelu(NextLatGeluArgs {
         stream: args.stream,
         input: &args.buffers.pre1,
         out: &mut args.buffers.act1,
-        len: args.row_count * NEXTLAT_HIDDEN as u32,
+        len: args.row_count * NEXTLAT_HIDDEN_DIM,
     })?;
     let buffers = &mut args.buffers;
     quantize_activation(
@@ -43,14 +43,14 @@ pub(in crate::training::next_latent) fn projection_gelu2(
         bias: args.weights.transition.bias.device(),
         out: &mut args.buffers.pre2,
         token_count: args.row_count,
-        input_dim: NEXTLAT_HIDDEN as u32,
-        output_dim: NEXTLAT_HIDDEN as u32,
+        input_dim: NEXTLAT_HIDDEN_DIM,
+        output_dim: NEXTLAT_HIDDEN_DIM,
     })?;
     args.next_latent.gelu(NextLatGeluArgs {
         stream: args.stream,
         input: &args.buffers.pre2,
         out: &mut args.buffers.act2,
-        len: args.row_count * NEXTLAT_HIDDEN as u32,
+        len: args.row_count * NEXTLAT_HIDDEN_DIM,
     })?;
     let buffers = &mut args.buffers;
     quantize_activation(

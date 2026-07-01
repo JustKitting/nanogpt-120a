@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DriverError};
-use gpt2_nvfp4::{uses_full_attention, AttentionDims, GPT2_TOKEN_ROWS};
+use gpt2_nvfp4::{uses_full_attention, AttentionDims, GPT2_TOKEN_ROWS_U32};
 use rust_kernels_cuda::optimizer::KdaAuroraClipArgs;
 
 use crate::training::runtime::Runtime;
@@ -40,7 +40,7 @@ pub(super) fn apply_kda_aurora_clip(
                 scores: &mut scratch.kda_clip_scores,
                 amax: &mut scratch.amax,
                 chunk_amax: &mut scratch.chunk_amax,
-                row_count: GPT2_TOKEN_ROWS as u32,
+                row_count: GPT2_TOKEN_ROWS_U32,
                 qkv_dim: dims.qkv_dim,
                 input_dim: dims.embedding_dim,
                 embedding_dim: dims.embedding_dim,

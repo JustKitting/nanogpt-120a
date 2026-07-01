@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_LAYER_NORM_EPSILON, GPT2_N_EMBD, NEXTLAT_INPUT};
+use gpt2_nvfp4::{GPT2_EMBEDDING_DIM, GPT2_LAYER_NORM_EPSILON, NEXTLAT_INPUT_DIM};
 use rust_kernels_cuda::embedding::{EmbeddingArgs, EmbeddingModule};
 use rust_kernels_cuda::layer_norm::{GptLayerNormArgs, LayerNormModule};
 use rust_kernels_cuda::next_latent::{NextLatConcatArgs, NextLatModule};
@@ -36,7 +36,7 @@ pub fn forward(mut args: NextLatForwardArgs<'_, '_>) -> Result<(), DriverError> 
         current_states: args.current_states,
         out: &mut args.buffers.concat,
         row_count: args.row_count,
-        embedding_dim: GPT2_N_EMBD as u32,
+        embedding_dim: GPT2_EMBEDDING_DIM,
     })?;
     norm_and_quantize_input(&mut args)?;
     projection_gelu1(&mut args)?;
@@ -50,8 +50,8 @@ fn lookup_next_tokens(args: &mut NextLatForwardArgs<'_, '_>) -> Result<(), Drive
         tokens: args.targets,
         token_embedding: args.token_embedding,
         residual: &mut args.buffers.next_token_embeddings,
-        hidden_len: args.row_count * GPT2_N_EMBD as u32,
-        embedding_dim: GPT2_N_EMBD as u32,
+        hidden_len: args.row_count * GPT2_EMBEDDING_DIM,
+        embedding_dim: GPT2_EMBEDDING_DIM,
     })
 }
 
@@ -66,7 +66,7 @@ fn norm_and_quantize_input(args: &mut NextLatForwardArgs<'_, '_>) -> Result<(), 
         mean: &mut args.buffers.mean,
         inv_std: &mut args.buffers.inv_std,
         row_count: args.row_count,
-        embedding_dim: NEXTLAT_INPUT as u32,
+        embedding_dim: NEXTLAT_INPUT_DIM,
         epsilon: GPT2_LAYER_NORM_EPSILON,
     })?;
     quantize_input(args)

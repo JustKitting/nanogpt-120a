@@ -12,6 +12,7 @@ pub const GPT2_KDA_ACTIVE_QKV: usize = 4 * GPT2_N_EMBD + GPT2_N_HEAD;
 pub const GPT2_QKV: usize = align_kda_qkv(GPT2_KDA_ACTIVE_QKV);
 pub const GPT2_EMBEDDING_DIM: u32 = GPT2_N_EMBD as u32;
 pub const GPT2_MLP_DIM: u32 = GPT2_MLP as u32;
+pub const GPT2_TOKEN_ROWS_U32: u32 = GPT2_TOKEN_ROWS as u32;
 pub const GPT2_VOCAB_DIM: u32 = GPT2_VOCAB_SIZE as u32;
 pub const GPT2_Q_OFFSET: usize = 0;
 pub const GPT2_K_OFFSET: usize = GPT2_N_EMBD;
@@ -22,6 +23,8 @@ pub const KDA_CHUNK_SIZE: usize = 64;
 pub const KDA_DECAY_SCALE: f32 = 0.01;
 pub const NEXTLAT_INPUT: usize = 2 * GPT2_N_EMBD;
 pub const NEXTLAT_HIDDEN: usize = NEXTLAT_INPUT;
+pub const NEXTLAT_INPUT_DIM: u32 = NEXTLAT_INPUT as u32;
+pub const NEXTLAT_HIDDEN_DIM: u32 = NEXTLAT_HIDDEN as u32;
 
 pub const KIMI_FULL_ATTENTION_PERIOD: usize = 4;
 

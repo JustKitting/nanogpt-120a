@@ -1,5 +1,5 @@
 use cuda_core::{CudaStream, DeviceBuffer, DriverError};
-use gpt2_nvfp4::{GPT2_N_EMBD, NEXTLAT_HIDDEN};
+use gpt2_nvfp4::{GPT2_EMBEDDING_DIM, NEXTLAT_HIDDEN_DIM};
 use rust_kernels_cuda::next_latent::{
     NextLatConcatBackwardArgs, NextLatGeluBackwardArgs, NextLatModule,
 };
@@ -21,7 +21,7 @@ pub fn backward(mut args: NextLatBackwardArgs<'_, '_, '_>) -> Result<(), DriverE
         &args.forward.pre2,
         &args.grads.d_act2,
         &mut args.grads.d_pre2,
-        args.row_count * NEXTLAT_HIDDEN as u32,
+        args.row_count * NEXTLAT_HIDDEN_DIM,
     )?;
     transition_backward(&mut args)?;
     gelu_backward(
@@ -30,7 +30,7 @@ pub fn backward(mut args: NextLatBackwardArgs<'_, '_, '_>) -> Result<(), DriverE
         &args.forward.pre1,
         &args.grads.d_act1,
         &mut args.grads.d_pre1,
-        args.row_count * NEXTLAT_HIDDEN as u32,
+        args.row_count * NEXTLAT_HIDDEN_DIM,
     )?;
     input_projection_backward(&mut args)?;
     layer_norm_backward(&mut args)?;
@@ -41,7 +41,7 @@ pub fn backward(mut args: NextLatBackwardArgs<'_, '_, '_>) -> Result<(), DriverE
         d_next_token_embeddings: &mut args.grads.d_next_token_embeddings,
         d_current_states: &mut args.grads.d_current_states,
         row_count: args.row_count,
-        embedding_dim: GPT2_N_EMBD as u32,
+        embedding_dim: GPT2_EMBEDDING_DIM,
     })
 }
 

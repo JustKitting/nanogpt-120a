@@ -1,4 +1,4 @@
-use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_VOCAB_SIZE};
+use gpt2_nvfp4::{GPT2_BATCH_SIZE, GPT2_SEQ_LEN, GPT2_VOCAB_DIM};
 use rust_kernels_cuda::loss::CrossEntropyArgs;
 
 use super::{TokenBatch, Trainer};
@@ -17,7 +17,7 @@ impl Trainer {
             dlogits: &mut self.buffers.backward.dlogits,
             dlogits_row_amax: &mut self.buffers.normalized_amax,
             token_count: batch.token_count as u32,
-            vocab_size: GPT2_VOCAB_SIZE as u32,
+            vocab_size: GPT2_VOCAB_DIM,
         })?;
 
         let losses = self.buffers.backward.losses.to_host_vec(stream)?;

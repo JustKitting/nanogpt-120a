@@ -1,8 +1,8 @@
 use cuda_core::DriverError;
-use gpt2_nvfp4::{GPT2_N_EMBD, NEXTLAT_HIDDEN, NEXTLAT_INPUT};
+use gpt2_nvfp4::{GPT2_EMBEDDING_DIM, NEXTLAT_HIDDEN_DIM, NEXTLAT_INPUT_DIM};
 
 use super::backward::NextLatBackwardArgs;
-use super::backward_linear_call::{LinearCall, run_linear};
+use super::backward_linear_call::{run_linear, LinearCall};
 
 pub(super) fn output_projection_backward(
     args: &mut NextLatBackwardArgs<'_, '_, '_>,
@@ -19,8 +19,8 @@ pub(super) fn output_projection_backward(
         dweight: &mut args.grads.d_output_projection_weight,
         dbias: &mut args.grads.d_output_projection_bias,
         row_count: args.row_count,
-        input_dim: NEXTLAT_HIDDEN as u32,
-        output_dim: GPT2_N_EMBD as u32,
+        input_dim: NEXTLAT_HIDDEN_DIM,
+        output_dim: GPT2_EMBEDDING_DIM,
         sign_seed: args.seeds.output_sign,
         scale_seed: args.seeds.output_scale,
     })
@@ -41,8 +41,8 @@ pub(super) fn transition_backward(
         dweight: &mut args.grads.d_transition_weight,
         dbias: &mut args.grads.d_transition_bias,
         row_count: args.row_count,
-        input_dim: NEXTLAT_HIDDEN as u32,
-        output_dim: NEXTLAT_HIDDEN as u32,
+        input_dim: NEXTLAT_HIDDEN_DIM,
+        output_dim: NEXTLAT_HIDDEN_DIM,
         sign_seed: args.seeds.transition_sign,
         scale_seed: args.seeds.transition_scale,
     })
@@ -63,8 +63,8 @@ pub(super) fn input_projection_backward(
         dweight: &mut args.grads.d_input_projection_weight,
         dbias: &mut args.grads.d_input_projection_bias,
         row_count: args.row_count,
-        input_dim: NEXTLAT_INPUT as u32,
-        output_dim: NEXTLAT_HIDDEN as u32,
+        input_dim: NEXTLAT_INPUT_DIM,
+        output_dim: NEXTLAT_HIDDEN_DIM,
         sign_seed: args.seeds.input_sign,
         scale_seed: args.seeds.input_scale,
     })

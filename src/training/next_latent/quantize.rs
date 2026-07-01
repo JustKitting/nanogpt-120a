@@ -13,7 +13,7 @@ pub(super) fn quantize_input(args: &mut NextLatForwardArgs<'_, '_>) -> Result<()
         buffers.input,
         buffers.amax,
         row_count,
-        gpt2_nvfp4::NEXTLAT_INPUT as u32,
+        gpt2_nvfp4::NEXTLAT_INPUT_DIM,
     )
 }
 
@@ -29,6 +29,6 @@ pub(super) fn quantize_activation(
         buffers.input,
         buffers.amax,
         row_count,
-        gpt2_nvfp4::NEXTLAT_HIDDEN as u32,
+        gpt2_nvfp4::NEXTLAT_HIDDEN_DIM,
     )
 }
