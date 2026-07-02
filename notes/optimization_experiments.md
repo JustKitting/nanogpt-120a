@@ -33,6 +33,60 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: accepted local jj commit after full gate
+experiment: Reuse four-six NVFP4 pack input values with warp shuffles.
+status: accepted_900s_gate
+change:
+  Removed duplicate hi/lo global loads from the four-six NVFP4 pack kernels.
+  Each lane already loads its group value for scale reduction, so the pack path
+  now obtains paired fp4 values with shuffle_f32_sync from the same half-warp
+  group before the lane < 8 byte-store branch. The shuffles are executed by all
+  lanes covered by the mask so the collective is well-formed.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/four_six_pack_shuffle_fixed_10s.nsys-rep,
+    target/nsys/four_six_pack_shuffle_fixed_10s_cuda_gpu_kern_sum.csv,
+    target/runs/20260702_052308Z_synth_10s.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=30 TRAIN_LOG_INTERVAL=10
+    ./target/release/rust-kernels:
+    target/runs/20260702_052337Z_synth_30s.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=900 TRAIN_LOG_INTERVAL=50
+    ./target/release/rust-kernels:
+    target/runs/20260702_052417Z_synth_900s.
+measured_effect:
+  10s profile against accepted lower-A PV profile target/nsys/forward_pv_lower_half_rhs_10s_cuda_gpu_kern_sum.csv:
+    fp32_transpose_to_nvfp4_four_six_exact_pow2_kernel:
+      541.403ms -> 500.803ms.
+    fp32_to_nvfp4_four_six_exact_kernel:
+      230.016ms -> 228.502ms.
+    fp32_to_nvfp4_four_six_rowwise_pow2_kernel:
+      158.014ms -> 157.247ms.
+    nvfp4_gemm_tma_kernel:
+      1193.680ms -> 1188.200ms.
+  30s screen:
+    lower-A PV: 42 steps, val_loss=6.497346, train_elapsed_s=30.324.
+    candidate: 42 steps, val_loss=6.496610, train_elapsed_s=30.274.
+  900s gate:
+    lower-A PV isolated accepted result: 1211 steps, val_loss=3.778019,
+      train_elapsed_s=900.482, step_s=0.743585.
+    candidate: 1220 steps, val_loss=3.788687,
+      train_elapsed_s=900.356, step_s=0.737997.
+    delta: +9 steps / +0.7432%, loss +0.010668 / +0.2824%,
+      step_s -0.7516%.
+decision:
+  Accept and promote. The full 900s held-out gate kept validation loss within
+  the 1% allowance while increasing completed steps. This still does not
+  complete the sub-0.7s/step goal.
+```
+
+```text
+date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
 experiment: Launch square lower f16 TC matmuls with a triangular CTA grid.
 status: rejected_profile_gate

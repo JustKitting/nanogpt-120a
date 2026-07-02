@@ -124,9 +124,6 @@ pub(crate) mod module {
         if group_ctx.group < out_scales.len() {
             let base = group_ctx.base as u32;
             let value = padded_value(x, base + group_ctx.lane as u32, rows, cols, padded_cols);
-            let pair = group_ctx.lane as u32 * 2;
-            let hi = padded_value(x, base + pair, rows, cols, padded_cols);
-            let lo = padded_value(x, base + pair + 1, rows, cols, padded_cols);
             let out = FourSixOutputs {
                 fp4: out_fp4,
                 scales: out_scales,
@@ -140,8 +137,6 @@ pub(crate) mod module {
                 group_ctx.group == 0,
                 scale_override,
                 value,
-                hi,
-                lo,
             );
         }
     }
@@ -198,10 +193,6 @@ pub(crate) mod module {
                 source_cols,
                 padded_cols,
             );
-            let pair = group_ctx.lane as u32 * 2;
-            let hi = transposed_padded_value(x, base + pair, source_rows, source_cols, padded_cols);
-            let lo =
-                transposed_padded_value(x, base + pair + 1, source_rows, source_cols, padded_cols);
             let out = FourSixOutputs {
                 fp4: out_fp4,
                 scales: out_scales,
@@ -215,8 +206,6 @@ pub(crate) mod module {
                 group_ctx.group == 0,
                 scale_override,
                 value,
-                hi,
-                lo,
             );
         }
     }
@@ -238,9 +227,6 @@ pub(crate) mod module {
             let base = group_ctx.base as u32;
             let value =
                 transposed_exact_value(x, base + group_ctx.lane as u32, source_rows, source_cols);
-            let pair = group_ctx.lane as u32 * 2;
-            let hi = transposed_exact_value(x, base + pair, source_rows, source_cols);
-            let lo = transposed_exact_value(x, base + pair + 1, source_rows, source_cols);
             let out = FourSixOutputs {
                 fp4: out_fp4,
                 scales: out_scales,
@@ -254,8 +240,6 @@ pub(crate) mod module {
                 group_ctx.group == 0,
                 scale_override,
                 value,
-                hi,
-                lo,
             );
         }
     }
@@ -283,21 +267,6 @@ pub(crate) mod module {
                 source_rows_mask,
                 source_cols,
             );
-            let pair = group_ctx.lane as u32 * 2;
-            let hi = transposed_exact_value_pow2(
-                x,
-                base + pair,
-                source_rows_shift,
-                source_rows_mask,
-                source_cols,
-            );
-            let lo = transposed_exact_value_pow2(
-                x,
-                base + pair + 1,
-                source_rows_shift,
-                source_rows_mask,
-                source_cols,
-            );
             let out = FourSixOutputs {
                 fp4: out_fp4,
                 scales: out_scales,
@@ -311,8 +280,6 @@ pub(crate) mod module {
                 group_ctx.group == 0,
                 scale_override,
                 value,
-                hi,
-                lo,
             );
         }
     }
@@ -327,12 +294,6 @@ pub(crate) mod module {
         scale_override: f32,
     ) {
         let value = x[group_ctx.base + group_ctx.lane];
-        let pair = group_ctx.lane * 2;
-        let (hi, lo) = if group_ctx.lane < GROUP_SIZE / 2 {
-            (x[group_ctx.base + pair], x[group_ctx.base + pair + 1])
-        } else {
-            (0.0, 0.0)
-        };
         pack_four_six_group_values(
             amax[row],
             out,
@@ -341,8 +302,6 @@ pub(crate) mod module {
             writes_global_scale,
             scale_override,
             value,
-            hi,
-            lo,
         );
     }
 
@@ -355,8 +314,6 @@ pub(crate) mod module {
         writes_global_scale: bool,
         scale_override: f32,
         value: f32,
-        hi: f32,
-        lo: f32,
     ) {
         let global_scale = four_six_global_scale(tensor_amax, scale_override);
         let (scale_bits, inv_scale) = four_six_group_scale(
@@ -367,6 +324,10 @@ pub(crate) mod module {
             group_ctx.leader,
             group_ctx.lane,
         );
+        let pair = group_ctx.leader + group_ctx.lane as u32 * 2;
+        let hi = cuda_device::warp::shuffle_f32_sync(group_ctx.mask, value, pair);
+        let lo = cuda_device::warp::shuffle_f32_sync(group_ctx.mask, value, pair + 1);
+
         unsafe {
             if writes_global_scale && group_ctx.lane == 0 {
                 *out.global_scale.get_unchecked_mut(scale_row) = global_scale;
