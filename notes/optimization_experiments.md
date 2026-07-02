@@ -33,6 +33,42 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
+experiment: Pack lower-triangle causal score TC tiles into the launch grid.
+status: rejected_screen_gate
+change:
+  Replaced the full square lower-triangle launch grid with a packed lower
+  triangle grid for the accepted causal score matmul kernels. The kernel mapped
+  a linear lower-triangle tile id back to row/column and avoided launching
+  upper-triangle CTAs entirely.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_015627Z_synth_1s
+    val_loss=10.376959, train_elapsed_s=7.651, completed_steps=1.
+  30s screen:
+    target/runs/20260702_015643Z_synth_30s
+    val_loss=6.593182, train_elapsed_s=30.378, completed_steps=39.
+  nsys profile:
+    target/nsys/causal_packed_lower_score_tiles_10s.nsys-rep
+measured_effect:
+  Against the accepted lower-tile profile:
+    target/nsys/causal_lower_score_tiles_10s.nsys-rep
+  Both profiles completed 13 steps. Total kernel time regressed from
+  10493.814ms to 10511.115ms. The half-input lower bucket moved from
+  f16_cta_tc_matmul_lower_kernel 384.810ms to
+  f16_cta_tc_matmul_packed_lower_kernel 388.284ms, and the f32 lower bucket
+  moved from 211.811ms to 213.704ms. The packed tile-id mapping overhead was
+  larger than the saved empty-CTA scheduling cost.
+decision:
+  Reject and revert. Keep the accepted full-grid lower-triangle early-return
+  kernels.
+```
+
+```text
+date: 2026-07-02
 commit: accepted local jj commit after full gate
 experiment: Skip upper-triangle TC tiles for causal score matmuls.
 status: accepted_900s
