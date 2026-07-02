@@ -39,6 +39,19 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         let padded_elements = args.padded_rows * args.padded_cols;
         assert!(padded_elements.is_multiple_of(16));
+        if args.rows == args.padded_rows && args.cols == args.padded_cols {
+            return self.four_six.fp32_to_nvfp4_four_six_exact_kernel(
+                args.stream,
+                four_six_grid_config(padded_elements / 16),
+                args.x,
+                args.amax,
+                args.out_fp4,
+                args.out_scales,
+                args.out_global_scale,
+                SCALE_OVERRIDE,
+            );
+        }
+
         self.four_six.fp32_to_nvfp4_four_six_padded_kernel(
             args.stream,
             four_six_grid_config(padded_elements / 16),
@@ -60,6 +73,39 @@ impl Nvfp4QuantModule {
     ) -> Result<(), DriverError> {
         let padded_elements = args.padded_rows * args.padded_cols;
         assert!(padded_elements.is_multiple_of(16));
+        if args.source_cols == args.padded_rows && args.source_rows == args.padded_cols {
+            if args.source_rows.is_power_of_two() {
+                return self
+                    .four_six
+                    .fp32_transpose_to_nvfp4_four_six_exact_pow2_kernel(
+                        args.stream,
+                        four_six_grid_config(padded_elements / 16),
+                        args.x,
+                        args.amax,
+                        args.out_fp4,
+                        args.out_scales,
+                        args.out_global_scale,
+                        args.source_rows.trailing_zeros(),
+                        args.source_rows - 1,
+                        args.source_cols,
+                        SCALE_OVERRIDE,
+                    );
+            }
+
+            return self.four_six.fp32_transpose_to_nvfp4_four_six_exact_kernel(
+                args.stream,
+                four_six_grid_config(padded_elements / 16),
+                args.x,
+                args.amax,
+                args.out_fp4,
+                args.out_scales,
+                args.out_global_scale,
+                args.source_rows,
+                args.source_cols,
+                SCALE_OVERRIDE,
+            );
+        }
+
         self.four_six
             .fp32_transpose_to_nvfp4_four_six_padded_kernel(
                 args.stream,

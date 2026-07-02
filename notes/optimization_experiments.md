@@ -33,6 +33,50 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: accepted local jj commit after full gate
+experiment: Use exact no-pad four-six pack kernels for exact Aurora TMA shapes.
+status: accepted_900s
+change:
+  Added exact four-six NVFP4 pack kernels for non-transposed and transposed
+  padded quantization calls. The launcher keeps the old padded kernels for
+  non-exact shapes, but when rows/cols already match padded_rows/padded_cols it
+  avoids padded bounds/index handling. The transposed exact path uses a pow2
+  source-row variant when possible. Quantization scale math, Aurora math,
+  optimizer settings, model size, batch size, and learning rates are unchanged.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_010611Z_synth_1s
+    val_loss=10.376959, train_elapsed_s=7.722, completed_steps=1.
+  30s screen:
+    target/runs/20260702_010628Z_synth_30s
+    val_loss=6.652033, train_elapsed_s=30.321, completed_steps=37.
+  nsys profile:
+    target/nsys/four_six_exact_pack_10s.nsys-rep
+  900s gate:
+    target/runs/20260702_010809Z_synth_900s
+    val_loss=3.852027, train_elapsed_s=900.077, completed_steps=1069.
+measured_effect:
+  Against notes/sweep_baseline.env before this change:
+    val_loss=3.845492, train_elapsed_s=900.687, completed_steps=1063.
+  Completed steps increased by 6 (+0.56%), seconds/step moved from 0.847307 to
+  0.841980 (-0.63%), and validation loss moved by +0.17%. In the 10s profile,
+  total kernel time moved from 10262.320ms to 10221.842ms. The main intended
+  bucket changes were:
+    fp32_to_nvfp4_four_six_padded_kernel 242.176ms ->
+      fp32_to_nvfp4_four_six_exact_kernel 198.390ms
+    fp32_transpose_to_nvfp4_four_six_padded_kernel 472.321ms ->
+      fp32_transpose_to_nvfp4_four_six_exact_pow2_kernel 466.071ms
+decision:
+  Keep and promote. The full 900s gate increased completed steps with less than
+  1% validation-loss movement, so notes/sweep_baseline.env now points at this
+  run as the active kernel-runtime baseline.
+```
+
+```text
+date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
 experiment: Use RoPE-saved f16 QKV tape for full-attention forward TC matmuls.
 status: rejected_screen_gate

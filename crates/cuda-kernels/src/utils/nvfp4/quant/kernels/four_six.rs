@@ -147,6 +147,35 @@ pub(crate) mod module {
     }
 
     #[kernel]
+    pub fn fp32_to_nvfp4_four_six_exact_kernel(
+        x: &[f32],
+        amax: &[f32],
+        out_fp4: DisjointSlice<u8>,
+        out_scales: DisjointSlice<u8>,
+        out_global_scale: DisjointSlice<f32>,
+        scale_override: f32,
+    ) {
+        let group_ctx = four_six_group_ctx();
+
+        if group_ctx.group < out_scales.len() {
+            let out = FourSixOutputs {
+                fp4: out_fp4,
+                scales: out_scales,
+                global_scale: out_global_scale,
+            };
+            pack_four_six_group(
+                x,
+                amax,
+                out,
+                group_ctx,
+                0,
+                group_ctx.group == 0,
+                scale_override,
+            );
+        }
+    }
+
+    #[kernel]
     pub fn fp32_transpose_to_nvfp4_four_six_padded_kernel(
         x: &[f32],
         amax: &[f32],
@@ -173,6 +202,102 @@ pub(crate) mod module {
             let hi = transposed_padded_value(x, base + pair, source_rows, source_cols, padded_cols);
             let lo =
                 transposed_padded_value(x, base + pair + 1, source_rows, source_cols, padded_cols);
+            let out = FourSixOutputs {
+                fp4: out_fp4,
+                scales: out_scales,
+                global_scale: out_global_scale,
+            };
+            pack_four_six_group_values(
+                amax[0],
+                out,
+                group_ctx,
+                0,
+                group_ctx.group == 0,
+                scale_override,
+                value,
+                hi,
+                lo,
+            );
+        }
+    }
+
+    #[kernel]
+    pub fn fp32_transpose_to_nvfp4_four_six_exact_kernel(
+        x: &[f32],
+        amax: &[f32],
+        out_fp4: DisjointSlice<u8>,
+        out_scales: DisjointSlice<u8>,
+        out_global_scale: DisjointSlice<f32>,
+        source_rows: u32,
+        source_cols: u32,
+        scale_override: f32,
+    ) {
+        let group_ctx = four_six_group_ctx();
+
+        if group_ctx.group < out_scales.len() {
+            let base = group_ctx.base as u32;
+            let value =
+                transposed_exact_value(x, base + group_ctx.lane as u32, source_rows, source_cols);
+            let pair = group_ctx.lane as u32 * 2;
+            let hi = transposed_exact_value(x, base + pair, source_rows, source_cols);
+            let lo = transposed_exact_value(x, base + pair + 1, source_rows, source_cols);
+            let out = FourSixOutputs {
+                fp4: out_fp4,
+                scales: out_scales,
+                global_scale: out_global_scale,
+            };
+            pack_four_six_group_values(
+                amax[0],
+                out,
+                group_ctx,
+                0,
+                group_ctx.group == 0,
+                scale_override,
+                value,
+                hi,
+                lo,
+            );
+        }
+    }
+
+    #[kernel]
+    pub fn fp32_transpose_to_nvfp4_four_six_exact_pow2_kernel(
+        x: &[f32],
+        amax: &[f32],
+        out_fp4: DisjointSlice<u8>,
+        out_scales: DisjointSlice<u8>,
+        out_global_scale: DisjointSlice<f32>,
+        source_rows_shift: u32,
+        source_rows_mask: u32,
+        source_cols: u32,
+        scale_override: f32,
+    ) {
+        let group_ctx = four_six_group_ctx();
+
+        if group_ctx.group < out_scales.len() {
+            let base = group_ctx.base as u32;
+            let value = transposed_exact_value_pow2(
+                x,
+                base + group_ctx.lane as u32,
+                source_rows_shift,
+                source_rows_mask,
+                source_cols,
+            );
+            let pair = group_ctx.lane as u32 * 2;
+            let hi = transposed_exact_value_pow2(
+                x,
+                base + pair,
+                source_rows_shift,
+                source_rows_mask,
+                source_cols,
+            );
+            let lo = transposed_exact_value_pow2(
+                x,
+                base + pair + 1,
+                source_rows_shift,
+                source_rows_mask,
+                source_cols,
+            );
             let out = FourSixOutputs {
                 fp4: out_fp4,
                 scales: out_scales,
@@ -281,5 +406,30 @@ pub(crate) mod module {
         } else {
             0.0
         }
+    }
+
+    #[inline(always)]
+    fn transposed_exact_value(
+        x: &[f32],
+        output_index: u32,
+        source_rows: u32,
+        source_cols: u32,
+    ) -> f32 {
+        let row = output_index / source_rows;
+        let col = output_index - row * source_rows;
+        x[(col * source_cols + row) as usize]
+    }
+
+    #[inline(always)]
+    fn transposed_exact_value_pow2(
+        x: &[f32],
+        output_index: u32,
+        source_rows_shift: u32,
+        source_rows_mask: u32,
+        source_cols: u32,
+    ) -> f32 {
+        let row = output_index >> source_rows_shift;
+        let col = output_index & source_rows_mask;
+        x[(col * source_cols + row) as usize]
     }
 }
