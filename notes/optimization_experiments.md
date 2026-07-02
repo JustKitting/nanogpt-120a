@@ -34,6 +34,41 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
+experiment: Launch square lower f16 TC matmuls with a triangular CTA grid.
+status: rejected_profile_gate
+change:
+  Added lower-triangle linear tile mapping for batched_matmul_half_input_lower
+  and batched_matmul_f32_input_lower so the launch grid omitted upper CTA tiles
+  instead of launching rectangular grids and returning from upper tiles inside
+  the kernel.
+verification:
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/lower_triangular_cta_grid_10s.nsys-rep,
+    target/nsys/lower_triangular_cta_grid_10s_cuda_gpu_kern_sum.csv,
+    target/runs/20260702_051921Z_synth_10s.
+measured_effect:
+  Against accepted lower-A PV profile target/nsys/forward_pv_lower_half_rhs_10s_cuda_gpu_kern_sum.csv:
+    f16_cta_tc_matmul_lower_kernel:
+      410.020ms / 56 launches -> 411.829ms / 56 launches
+      as f16_cta_tc_matmul_lower_linear_kernel.
+    f16_cta_tc_matmul_f32_lower_kernel:
+      224.077ms / 30 launches -> 224.872ms / 30 launches
+      as f16_cta_tc_matmul_f32_lower_linear_kernel.
+    train_elapsed_s:
+      10.311s -> 10.295s, same 14 steps and val_loss=8.110743.
+decision:
+  Reject before 30s screen. The target kernels moved the wrong way; the tiny
+  elapsed change is not attributable to this candidate.
+```
+
+```text
+date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
 experiment: Launch attention_prob_ds as one row block per query/head/batch instead of a linear full-square grid.
 status: rejected_profile_gate
 change:
