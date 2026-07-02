@@ -33,6 +33,59 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: accepted local jj commit after full gate
+experiment: Hoist TMA output scales and make lower-triangle attention backward consumers mask stale upper entries.
+status: accepted_900s_gate
+change:
+  In nvfp4_gemm_tma_kernel, hoisted scalar output-scale loads out of every
+  accumulator store. Mode 1 now loads scalar a/b global scales once per MMA
+  thread; mode 2 loads scalar b once and computes each row scale once per
+  M-repeat row pair before reusing it across N-repeat stores.
+  Added lower-aware staging for the f16 TC lower-A matmul variants used by
+  full-attention backward. The diagonal A tile now writes masked upper entries
+  as zero in shared memory, so attention_prob_ds_kernel can return immediately
+  for key > query without writing p/ds zeroes to global scratch.
+verification:
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/tma_scale_lower_mask_10s.nsys-rep,
+    target/nsys/tma_scale_lower_mask_10s_cuda_gpu_kern_sum.csv.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=30 TRAIN_LOG_INTERVAL=10
+    ./target/release/rust-kernels:
+    target/runs/20260702_034218Z_synth_30s.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=900 TRAIN_LOG_INTERVAL=50
+    ./target/release/rust-kernels:
+    target/runs/20260702_034300Z_synth_900s.
+measured_effect:
+  Against target/nsys/current_sub07_10s_cuda_gpu_kern_sum.csv:
+    nvfp4_gemm_tma_kernel:
+      1218.337ms -> 1190.025ms over 9343 launches.
+    attention_prob_ds_kernel:
+      517.012ms -> 333.329ms over 28 launches.
+    f16_cta_tc_matmul_f32_a_transposed_half_rhs_lower_a_kernel:
+      350.200ms -> 355.483ms over 56 launches.
+  30s screen:
+    baseline: 41 steps, val_loss=6.529651, train_elapsed_s=30.573.
+    candidate: 41 steps, val_loss=6.528993, train_elapsed_s=30.133.
+  900s gate:
+    baseline: 1174 steps, val_loss=3.798182, train_elapsed_s=900.337,
+      step_s=0.766897.
+    candidate: 1192 steps, val_loss=3.801805, train_elapsed_s=900.398,
+      step_s=0.755367.
+    delta: +18 steps / +1.533%, loss +0.003623 / +0.0954%, step_s -1.503%.
+decision:
+  Accept and promote as a math-preserving kernel/runtime improvement. The
+  validation loss is inside the active +/-1% noise band and completed step count
+  increased. This does not complete the sub-0.7s/step goal; the accepted 900s
+  step time is 0.755367s.
+```
+
+```text
+date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
 experiment: Pack four TMA descriptor uploads into one contiguous descriptor buffer.
 status: rejected_30s_screen

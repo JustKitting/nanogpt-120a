@@ -25,7 +25,10 @@ pub(super) fn prob_ds_body(
     let batch = batch_head / params.head_count;
     let head = batch_head - batch * params.head_count;
     let row = batch * params.seq_len + query;
-    if key > query || row >= params.row_count {
+    if key > query {
+        return;
+    }
+    if row >= params.row_count {
         unsafe {
             *p.get_unchecked_mut(index as usize) = 0.0;
             *ds.get_unchecked_mut(index as usize) = 0.0;

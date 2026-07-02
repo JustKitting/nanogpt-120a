@@ -24,7 +24,9 @@ pub(super) fn cta_matmul_f32_half_rhs_lower_a_body(
     };
     let mut k_base = 0;
     while k_base < k_limit {
-        super::cta_stage_f32::stage_tiles_f32_half_rhs(a, rhs, a_tile, b_tile, tile, dims, k_base);
+        super::cta_stage_f32::stage_tiles_f32_half_rhs_lower_a(
+            a, rhs, a_tile, b_tile, tile, dims, k_base,
+        );
         cuda_device::thread::sync_threads();
         cta_mma4!(a_tile, b_tile, tile, acc0, acc1, acc2, acc3);
         super::cta_sync::sync_before_next_k(k_base, k_limit);

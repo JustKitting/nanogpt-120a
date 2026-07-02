@@ -18,7 +18,7 @@ pub(super) fn cta_matmul_f32_a_transposed_half_rhs_lower_a_body(
     cta_accumulators!(acc0, acc1, acc2, acc3);
     let mut k_base = tile.row_base;
     while k_base < dims.k {
-        super::cta_stage_f32_transposed::stage_tiles_f32_a_transposed_half_rhs(
+        super::cta_stage_f32_transposed::stage_tiles_f32_a_transposed_half_rhs_lower_a(
             a, rhs, a_tile, b_tile, tile, dims, k_base,
         );
         cuda_device::thread::sync_threads();

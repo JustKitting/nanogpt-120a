@@ -44,6 +44,19 @@ stage_tiles_f32_fn!(
     stage_half_rhs_transposed
 );
 
+pub(super) fn stage_tiles_f32_half_rhs_lower_a(
+    a: &[f32],
+    rhs: &[u16],
+    a_tile: &mut super::CtaATile,
+    b_tile: &mut super::CtaBTile,
+    tile: CtaTile,
+    dims: CtaMatmulDims,
+    k_base: u32,
+) {
+    stage_a_lower(a, a_tile, tile, dims.m, dims.k, k_base);
+    stage_half_rhs_transposed(rhs, b_tile, tile, dims.n, dims.k, k_base);
+}
+
 macro_rules! stage_row_major_f32_fn {
     ($name:ident, $tile_elems:ident, $row_base:ident, $check_bounds:expr) => {
         fn $name(
@@ -71,6 +84,27 @@ stage_row_major_f32_fn!(stage_a, CTA_A_ELEMS, row_base, true);
 stage_row_major_f32_fn!(stage_a_aligned, CTA_A_ELEMS, row_base, false);
 stage_row_major_f32_fn!(stage_b_t, CTA_B_ELEMS, col_base, true);
 stage_row_major_f32_fn!(stage_b_t_aligned, CTA_B_ELEMS, col_base, false);
+
+fn stage_a_lower(
+    src: &[f32],
+    dst: &mut SharedArray<u16, CTA_A_ELEMS>,
+    tile: CtaTile,
+    rows: u32,
+    cols: u32,
+    k_base: u32,
+) {
+    let mut offset = thread::threadIdx_x();
+    while offset < CTA_A_ELEMS as u32 {
+        let (global_row, global_col) = stage_coords(offset, tile.row_base, k_base);
+        dst[offset as usize] = if global_row < rows && global_col < cols && global_col <= global_row
+        {
+            cvt_rn_f16_f32(src[((tile.batch * rows + global_row) * cols + global_col) as usize])
+        } else {
+            0
+        };
+        offset += CTA_THREADS;
+    }
+}
 
 fn stage_row_major_f32<const CHECK_BOUNDS: bool, const TILE_ELEMS: usize>(
     src: &[f32],

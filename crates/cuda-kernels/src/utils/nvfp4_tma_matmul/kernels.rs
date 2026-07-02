@@ -306,6 +306,50 @@ fn store_f32x2_global(out: &mut DisjointSlice<f32>, index: u32, x: f32, y: f32) 
     }
 }
 
+#[derive(Clone, Copy)]
+struct OutputScale {
+    mode: u32,
+    weight: f32,
+    scalar_a: f32,
+    scalar_b: f32,
+    a_global_scale: u64,
+}
+
+impl OutputScale {
+    #[inline(always)]
+    fn new(params: Nvfp4GemmParams) -> Self {
+        let (scalar_a, scalar_b) = if params.global_scale_mode == 0 {
+            (1.0, 1.0)
+        } else {
+            let scalar_b = unsafe { *(params.b_global_scale as usize as *const f32) };
+            let scalar_a = if params.global_scale_mode == 1 {
+                unsafe { *(params.a_global_scale as usize as *const f32) }
+            } else {
+                1.0
+            };
+            (scalar_a, scalar_b)
+        };
+        Self {
+            mode: params.global_scale_mode,
+            weight: params.weight_global_scale,
+            scalar_a,
+            scalar_b,
+            a_global_scale: params.a_global_scale,
+        }
+    }
+
+    #[inline(always)]
+    fn row(self, row: u32) -> f32 {
+        if self.mode == 2 {
+            let row_scale =
+                unsafe { *((self.a_global_scale as usize as *const f32).add(row as usize)) };
+            self.weight * row_scale * self.scalar_b
+        } else {
+            self.weight * self.scalar_a * self.scalar_b
+        }
+    }
+}
+
 #[inline(always)]
 fn scale_tma_y(mn_base: u32, k_base: u32, mn_extent: u32, k_dim: u32) -> i32 {
     Sm120ScaleLayout::block_major_tma_y_padded(mn_base, k_base, mn_extent, k_dim)
@@ -491,12 +535,14 @@ fn load_b_scale4_packed(b_scales: *const u32, tile: CtaTile, k_atom: u32, n_repe
 }
 
 #[inline(always)]
-fn store_acc_full(
+fn store_acc_scaled(
     acc: [f32; 4],
     tile: CtaTile,
     m_repeat: u32,
     n_repeat: u32,
     params: Nvfp4GemmParams,
+    scale0: f32,
+    scale1: f32,
     out: &mut DisjointSlice<f32>,
 ) {
     let row0 = tile.mma_row_base(m_repeat) + tile.group;
@@ -506,8 +552,6 @@ fn store_acc_full(
     if col0 + 1 >= output_dim {
         return;
     }
-    let scale0 = output_scale(params, row0);
-    let scale1 = output_scale(params, row1);
 
     store_f32x2_global(
         out,
@@ -523,20 +567,32 @@ fn store_acc_full(
     );
 }
 
-#[inline(always)]
-fn output_scale(params: Nvfp4GemmParams, row: u32) -> f32 {
-    if params.global_scale_mode == 0 {
-        return params.weight_global_scale;
-    }
-    unsafe {
-        let b_scale = *(params.b_global_scale as usize as *const f32);
-        let a_scale = if params.global_scale_mode == 2 {
-            *((params.a_global_scale as usize as *const f32).add(row as usize))
-        } else {
-            *(params.a_global_scale as usize as *const f32)
-        };
-        params.weight_global_scale * a_scale * b_scale
-    }
+macro_rules! store_accumulator_rows {
+    ([], $tile:expr, $params:expr, $output_scale:expr, $out:expr) => {};
+    (
+        [($m_repeat:tt, [$(($n_repeat:tt, $acc:ident)),+ $(,)?]) $(, $rest:tt)* $(,)?],
+        $tile:expr,
+        $params:expr,
+        $output_scale:expr,
+        $out:expr
+    ) => {{
+        let row0 = $tile.mma_row_base($m_repeat) + $tile.group;
+        let scale0 = $output_scale.row(row0);
+        let scale1 = $output_scale.row(row0 + 8);
+        $(
+            store_acc_scaled(
+                $acc,
+                $tile,
+                $m_repeat,
+                $n_repeat,
+                $params,
+                scale0,
+                scale1,
+                $out,
+            );
+        )+
+        store_accumulator_rows!([$($rest),*], $tile, $params, $output_scale, $out);
+    }};
 }
 
 macro_rules! accumulate_scalar_b_row {
@@ -1223,16 +1279,13 @@ macro_rules! run_tma_nvfp4_full_tile_shape {
                 k_tile += 1;
             }
 
-            $($(
-                    store_acc_full(
-                        $acc,
-                        tile,
-                        $m_repeat,
-                        $n_repeat,
-                        params,
-                        out,
-                    );
-            )+)+
+            store_accumulator_rows!(
+                [$(($m_repeat, [$(($n_repeat, $acc)),+])),+],
+                tile,
+                params,
+                OutputScale::new(params),
+                out
+            );
         }
     }};
 }
