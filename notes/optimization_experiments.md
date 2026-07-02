@@ -33,6 +33,36 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
+experiment: Launch attention_prob_ds as one row block per query/head/batch instead of a linear full-square grid.
+status: rejected_profile_gate
+change:
+  Re-indexed attention_prob_ds_kernel so each block owned one softmax row and
+  each thread iterated key <= query. The intent was to avoid launching work for
+  upper-triangular entries that the kernel already returned from immediately.
+verification:
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/prob_ds_row_launch_10s.nsys-rep,
+    target/nsys/prob_ds_row_launch_10s_cuda_gpu_kern_sum.csv,
+    target/runs/20260702_051533Z_synth_10s.
+measured_effect:
+  Against accepted lower-A PV profile target/nsys/forward_pv_lower_half_rhs_10s_cuda_gpu_kern_sum.csv:
+    attention_prob_ds_kernel:
+      333.321ms / 28 launches -> 336.190ms / 28 launches.
+    train_elapsed_s:
+      10.311s -> 10.292s, same 14 steps and val_loss=8.110743.
+decision:
+  Reject before 30s screen. The target kernel moved the wrong way; the tiny
+  10s elapsed improvement is not attributable to this candidate.
+```
+
+```text
+date: 2026-07-02
 commit: f4f7ae62
 experiment: Route forward full-attention P @ V through the existing lower-A f32-by-f16 TC matmul.
 status: accepted_900s_gate
