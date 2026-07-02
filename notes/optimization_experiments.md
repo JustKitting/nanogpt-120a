@@ -32,6 +32,84 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```
 
 ```text
+date: 2026-07-02
+commit: accepted local jj commit after full gate
+experiment: Route exact Aurora TMA outputs directly to their final buffers.
+status: accepted_900s
+change:
+  Added an exact-shape branch in the Aurora TMA GEMM helpers. When the logical
+  output dimensions already match the TMA tile-padded dimensions, the TMA GEMM
+  now writes directly to the requested output buffer instead of writing
+  tma.out_padded and launching f32_crop_cols_kernel. Non-exact shapes keep the
+  existing padded-output and crop path. Polar iteration count, learning rates,
+  batch size, attention mix, and optimizer math are unchanged.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_000606Z_synth_1s
+    val_loss=10.386334, train_elapsed_s=1.643, completed_steps=2.
+  30s candidate screen:
+    target/runs/20260702_000614Z_synth_30s
+    val_loss=6.652033, train_elapsed_s=30.499, completed_steps=37.
+  nsys profile after the direct-output branch:
+    target/nsys/aurora_tma_direct_out_10s.nsys-rep
+    f32_crop_cols_kernel dropped out of the kernel summary.
+  900s gate:
+    target/runs/20260702_002115Z_synth_900s
+    val_loss=3.845492, train_elapsed_s=900.687, completed_steps=1063.
+    Final metrics stayed finite/nonzero with no skipped updates.
+measured_effect:
+  Against notes/sweep_baseline.env before this change:
+    30s screen:
+      val_loss: 6.680145 -> 6.652033
+      completed_steps: 36 -> 37
+    900s gate:
+      val_loss: 3.861339 -> 3.845492
+      completed_steps: 1044 -> 1063
+      avg_step_s: 0.862816 -> 0.847307
+  The 900s step count improved by 19 steps (+1.82%) and validation loss
+  improved by 0.015847 (-0.41% relative).
+decision:
+  Accept as the new active kernel/runtime baseline. Keep the code and update
+  notes/sweep_baseline.env to this run.
+```
+
+```text
+date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
+experiment: Route exact Aurora four-six quantization around padded kernels.
+status: rejected_profile_gate
+change:
+  Tried routing exact Aurora TMA operand shapes through non-padded four-six
+  quantization, including a new exact transpose wrapper in the NVFP4 quant
+  utility module. The intent was to remove padding/bounds work from the Aurora
+  quant path without changing values.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  Existing four-six utility test passed:
+    CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test nvfp4_quant
+      fp32_to_nvfp4_four_six_writes_quantized_outputs -- --ignored --nocapture
+  30s candidate screen with exact quant routing:
+    target/runs/20260702_001617Z_synth_30s
+    val_loss=6.650756, train_elapsed_s=30.657, completed_steps=37.
+  nsys profile with exact quant routing:
+    target/nsys/aurora_tma_exact_quant_10s.nsys-rep
+measured_effect:
+  Against the direct-output-only profile:
+    target/nsys/aurora_tma_direct_out_10s.nsys-rep
+  padded four-six kernels dropped to zero, but total four-six quant time moved
+  from 868.355ms to 925.214ms over the same 12-step profile, total kernel time
+  moved from 10262.320ms to 10344.739ms, and 30s completed_steps stayed at 37.
+decision:
+  Reject and revert the exact quant routing. This result only rejects that
+  helper routing; the accepted TMA direct-output branch above is kept.
+```
+
+```text
 date: 2026-07-01
 commit: accepted local jj commit after full gate
 experiment: Align KDA QKV padded width to the 128-row TMA tile.

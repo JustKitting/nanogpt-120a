@@ -430,6 +430,35 @@ fn run_tma_gemm_prepared(
     tma: &mut TmaScratchRefs<'_>,
     dims: TmaDims,
 ) -> Result<(), DriverError> {
+    if dims.is_exact() {
+        runtime
+            .optimizer
+            .tma_gemm()
+            .prepare_tma_nvfp4_device_scales_into(
+                stream,
+                &*tma.a.bytes,
+                &*tma.a.scale_packed,
+                &*tma.b.bytes,
+                &*tma.b.scale_packed,
+                dims.m,
+                dims.k,
+                dims.n,
+                tma.descriptors,
+            )?;
+        return runtime
+            .optimizer
+            .tma_gemm()
+            .gemm_tma_nvfp4_device_scales_and_global_scale_buffers(
+                stream,
+                &*tma.descriptors,
+                out,
+                dims.m,
+                dims.k,
+                dims.n,
+                &*tma.a.global_scale,
+                &*tma.b.global_scale,
+            );
+    }
     runtime
         .optimizer
         .tma_gemm()
@@ -467,6 +496,35 @@ fn run_tma_gemm_self_prepared(
     tma: &mut TmaScratchRefs<'_>,
     dims: TmaDims,
 ) -> Result<(), DriverError> {
+    if dims.is_exact() {
+        runtime
+            .optimizer
+            .tma_gemm()
+            .prepare_tma_nvfp4_device_scales_into(
+                stream,
+                &*tma.a.bytes,
+                &*tma.a.scale_packed,
+                &*tma.a.bytes,
+                &*tma.a.scale_packed,
+                dims.m,
+                dims.k,
+                dims.n,
+                tma.descriptors,
+            )?;
+        return runtime
+            .optimizer
+            .tma_gemm()
+            .gemm_tma_nvfp4_device_scales_and_global_scale_buffers(
+                stream,
+                &*tma.descriptors,
+                out,
+                dims.m,
+                dims.k,
+                dims.n,
+                &*tma.a.global_scale,
+                &*tma.a.global_scale,
+            );
+    }
     runtime
         .optimizer
         .tma_gemm()
@@ -622,6 +680,10 @@ impl TmaDims {
             n: ceil_to(n, TILE_N),
             k: ceil_to(k, TILE_K),
         }
+    }
+
+    fn is_exact(self) -> bool {
+        self.logical_m == self.m && self.logical_n == self.n
     }
 }
 
