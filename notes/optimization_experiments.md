@@ -33,6 +33,47 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
+experiment: Skip upper-triangle probability work in full-attention forward/backward.
+status: rejected_900s_correctness
+change:
+  Replaced attention_prob_ds with a row-wise lower-triangle launch, raised the
+  full-attention softmax row launch to 512 threads, stopped writing upper
+  causal-mask probabilities for valid rows, and routed full-attention P @ V
+  through a new lower-A f32-RHS TC matmul helper so the skipped upper triangle
+  would not be consumed.
+verification:
+  cargo fmt --check: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  30s screen:
+    target/runs/20260702_025801Z_synth_30s
+    val_loss=6.500129, train_elapsed_s=30.474, completed_steps=42.
+  900s gate:
+    target/runs/20260702_025853Z_synth_900s
+    stopped after repeated non_finite_gradient lines beginning at
+    optimizer_step_candidate=664, tensor=lm_head.weight, value=NaN.
+    Loss.log rose from 4.378068 at log row 14 to 5.528164 at row 18, and
+    Skip_non_finite.log flips from 0 to 1 at row 16.
+  nsys 10s profiles:
+    target/nsys/probds_pv_lower_10s*
+    target/nsys/softmax512_probds512_pv_lower_10s*
+measured_effect:
+  The 30-second screen improved from the active baseline's 41 steps,
+  train_elapsed_s=30.573, val_loss=6.529651 to 42 steps,
+  train_elapsed_s=30.474, val_loss=6.500129. Short nsys profiles also showed
+  the target attention kernels moving in the intended direction. The full
+  900-second gate failed correctness before completion with repeated NaN
+  gradients, so the profile and screen wins are not acceptable evidence.
+decision:
+  Reject and revert. The implementation likely leaves or consumes stale
+  upper-triangle probability state somewhere in the full training path despite
+  the lower-A consumer change. Do not commit this speedup unless the stale
+  buffer/consumer contract is fixed and a fresh 900-second gate passes.
+```
+
+```text
+date: 2026-07-02
 commit: accepted local jj commit after full gate
 experiment: Skip impossible K ranges in full-attention backward gradient matmuls.
 status: accepted_900s
