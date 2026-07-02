@@ -1,10 +1,10 @@
 use cuda_device::{DisjointSlice, cuda_module, kernel};
 
 use super::convert::fp32_to_f16_body;
-use super::cta::cta_matmul_body;
+use super::cta::{cta_matmul_body, cta_matmul_lower_body};
 use super::cta_add_f32::cta_matmul_add_f32_body;
 use super::cta_add_f32_rhs_transposed_base::cta_matmul_add_f32_rhs_transposed_base_body;
-use super::cta_f32::cta_matmul_f32_body;
+use super::cta_f32::{cta_matmul_f32_body, cta_matmul_f32_lower_body};
 use super::cta_f32_a_transposed_half_rhs::cta_matmul_f32_a_transposed_half_rhs_body;
 use super::cta_f32_a_transposed_rhs::cta_matmul_f32_a_transposed_rhs_body;
 use super::cta_f32_half_rhs::cta_matmul_f32_half_rhs_body;
@@ -57,6 +57,19 @@ pub(super) mod module {
     }
 
     #[kernel]
+    pub fn f16_cta_tc_matmul_lower_kernel(
+        a: &[u16],
+        b_t: &[u16],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
+    ) {
+        call_with_tiles!(cta_matmul_lower_body; a, b_t, out; batch_count, m, n, k);
+    }
+
+    #[kernel]
     pub fn f16_cta_tc_matmul_f32_kernel(
         a: &[f32],
         b_t: &[f32],
@@ -67,6 +80,19 @@ pub(super) mod module {
         k: u32,
     ) {
         call_with_tiles!(cta_matmul_f32_body; a, b_t, out; batch_count, m, n, k);
+    }
+
+    #[kernel]
+    pub fn f16_cta_tc_matmul_f32_lower_kernel(
+        a: &[f32],
+        b_t: &[f32],
+        out: DisjointSlice<f32>,
+        batch_count: u32,
+        m: u32,
+        n: u32,
+        k: u32,
+    ) {
+        call_with_tiles!(cta_matmul_f32_lower_body; a, b_t, out; batch_count, m, n, k);
     }
 
     #[kernel]

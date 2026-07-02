@@ -33,6 +33,51 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: accepted local jj commit after full gate
+experiment: Skip upper-triangle TC tiles for causal score matmuls.
+status: accepted_900s
+change:
+  Added lower-triangle variants of the f16 TC b_t matmul kernels and routed
+  only causal score-producing matmuls through them: full-attention forward QK
+  scores and full-attention backward QK / dOutV pair scores. Tile columns above
+  the causal diagonal return before staging or HMMA. Upper-triangle scores are
+  not consumed: forward softmax reads only key <= query, and backward prob/ds
+  writes masked entries to zero before use. Projection, optimizer, attention
+  math, model size, batch size, and learning rates are unchanged.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_013506Z_synth_1s
+    val_loss=10.376959, train_elapsed_s=8.109, completed_steps=1.
+  30s screen:
+    target/runs/20260702_013522Z_synth_30s
+    val_loss=6.592090, train_elapsed_s=30.309, completed_steps=39.
+  nsys profile:
+    target/nsys/causal_lower_score_tiles_10s.nsys-rep
+  900s gate:
+    target/runs/20260702_013657Z_synth_900s
+    val_loss=3.812444, train_elapsed_s=900.356, completed_steps=1125.
+measured_effect:
+  Against notes/sweep_baseline.env before this change:
+    val_loss=3.852027, train_elapsed_s=900.077, completed_steps=1069.
+  Completed steps increased by 56 (+5.24%), seconds/step moved from 0.841980
+  to 0.800316 (-4.95%), and validation loss improved by 1.03%. The 10s profile
+  completed 13 steps instead of 12; per-step kernel time moved from
+  851.820ms/step to 807.216ms/step. The old full score matmul bucket
+  f16_cta_tc_matmul_kernel is replaced by f16_cta_tc_matmul_lower_kernel for
+  backward pair scores, and f16_cta_tc_matmul_f32_lower_kernel appears for
+  forward QK scores.
+decision:
+  Keep and promote. This is a kernel-only causal masking optimization that
+  materially improves fixed-wall training speed and validation loss. The active
+  baseline is now 1125 steps in 900.356s, still slightly above the sub-0.8s
+  target at 0.800316s/step.
+```
+
+```text
+date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
 experiment: Specialize MS-EDEN pair packing for 6144-wide row chunks.
 status: rejected_screen_gate

@@ -28,7 +28,7 @@ impl AttentionModule {
             params,
         )?;
         args.tc_module
-            .batched_matmul_f32_input(F16TcMatmulF32Args {
+            .batched_matmul_f32_input_lower(F16TcMatmulF32Args {
                 stream: args.stream,
                 a: &*scratch.q,
                 b_t: &*scratch.k,

@@ -76,6 +76,28 @@ impl F16TcMatmulModule {
             args.k,
         )
     }
+
+    pub fn batched_matmul_half_input_lower(
+        &self,
+        args: F16TcMatmulHalfArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        assert_eq!(args.m, args.n);
+        assert!(args.a.len() >= elements(args.batch_count, args.m, args.k));
+        assert!(args.b_t.len() >= elements(args.batch_count, args.n, args.k));
+        assert!(args.out.len() >= elements(args.batch_count, args.m, args.n));
+
+        self.module.f16_cta_tc_matmul_lower_kernel(
+            args.stream,
+            cta_config(args.m, args.n, args.batch_count),
+            args.a,
+            args.b_t,
+            args.out,
+            args.batch_count,
+            args.m,
+            args.n,
+            args.k,
+        )
+    }
 }
 
 pub(super) fn cta_config(m: u32, n: u32, batch_count: u32) -> LaunchConfig {

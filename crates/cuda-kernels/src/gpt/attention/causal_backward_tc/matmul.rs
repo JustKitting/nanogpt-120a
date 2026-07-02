@@ -26,7 +26,7 @@ pub(super) fn run_tc_matmul(
     n: u32,
     k: u32,
 ) -> Result<(), DriverError> {
-    tc_module.batched_matmul_half_input(F16TcMatmulHalfArgs {
+    tc_module.batched_matmul_half_input_lower(F16TcMatmulHalfArgs {
         stream,
         a,
         b_t,
