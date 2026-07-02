@@ -33,6 +33,41 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
+experiment: Use original f16 TC staging for lower-triangle K tiles outside the diagonal boundary.
+status: rejected_profile_gate
+change:
+  After accepting lower-aware f16 TC staging for full-attention backward, tried
+  routing full-valid K tiles back through the original unmasked staging helpers
+  and using the masked helpers only on the diagonal boundary. The intent was to
+  keep stale upper scratch masked while removing branch overhead from K tiles
+  that are entirely inside the causal triangle.
+verification:
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/lower_mask_boundary_only_10s.nsys-rep,
+    target/nsys/lower_mask_boundary_only_10s_cuda_gpu_kern_sum.csv,
+    target/runs/20260702_040137Z_synth_10s.
+measured_effect:
+  Against the accepted profile target/nsys/tma_scale_lower_mask_10s_cuda_gpu_kern_sum.csv:
+    train_elapsed_s: 10.462 -> 10.489 over the 10s run.
+    nvfp4_gemm_tma_kernel: 1190.025ms -> 1198.461ms.
+    f16_cta_tc_matmul_f32_a_transposed_half_rhs_lower_a_kernel:
+      355.483ms -> 353.249ms.
+    f16_cta_tc_matmul_f32_half_rhs_lower_a_kernel:
+      161.401ms -> 163.162ms.
+    attention_prob_ds_kernel stayed flat: 333.329ms -> 333.337ms.
+decision:
+  Reject and revert before the 30s screen. The intended transposed lower-matmul
+  improvement was too small and the profile/wall-clock moved the wrong way.
+```
+
+```text
+date: 2026-07-02
 commit: accepted local jj commit after full gate
 experiment: Hoist TMA output scales and make lower-triangle attention backward consumers mask stale upper entries.
 status: accepted_900s_gate
