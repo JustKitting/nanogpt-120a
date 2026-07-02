@@ -34,6 +34,47 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
+experiment: Pack four TMA descriptor uploads into one contiguous descriptor buffer.
+status: rejected_30s_screen
+change:
+  Replaced the four separate TmaNvfp4DeviceScaleDescriptors device buffers with
+  one contiguous DeviceBuffer<[u64; 16]> holding a/b/a_scales/b_scales. Existing
+  TMA GEMM launch call sites then passed pointer offsets into that packed
+  descriptor buffer. The intent was to reduce per-GEMM descriptor upload API
+  overhead without changing GEMM math or kernel launch geometry.
+verification:
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test lm_head -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test linear_backward -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/tma_descriptor_packed_10s.nsys-rep,
+    target/nsys/tma_descriptor_packed_10s_cuda_api_sum.csv,
+    target/nsys/tma_descriptor_packed_10s_cuda_gpu_kern_sum.csv.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=30 TRAIN_LOG_INTERVAL=10
+    ./target/release/rust-kernels:
+    target/runs/20260702_032847Z_synth_30s.
+measured_effect:
+  Against target/nsys/current_sub07_10s_cuda_api_sum.csv, the profile showed the
+  intended API reduction:
+    cuMemcpyHtoDAsync_v2: 37727 calls / 1462.677ms -> 9698 calls / 202.652ms.
+  GPU kernel timings were effectively unchanged; nvfp4_gemm_tma_kernel was
+  1218.337ms baseline vs 1217.217ms candidate over the same 9343 launches.
+  The 30s target screen did not improve:
+    baseline: 41 steps, val_loss=6.529651, train_elapsed_s=30.573.
+    candidate: 41 steps, val_loss=6.529651, train_elapsed_s=30.615.
+decision:
+  Reject and revert for the training objective. The packed descriptor upload is
+  a real nsys API cleanup, but it did not produce a measurable step-count or
+  validation-loss improvement in the 30s screen, so it is not worth carrying as
+  an optimization candidate.
+```
+
+```text
+date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
 experiment: Use warp shuffles for transposed four-six NVFP4 pack pairs.
 status: rejected_30s_screen
 change:
