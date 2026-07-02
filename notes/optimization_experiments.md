@@ -34,6 +34,39 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
+experiment: Fuse Aurora source/Gram bound scaling into one f32 utility kernel.
+status: rejected_screen_gate
+change:
+  Added f32_scale_pair_by_amax_bound_kernel to scale the Aurora polar source by
+  1/sqrt(amax) and Gram matrix by 1/amax in one launch, using the same bound
+  calculation as the two existing f32 scale kernels. Aurora bound_source_and_gram
+  was routed through the paired utility.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_004915Z_synth_1s
+    val_loss=10.386334, train_elapsed_s=1.644, completed_steps=2.
+  30s screen:
+    target/runs/20260702_004925Z_synth_30s
+    val_loss=6.650756, train_elapsed_s=30.494, completed_steps=37.
+  nsys profile:
+    target/nsys/aurora_bound_pair_scale_10s.nsys-rep
+measured_effect:
+  Against the accepted direct-output TMA profile:
+    target/nsys/aurora_tma_direct_out_10s.nsys-rep
+  The two old scale kernels totaled 98.070ms over 5040 launches. The paired
+  kernel took 79.709ms over 2520 launches, but total kernel time did not improve
+  (10262.320ms -> 10265.219ms) and the 30s screen stayed at 37 completed steps.
+decision:
+  Reject and revert. The local bound-scale reduction is too small/noisy to move
+  the fixed-wall screen and is not worth carrying as an isolated candidate.
+```
+
+```text
+date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
 experiment: Fuse Aurora polar linear3 epilogue into the exact-output TMA GEMM.
 status: rejected_profile_gate
 change:
