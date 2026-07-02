@@ -74,6 +74,28 @@ impl F16TcMatmulModule {
         a(m, k),
         rhs(k, n)
     );
+
+    pub fn batched_matmul_f32_half_rhs_lower_a(
+        &self,
+        args: F16TcMatmulF32HalfRhsArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        assert_eq!(args.m, args.k);
+        assert!(args.a.len() >= elements(args.batch_count, args.m, args.k));
+        assert!(args.rhs.len() >= elements(args.batch_count, args.k, args.n));
+        assert!(args.out.len() >= elements(args.batch_count, args.m, args.n));
+        self.module.f16_cta_tc_matmul_f32_half_rhs_lower_a_kernel(
+            args.stream,
+            cta_config(args.m, args.n, args.batch_count),
+            args.a,
+            args.rhs,
+            args.out,
+            args.batch_count,
+            args.m,
+            args.n,
+            args.k,
+        )
+    }
+
     f32_matmul_launcher!(
         batched_matmul_f32_a_transposed_rhs,
         F16TcMatmulF32ATransposedRhsArgs<'_, '_>,
@@ -90,4 +112,26 @@ impl F16TcMatmulModule {
         a(k, m),
         rhs(k, n)
     );
+
+    pub fn batched_matmul_f32_a_transposed_half_rhs_lower_a(
+        &self,
+        args: F16TcMatmulF32ATransposedHalfRhsArgs<'_, '_>,
+    ) -> Result<(), DriverError> {
+        assert_eq!(args.m, args.k);
+        assert!(args.a.len() >= elements(args.batch_count, args.k, args.m));
+        assert!(args.rhs.len() >= elements(args.batch_count, args.k, args.n));
+        assert!(args.out.len() >= elements(args.batch_count, args.m, args.n));
+        self.module
+            .f16_cta_tc_matmul_f32_a_transposed_half_rhs_lower_a_kernel(
+                args.stream,
+                cta_config(args.m, args.n, args.batch_count),
+                args.a,
+                args.rhs,
+                args.out,
+                args.batch_count,
+                args.m,
+                args.n,
+                args.k,
+            )
+    }
 }

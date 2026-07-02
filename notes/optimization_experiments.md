@@ -33,6 +33,45 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: accepted local jj commit after full gate
+experiment: Skip impossible K ranges in full-attention backward gradient matmuls.
+status: accepted_900s
+change:
+  Added lower-A variants of the f16 TC matmul helpers used by full-attention
+  backward gradient matmuls. For dQ = dS K, the K loop stops at the current
+  query-row tile because dS is causal lower triangular. For dK = dS^T Q and
+  dV = P^T dOut, the K loop starts at the key-row tile because transposed lower
+  triangular inputs only consume queries at or after the key. The existing
+  full-grid lower-triangle score kernels are unchanged; this only trims masked
+  reduction ranges in the backward gradient matmuls.
+verification:
+  cargo fmt --check: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_020159Z_synth_1s
+    val_loss=10.376959, completed_steps=1.
+  30s screen:
+    target/runs/20260702_020510Z_synth_30s
+    val_loss=6.529651, train_elapsed_s=30.573, completed_steps=41.
+  900s gate:
+    target/runs/20260702_020600Z_synth_900s
+    val_loss=3.798182, train_elapsed_s=900.337, completed_steps=1174.
+measured_effect:
+  Against the accepted lower-score-tile baseline:
+    target/runs/20260702_013657Z_synth_900s
+    val_loss=3.812444, train_elapsed_s=900.356, completed_steps=1125.
+  Completed steps increased by 49 (+4.36%), seconds/step moved from
+  0.800316 to 0.766897 (-4.18%), and validation loss improved by 0.37%.
+decision:
+  Keep and promote. This is a kernel-only causal masking optimization for
+  already-zeroed full-attention backward probability/dS matrices. The active
+  baseline is now 1174 steps in 900.337s at 0.766897s/step, below the sub-0.8s
+  target.
+```
+
+```text
+date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
 experiment: Pack lower-triangle causal score TC tiles into the launch grid.
 status: rejected_screen_gate

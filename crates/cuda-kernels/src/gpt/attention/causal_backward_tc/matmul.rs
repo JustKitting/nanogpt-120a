@@ -49,7 +49,7 @@ pub(super) fn run_tc_matmul_rhs(
     n: u32,
     k: u32,
 ) -> Result<(), DriverError> {
-    tc_module.batched_matmul_f32_half_rhs(F16TcMatmulF32HalfRhsArgs {
+    tc_module.batched_matmul_f32_half_rhs_lower_a(F16TcMatmulF32HalfRhsArgs {
         stream,
         a,
         rhs,
@@ -72,14 +72,16 @@ pub(super) fn run_tc_matmul_a_transposed_rhs(
     n: u32,
     k: u32,
 ) -> Result<(), DriverError> {
-    tc_module.batched_matmul_f32_a_transposed_half_rhs(F16TcMatmulF32ATransposedHalfRhsArgs {
-        stream,
-        a,
-        rhs,
-        out,
-        batch_count,
-        m,
-        n,
-        k,
-    })
+    tc_module.batched_matmul_f32_a_transposed_half_rhs_lower_a(
+        F16TcMatmulF32ATransposedHalfRhsArgs {
+            stream,
+            a,
+            rhs,
+            out,
+            batch_count,
+            m,
+            n,
+            k,
+        },
+    )
 }
