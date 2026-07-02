@@ -3,7 +3,7 @@ use cuda_core::DriverError;
 use super::gather::TC_FORWARD_THREADS_PER_BLOCK;
 use super::types::CausalAttentionTcArgs;
 use crate::attention::AttentionModule;
-use crate::f16_tc_matmul::{F16TcMatmulF32Args, F16TcMatmulF32RhsArgs};
+use crate::f16_tc_matmul::{F16TcMatmulF32Args, F16TcMatmulF32HalfRhsArgs};
 use crate::launch::{launch_config, linear_config};
 
 impl AttentionModule {
@@ -15,18 +15,20 @@ impl AttentionModule {
         let batch_head = args.batch_size * args.head_count;
         let scratch = args.scratch;
 
-        self.causal_attention_tc.base.gather_qkv_forward_kernel(
-            args.stream,
-            linear_config(
-                batch_head * args.seq_len * args.head_dim,
-                TC_FORWARD_THREADS_PER_BLOCK,
-            ),
-            args.qkv,
-            &mut *scratch.q,
-            &mut *scratch.k,
-            &mut *scratch.v,
-            params,
-        )?;
+        self.causal_attention_tc
+            .base
+            .gather_qk_v_f16_forward_kernel(
+                args.stream,
+                linear_config(
+                    batch_head * args.seq_len * args.head_dim,
+                    TC_FORWARD_THREADS_PER_BLOCK,
+                ),
+                args.qkv,
+                &mut *scratch.q,
+                &mut *scratch.k,
+                &mut *scratch.chunk_states,
+                params,
+            )?;
         args.tc_module
             .batched_matmul_f32_input_lower(F16TcMatmulF32Args {
                 stream: args.stream,
@@ -52,10 +54,10 @@ impl AttentionModule {
                 params,
             )?;
         args.tc_module
-            .batched_matmul_f32_rhs(F16TcMatmulF32RhsArgs {
+            .batched_matmul_f32_half_rhs(F16TcMatmulF32HalfRhsArgs {
                 stream: args.stream,
                 a: &*scratch.probs,
-                rhs: &*scratch.v,
+                rhs: &*scratch.chunk_states,
                 out: &mut *scratch.compact_out,
                 batch_count: batch_head,
                 m: args.seq_len,

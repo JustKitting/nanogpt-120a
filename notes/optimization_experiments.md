@@ -33,6 +33,58 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: accepted local jj commit after full gate
+experiment: Store forward-attention V scratch as f16 and use the existing f32-by-half RHS TC matmul.
+status: accepted_900s_gate
+change:
+  Added a full-attention gather kernel that writes Q/K scratch as f32 but stores
+  V into the existing u16 chunk_states scratch. The following P @ V matmul now
+  calls batched_matmul_f32_half_rhs instead of batched_matmul_f32_rhs. KDA and
+  backward paths keep their existing scratch contracts. This preserves the TC
+  math because the previous f32-RHS matmul converted V to f16 during shared
+  staging; the conversion now happens once during gather.
+verification:
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/forward_v_f16_rhs_10s.nsys-rep,
+    target/nsys/forward_v_f16_rhs_10s_cuda_gpu_kern_sum.csv.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=30 TRAIN_LOG_INTERVAL=10
+    ./target/release/rust-kernels:
+    target/runs/20260702_040625Z_synth_30s.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=900 TRAIN_LOG_INTERVAL=50
+    ./target/release/rust-kernels:
+    target/runs/20260702_040725Z_synth_900s.
+measured_effect:
+  Against accepted profile target/nsys/tma_scale_lower_mask_10s_cuda_gpu_kern_sum.csv:
+    f16_cta_tc_matmul_f32_rhs_kernel:
+      479.640ms / 462 launches -> 124.697ms / 432 launches.
+    f16_cta_tc_matmul_f32_half_rhs_kernel:
+      not in accepted top path -> 336.734ms / 30 launches.
+    gather_qkv_forward_kernel -> gather_qk_v_f16_forward_kernel:
+      16.576ms -> 15.147ms over 30 launches.
+    10s run elapsed:
+      10.462s accepted baseline -> 10.443s candidate, same 14 steps.
+  30s screen:
+    baseline: 41 steps, val_loss=6.528993, train_elapsed_s=30.133.
+    candidate: 41 steps, val_loss=6.529943, train_elapsed_s=30.073.
+  900s gate:
+    baseline: 1192 steps, val_loss=3.801805, train_elapsed_s=900.398,
+      step_s=0.755367.
+    candidate: 1197 steps, val_loss=3.784173, train_elapsed_s=900.577,
+      step_s=0.752362.
+    delta: +5 steps / +0.4195%, loss -0.017632 / -0.4638%, step_s -0.3979%.
+decision:
+  Accept and promote. The 900s gate improved held-out validation loss and
+  completed more steps. This still does not complete the sub-0.7s/step goal;
+  the accepted step time is 0.752362s.
+```
+
+```text
+date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
 experiment: Use original f16 TC staging for lower-triangle K tiles outside the diagonal boundary.
 status: rejected_profile_gate
