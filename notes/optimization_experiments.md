@@ -34,6 +34,58 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
+experiment: Use warp shuffles for transposed four-six NVFP4 pack pairs.
+status: rejected_30s_screen
+change:
+  Changed the transposed four-six FP32-to-NVFP4 pack kernels to load each
+  lane's source value once and use warp shuffles for the paired FP4 payload
+  values. The non-transposed four-six pack path was restored to its original
+  direct pair loads after profiling showed the shuffle variant did not help
+  that coalesced path.
+verification:
+  cargo fmt --check: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test nvfp4_quant
+    -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test
+    ms_eden_transpose -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test
+    causal_attention_backward_tc -- --ignored --nocapture --test-threads=1:
+    pass.
+  gpt2-nvfp4 causal/block attention tests were not usable as evidence in this
+    checkout because their shared test upload initializer does not compile:
+    missing qkv_weight_device, c_proj_weight_device, and MLP weight_device
+    fields.
+  10s nsys profile:
+    target/nsys/four_six_transpose_shuffle_10s_cuda_gpu_kern_sum.csv
+    fp32_transpose_to_nvfp4_four_six_exact_pow2_kernel improved from
+    539.246ms to 503.386ms over the 14-step slice. Total GPU kernel time moved
+    from 10754.595ms to 10714.159ms.
+  rejected side check:
+    target/nsys/probds_row_full_zero_four_six_10s_cuda_gpu_kern_sum.csv
+    A row-wise attention_prob_ds variant that still zeroed upper/padded cells
+    regressed attention_prob_ds_kernel from 517.012ms to 525.166ms over the
+    same 14-step profile shape, so it was reverted before screening.
+  30s screen:
+    target/runs/20260702_031902Z_synth_30s
+    val_loss=6.529679, train_elapsed_s=30.546, completed_steps=41.
+measured_effect:
+  Against the active 30-second baseline
+    target/runs/20260702_020510Z_synth_30s
+    val_loss=6.529651, train_elapsed_s=30.573, completed_steps=41,
+  the candidate completed the same number of steps and had effectively the same
+  but slightly worse held-out validation loss. The short profile improvement
+  was too small to show up as a useful fixed-wall training gain.
+decision:
+  Reject and revert. This only rejects the transposed four-six shuffle-pack
+  implementation as a training candidate; the current bottleneck still needs a
+  larger kernel-side change than this profile-only improvement.
+```
+
+```text
+date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
 experiment: Skip upper-triangle probability work in full-attention forward/backward.
 status: rejected_900s_correctness
 change:
