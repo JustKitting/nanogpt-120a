@@ -54,7 +54,7 @@ impl AttentionModule {
                 params,
             )?;
         args.tc_module
-            .batched_matmul_f32_half_rhs(F16TcMatmulF32HalfRhsArgs {
+            .batched_matmul_f32_half_rhs_lower_a(F16TcMatmulF32HalfRhsArgs {
                 stream: args.stream,
                 a: &*scratch.probs,
                 rhs: &*scratch.chunk_states,
