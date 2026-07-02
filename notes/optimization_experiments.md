@@ -33,6 +33,103 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: f4f7ae62
+experiment: Route forward full-attention P @ V through the existing lower-A f32-by-f16 TC matmul.
+status: accepted_900s_gate
+change:
+  After storing forward V scratch as f16, changed the full-attention P @ V call
+  from batched_matmul_f32_half_rhs to batched_matmul_f32_half_rhs_lower_a. The
+  probability matrix is causal lower-triangular, and the lower-A TC path skips
+  upper-triangle K work without changing the consumed lower entries.
+verification:
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/forward_pv_lower_half_rhs_10s.nsys-rep,
+    target/nsys/forward_pv_lower_half_rhs_10s_cuda_gpu_kern_sum.csv,
+    target/runs/20260702_042521Z_synth_10s.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=30 TRAIN_LOG_INTERVAL=10
+    ./target/release/rust-kernels:
+    target/runs/20260702_042720Z_synth_30s.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=900 TRAIN_LOG_INTERVAL=50
+    ./target/release/rust-kernels, isolated on child of f4f7ae62:
+    target/runs/20260702_045506Z_synth_900s.
+measured_effect:
+  10s profile against the accepted forward-V-f16 profile:
+    f16_cta_tc_matmul_f32_half_rhs_kernel:
+      336.734ms / 30 launches -> removed from the forward PV path.
+    f16_cta_tc_matmul_f32_half_rhs_lower_a_kernel:
+      161.311ms / 28 launches -> 340.708ms / 58 launches.
+    Combined f32-half-RHS TC family:
+      498.045ms -> 340.708ms.
+    10s run elapsed:
+      10.443s -> 10.311s, same 14 steps.
+  30s screen:
+    baseline: 41 steps, val_loss=6.529943, train_elapsed_s=30.073.
+    candidate: 42 steps, val_loss=6.497346, train_elapsed_s=30.324.
+  900s gate:
+    baseline: 1197 steps, val_loss=3.784173, train_elapsed_s=900.577,
+      step_s=0.752362.
+    candidate: 1211 steps, val_loss=3.778019, train_elapsed_s=900.482,
+      step_s=0.743585.
+    delta: +14 steps / +1.1696%, loss -0.006154 / -0.1626%,
+      step_s -1.1665%.
+decision:
+  Accept and promote. The isolated 900s gate improved held-out validation loss
+  and completed more steps. This still does not complete the sub-0.7s/step goal.
+```
+
+```text
+date: 2026-07-02
+commit: af10a7f2 off active candidate line
+experiment: Skip forward softmax writes for upper-triangular probabilities after lower-A P @ V.
+status: rejected_900s_gate
+change:
+  Changed causal_attention_tc softmax to write only key <= query entries,
+  relying on the lower-A P @ V consumer not to read upper-triangular
+  probabilities. Backward recomputed p/ds separately, so the candidate was
+  intended to affect forward softmax storage only.
+verification:
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test projection_tma -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 cargo test -q -p rust-kernels-cuda --test causal_attention_backward_tc -- --ignored --nocapture: pass.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=10 TRAIN_LOG_INTERVAL=10
+    nsys profile --trace=cuda,osrt --sample=none:
+    target/nsys/softmax_lower_only_10s.nsys-rep,
+    target/nsys/softmax_lower_only_10s_cuda_gpu_kern_sum.csv.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=30 TRAIN_LOG_INTERVAL=10
+    ./target/release/rust-kernels:
+    target/runs/20260702_043240Z_synth_30s.
+  CUDA_DEVICE_INDEX=0 TRAIN_DATASET=synth TRAIN_MAX_SECONDS=900 TRAIN_LOG_INTERVAL=50
+    ./target/release/rust-kernels, combined with f4f7ae62:
+    target/runs/20260702_043754Z_synth_900s.
+measured_effect:
+  10s profile against lower-A PV:
+    attention_softmax_forward_kernel:
+      275.825ms / 30 launches -> 180.130ms / 30 launches.
+    10s run elapsed:
+      10.311s -> 10.202s, same 14 steps and val_loss=8.110743.
+  30s screen:
+    lower-A PV: 42 steps, val_loss=6.497346, train_elapsed_s=30.324.
+    candidate stack: 42 steps, val_loss=6.497346, train_elapsed_s=30.142.
+  900s gate for combined stack:
+    lower-A PV isolated accepted result: 1211 steps, val_loss=3.778019,
+      train_elapsed_s=900.482.
+    candidate stack: 1223 steps, val_loss=3.854005,
+      train_elapsed_s=900.444.
+    delta: +12 steps / +0.991%, loss +0.075986 / +2.011%.
+decision:
+  Reject and keep off the active line. The short screen looked good, but the
+  full 900s gate regressed validation loss outside the 1% allowance. This result
+  does not reject f4f7ae62; f4f7ae62 passed when isolated.
+```
+
+```text
+date: 2026-07-02
 commit: accepted local jj commit after full gate
 experiment: Store forward-attention V scratch as f16 and use the existing f32-by-half RHS TC matmul.
 status: accepted_900s_gate
