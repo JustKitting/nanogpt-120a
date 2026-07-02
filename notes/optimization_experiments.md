@@ -34,6 +34,42 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 ```text
 date: 2026-07-02
 commit: rejected uncommitted candidate, code reverted
+experiment: Use RoPE-saved f16 QKV tape for full-attention forward TC matmuls.
+status: rejected_screen_gate
+change:
+  Exposed the existing u16 attention scratch buffers to the full-attention
+  forward path, added a packed-f16 QKV gather kernel, and routed full attention
+  through f16 half-input QK plus f32-probs/half-V PV matmuls when the forward
+  tape already contained RoPE-saved f16 QKV. The no-tape fallback kept the
+  original f32 gather and f32-input matmul path.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_010002Z_synth_1s
+    val_loss=10.376959, train_elapsed_s=7.810, completed_steps=1.
+  30s screen:
+    target/runs/20260702_010023Z_synth_30s
+    val_loss=6.650756, train_elapsed_s=30.392, completed_steps=37.
+  nsys profile:
+    target/nsys/full_attention_f16_forward_10s.nsys-rep
+measured_effect:
+  Against the accepted direct-output TMA profile:
+    target/nsys/aurora_tma_direct_out_10s.nsys-rep
+  Total kernel time moved only from 10262.320ms to 10236.939ms in the 10s
+  profile, while the 30s screen stayed at 37 completed steps. The intended f32
+  matmul buckets dropped, but f16_cta_tc_matmul_kernel and
+  f16_cta_tc_matmul_f32_half_rhs_kernel grew enough that the change did not
+  move fixed-wall training speed.
+decision:
+  Reject and revert. This preserves math but does not increase completed steps
+  in the screen gate, so it is not a useful step toward the sub-0.8s target.
+```
+
+```text
+date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
 experiment: Fuse Aurora source/Gram bound scaling into one f32 utility kernel.
 status: rejected_screen_gate
 change:
