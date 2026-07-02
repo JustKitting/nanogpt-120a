@@ -33,6 +33,42 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
+experiment: Fuse Aurora polar linear3 epilogue into the exact-output TMA GEMM.
+status: rejected_profile_gate
+change:
+  Added a TMA GEMM epilogue mode for the second Aurora polar action GEMM so
+  target = G * ax could be combined with the existing polar update
+  target = a * source + b * ax + c * target at TMA store time. The trace path
+  kept the old materialized intermediate behavior.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_004413Z_synth_1s
+    val_loss=10.386334, train_elapsed_s=1.651, completed_steps=2.
+  30s screen:
+    target/runs/20260702_004422Z_synth_30s
+    val_loss=6.651139, train_elapsed_s=30.633, completed_steps=37.
+  nsys profile:
+    target/nsys/aurora_tma_linear3_epilogue_10s.nsys-rep
+measured_effect:
+  Against the accepted direct-output TMA profile:
+    target/nsys/aurora_tma_direct_out_10s.nsys-rep
+  f32_linear3_in_place_kernel dropped from 164.452ms over 2100 launches to
+  zero, but nvfp4_gemm_tma_kernel regressed from 1068.095ms to 1263.986ms over
+  the same 8013 launches. Total kernel time moved from 10262.320ms to
+  10328.414ms, and the 30s screen did not increase completed_steps.
+decision:
+  Reject before the 900s gate and revert. The simple uniform epilogue branch
+  increased TMA register/control cost enough to erase the removed elementwise
+  launches. A future attempt would need a separate specialized epilogue kernel
+  or codegen path that does not slow the non-epilogue TMA stores.
+```
+
+```text
+date: 2026-07-02
 commit: accepted local jj commit after full gate
 experiment: Route exact Aurora TMA outputs directly to their final buffers.
 status: accepted_900s
