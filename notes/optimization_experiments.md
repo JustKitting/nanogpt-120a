@@ -33,6 +33,41 @@ heldout_eval split=val val_loss=... train_elapsed_s=... completed_steps=...
 
 ```text
 date: 2026-07-02
+commit: rejected uncommitted candidate, code reverted
+experiment: Specialize MS-EDEN pair packing for 6144-wide row chunks.
+status: rejected_screen_gate
+change:
+  Added a fixed chunks_per_row=192 no-pad input path and mixed pair kernels for
+  row192/transpose-pow2 and row-pow2/transpose192 MS-EDEN pair packing. The
+  target was the 6144-wide QKV error-pair packing shape, avoiding a runtime
+  chunks_per_row divide in that branch while keeping generic fallbacks.
+verification:
+  cargo fmt: pass.
+  cargo check -q: pass.
+  cargo oxide build --arch sm_120a: pass.
+  1s launch smoke:
+    target/runs/20260702_012831Z_synth_1s
+    val_loss=10.376959, train_elapsed_s=7.658, completed_steps=1.
+  30s screen:
+    target/runs/20260702_012847Z_synth_30s
+    val_loss=6.652033, train_elapsed_s=30.344, completed_steps=37.
+  nsys profile:
+    target/nsys/ms_eden_pair_row192_10s.nsys-rep
+measured_effect:
+  Against the accepted exact four-six pack profile:
+    target/nsys/four_six_exact_pack_10s.nsys-rep
+  The new row192 kernel appeared for 24 launches and took 38.515ms. The generic
+  no-pad pair kernel dropped from 301.577ms over 108 launches to 262.624ms over
+  84 launches, which nearly exactly offset the new kernel. Total kernel time
+  regressed from 10221.842ms to 10229.848ms, and the 30s screen stayed at 37
+  completed steps.
+decision:
+  Reject and revert. The specialization only split the same work into another
+  kernel bucket and did not reduce fixed-wall runtime.
+```
+
+```text
+date: 2026-07-02
 commit: accepted local jj commit after full gate
 experiment: Use exact no-pad four-six pack kernels for exact Aurora TMA shapes.
 status: accepted_900s
